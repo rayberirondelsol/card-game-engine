@@ -1,0 +1,38 @@
+=== Card Game Engine - Progress Notes ===
+
+--- Session: 2026-02-06 (Agent handling features #4 and #5) ---
+
+COMPLETED:
+- Feature #4: No mock data patterns in codebase - PASSING
+  - Ran all required grep scans across server/src and client/src
+  - Zero hits for: globalThis, devStore, mockData, testData, fakeData, sampleData, dummyData
+  - Zero hits for: TODO.*real, TODO.*database, STUB, MOCK
+  - Zero hits for: isDevelopment, isDev, process.env.NODE_ENV.*development
+  - Zero hits for: new Map(), new Set() (in-memory stores)
+  - Zero hits for: json-server, miragejs, msw in package.json files
+  - Created unique test data via API, verified it appears, deleted and confirmed removal
+
+- Feature #5: Backend API queries real database - PASSING
+  - Started server with Fastify logger enabled
+  - Verified SQL query logs appear for every API endpoint:
+    - GET /api/games -> [SQL] SELECT * FROM games ORDER BY updated_at DESC
+    - POST /api/games -> [SQL] INSERT INTO games (id, name, description) VALUES (?, ?, ?)
+    - DELETE /api/games/:id -> [SQL] DELETE FROM games WHERE id = ?
+    - GET /api/health -> [SQL] Health check: SELECT COUNT(*) FROM sqlite_master
+  - All routes use getDb() which returns a real better-sqlite3 Database instance
+  - No mock data patterns detected
+
+NOTES:
+- PostgreSQL is not available in this environment; project uses SQLite (better-sqlite3) instead
+- Database file: server/data/card-game-engine.db
+- Fixed init.sh to reference server/src/index.js instead of server/index.js (old entry point)
+- Project structure: monorepo with server/ (Fastify) and client/ (React + Vite)
+- Backend runs on port 3001, Frontend on port 5173
+
+CURRENT STATUS: 2/44 features passing (Features #4 and #5)
+
+WHAT TO WORK ON NEXT:
+- Features #1-3 (database connection, schema, persistence) should also pass given the current codebase
+- Game management features (start screen, CRUD operations)
+- Card import system
+- Game table canvas with PixiJS
