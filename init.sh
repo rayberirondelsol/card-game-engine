@@ -46,7 +46,7 @@ done
 
 # Start frontend dev server in background
 echo "[Init] Starting frontend dev server on port 5173..."
-npx --prefix client vite --port 5173 &
+npm run dev --prefix client &
 FRONTEND_PID=$!
 
 echo ""

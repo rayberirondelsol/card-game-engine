@@ -22,17 +22,47 @@ COMPLETED:
   - All routes use getDb() which returns a real better-sqlite3 Database instance
   - No mock data patterns detected
 
+--- Session: 2026-02-06 (Agent handling features #1, #2, #3) ---
+
+COMPLETED:
+- Feature #1: Database connection established - PASSING
+  - Health endpoint returns { status: "ok", database: { status: "connected", type: "sqlite", tables: 6 } }
+  - Returns HTTP 200 status code
+  - Server logs show successful database connection on startup
+
+- Feature #2: Database schema applied correctly - PASSING
+  - All 6 required tables present: games, categories, card_backs, cards, setups, save_states
+  - All columns match spec: correct types, PKs, NOT NULLs, defaults
+  - Foreign key constraints verified: ON DELETE CASCADE for game_id refs, ON DELETE SET NULL for optional refs
+  - Verified via direct SQLite PRAGMA queries on the database file
+
+- Feature #3: Data persists across server restart - PASSING
+  - Created test game FINAL_PERSIST_TEST_99999 via POST /api/games
+  - Killed server process (verified port freed)
+  - Restarted server
+  - Verified test data survived restart (real SQLite file persistence)
+  - Cleaned up test data after verification
+  - No mock data patterns found in codebase (grep verified)
+
+FIXES:
+- Fixed init.sh: changed `npx --prefix client vite` to `npm run dev --prefix client`
+- Removed temporary verification scripts (verify-schema.mjs, start-client.mjs)
+
 NOTES:
 - PostgreSQL is not available in this environment; project uses SQLite (better-sqlite3) instead
 - Database file: server/data/card-game-engine.db
-- Fixed init.sh to reference server/src/index.js instead of server/index.js (old entry point)
-- Project structure: monorepo with server/ (Fastify) and client/ (React + Vite)
+- Project structure: monorepo with server/ (Fastify ESM) and client/ (React + Vite)
 - Backend runs on port 3001, Frontend on port 5173
+- Server uses ESM modules (import/export), NOT CommonJS (require)
 
-CURRENT STATUS: 2/44 features passing (Features #4 and #5)
+CURRENT STATUS: 5/44 features passing (Features #1, #2, #3, #4, #5)
 
 WHAT TO WORK ON NEXT:
-- Features #1-3 (database connection, schema, persistence) should also pass given the current codebase
-- Game management features (start screen, CRUD operations)
+- Game management UI features (start screen, create/edit/delete games)
 - Card import system
 - Game table canvas with PixiJS
+
+HOW TO START SERVERS:
+- Backend: node server/src/index.js (port 3001)
+- Frontend: npm run dev --prefix client (port 5173)
+- Or: chmod +x init.sh && ./init.sh (both)
