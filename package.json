@@ -1,0 +1,14 @@
+{
+  "name": "card-game-engine",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node server/src/index.js",
+    "dev:client": "npx --prefix client vite --port 5173",
+    "build": "npx --prefix client vite build"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

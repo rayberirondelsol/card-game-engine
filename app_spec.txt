@@ -1,0 +1,472 @@
+<project_specification>
+  <project_name>Card Game Engine</project_name>
+
+  <overview>
+    A digital card game engine — a virtual tabletop for playing any card game locally, as long as the user has the required card assets. Similar to Tabletop Simulator but without physics — pure drag and drop interaction. Designed for solo play with support for games of varying complexity, inspired by titles like Earthborne Rangers and Star Trek Captain's Chair.
+  </overview>
+
+  <technology_stack>
+    <frontend>
+      <framework>React 19+ with @pixi/react v8</framework>
+      <canvas>PixiJS 8 with PixiJS Layout for canvas-based rendering</canvas>
+      <styling>Tailwind CSS for DOM overlays and UI panels</styling>
+      <state_management>Zustand for frontend state management</state_management>
+    </frontend>
+    <backend>
+      <runtime>Node.js with Fastify</runtime>
+      <database>PostgreSQL</database>
+      <file_uploads>Multer for file upload handling</file_uploads>
+      <pdf_processing>pdf.js for PDF parsing and card extraction</pdf_processing>
+    </backend>
+    <communication>
+      <api>REST API</api>
+    </communication>
+  </technology_stack>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 20+ installed
+      - PostgreSQL 16+ running locally
+      - npm or yarn for package management
+    </environment_setup>
+  </prerequisites>
+
+  <feature_count>92</feature_count>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="local_user">
+        <permissions>
+          - Full access to all features (single-player local application)
+          - Create, edit, delete games
+          - Import cards and manage assets
+          - Create, load, save game states and setups
+          - Full table interaction (drag, drop, flip, rotate, etc.)
+        </permissions>
+        <protected_routes>
+          - No authentication required (local single-player app)
+        </protected_routes>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>none - local single-player application</method>
+      <session_timeout>none</session_timeout>
+    </authentication>
+    <sensitive_operations>
+      - Delete game confirmation dialog (prevents accidental deletion of game with all cards/setups/saves)
+    </sensitive_operations>
+  </security_and_access_control>
+
+  <core_features>
+    <infrastructure>
+      - Database connection established
+      - Database schema applied correctly
+      - Data persists across server restart
+      - No mock data patterns in codebase
+      - Backend API queries real database
+    </infrastructure>
+
+    <startscreen_and_navigation>
+      - Game list displayed on start screen with existing games
+      - Create new game (name + description)
+      - Edit game details (name, description)
+      - Delete game with confirmation dialog
+      - Game detail view with save states and setups
+      - Load a saved game state
+      - Auto-save functionality (periodic save during gameplay)
+      - Manual save with custom name
+    </startscreen_and_navigation>
+
+    <card_import>
+      - Single card upload (PNG, JPG/JPEG)
+      - Batch upload of multiple card images at once
+      - PDF import with automatic card detection and extraction (single card per page)
+      - PDF import with automatic card detection and extraction (multiple cards per page with grid recognition)
+      - Assign card back image to cards (from uploaded images)
+      - Card back management (upload, select, assign to card groups)
+      - Folder/category structure for organizing cards
+      - Create and manage card categories
+      - Import preview before confirming
+      - Edit card name after import
+      - Delete individual cards
+      - Batch import from folder structure preserving hierarchy
+    </card_import>
+
+    <game_table_canvas>
+      - Free scrolling/panning across the table
+      - Zoom in and out (mouse wheel)
+      - Camera rotation (rotate view perspective)
+      - Invisible snap grid (not visible during normal view)
+      - Visual grid highlights when dragging a card (snap-to-grid assistance)
+      - Snap-to-grid when placing cards
+      - Customizable table background (2-3 textures: felt, wood, solid colors)
+      - Free card positioning anywhere on the table
+      - Right-click context menu on cards/stacks/markers
+      - Keyboard shortcuts overlay/help display
+    </game_table_canvas>
+
+    <card_interaction>
+      - Drag and drop cards freely on the table
+      - Flip card (front/back) with F key
+      - Rotate card 90° clockwise with E key
+      - Rotate card 90° counter-clockwise with Q key
+      - Large preview/zoom on mouseover (ALT key, like TTS)
+      - Pick up single card to hand from table
+      - Draw 1-10 cards from stack to hand (number keys like TTS, with 1-second delay for multi-digit)
+      - Place card on top of a stack
+      - Take top card from a stack
+      - Place card freely on table from hand
+      - Snap card to grid position from hand
+      - Play card from hand to table
+      - Reorder cards within hand (drag to sort)
+      - Hand displayed as fan at bottom of screen with mouseover enlargement
+    </card_interaction>
+
+    <stack_management>
+      - Create stack by grouping cards (G key or drag onto each other)
+      - Shuffle stack (randomize card order)
+      - Split stack (separate top N cards into new stack)
+      - Flip entire stack (reverse all cards)
+      - Search/browse stack contents (view all cards in stack)
+      - Stack card count shown on mouseover tooltip
+      - Draw cards from top of stack
+      - Visual distinction between single card and stack
+    </stack_management>
+
+    <markers_tokens>
+      - Create colored circle markers
+      - Color picker for marker creation (multiple colors available)
+      - Slot marker onto card corner (snap to corner position)
+      - Place marker freely on table
+      - Drag and drop markers to reposition
+      - Remove/delete markers
+      - Multiple marker colors usable simultaneously on table
+    </markers_tokens>
+
+    <counters>
+      - Create named counter widget
+      - Custom label/name for counter
+      - Increment and decrement counter value
+      - Free positioning of counter widget on table
+      - Multiple counters simultaneously on table
+      - Delete counter widget
+    </counters>
+
+    <dice>
+      - Place dice on table
+      - Roll dice with result display (animation)
+      - Multiple dice types (D6, D8, D10, D12, D20)
+      - Multiple dice simultaneously on table
+      - Free positioning of dice on table
+    </dice>
+
+    <notes>
+      - Create text note on table
+      - Edit note text content
+      - Free positioning of note on table
+      - Delete note
+    </notes>
+
+    <start_setups>
+      - Create new setup for a game
+      - Name/label a setup
+      - Place cards and stacks in setup editor
+      - Place markers in setup editor
+      - Place counters and dice in setup editor
+      - Save setup configuration
+      - Load setup to start a game from predefined state
+      - Edit existing setup
+    </start_setups>
+
+    <keyboard_shortcuts>
+      - F key: flip card/stack
+      - Q key: rotate 90° counter-clockwise
+      - E key: rotate 90° clockwise
+      - ALT key: zoom/preview card under cursor
+      - G key: group selected cards into stack
+    </keyboard_shortcuts>
+  </core_features>
+
+  <database_schema>
+    <tables>
+      <games>
+        - id (PK, UUID), name (VARCHAR), description (TEXT), table_background (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP)
+      </games>
+      <categories>
+        - id (PK, UUID), game_id (FK -> games), name (VARCHAR), parent_category_id (FK -> categories, nullable), sort_order (INT), created_at (TIMESTAMP)
+      </categories>
+      <card_backs>
+        - id (PK, UUID), game_id (FK -> games), name (VARCHAR), image_path (VARCHAR), created_at (TIMESTAMP)
+      </card_backs>
+      <cards>
+        - id (PK, UUID), game_id (FK -> games), category_id (FK -> categories, nullable), card_back_id (FK -> card_backs, nullable), name (VARCHAR), image_path (VARCHAR), created_at (TIMESTAMP), updated_at (TIMESTAMP)
+      </cards>
+      <setups>
+        - id (PK, UUID), game_id (FK -> games), name (VARCHAR), state_data (JSONB), created_at (TIMESTAMP), updated_at (TIMESTAMP)
+      </setups>
+      <save_states>
+        - id (PK, UUID), game_id (FK -> games), name (VARCHAR), is_auto_save (BOOLEAN), state_data (JSONB), created_at (TIMESTAMP), updated_at (TIMESTAMP)
+      </save_states>
+    </tables>
+    <state_data_json_structure>
+      The state_data JSONB column in setups and save_states stores the complete table state:
+      {
+        "camera": { "x": 0, "y": 0, "zoom": 1, "rotation": 0 },
+        "cards": [{ "card_id": "uuid", "x": 100, "y": 200, "rotation": 0, "face_up": true, "z_index": 1 }],
+        "stacks": [{ "id": "uuid", "x": 100, "y": 200, "card_ids": ["uuid1", "uuid2"], "face_up": true }],
+        "hand": ["card_id_1", "card_id_2"],
+        "markers": [{ "id": "uuid", "color": "#ff0000", "x": 100, "y": 200, "slotted_to_card_id": null, "slot_corner": null }],
+        "counters": [{ "id": "uuid", "name": "Health", "value": 20, "x": 100, "y": 200 }],
+        "dice": [{ "id": "uuid", "type": "d6", "value": 3, "x": 100, "y": 200 }],
+        "notes": [{ "id": "uuid", "text": "Remember to...", "x": 100, "y": 200 }]
+      }
+    </state_data_json_structure>
+  </database_schema>
+
+  <api_endpoints_summary>
+    <games>
+      - GET /api/games (list all games)
+      - POST /api/games (create new game)
+      - GET /api/games/:id (get game details)
+      - PUT /api/games/:id (update game)
+      - DELETE /api/games/:id (delete game and all related data)
+    </games>
+    <cards>
+      - GET /api/games/:id/cards (list cards, with optional category filter)
+      - POST /api/games/:id/cards (upload single card)
+      - POST /api/games/:id/cards/batch (batch upload cards)
+      - POST /api/games/:id/cards/pdf (import cards from PDF)
+      - PUT /api/games/:id/cards/:cardId (update card name/category/back)
+      - DELETE /api/games/:id/cards/:cardId (delete card)
+    </cards>
+    <categories>
+      - GET /api/games/:id/categories (list categories)
+      - POST /api/games/:id/categories (create category)
+      - PUT /api/games/:id/categories/:catId (update category)
+      - DELETE /api/games/:id/categories/:catId (delete category)
+    </categories>
+    <card_backs>
+      - GET /api/games/:id/card-backs (list card backs)
+      - POST /api/games/:id/card-backs (upload card back)
+      - DELETE /api/games/:id/card-backs/:backId (delete card back)
+    </card_backs>
+    <setups>
+      - GET /api/games/:id/setups (list setups)
+      - POST /api/games/:id/setups (create setup)
+      - GET /api/games/:id/setups/:setupId (get setup with state data)
+      - PUT /api/games/:id/setups/:setupId (update setup)
+      - DELETE /api/games/:id/setups/:setupId (delete setup)
+    </setups>
+    <saves>
+      - GET /api/games/:id/saves (list save states)
+      - POST /api/games/:id/saves (manual save)
+      - POST /api/games/:id/saves/auto (auto-save)
+      - GET /api/games/:id/saves/:saveId (load save state)
+      - DELETE /api/games/:id/saves/:saveId (delete save state)
+    </saves>
+    <health>
+      - GET /api/health (health check with database status)
+    </health>
+  </api_endpoints_summary>
+
+  <ui_layout>
+    <main_structure>
+      Three main views:
+      1. Start Screen - Game selection grid/list with "New Game" button
+      2. Game Detail Screen - Card manager (import/categorize), setup list, saved games list
+      3. Game Table - Full-screen PixiJS canvas with overlay UI elements
+    </main_structure>
+    <start_screen>
+      - Grid of game cards showing name, card count, last played date
+      - "Create New Game" card/button prominently displayed
+      - Clean, minimal layout
+    </start_screen>
+    <game_detail_screen>
+      - Left sidebar: Card categories/folders tree
+      - Main area: Card grid view with thumbnails
+      - Right panel or tabs: Setups list, Saved games list
+      - Top bar: Game name, back button, import actions
+    </game_detail_screen>
+    <game_table>
+      - Full-screen PixiJS canvas as the game table
+      - Hand area: Bottom of screen, cards fanned out, auto-hides when empty
+      - Toolbar: Floating minimal toolbar for dice, markers, counters, notes, save
+      - Context menu: Right-click popup with card/stack actions
+      - Counter widgets: Floating positioned widgets on canvas
+      - Keyboard shortcut hint: Toggle-able overlay showing available shortcuts
+    </game_table>
+  </ui_layout>
+
+  <design_system>
+    <theme>
+      - Light and Dark mode toggle
+      - Modern, minimalist aesthetic
+      - Clean lines, generous spacing, subtle shadows
+    </theme>
+    <color_palette>
+      <light_mode>
+        - Background: #f8fafc (slate-50)
+        - Surface: #ffffff
+        - Primary: #3b82f6 (blue-500)
+        - Primary Hover: #2563eb (blue-600)
+        - Text: #0f172a (slate-900)
+        - Text Secondary: #64748b (slate-500)
+        - Border: #e2e8f0 (slate-200)
+        - Accent: #8b5cf6 (violet-500)
+      </light_mode>
+      <dark_mode>
+        - Background: #0f172a (slate-900)
+        - Surface: #1e293b (slate-800)
+        - Primary: #60a5fa (blue-400)
+        - Primary Hover: #3b82f6 (blue-500)
+        - Text: #f1f5f9 (slate-100)
+        - Text Secondary: #94a3b8 (slate-400)
+        - Border: #334155 (slate-700)
+        - Accent: #a78bfa (violet-400)
+      </dark_mode>
+    </color_palette>
+    <table_backgrounds>
+      - Felt texture (dark green, classic card table)
+      - Wood texture (warm brown, natural look)
+      - Solid color options (dark slate, navy, deep green)
+    </table_backgrounds>
+    <card_styling>
+      - Subtle drop shadow for cards on table (elevated appearance)
+      - Slight border radius (4px) for card corners
+      - Hover glow/highlight effect when draggable
+      - Smooth drag animation with slight scale-up on pickup
+    </card_styling>
+    <typography>
+      - Font: Inter (system-ui fallback)
+      - Clean, readable sizing hierarchy
+      - Monospace for counters/numbers: JetBrains Mono
+    </typography>
+    <animations>
+      - Smooth card drag and drop transitions
+      - Card flip animation (subtle 3D rotation)
+      - Stack shuffle animation
+      - Dice roll animation
+      - Fade in/out for markers and notes
+    </animations>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Project Foundation</title>
+      <tasks>
+        - Initialize React + Vite project with TypeScript
+        - Set up Fastify backend with PostgreSQL connection
+        - Configure Tailwind CSS
+        - Set up @pixi/react v8 integration
+        - Create database schema and migrations
+        - Implement health check endpoint
+      </tasks>
+    </step>
+    <step number="2">
+      <title>Game Management</title>
+      <tasks>
+        - Implement games CRUD API endpoints
+        - Build start screen with game list UI
+        - Create new game form/dialog
+        - Edit and delete game functionality
+      </tasks>
+    </step>
+    <step number="3">
+      <title>Card Import System</title>
+      <tasks>
+        - Implement single and batch card upload API
+        - Build PDF import with automatic card detection
+        - Create card back management
+        - Build category/folder management
+        - Create card management UI in game detail screen
+        - Import preview functionality
+      </tasks>
+    </step>
+    <step number="4">
+      <title>Game Table Canvas</title>
+      <tasks>
+        - Set up PixiJS canvas with pan, zoom, and camera rotation
+        - Implement invisible snap grid system
+        - Visual grid highlights during drag operations
+        - Table background selection and rendering
+        - Card rendering on canvas with shadows and effects
+      </tasks>
+    </step>
+    <step number="5">
+      <title>Card Interactions</title>
+      <tasks>
+        - Implement drag and drop for cards
+        - Card flip, rotate functionality
+        - Mouseover zoom/preview
+        - Hand management (fan display, sorting, mouseover enlargement)
+        - Draw cards from stack (number key input with TTS-style delay)
+        - Right-click context menu
+        - Keyboard shortcut system
+      </tasks>
+    </step>
+    <step number="6">
+      <title>Table Objects</title>
+      <tasks>
+        - Implement stack creation, shuffle, split, flip, search
+        - Build marker/token system with color picker and corner slotting
+        - Create counter widgets with increment/decrement
+        - Implement dice with roll animation and multiple types
+        - Build notes system
+      </tasks>
+    </step>
+    <step number="7">
+      <title>Save & Setup System</title>
+      <tasks>
+        - Implement game state serialization/deserialization
+        - Build manual save and auto-save functionality
+        - Create setup editor mode
+        - Setup save, load, and edit functionality
+        - Save state management UI
+      </tasks>
+    </step>
+    <step number="8">
+      <title>Polish & Design</title>
+      <tasks>
+        - Implement light/dark mode toggle
+        - Apply design system consistently
+        - Add animations (card flip, shuffle, dice roll)
+        - Responsive adjustments for different screen sizes
+        - Keyboard shortcut help overlay
+        - Performance optimization for many cards on canvas
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - All 92 features pass automated testing
+      - Cards can be imported via PNG, JPG, and PDF
+      - Complete drag-and-drop gameplay loop works smoothly
+      - Game states save and load reliably (manual and auto-save)
+      - Setups can be created, saved, and loaded
+      - All keyboard shortcuts work as specified (F, Q, E, ALT, G, number keys)
+    </functionality>
+    <user_experience>
+      - Intuitive drag and drop that feels natural
+      - Responsive canvas with smooth scrolling, zooming, and rotation
+      - Card interactions feel polished (flip animation, drag feedback, hover effects)
+      - Hand display is intuitive with fan layout and mouseover zoom
+      - Context menus provide quick access to all card actions
+    </user_experience>
+    <technical_quality>
+      - PostgreSQL database with proper schema and migrations
+      - Clean REST API with proper error handling
+      - Efficient canvas rendering even with 200+ cards on table
+      - Proper state serialization for saves and setups
+      - No mock data — all data persists across server restarts
+    </technical_quality>
+    <design_polish>
+      - Visually polished, not prototype-looking
+      - Consistent design system with light and dark mode
+      - Subtle card shadows and animations
+      - Clean typography and spacing
+      - Professional-looking start screen and game management UI
+      - Table backgrounds add atmosphere (felt, wood textures)
+    </design_polish>
+  </success_criteria>
+</project_specification>
