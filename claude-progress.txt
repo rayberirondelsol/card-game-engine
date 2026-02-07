@@ -1,5 +1,69 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #36, #41, #42) ---
+
+COMPLETED:
+- Feature #36: Manual save game state - PASSING
+  - Added save modal UI triggered by toolbar Save button (data-testid="toolbar-save-btn")
+  - Save modal with name input, Cancel/Save buttons
+  - Calls POST /api/games/:id/saves with name and serialized state_data
+  - Green success toast "Game saved as '<name>'" with auto-dismiss
+  - Save appears in GameDetail saves list with Load and Delete buttons
+  - Data persists across server restart (SQLite database)
+  - No mock data patterns in codebase
+  - Zero console errors
+
+- Feature #41: Game state serialization includes all table objects - PASSING
+  - getGameState() function serializes all table objects:
+    - camera: { x, y, zoom, rotation }
+    - background: table background setting
+    - cards: array with tableId, cardId, name, image_path, x, y, zIndex, faceDown, rotation, face_up
+    - stacks: array with stackId, card_ids, x, y, cards array
+    - hand: array with handId, cardId, name, image_path
+    - markers: array with id, color, label, x, y, attachedTo, attachedCorner
+    - counters: array with id, name, value, x, y
+    - dice: array with id, type, value, maxValue, x, y
+    - notes: array with id, text, x, y
+  - All fields verified via API retrieval of saved state
+  - Zero console errors
+
+- Feature #42: Saved game state loads all objects correctly - PASSING
+  - loadGameState() restores all object types from serialized state_data
+  - Load triggered via URL query param: /games/:id/play?saveId=<saveId>
+  - Verified restoration of:
+    - Camera zoom and position (130% zoom correctly shown)
+    - 2 loose cards at saved positions with correct rotation/face state
+    - 1 stack with 2 cards at correct position
+    - 1 card in hand
+    - 2 markers (one slotted to card corner, one free)
+    - Counter with correct name and value (Lives = 7)
+    - Die with correct type and value (d12 = 9)
+    - Note with text at position
+  - GameDetail Load button navigates to /games/:id/play?saveId=<saveId>
+  - GameDetail Delete button removes saves with confirmation
+  - Load toast "Loaded save: '<name>'" shown on successful load
+  - Zero console errors
+
+CHANGES MADE:
+- client/src/pages/GameTable.jsx:
+  - Added useSearchParams import
+  - Added save state variables (showSaveModal, saveName, saving, saveToast, saveLoadedRef)
+  - Added getGameState() function for complete state serialization
+  - Added saveGameState(name) function for API save call
+  - Added loadGameState(stateData) function for full state restoration
+  - Added useEffect to load save from URL ?saveId= param on mount
+  - Added Save modal UI with name input and confirm/cancel
+  - Added save toast notification
+  - Wired toolbar Save button onClick to open save modal
+- client/src/pages/GameDetail.jsx:
+  - Updated saves list to show Load and Delete buttons per save
+  - Load navigates to /games/:id/play?saveId=<id>
+  - Delete calls DELETE /api/games/:id/saves/:saveId with confirmation
+  - Added timestamp display for each save
+- Test files: test-f36-41-42-final.mjs, test-feature-36-41-42.mjs, test-f42-quick.mjs
+
+STATS: 29/44 features passing (65.9%) - 3 features added this session
+
 --- Session: 2026-02-07 (Agent handling features #27, #24, #25) ---
 
 COMPLETED:
