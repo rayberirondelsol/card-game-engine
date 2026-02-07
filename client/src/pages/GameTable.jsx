@@ -2635,6 +2635,94 @@ export default function GameTable() {
         );
       })()}
 
+      {/* Browse Stack Overlay */}
+      {browseStackId && (() => {
+        const stackCards = tableCards
+          .filter(c => c.inStack === browseStackId)
+          .sort((a, b) => b.zIndex - a.zIndex); // Top card first
+        if (stackCards.length === 0) {
+          setBrowseStackId(null);
+          return null;
+        }
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            data-testid="browse-stack-overlay"
+            data-ui-element="true"
+            onClick={(e) => { if (e.target === e.currentTarget) setBrowseStackId(null); }}
+          >
+            <div className="bg-slate-800 rounded-xl shadow-2xl border border-slate-600 max-w-3xl w-full mx-4 max-h-[80vh] flex flex-col" data-testid="browse-stack-panel">
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700">
+                <h3 className="text-white font-semibold text-base">
+                  Stack Contents ({stackCards.length} cards)
+                </h3>
+                <button
+                  onClick={() => setBrowseStackId(null)}
+                  data-testid="browse-close-btn"
+                  className="text-slate-400 hover:text-white transition-colors text-xl leading-none px-2"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                  {stackCards.map((card, index) => (
+                    <div
+                      key={card.tableId}
+                      data-testid={`browse-card-${card.tableId}`}
+                      className="flex flex-col items-center"
+                    >
+                      <div className="relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors"
+                        style={{ width: 100, height: 140, backgroundColor: '#fff' }}>
+                        {card.faceDown ? (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                            <div className="w-12 h-16 rounded border border-blue-400/30 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <path d="M12 8v8M8 12h8" />
+                              </svg>
+                            </div>
+                          </div>
+                        ) : card.image_path ? (
+                          <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" />
+                              <path d="M21 15l-5-5L5 21" />
+                            </svg>
+                            <span className="text-[9px] text-gray-500 text-center px-1">{card.name}</span>
+                          </div>
+                        )}
+                        <div className="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                          {index + 1}
+                        </div>
+                      </div>
+                      <span className="text-slate-300 text-xs mt-1 truncate w-full text-center" title={card.name}>
+                        {card.name}
+                      </span>
+                      {card.faceDown && (
+                        <span className="text-slate-500 text-[10px]">(face down)</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="px-5 py-3 border-t border-slate-700 flex justify-end">
+                <button
+                  onClick={() => setBrowseStackId(null)}
+                  data-testid="browse-done-btn"
+                  className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Save Toast Notification */}
       {saveToast && (
         <div

@@ -1141,20 +1141,72 @@ export default function GameDetail() {
             </div>
 
             {/* Setups */}
-            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4">
-              <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-3">Setups</h2>
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="setups-section">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide">Setups</h2>
+                <button
+                  onClick={() => navigate(`/games/${id}/play?mode=setup`)}
+                  data-testid="create-setup-btn"
+                  className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors"
+                  title="Create new setup"
+                >
+                  +
+                </button>
+              </div>
               {setups.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  No setups created yet.
+                <p className="text-xs text-[var(--color-text-secondary)]" data-testid="no-setups-message">
+                  No setups created yet. Create a setup to define a starting state for your game.
                 </p>
               ) : (
-                <ul className="space-y-1">
+                <ul className="space-y-1" data-testid="setups-list">
                   {setups.map((setup) => (
                     <li
                       key={setup.id}
+                      data-testid={`setup-item-${setup.id}`}
                       className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      <span className="text-sm text-[var(--color-text)]">{setup.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-[var(--color-text)] block truncate" data-testid={`setup-name-${setup.id}`}>{setup.name}</span>
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                          {new Date(setup.updated_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => navigate(`/games/${id}/play?setupId=${setup.id}`)}
+                          data-testid={`setup-load-btn-${setup.id}`}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
+                          title="Load this setup"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => navigate(`/games/${id}/play?mode=setup&editSetupId=${setup.id}`)}
+                          data-testid={`setup-edit-btn-${setup.id}`}
+                          className="px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-500 transition-colors"
+                          title="Edit this setup"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Delete setup "${setup.name}"?`)) return;
+                            try {
+                              const res = await fetch(`/api/games/${id}/setups/${setup.id}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setSetups(prev => prev.filter(s => s.id !== setup.id));
+                                setSuccessMessage(`Setup "${setup.name}" deleted`);
+                                setTimeout(() => setSuccessMessage(null), 3000);
+                              }
+                            } catch (err) { console.error('Delete setup failed:', err); }
+                          }}
+                          data-testid={`setup-delete-btn-${setup.id}`}
+                          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
+                          title="Delete this setup"
+                        >
+                          &times;
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
