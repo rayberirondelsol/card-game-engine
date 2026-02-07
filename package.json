@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "node server/src/index.js",
-    "dev:client": "npx --prefix client vite --port 5173",
-    "build": "npx --prefix client vite build"
+    "dev:client": "cd client && npx vite --port 5173",
+    "build": "cd client && npx vite build"
   },
   "dependencies": {
     "concurrently": "^9.1.2"
