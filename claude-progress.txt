@@ -1,5 +1,42 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #23, #28, #32) ---
+
+COMPLETED:
+- Feature #23: Drag and drop cards on table - PASSING
+  - Added card drawer panel to place cards from library onto table
+  - Cards render as draggable DOM overlays with card images
+  - Visual lift on drag: scale 1.1x, elevated z-index (9999), enhanced shadow
+  - Snap-to-grid: 80px grid, 20px threshold, grid highlight overlay
+  - Ctrl+Click multi-select, F to flip, E/Q to rotate
+  - Cards stay at position after release
+  - Verified with Playwright, zero console errors
+
+- Feature #28: Create stack by grouping cards with G key - PASSING
+  - Select multiple cards with Ctrl+Click, press G to group
+  - Stack renders as single element with ghost cards behind (offset)
+  - Yellow border and count badge distinguish stacks from singles
+  - Tooltip "Stack: N cards" on hover
+  - Stacks drag as a unit and snap to grid together
+  - Verified with Playwright, zero console errors
+
+- Feature #32: Create and manage colored markers - PASSING
+  - Markers created via toolbar with color picker (8 colors) and label input
+  - Markers render as DOM overlays, fully draggable
+  - Snap-to-card-corner: markers snap to nearest card corner when dropped within 30px
+  - Visual attachment indicator (white dot) when attached to card
+  - Delete markers via hover-reveal delete button
+  - Multiple colored markers simultaneously supported
+  - Verified with Playwright all 10 steps, zero console errors
+
+STATS: 26/44 features passing (59.1%)
+
+NOTES:
+- GameTable.jsx is the main file modified for all 3 features
+- Other agents may have added hand state and zoom display reactive state (linter changes)
+- Test game "Drag Test Game" (ID: 438a26be-ab99-4ca5-bb63-a81b06dc6e9b) with 3 test cards
+- All features verified with comprehensive Playwright tests and screenshots
+
 --- Session: 2026-02-07 (Agent handling features #18, #19) ---
 
 COMPLETED:
