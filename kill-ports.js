@@ -1,6 +1,6 @@
 const { execSync } = require('child_process');
 
-const ports = [3001, 5173, 5174];
+const ports = [3001, 5173, 5174, 5175, 5176, 5177, 5178];
 const isWin = process.platform === 'win32';
 
 ports.forEach(port => {

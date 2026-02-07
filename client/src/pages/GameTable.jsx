@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -121,6 +121,7 @@ function drawSolidBackground(ctx, width, height, color) {
 export default function GameTable() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const animFrameRef = useRef(null);
@@ -132,6 +133,13 @@ export default function GameTable() {
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showToolbar, setShowToolbar] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Save state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveToast, setSaveToast] = useState(null);
+  const saveLoadedRef = useRef(false);
 
   // Camera state
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
@@ -926,6 +934,311 @@ export default function GameTable() {
     setHandDragOverIndex(null);
   }
 
+  // ===== SAVE/LOAD FUNCTIONS =====
+
+  // Serialize the entire game state into a JSON-friendly object
+  function getGameState() {
+    const camera = cameraRef.current;
+    // Separate stacked cards: identify unique stacks
+    const stackMap = {};
+    const looseCards = [];
+    tableCards.forEach(card => {
+      if (card.inStack) {
+        if (!stackMap[card.inStack]) stackMap[card.inStack] = [];
+        stackMap[card.inStack].push(card);
+      } else {
+        looseCards.push(card);
+      }
+    });
+
+    // Build stacks array for serialization
+    const stacks = Object.entries(stackMap).map(([stackId, cards]) => {
+      const sorted = [...cards].sort((a, b) => a.zIndex - b.zIndex);
+      return {
+        stackId,
+        card_ids: sorted.map(c => c.cardId),
+        table_ids: sorted.map(c => c.tableId),
+        x: sorted[0].x,
+        y: sorted[0].y,
+        cards: sorted.map(c => ({
+          tableId: c.tableId,
+          cardId: c.cardId,
+          name: c.name,
+          image_path: c.image_path,
+          faceDown: c.faceDown,
+          rotation: c.rotation || 0,
+          zIndex: c.zIndex,
+        })),
+      };
+    });
+
+    return {
+      camera: {
+        x: camera.x,
+        y: camera.y,
+        zoom: camera.zoom,
+        rotation: 0, // no camera rotation implemented yet
+      },
+      background,
+      cards: looseCards.map(c => ({
+        tableId: c.tableId,
+        cardId: c.cardId,
+        name: c.name,
+        image_path: c.image_path,
+        x: c.x,
+        y: c.y,
+        zIndex: c.zIndex,
+        faceDown: c.faceDown,
+        rotation: c.rotation || 0,
+        face_up: !c.faceDown,
+      })),
+      stacks,
+      hand: handCards.map(c => ({
+        handId: c.handId,
+        cardId: c.cardId,
+        name: c.name,
+        image_path: c.image_path,
+      })),
+      markers: markers.map(m => ({
+        id: m.id,
+        color: m.color,
+        label: m.label || '',
+        x: m.x,
+        y: m.y,
+        attachedTo: m.attachedTo || null,
+        attachedCorner: m.attachedCorner || null,
+      })),
+      counters: counters.map(c => ({
+        id: c.id,
+        name: c.name,
+        value: c.value,
+        x: c.x,
+        y: c.y,
+      })),
+      dice: dice.map(d => ({
+        id: d.id,
+        type: d.type,
+        value: d.value,
+        maxValue: d.maxValue,
+        x: d.x,
+        y: d.y,
+      })),
+      notes: notes.map(n => ({
+        id: n.id,
+        text: n.text,
+        x: n.x,
+        y: n.y,
+      })),
+      maxZIndex: maxZIndex,
+    };
+  }
+
+  // Save the game state to the backend
+  async function saveGameState(name) {
+    setSaving(true);
+    try {
+      const stateData = getGameState();
+      const res = await fetch(`/api/games/${id}/saves`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, state_data: stateData }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Save failed');
+      }
+      const saved = await res.json();
+      setShowSaveModal(false);
+      setSaveName('');
+      setSaveToast(`Game saved as "${name}"`);
+      setTimeout(() => setSaveToast(null), 4000);
+      return saved;
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaveToast(`Save failed: ${err.message}`);
+      setTimeout(() => setSaveToast(null), 4000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Load a game state from serialized data
+  function loadGameState(stateData) {
+    // Parse state_data if it's a string
+    let state = stateData;
+    if (typeof state === 'string') {
+      try {
+        state = JSON.parse(state);
+      } catch (err) {
+        console.error('Failed to parse state_data:', err);
+        return;
+      }
+    }
+
+    // Restore camera
+    if (state.camera) {
+      const camera = cameraRef.current;
+      camera.x = state.camera.x || 0;
+      camera.y = state.camera.y || 0;
+      camera.zoom = state.camera.zoom || 1;
+      setZoomDisplay(Math.round(camera.zoom * 100));
+      setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
+    }
+
+    // Restore background
+    if (state.background && TABLE_BACKGROUNDS[state.background]) {
+      setBackground(state.background);
+    }
+
+    // Restore loose cards
+    const restoredCards = [];
+    let restoredMaxZ = 1;
+
+    if (state.cards && Array.isArray(state.cards)) {
+      state.cards.forEach(c => {
+        restoredCards.push({
+          tableId: c.tableId || crypto.randomUUID(),
+          cardId: c.cardId,
+          name: c.name,
+          image_path: c.image_path,
+          x: c.x,
+          y: c.y,
+          zIndex: c.zIndex || 1,
+          faceDown: c.faceDown !== undefined ? c.faceDown : !c.face_up,
+          rotation: c.rotation || 0,
+          inStack: null,
+        });
+        if (c.zIndex > restoredMaxZ) restoredMaxZ = c.zIndex;
+      });
+    }
+
+    // Restore stacks
+    if (state.stacks && Array.isArray(state.stacks)) {
+      state.stacks.forEach(stack => {
+        const stackId = stack.stackId || crypto.randomUUID();
+        if (stack.cards && Array.isArray(stack.cards)) {
+          stack.cards.forEach(c => {
+            restoredCards.push({
+              tableId: c.tableId || crypto.randomUUID(),
+              cardId: c.cardId,
+              name: c.name,
+              image_path: c.image_path,
+              x: stack.x,
+              y: stack.y,
+              zIndex: c.zIndex || 1,
+              faceDown: c.faceDown !== undefined ? c.faceDown : false,
+              rotation: c.rotation || 0,
+              inStack: stackId,
+            });
+            if (c.zIndex > restoredMaxZ) restoredMaxZ = c.zIndex;
+          });
+        }
+      });
+    }
+
+    setTableCards(restoredCards);
+    setMaxZIndex(state.maxZIndex || restoredMaxZ);
+    setSelectedCards(new Set());
+
+    // Restore hand
+    if (state.hand && Array.isArray(state.hand)) {
+      setHandCards(state.hand.map(c => ({
+        handId: c.handId || crypto.randomUUID(),
+        cardId: c.cardId,
+        name: c.name,
+        image_path: c.image_path,
+      })));
+    } else {
+      setHandCards([]);
+    }
+
+    // Restore markers
+    if (state.markers && Array.isArray(state.markers)) {
+      setMarkers(state.markers.map(m => ({
+        id: m.id || crypto.randomUUID(),
+        color: m.color,
+        label: m.label || '',
+        x: m.x,
+        y: m.y,
+        attachedTo: m.attachedTo || null,
+        attachedCorner: m.attachedCorner || null,
+      })));
+    } else {
+      setMarkers([]);
+    }
+
+    // Restore counters
+    if (state.counters && Array.isArray(state.counters)) {
+      setCounters(state.counters.map(c => ({
+        id: c.id || crypto.randomUUID(),
+        name: c.name,
+        value: c.value,
+        x: c.x,
+        y: c.y,
+      })));
+    } else {
+      setCounters([]);
+    }
+
+    // Restore dice
+    if (state.dice && Array.isArray(state.dice)) {
+      setDice(state.dice.map(d => ({
+        id: d.id || crypto.randomUUID(),
+        type: d.type,
+        value: d.value,
+        maxValue: d.maxValue || { d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 }[d.type] || 6,
+        x: d.x,
+        y: d.y,
+        rolling: false,
+      })));
+    } else {
+      setDice([]);
+    }
+
+    // Restore notes
+    if (state.notes && Array.isArray(state.notes)) {
+      setNotes(state.notes.map(n => ({
+        id: n.id || crypto.randomUUID(),
+        text: n.text,
+        x: n.x,
+        y: n.y,
+      })));
+    } else {
+      setNotes([]);
+    }
+
+    // Trigger canvas re-render
+    setTimeout(() => renderCanvas(), 100);
+  }
+
+  // Load save state from URL query param on mount
+  useEffect(() => {
+    if (saveLoadedRef.current) return;
+    const saveId = searchParams.get('saveId');
+    if (!saveId) return;
+
+    saveLoadedRef.current = true;
+    async function loadSave() {
+      try {
+        const res = await fetch(`/api/games/${id}/saves/${saveId}`);
+        if (!res.ok) {
+          console.error('Failed to load save:', res.status);
+          return;
+        }
+        const save = await res.json();
+        loadGameState(save.state_data);
+        setSaveToast(`Loaded save: "${save.name}"`);
+        setTimeout(() => setSaveToast(null), 4000);
+      } catch (err) {
+        console.error('Failed to load save:', err);
+      }
+    }
+    // Wait for game data and cards to load first
+    if (!loading && game) {
+      loadSave();
+    }
+  }, [loading, game, id, searchParams]);
+
   if (loading) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-slate-900">
@@ -1576,6 +1889,7 @@ export default function GameTable() {
 
             {/* Save button */}
             <button
+              onClick={() => setShowSaveModal(true)}
               data-testid="toolbar-save-btn"
               className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
               title="Save Game"
@@ -1802,6 +2116,61 @@ export default function GameTable() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Save Game Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="save-modal">
+            <h3 className="text-white font-semibold mb-3">Save Game</h3>
+            <input
+              type="text"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="Enter save name..."
+              data-testid="save-name-input"
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && saveName.trim() && !saving) {
+                  saveGameState(saveName.trim());
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowSaveModal(false); setSaveName(''); }}
+                data-testid="save-cancel-btn"
+                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveGameState(saveName.trim())}
+                disabled={!saveName.trim() || saving}
+                data-testid="save-confirm-btn"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Toast Notification */}
+      {saveToast && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+          data-testid="save-toast"
+          data-ui-element="true"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          <span className="text-sm font-medium">{saveToast}</span>
+          <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
         </div>
       )}
 
