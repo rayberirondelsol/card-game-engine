@@ -556,6 +556,31 @@ WHAT TO WORK ON NEXT:
 - Card import system
 - Game table canvas with PixiJS
 
+--- Session: 2026-02-07 (Agent handling features #26, #29, #30) ---
+
+COMPLETED:
+- Feature #26: Card zoom preview on ALT key hover - PASSING
+  - Added hoveredTableCard and altKeyHeld state tracking
+  - ALT keydown/keyup/blur handlers for reliable key state
+  - onMouseEnter/onMouseLeave on table cards for hover detection
+  - Large 250x350 preview overlay with pointer-events:none
+  - Shows card front or back design based on faceDown state
+
+- Feature #29: Shuffle, split, and flip stack - PASSING
+  - Split Stack now shows a modal with number input for specifying how many cards
+  - Added performSplit function handling stacks and individual cards correctly
+  - Shuffle randomizes card zIndex order within stack
+  - Flip Stack toggles faceDown on all cards in stack
+
+- Feature #30: Search/browse stack contents - PASSING
+  - Replaced alert() with proper visual overlay panel
+  - Grid layout showing card thumbnails with numbered badges
+  - Card names visible below each thumbnail
+  - Close via X button, Done button, or backdrop click
+  - Stack remains intact after browsing
+
+CURRENT STATUS: 41/44 features passing (93.2%)
+
 HOW TO START SERVERS:
 - Backend: node server/src/index.js (port 3001)
 - Frontend: npm run dev --prefix client (port 5173)
