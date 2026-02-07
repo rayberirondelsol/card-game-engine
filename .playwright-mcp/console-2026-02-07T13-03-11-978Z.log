@@ -1,0 +1,6 @@
+[   43760ms] [ERROR] [JavaScript Error: "The connection to ws://localhost:5173/?token=mU_zJypNjlAl was interrupted while the page was loading." {file: "http://localhost:5173/@vite/client" line: 802}] @ http://localhost:5173/@vite/client:802
+[   48204ms] [ERROR] [JavaScript Error: "Firefox can’t establish a connection to the server at ws://localhost:5173/." {file: "http://localhost:5173/@vite/client" line: 1035}] @ http://localhost:5173/@vite/client:1035
+[   51534ms] [ERROR] [JavaScript Error: "Firefox can’t establish a connection to the server at ws://localhost:5173/." {file: "http://localhost:5173/@vite/client" line: 1035}] @ http://localhost:5173/@vite/client:1035
+[   55587ms] [ERROR] [JavaScript Error: "Firefox can’t establish a connection to the server at ws://localhost:5173/." {file: "http://localhost:5173/@vite/client" line: 1035}] @ http://localhost:5173/@vite/client:1035
+[   59692ms] [ERROR] [JavaScript Error: "Firefox can’t establish a connection to the server at ws://localhost:5173/." {file: "http://localhost:5173/@vite/client" line: 1035}] @ http://localhost:5173/@vite/client:1035
+[   63794ms] [ERROR] [JavaScript Error: "Firefox can’t establish a connection to the server at ws://localhost:5173/." {file: "http://localhost:5173/@vite/client" line: 1035}] @ http://localhost:5173/@vite/client:1035

@@ -1,10 +1,27 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { mkdirSync, existsSync } from 'fs';
 import { setupDatabase, closeDatabase } from './database.js';
 import { gamesRoutes } from './routes/games.js';
 import { healthRoutes } from './routes/health.js';
+import { savesRoutes } from './routes/saves.js';
+import { setupsRoutes } from './routes/setups.js';
+import { cardsRoutes } from './routes/cards.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 3001;
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+if (!existsSync(UPLOADS_DIR)) {
+  mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 async function start() {
   // Initialize database
@@ -20,9 +37,26 @@ async function start() {
     credentials: true
   });
 
+  // Register multipart for file uploads (10MB limit)
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024 // 10MB
+    }
+  });
+
+  // Register static file serving for uploaded images
+  await fastify.register(fastifyStatic, {
+    root: UPLOADS_DIR,
+    prefix: '/uploads/',
+    decorateReply: false
+  });
+
   // Register routes
   await fastify.register(gamesRoutes);
   await fastify.register(healthRoutes);
+  await fastify.register(savesRoutes);
+  await fastify.register(setupsRoutes);
+  await fastify.register(cardsRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {
