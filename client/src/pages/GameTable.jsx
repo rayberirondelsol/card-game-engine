@@ -357,12 +357,13 @@ export default function GameTable() {
   // Counter functions
   function createCounter(name) {
     const canvas = canvasRef.current;
+    const offset = counters.length * 160; // Stagger each new counter
     const newCounter = {
       id: crypto.randomUUID(),
       name: name || 'Counter',
       value: 0,
-      x: (canvas?.width || 800) / 2,
-      y: (canvas?.height || 600) / 2,
+      x: (canvas?.width || 800) / 2 + offset,
+      y: (canvas?.height || 600) / 2 - 60,
     };
     setCounters(prev => [...prev, newCounter]);
     setShowCounterModal(false);
@@ -551,10 +552,7 @@ export default function GameTable() {
             <button
               onClick={(e) => { e.stopPropagation(); deleteCounter(counter.id); }}
               data-testid={`counter-delete-${counter.id}`}
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-              style={{ opacity: undefined }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white text-xs flex items-center justify-center transition-colors"
             >
               &times;
             </button>
