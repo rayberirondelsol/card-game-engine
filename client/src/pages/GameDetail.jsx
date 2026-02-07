@@ -26,6 +26,30 @@ export default function GameDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Category state
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null); // null = "All Cards"
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParentId, setNewCategoryParentId] = useState(null);
+  const [categoryError, setCategoryError] = useState('');
+  const [creatingSaving, setCreatingSaving] = useState(false);
+
+  // Edit category state
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editCategoryId, setEditCategoryId] = useState(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editCategoryError, setEditCategoryError] = useState('');
+  const [editCategorySaving, setEditCategorySaving] = useState(false);
+
+  // Delete category state
+  const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
+  const [deleteCategoryId, setDeleteCategoryId] = useState(null);
+  const [deleteCategoryName, setDeleteCategoryName] = useState('');
+  const [deletingCategory, setDeletingCategory] = useState(false);
+
+  // Expanded categories in tree
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+
   useEffect(() => {
     fetchGame();
     fetchSaves();
@@ -171,6 +195,21 @@ export default function GameDetail() {
     }
   }
 
+  async function handleAssignCardToCategory(cardId, categoryId) {
+    try {
+      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category_id: categoryId || null }),
+      });
+      if (res.ok) {
+        fetchCards();
+      }
+    } catch (err) {
+      console.error('Assign category error:', err);
+    }
+  }
+
   function openEditModal() {
     setEditName(game.name);
     setEditDesc(game.description || '');
@@ -208,7 +247,6 @@ export default function GameDetail() {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete game');
-      // Navigate back to start screen after successful deletion
       navigate('/', { state: { deletedGame: game.name } });
     } catch (err) {
       setError(err.message);
@@ -218,10 +256,297 @@ export default function GameDetail() {
     }
   }
 
+  // --- Category CRUD ---
+  function openCreateCategoryModal(parentId = null) {
+    setNewCategoryName('');
+    setNewCategoryParentId(parentId);
+    setCategoryError('');
+    setShowCreateCategoryModal(true);
+  }
+
+  async function handleCreateCategory(e) {
+    e.preventDefault();
+    setCategoryError('');
+
+    if (!newCategoryName.trim()) {
+      setCategoryError('Category name is required');
+      return;
+    }
+
+    setCreatingSaving(true);
+    try {
+      const body = { name: newCategoryName.trim() };
+      if (newCategoryParentId) {
+        body.parent_category_id = newCategoryParentId;
+      }
+
+      const res = await fetch(`/api/games/${id}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        setCategoryError(errData.error || 'Failed to create category');
+        return;
+      }
+
+      const created = await res.json();
+      setShowCreateCategoryModal(false);
+      fetchCategories();
+
+      // Auto-expand parent if creating subcategory
+      if (newCategoryParentId) {
+        setExpandedCategories(prev => {
+          const next = new Set(prev);
+          next.add(newCategoryParentId);
+          return next;
+        });
+      }
+
+      setSuccessMessage(`Category "${created.name}" created`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setCategoryError('Failed to create category');
+    } finally {
+      setCreatingSaving(false);
+    }
+  }
+
+  function openEditCategoryModal(cat) {
+    setEditCategoryId(cat.id);
+    setEditCategoryName(cat.name);
+    setEditCategoryError('');
+    setShowEditCategoryModal(true);
+  }
+
+  async function handleEditCategory(e) {
+    e.preventDefault();
+    setEditCategoryError('');
+
+    if (!editCategoryName.trim()) {
+      setEditCategoryError('Category name cannot be empty');
+      return;
+    }
+
+    setEditCategorySaving(true);
+    try {
+      const res = await fetch(`/api/games/${id}/categories/${editCategoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editCategoryName.trim() }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        setEditCategoryError(errData.error || 'Failed to update category');
+        return;
+      }
+
+      setShowEditCategoryModal(false);
+      fetchCategories();
+      setSuccessMessage('Category renamed successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setEditCategoryError('Failed to update category');
+    } finally {
+      setEditCategorySaving(false);
+    }
+  }
+
+  function openDeleteCategoryModal(cat) {
+    setDeleteCategoryId(cat.id);
+    setDeleteCategoryName(cat.name);
+    setShowDeleteCategoryModal(true);
+  }
+
+  async function handleDeleteCategory() {
+    setDeletingCategory(true);
+    try {
+      const res = await fetch(`/api/games/${id}/categories/${deleteCategoryId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        // If the deleted category was selected, go back to all cards
+        if (selectedCategoryId === deleteCategoryId) {
+          setSelectedCategoryId(null);
+        }
+        setShowDeleteCategoryModal(false);
+        fetchCategories();
+        fetchCards(); // Cards may have been reassigned
+        setSuccessMessage(`Category "${deleteCategoryName}" deleted`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error('Delete category error:', err);
+    } finally {
+      setDeletingCategory(false);
+    }
+  }
+
+  function toggleCategoryExpand(catId) {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(catId)) {
+        next.delete(catId);
+      } else {
+        next.add(catId);
+      }
+      return next;
+    });
+  }
+
+  // Build tree structure from flat categories list
+  function buildCategoryTree(cats, parentId = null) {
+    return cats
+      .filter(c => c.parent_category_id === parentId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  }
+
+  // Get all descendant category IDs (for filtering cards)
+  function getDescendantIds(catId) {
+    const ids = [catId];
+    const children = categories.filter(c => c.parent_category_id === catId);
+    for (const child of children) {
+      ids.push(...getDescendantIds(child.id));
+    }
+    return ids;
+  }
+
+  // Filter cards by selected category (including subcategories)
+  const filteredCards = selectedCategoryId
+    ? cards.filter(c => {
+        const relevantIds = getDescendantIds(selectedCategoryId);
+        return relevantIds.includes(c.category_id);
+      })
+    : cards;
+
+  // Count cards per category
+  function countCardsInCategory(catId) {
+    const ids = getDescendantIds(catId);
+    return cards.filter(c => ids.includes(c.category_id)).length;
+  }
+
+  // Render category tree item
+  function renderCategoryItem(cat, depth = 0) {
+    const children = buildCategoryTree(categories, cat.id);
+    const hasChildren = children.length > 0;
+    const isExpanded = expandedCategories.has(cat.id);
+    const isSelected = selectedCategoryId === cat.id;
+    const cardCount = countCardsInCategory(cat.id);
+
+    return (
+      <div key={cat.id} data-testid={`category-${cat.id}`}>
+        <div
+          className={`flex items-center group py-1.5 px-2 rounded-md cursor-pointer transition-colors ${
+            isSelected
+              ? 'bg-[var(--color-primary)] text-white'
+              : 'hover:bg-gray-100 text-[var(--color-text)]'
+          }`}
+          style={{ paddingLeft: `${8 + depth * 16}px` }}
+          onClick={() => setSelectedCategoryId(cat.id)}
+        >
+          {/* Expand/collapse toggle */}
+          {hasChildren ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCategoryExpand(cat.id);
+              }}
+              className={`mr-1 w-4 h-4 flex items-center justify-center text-xs flex-shrink-0 ${
+                isSelected ? 'text-white/80' : 'text-[var(--color-text-secondary)]'
+              }`}
+              data-testid={`category-toggle-${cat.id}`}
+            >
+              {isExpanded ? '▼' : '▶'}
+            </button>
+          ) : (
+            <span className="mr-1 w-4 h-4 flex-shrink-0" />
+          )}
+
+          {/* Folder icon */}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 flex-shrink-0">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+
+          {/* Category name */}
+          <span className="text-sm truncate flex-1" data-testid={`category-name-${cat.id}`} title={cat.name}>
+            {cat.name}
+          </span>
+
+          {/* Card count badge */}
+          {cardCount > 0 && (
+            <span className={`text-xs ml-1 flex-shrink-0 ${
+              isSelected ? 'text-white/70' : 'text-[var(--color-text-secondary)]'
+            }`}>
+              {cardCount}
+            </span>
+          )}
+
+          {/* Action buttons (visible on hover) */}
+          <div className={`flex items-center gap-0.5 ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ${
+            isSelected ? '' : ''
+          }`}>
+            {/* Add subcategory */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openCreateCategoryModal(cat.id);
+              }}
+              className={`w-5 h-5 flex items-center justify-center rounded text-xs ${
+                isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-200 text-[var(--color-text-secondary)]'
+              }`}
+              title="Add subcategory"
+              data-testid={`add-subcategory-${cat.id}`}
+            >
+              +
+            </button>
+            {/* Edit category */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openEditCategoryModal(cat);
+              }}
+              className={`w-5 h-5 flex items-center justify-center rounded text-xs ${
+                isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-200 text-[var(--color-text-secondary)]'
+              }`}
+              title="Edit category"
+              data-testid={`edit-category-${cat.id}`}
+            >
+              ✎
+            </button>
+            {/* Delete category */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openDeleteCategoryModal(cat);
+              }}
+              className={`w-5 h-5 flex items-center justify-center rounded text-xs ${
+                isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-100 text-red-500'
+              }`}
+              title="Delete category"
+              data-testid={`delete-category-${cat.id}`}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Children */}
+        {hasChildren && isExpanded && (
+          <div data-testid={`category-children-${cat.id}`}>
+            {children.map(child => renderCategoryItem(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--color-background)] p-8">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="text-[var(--color-text-secondary)]">Loading game...</div>
         </div>
       </div>
@@ -231,7 +556,7 @@ export default function GameDetail() {
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--color-background)] p-8">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] mb-6 transition-colors"
@@ -249,9 +574,11 @@ export default function GameDetail() {
     );
   }
 
+  const rootCategories = buildCategoryTree(categories, null);
+
   return (
     <div className="min-h-screen bg-[var(--color-background)] p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
@@ -335,14 +662,100 @@ export default function GameDetail() {
           </div>
         )}
 
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Main Content Grid: Sidebar + Cards + Right Panel */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Sidebar - Categories */}
+          <div className="lg:col-span-1">
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="categories-sidebar">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide">Categories</h2>
+                <button
+                  onClick={() => openCreateCategoryModal(null)}
+                  data-testid="create-category-btn"
+                  className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors"
+                  title="Create category"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* All Cards item */}
+              <div
+                className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer transition-colors mb-1 ${
+                  selectedCategoryId === null
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'hover:bg-gray-100 text-[var(--color-text)]'
+                }`}
+                onClick={() => setSelectedCategoryId(null)}
+                data-testid="all-cards-filter"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                <span className="text-sm flex-1">All Cards</span>
+                <span className={`text-xs ${selectedCategoryId === null ? 'text-white/70' : 'text-[var(--color-text-secondary)]'}`}>
+                  {cards.length}
+                </span>
+              </div>
+
+              {/* Uncategorized */}
+              <div
+                className={`flex items-center py-1.5 px-2 rounded-md cursor-pointer transition-colors mb-1 ${
+                  selectedCategoryId === 'uncategorized'
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'hover:bg-gray-100 text-[var(--color-text)]'
+                }`}
+                onClick={() => setSelectedCategoryId('uncategorized')}
+                data-testid="uncategorized-filter"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                </svg>
+                <span className="text-sm flex-1">Uncategorized</span>
+                <span className={`text-xs ${selectedCategoryId === 'uncategorized' ? 'text-white/70' : 'text-[var(--color-text-secondary)]'}`}>
+                  {cards.filter(c => !c.category_id).length}
+                </span>
+              </div>
+
+              {/* Category tree */}
+              {rootCategories.length > 0 && (
+                <div className="mt-1 border-t border-[var(--color-border)] pt-1" data-testid="category-tree">
+                  {rootCategories.map(cat => renderCategoryItem(cat, 0))}
+                </div>
+              )}
+
+              {categories.length === 0 && (
+                <p className="text-xs text-[var(--color-text-secondary)] mt-2 text-center" data-testid="no-categories-message">
+                  No categories yet
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Cards Section */}
           <div className="lg:col-span-2">
             <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-[var(--color-text)]">
-                  Cards {cards.length > 0 && <span className="text-sm font-normal text-[var(--color-text-secondary)]">({cards.length})</span>}
+                  {selectedCategoryId === null
+                    ? 'All Cards'
+                    : selectedCategoryId === 'uncategorized'
+                    ? 'Uncategorized'
+                    : categories.find(c => c.id === selectedCategoryId)?.name || 'Cards'}
+                  {' '}
+                  {(selectedCategoryId === 'uncategorized'
+                    ? cards.filter(c => !c.category_id).length
+                    : filteredCards.length) > 0 && (
+                    <span className="text-sm font-normal text-[var(--color-text-secondary)]">
+                      ({selectedCategoryId === 'uncategorized'
+                        ? cards.filter(c => !c.category_id).length
+                        : filteredCards.length})
+                    </span>
+                  )}
                 </h2>
                 <div className="flex items-center gap-2">
                   <input
@@ -373,70 +786,91 @@ export default function GameDetail() {
               )}
 
               {/* Card Grid */}
-              {cards.length === 0 ? (
-                <div className="text-[var(--color-text-secondary)] text-center py-8" data-testid="no-cards-message">
-                  No cards imported yet. Import cards to get started.
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4" data-testid="card-grid">
-                  {cards.map((card) => (
-                    <div
-                      key={card.id}
-                      data-testid={`card-${card.id}`}
-                      className="group relative bg-[var(--color-background)] rounded-lg border border-[var(--color-border)] overflow-hidden hover:border-[var(--color-primary)] transition-colors"
-                    >
-                      <div className="aspect-[2.5/3.5] overflow-hidden">
-                        <img
-                          src={card.image_path}
-                          alt={card.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="p-2">
-                        <p
-                          className="text-xs text-[var(--color-text)] truncate font-medium"
-                          data-testid={`card-name-${card.id}`}
-                          title={card.name}
-                        >
-                          {card.name}
-                        </p>
-                        {card.category_id && (
-                          <p className="text-xs text-[var(--color-text-secondary)] truncate">
-                            {categories.find(c => c.id === card.category_id)?.name || ''}
-                          </p>
-                        )}
-                      </div>
-                      {/* Delete button (shown on hover) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCard(card.id, card.name);
-                        }}
-                        data-testid={`delete-card-${card.id}`}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-xs w-5 h-5 flex items-center justify-center"
-                        title="Delete card"
+              {(() => {
+                const displayCards = selectedCategoryId === 'uncategorized'
+                  ? cards.filter(c => !c.category_id)
+                  : filteredCards;
+
+                return displayCards.length === 0 ? (
+                  <div className="text-[var(--color-text-secondary)] text-center py-8" data-testid="no-cards-message">
+                    {cards.length === 0
+                      ? 'No cards imported yet. Import cards to get started.'
+                      : selectedCategoryId === 'uncategorized'
+                      ? 'No uncategorized cards.'
+                      : 'No cards in this category.'}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-4" data-testid="card-grid">
+                    {displayCards.map((card) => (
+                      <div
+                        key={card.id}
+                        data-testid={`card-${card.id}`}
+                        className="group relative bg-[var(--color-background)] rounded-lg border border-[var(--color-border)] overflow-hidden hover:border-[var(--color-primary)] transition-colors"
                       >
-                        &times;
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        <div className="aspect-[2.5/3.5] overflow-hidden">
+                          <img
+                            src={card.image_path}
+                            alt={card.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-2">
+                          <p
+                            className="text-xs text-[var(--color-text)] truncate font-medium"
+                            data-testid={`card-name-${card.id}`}
+                            title={card.name}
+                          >
+                            {card.name}
+                          </p>
+                          {/* Category assignment dropdown */}
+                          <select
+                            value={card.category_id || ''}
+                            onChange={(e) => handleAssignCardToCategory(card.id, e.target.value || null)}
+                            className="mt-1 w-full text-xs border border-[var(--color-border)] rounded px-1 py-0.5 bg-white text-[var(--color-text)]"
+                            data-testid={`card-category-select-${card.id}`}
+                          >
+                            <option value="">Uncategorized</option>
+                            {categories.map(cat => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.parent_category_id
+                                  ? `${categories.find(p => p.id === cat.parent_category_id)?.name || ''} / ${cat.name}`
+                                  : cat.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Delete button (shown on hover) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCard(card.id, card.name);
+                          }}
+                          data-testid={`delete-card-${card.id}`}
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-xs w-5 h-5 flex items-center justify-center"
+                          title="Delete card"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
-          {/* Sidebar - Setups & Saves */}
-          <div className="space-y-6">
+          {/* Right Sidebar - Setups & Saves */}
+          <div className="lg:col-span-1 space-y-6">
             {/* Setups */}
-            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Setups</h2>
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4">
+              <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-3">Setups</h2>
               {setups.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-xs text-[var(--color-text-secondary)]">
                   No setups created yet.
                 </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-1">
                   {setups.map((setup) => (
                     <li
                       key={setup.id}
@@ -450,14 +884,14 @@ export default function GameDetail() {
             </div>
 
             {/* Saved Games */}
-            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Saved Games</h2>
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4">
+              <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-3">Saved Games</h2>
               {saves.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-secondary)]">
+                <p className="text-xs text-[var(--color-text-secondary)]">
                   No saved games yet.
                 </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-1">
                   {saves.map((save) => (
                     <li
                       key={save.id}
@@ -474,6 +908,7 @@ export default function GameDetail() {
             </div>
           </div>
         </div>
+
         {/* Edit Game Modal */}
         {showEditModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="edit-game-modal">
@@ -558,6 +993,150 @@ export default function GameDetail() {
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deleting ? 'Deleting...' : 'Delete Game'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Category Modal */}
+        {showCreateCategoryModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="create-category-modal">
+            <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-xl font-semibold mb-4">
+                {newCategoryParentId
+                  ? `Create Subcategory in "${categories.find(c => c.id === newCategoryParentId)?.name || ''}"`
+                  : 'Create Category'}
+              </h2>
+              <form onSubmit={handleCreateCategory}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => {
+                      setNewCategoryName(e.target.value);
+                      setCategoryError('');
+                    }}
+                    data-testid="category-name-input"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      categoryError ? 'border-red-300' : 'border-[var(--color-border)]'
+                    }`}
+                    placeholder="Enter category name..."
+                    autoFocus
+                  />
+                  {categoryError && (
+                    <p className="mt-1 text-sm text-red-600" data-testid="category-name-error">
+                      {categoryError}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCategoryModal(false)}
+                    data-testid="create-category-cancel-btn"
+                    className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creatingSaving}
+                    data-testid="create-category-submit-btn"
+                    className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingSaving ? 'Creating...' : 'Create Category'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Category Modal */}
+        {showEditCategoryModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="edit-category-modal">
+            <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-xl font-semibold mb-4">Edit Category</h2>
+              <form onSubmit={handleEditCategory}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editCategoryName}
+                    onChange={(e) => {
+                      setEditCategoryName(e.target.value);
+                      setEditCategoryError('');
+                    }}
+                    data-testid="edit-category-name-input"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
+                      editCategoryError ? 'border-red-300' : 'border-[var(--color-border)]'
+                    }`}
+                    placeholder="Enter category name..."
+                    autoFocus
+                  />
+                  {editCategoryError && (
+                    <p className="mt-1 text-sm text-red-600" data-testid="edit-category-name-error">
+                      {editCategoryError}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditCategoryModal(false)}
+                    data-testid="edit-category-cancel-btn"
+                    className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editCategorySaving}
+                    data-testid="edit-category-save-btn"
+                    className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {editCategorySaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Category Confirmation Modal */}
+        {showDeleteCategoryModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="delete-category-modal">
+            <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+              <h2 className="text-xl font-semibold text-red-600 mb-4">Delete Category</h2>
+              <p className="text-[var(--color-text)] mb-2">
+                Are you sure you want to delete the category <strong>"{deleteCategoryName}"</strong>?
+              </p>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+                Cards in this category will become uncategorized. Subcategories will be moved to the root level.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteCategoryModal(false)}
+                  data-testid="delete-category-cancel-btn"
+                  className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteCategory}
+                  disabled={deletingCategory}
+                  data-testid="delete-category-confirm-btn"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deletingCategory ? 'Deleting...' : 'Delete Category'}
                 </button>
               </div>
             </div>
