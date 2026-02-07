@@ -1428,30 +1428,34 @@ export default function GameTable() {
                 </>
               )}
 
-              {/* Main card visual */}
+              {/* Main card visual with flip animation */}
               <div
                 className={`absolute top-0 left-0 rounded-lg overflow-hidden border-2 ${
                   isSelected ? 'border-blue-400 ring-2 ring-blue-400/50' : isStack ? 'border-yellow-400/50' : 'border-white/30'
                 }`}
+                data-testid={`card-face-container-${card.tableId}`}
+                data-face-down={card.faceDown ? 'true' : 'false'}
                 style={{
                   width: CARD_WIDTH,
                   height: CARD_HEIGHT,
-                  backgroundColor: card.faceDown ? '#2d3748' : '#fff',
+                  perspective: '600px',
                 }}
               >
-                {card.faceDown ? (
-                  // Face-down card back
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-                    <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M12 8v8M8 12h8" />
-                      </svg>
-                    </div>
-                  </div>
-                ) : (
-                  // Face-up card front
-                  <div className="w-full h-full relative bg-white">
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    transition: 'transform 0.4s ease',
+                    transformStyle: 'preserve-3d',
+                    transform: card.faceDown ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Front face */}
+                  <div
+                    className="absolute inset-0 bg-white"
+                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                  >
                     {card.image_path ? (
                       <img
                         src={card.image_path}
@@ -1476,7 +1480,20 @@ export default function GameTable() {
                       {card.name}
                     </div>
                   </div>
-                )}
+
+                  {/* Back face */}
+                  <div
+                    className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700"
+                    style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                  >
+                    <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M12 8v8M8 12h8" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Stack count badge */}
