@@ -208,6 +208,9 @@ export default function GameTable() {
   const [splitStackId, setSplitStackId] = useState(null);
   const [splitCount, setSplitCount] = useState('');
 
+  // Browse stack modal state
+  const [browseStackId, setBrowseStackId] = useState(null);
+
   // Fetch game data
   useEffect(() => {
     async function fetchGame() {
@@ -2838,10 +2841,7 @@ export default function GameTable() {
                     </button>
                     <button
                       onClick={() => {
-                        const sid = contextMenu.stackId;
-                        const stackCards = tableCards.filter(c => c.inStack === sid);
-                        const names = stackCards.map(c => c.name).join(', ');
-                        alert(`Stack contents (${stackCards.length} cards):\n${stackCards.map((c, i) => `${i + 1}. ${c.name}${c.faceDown ? ' (face down)' : ''}`).join('\n')}`);
+                        setBrowseStackId(contextMenu.stackId);
                         setContextMenu(null);
                       }}
                       data-testid="context-browse"
