@@ -1,5 +1,25 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #43) ---
+
+COMPLETED:
+- Feature #43: Game creation requires name field - PASSING
+  - Added nameError state to StartScreen component
+  - When user submits form with empty name, shows "Game name is required" error in red
+  - Input border turns red on validation error
+  - Error clears automatically when user starts typing
+  - Form does NOT submit with empty name (stays open)
+  - After entering valid name, form submits successfully
+  - Added data-testid attributes for name-error, game-name-input, create-game-submit, create-game-cancel
+  - Verified through browser automation with screenshots
+  - No mock data patterns detected in codebase
+  - Backend already had 400 validation for empty name (belt and suspenders)
+
+CHANGES MADE:
+- client/src/pages/StartScreen.jsx: Added nameError state, validation error display, red border on error, clear error on typing
+
+CURRENT STATUS: 42/44 features passing
+
 --- Session: 2026-02-07 (Agent handling features #31, #35, #37) ---
 
 COMPLETED:
