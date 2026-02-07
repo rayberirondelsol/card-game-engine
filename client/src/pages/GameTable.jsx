@@ -829,6 +829,7 @@ export default function GameTable() {
     if (objType === 'counter') obj = counters.find(c => c.id === objId);
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
     else if (objType === 'marker') obj = markers.find(m => m.id === objId);
+    else if (objType === 'note') obj = notes.find(n => n.id === objId);
     if (!obj) return;
     dragOffsetRef.current = {
       x: e.clientX - (obj.x || 0),
@@ -881,6 +882,10 @@ export default function GameTable() {
       setMarkers(prev => prev.map(m =>
         m.id === draggingObj.id ? { ...m, x: newX, y: newY, attachedTo: null } : m
       ));
+    } else if (draggingObj.type === 'note') {
+      setNotes(prev => prev.map(n =>
+        n.id === draggingObj.id ? { ...n, x: newX, y: newY } : n
+      ));
     }
   }
 
@@ -901,6 +906,35 @@ export default function GameTable() {
 
   function deleteMarker(markerId) {
     setMarkers(prev => prev.filter(m => m.id !== markerId));
+  }
+
+  // Note editing state
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
+
+  function deleteNote(noteId) {
+    setNotes(prev => prev.filter(n => n.id !== noteId));
+    if (editingNoteId === noteId) {
+      setEditingNoteId(null);
+      setEditingNoteText('');
+    }
+  }
+
+  function startEditingNote(noteId) {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    setEditingNoteId(noteId);
+    setEditingNoteText(note.text);
+  }
+
+  function saveNoteEdit(noteId) {
+    if (editingNoteText.trim()) {
+      setNotes(prev => prev.map(n =>
+        n.id === noteId ? { ...n, text: editingNoteText.trim() } : n
+      ));
+    }
+    setEditingNoteId(null);
+    setEditingNoteText('');
   }
 
   // Combined mouse move handler (React events on container)
