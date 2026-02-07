@@ -156,6 +156,12 @@ export default function GameTable() {
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
 
+  // Hand state
+  const [handCards, setHandCards] = useState([]); // cards in player's hand
+  const [hoveredHandCard, setHoveredHandCard] = useState(null); // card being hovered in hand (for preview)
+  const [draggingHandCard, setDraggingHandCard] = useState(null); // card being dragged within hand
+  const [handDragOverIndex, setHandDragOverIndex] = useState(null); // index being dragged over for reorder
+
   // Toolbar modals
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
@@ -249,24 +255,7 @@ export default function GameTable() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-width / 2 + camera.x, -height / 2 + camera.y);
 
-    // Draw markers
-    markers.forEach(marker => {
-      ctx.beginPath();
-      ctx.arc(marker.x, marker.y, 15, 0, Math.PI * 2);
-      ctx.fillStyle = marker.color;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      // Draw label if present
-      if (marker.label) {
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 9px Inter, system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(marker.label.substring(0, 3), marker.x, marker.y);
-      }
-    });
+    // Markers are now rendered as DOM overlays (not on canvas)
 
     // Draw notes
     notes.forEach(note => {
@@ -332,9 +321,15 @@ export default function GameTable() {
       renderCanvas();
     }
 
+    const container = containerRef.current;
+
     function handleMouseDown(e) {
-      // Only pan when clicking directly on the canvas (not on card overlays or UI)
-      if (e.button === 1 || (e.button === 0 && e.target === canvas)) {
+      // Pan when clicking on canvas or the container background (not on UI elements)
+      const isCanvas = e.target === canvas;
+      const isContainer = e.target === container;
+      const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
+
+      if (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement)) {
         isPanningRef.current = true;
         panStartRef.current = {
           x: e.clientX,
@@ -377,19 +372,24 @@ export default function GameTable() {
       });
     }
 
+    // Wheel on canvas and container for zoom
     canvas.addEventListener('wheel', handleWheel, { passive: false });
+    if (container) container.addEventListener('wheel', handleWheel, { passive: false });
+    // Mousedown on both canvas and container for pan start
     canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mouseleave', handleMouseUp);
+    if (container) container.addEventListener('mousedown', handleMouseDown);
+    // Mousemove and mouseup on document for reliable tracking
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       canvas.removeEventListener('wheel', handleWheel);
+      if (container) container.removeEventListener('wheel', handleWheel);
       canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('mouseleave', handleMouseUp);
+      if (container) container.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('contextmenu', handleContextMenu);
     };
   }, [renderCanvas]);
@@ -714,15 +714,14 @@ export default function GameTable() {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
-  // Drag handlers for floating objects (counters, dice)
+  // Drag handlers for floating objects (counters, dice, markers)
   function handleObjDragStart(e, objType, objId) {
     e.preventDefault();
-    const obj = objType === 'counter'
-      ? counters.find(c => c.id === objId)
-      : dice.find(d => d.id === objId);
-
+    let obj;
+    if (objType === 'counter') obj = counters.find(c => c.id === objId);
+    else if (objType === 'die') obj = dice.find(d => d.id === objId);
+    else if (objType === 'marker') obj = markers.find(m => m.id === objId);
     if (!obj) return;
-
     dragOffsetRef.current = {
       x: e.clientX - (obj.x || 0),
       y: e.clientY - (obj.y || 0),
@@ -730,12 +729,38 @@ export default function GameTable() {
     setDraggingObj({ type: objType, id: objId });
   }
 
+  function findNearestCardCorner(px, py) {
+    const MARKER_SNAP_DISTANCE = 30;
+    let nearest = null;
+    let nearestDist = MARKER_SNAP_DISTANCE;
+    const allCards = tableCards.filter(c => {
+      if (!c.inStack) return true;
+      const stackCards2 = tableCards.filter(sc => sc.inStack === c.inStack);
+      const maxZ = Math.max(...stackCards2.map(sc => sc.zIndex));
+      return c.zIndex === maxZ;
+    });
+    allCards.forEach(card => {
+      const corners = [
+        { name: 'top-left', x: card.x - CARD_WIDTH / 2 + 8, y: card.y - CARD_HEIGHT / 2 + 8 },
+        { name: 'top-right', x: card.x + CARD_WIDTH / 2 - 8, y: card.y - CARD_HEIGHT / 2 + 8 },
+        { name: 'bottom-left', x: card.x - CARD_WIDTH / 2 + 8, y: card.y + CARD_HEIGHT / 2 - 8 },
+        { name: 'bottom-right', x: card.x + CARD_WIDTH / 2 - 8, y: card.y + CARD_HEIGHT / 2 - 8 },
+      ];
+      corners.forEach(corner => {
+        const dist = Math.sqrt((px - corner.x) ** 2 + (py - corner.y) ** 2);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = { cardTableId: card.tableId, corner: corner.name, x: corner.x, y: corner.y };
+        }
+      });
+    });
+    return nearest;
+  }
+
   function handleObjDragMove(e) {
     if (!draggingObj) return;
-
     const newX = e.clientX - dragOffsetRef.current.x;
     const newY = e.clientY - dragOffsetRef.current.y;
-
     if (draggingObj.type === 'counter') {
       setCounters(prev => prev.map(c =>
         c.id === draggingObj.id ? { ...c, x: newX, y: newY } : c
@@ -744,24 +769,56 @@ export default function GameTable() {
       setDice(prev => prev.map(d =>
         d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
       ));
+    } else if (draggingObj.type === 'marker') {
+      setMarkers(prev => prev.map(m =>
+        m.id === draggingObj.id ? { ...m, x: newX, y: newY, attachedTo: null } : m
+      ));
     }
   }
 
   function handleObjDragEnd() {
+    if (draggingObj && draggingObj.type === 'marker') {
+      const marker = markers.find(m => m.id === draggingObj.id);
+      if (marker) {
+        const snap = findNearestCardCorner(marker.x, marker.y);
+        if (snap) {
+          setMarkers(prev => prev.map(m =>
+            m.id === draggingObj.id ? { ...m, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner } : m
+          ));
+        }
+      }
+    }
     setDraggingObj(null);
   }
 
-  // Combined mouse move handler
+  function deleteMarker(markerId) {
+    setMarkers(prev => prev.filter(m => m.id !== markerId));
+  }
+
+  // Combined mouse move handler (React events on container)
   function handleGlobalMouseMove(e) {
-    if (draggingCard) {
+    // Handle panning via React events as well (for better Playwright compatibility)
+    if (isPanningRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      const camera = cameraRef.current;
+      camera.x = panStartRef.current.camX + dx / camera.zoom;
+      camera.y = panStartRef.current.camY + dy / camera.zoom;
+      setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
+      renderCanvas();
+    } else if (draggingCard) {
       handleCardDragMove(e);
     } else if (draggingObj) {
       handleObjDragMove(e);
     }
   }
 
-  // Combined mouse up handler
+  // Combined mouse up handler (React events on container)
   function handleGlobalMouseUp(e) {
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+    }
     if (draggingCard) {
       handleCardDragEnd();
     }
@@ -778,6 +835,95 @@ export default function GameTable() {
       next.delete(tableId);
       return next;
     });
+  }
+
+  // ===== HAND FUNCTIONS =====
+
+  // Pick up a card from the table to the player's hand
+  function pickUpToHand(tableId) {
+    const card = tableCards.find(c => c.tableId === tableId);
+    if (!card) return;
+
+    // Add to hand
+    const handCard = {
+      handId: crypto.randomUUID(),
+      cardId: card.cardId,
+      name: card.name,
+      image_path: card.image_path,
+      originalTableId: card.tableId,
+    };
+    setHandCards(prev => [...prev, handCard]);
+
+    // Remove from table
+    removeCardFromTable(tableId);
+    setContextMenu(null);
+  }
+
+  // Play a card from hand back to the table
+  function playCardFromHand(handId) {
+    const card = handCards.find(c => c.handId === handId);
+    if (!card) return;
+
+    const newZIndex = maxZIndex + 1;
+    setMaxZIndex(newZIndex);
+
+    // Place card in center-ish area of screen
+    const canvas = canvasRef.current;
+    const centerX = (canvas?.width || 800) / 2;
+    const centerY = (canvas?.height || 600) / 2 - 60;
+
+    const newTableCard = {
+      tableId: crypto.randomUUID(),
+      cardId: card.cardId,
+      name: card.name,
+      image_path: card.image_path,
+      x: centerX + (Math.random() - 0.5) * 60,
+      y: centerY + (Math.random() - 0.5) * 60,
+      zIndex: newZIndex,
+      faceDown: false,
+      rotation: 0,
+      inStack: null,
+    };
+    setTableCards(prev => [...prev, newTableCard]);
+
+    // Remove from hand
+    setHandCards(prev => prev.filter(c => c.handId !== handId));
+    setHoveredHandCard(null);
+  }
+
+  // Reorder cards in hand via drag
+  function handleHandDragStart(e, index) {
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingHandCard(index);
+  }
+
+  function handleHandDragOver(e, index) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setHandDragOverIndex(index);
+  }
+
+  function handleHandDrop(e, dropIndex) {
+    e.preventDefault();
+    if (draggingHandCard === null || draggingHandCard === dropIndex) {
+      setDraggingHandCard(null);
+      setHandDragOverIndex(null);
+      return;
+    }
+
+    setHandCards(prev => {
+      const newHand = [...prev];
+      const [moved] = newHand.splice(draggingHandCard, 1);
+      newHand.splice(dropIndex, 0, moved);
+      return newHand;
+    });
+    setDraggingHandCard(null);
+    setHandDragOverIndex(null);
+  }
+
+  function handleHandDragEnd() {
+    setDraggingHandCard(null);
+    setHandDragOverIndex(null);
   }
 
   if (loading) {
@@ -804,10 +950,43 @@ export default function GameTable() {
     );
   }
 
+  // React onWheel handler for zoom (backup for native event approach)
+  function handleGlobalWheel(e) {
+    // Only zoom if not over a UI element
+    const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
+    if (isUIElement) return;
+
+    const camera = cameraRef.current;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+    setZoomDisplay(Math.round(camera.zoom * 100));
+    renderCanvas();
+  }
+
+  // React onMouseDown handler for panning (backup for native event approach)
+  function handleGlobalMouseDown(e) {
+    const isCanvas = e.target === canvasRef.current;
+    const isContainer = e.target === containerRef.current;
+    const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
+    const isTableCard = e.target.closest && e.target.closest('[data-table-card]');
+
+    if (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement && !isTableCard)) {
+      isPanningRef.current = true;
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        camX: cameraRef.current.x,
+        camY: cameraRef.current.y,
+      };
+      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
+    }
+  }
+
   return (
     <div
       ref={containerRef}
       className="w-screen h-screen relative overflow-hidden select-none"
+      onMouseDown={handleGlobalMouseDown}
       onMouseMove={handleGlobalMouseMove}
       onMouseUp={handleGlobalMouseUp}
       onClick={handleTableClick}
@@ -891,6 +1070,20 @@ export default function GameTable() {
                     : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Select this card so context menu operations apply to it
+                if (!selectedCards.has(card.tableId)) {
+                  setSelectedCards(new Set([card.tableId]));
+                }
+                setContextMenu({
+                  x: e.clientX,
+                  y: e.clientY,
+                  cardTableId: card.tableId,
+                  stackId: stackId,
+                });
+              }}
               title={isStack ? `Stack: ${stackSize} cards` : card.name}
             >
               {/* Stack offset visual - ghost cards behind */}
@@ -1107,6 +1300,52 @@ export default function GameTable() {
               </button>
             </div>
           </div>
+        </div>
+      ))}
+
+      {/* Floating Marker Widgets */}
+      {markers.map(marker => (
+        <div
+          key={marker.id}
+          data-testid={`marker-${marker.id}`}
+          data-marker-color={marker.color}
+          data-marker-label={marker.label || ''}
+          data-marker-attached={marker.attachedTo || ''}
+          data-ui-element="true"
+          className="absolute z-20 select-none group"
+          style={{
+            left: marker.x - 15,
+            top: marker.y - 15,
+            cursor: draggingObj?.id === marker.id ? 'grabbing' : 'grab',
+          }}
+          onMouseDown={(e) => handleObjDragStart(e, 'marker', marker.id)}
+        >
+          {/* Marker circle */}
+          <div
+            className={`w-[30px] h-[30px] rounded-full border-2 flex items-center justify-center shadow-lg transition-transform ${
+              marker.attachedTo ? 'border-white/80 scale-90' : 'border-white/50'
+            } ${draggingObj?.id === marker.id ? 'scale-125' : ''}`}
+            style={{ backgroundColor: marker.color }}
+            title={marker.label || `Marker (${marker.color})`}
+          >
+            {marker.label && (
+              <span className="text-white text-[8px] font-bold leading-none drop-shadow-sm">
+                {marker.label.substring(0, 3)}
+              </span>
+            )}
+          </div>
+          {/* Delete button on hover */}
+          <button
+            onClick={(e) => { e.stopPropagation(); deleteMarker(marker.id); }}
+            data-testid={`marker-delete-${marker.id}`}
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            &times;
+          </button>
+          {/* Attached indicator */}
+          {marker.attachedTo && (
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
+          )}
         </div>
       ))}
 
@@ -1640,6 +1879,18 @@ export default function GameTable() {
             {selectedCards.size > 0 && (
               <>
                 <div className="border-t border-slate-700 my-1" />
+                <button
+                  onClick={() => {
+                    // Pick up selected cards to hand
+                    const selected = Array.from(selectedCards);
+                    selected.forEach(tid => pickUpToHand(tid));
+                    setContextMenu(null);
+                  }}
+                  data-testid="context-pick-up-to-hand"
+                  className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-slate-700 hover:text-green-300 transition-colors"
+                >
+                  Pick up to Hand
+                </button>
                 <button
                   onClick={() => {
                     selectedCards.forEach(tid => removeCardFromTable(tid));
