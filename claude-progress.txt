@@ -1,5 +1,41 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #31, #35, #37) ---
+
+COMPLETED:
+- Feature #31: Draw cards from stack using number keys - PASSING
+  - TTS-style number key input (1-9) draws cards from hovered/selected stack
+  - Multi-digit support with 1-second delay (press 1 then 0 for 10)
+  - Blue toast notification showing draw count
+  - Auto-unstacks when only 1 card remains
+  - Verified with Playwright: draw 3, draw 5, multi-digit draw 10 all work
+
+- Feature #35: Create and manage text notes on table - PASSING
+  - Converted notes from canvas-only rendering to interactive DOM overlays
+  - Sticky note style with amber background and border
+  - Double-click or edit button to enter inline editing mode with Save/Cancel
+  - Drag notes to reposition anywhere on table
+  - Delete via X button on hover
+  - Notes still saved/loaded with game state
+
+- Feature #37: Auto-save functionality - PASSING
+  - Periodic auto-save every 60 seconds via setInterval
+  - Auto-save on page unload via navigator.sendBeacon
+  - Visual status indicator (idle/saving/saved) in toolbar top-right
+  - Click indicator to manually trigger auto-save
+  - Auto-save entries marked with is_auto_save flag in database
+  - GameDetail page shows "Auto" vs "Manual" label on save entries
+  - Data persists across server restart (SQLite)
+  - Full flow tested: create -> auto-save -> navigate away -> load auto-save
+
+STATS: 43/44 features passing (97.7%)
+
+TECHNICAL NOTES:
+- GameTable.jsx is the main monolithic component (~3000+ lines)
+- Notes now rendered as DOM overlays (previously canvas-only)
+- Auto-save uses refs to avoid stale closures in setInterval callback
+- Number key draw uses buffer + timeout pattern for multi-digit input
+
 --- Session: 2026-02-07 (Agent handling feature #38) ---
 
 COMPLETED:
