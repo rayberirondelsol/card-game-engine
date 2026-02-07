@@ -1,5 +1,27 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #11) ---
+
+COMPLETED:
+- Feature #11: Delete game with confirmation dialog - PASSING
+  - Added delete button (X) on game cards in StartScreen, shown on hover
+  - Added confirmation dialog modal with warning about deleting all cards/setups/saves
+  - Cancel button properly dismisses dialog without any side effects
+  - Confirm triggers DELETE API call, shows success toast, removes game from list
+  - Delete works from both StartScreen (hover delete) and GameDetail (Delete button)
+  - After deletion from GameDetail, navigates back to StartScreen with success message
+  - API correctly returns 404 for deleted games
+  - Database CASCADE foreign keys verified: deleting game cascades to categories, cards, card_backs, save_states, setups
+  - No mock data patterns in codebase
+  - Verified end-to-end with Playwright browser automation
+
+CHANGES MADE:
+- client/src/pages/StartScreen.jsx: Added delete button on game cards, delete confirmation modal, delete handlers
+- client/src/pages/GameDetail.jsx: Already had delete flow (committed as part of this session)
+- test-feature-11.mjs: Comprehensive Playwright test script
+
+CURRENT STATUS: 12/44 features passing (Feature #11 added this session)
+
 --- Session: 2026-02-07 (Agent handling features #3, #7, #9) ---
 
 COMPLETED:
