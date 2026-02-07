@@ -137,6 +137,8 @@ export default function GameTable() {
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
+  const [zoomDisplay, setZoomDisplay] = useState(100); // reactive zoom % for display
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 }); // reactive pan position for display
 
   // Game objects state (counters, dice, markers, notes)
   const [counters, setCounters] = useState([]);
@@ -326,6 +328,7 @@ export default function GameTable() {
       const camera = cameraRef.current;
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+      setZoomDisplay(Math.round(camera.zoom * 100));
       renderCanvas();
     }
 
@@ -354,6 +357,7 @@ export default function GameTable() {
         const camera = cameraRef.current;
         camera.x = panStartRef.current.camX + dx / camera.zoom;
         camera.y = panStartRef.current.camY + dy / camera.zoom;
+        setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
         renderCanvas();
       }
     }
@@ -454,13 +458,17 @@ export default function GameTable() {
   function placeCardOnTable(card) {
     const newZIndex = maxZIndex + 1;
     setMaxZIndex(newZIndex);
+    // Spread cards out so they don't overlap too much
+    const existingCount = tableCards.length;
+    const col = existingCount % 4;
+    const row = Math.floor(existingCount / 4);
     const newTableCard = {
       tableId: crypto.randomUUID(),
       cardId: card.id,
       name: card.name,
       image_path: card.image_path,
-      x: 400 + Math.random() * 200,
-      y: 300 + Math.random() * 200,
+      x: 250 + col * 150 + (Math.random() - 0.5) * 30,
+      y: 300 + row * 180 + (Math.random() - 0.5) * 30,
       zIndex: newZIndex,
       faceDown: false,
       rotation: 0,
@@ -1135,8 +1143,11 @@ export default function GameTable() {
               </svg>
               Cards ({availableCards.length})
             </button>
-            <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
-              Zoom: {Math.round(cameraRef.current.zoom * 100)}%
+            <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="zoom-display">
+              Zoom: {zoomDisplay}%
+            </span>
+            <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="pan-display">
+              Pan: {panPosition.x},{panPosition.y}
             </span>
           </div>
         </div>
