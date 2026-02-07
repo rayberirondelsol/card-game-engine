@@ -141,6 +141,14 @@ export default function GameTable() {
   const [saveToast, setSaveToast] = useState(null);
   const saveLoadedRef = useRef(false);
 
+  // Setup state
+  const [setupMode, setSetupMode] = useState(false);
+  const [showSetupSaveModal, setShowSetupSaveModal] = useState(false);
+  const [setupName, setSetupName] = useState('');
+  const [savingSetup, setSavingSetup] = useState(false);
+  const [editingSetupId, setEditingSetupId] = useState(null);
+  const setupLoadedRef = useRef(false);
+
   // Camera state
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
   const isPanningRef = useRef(false);
@@ -189,6 +197,16 @@ export default function GameTable() {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Number key draw state (TTS-style: press 1-9 or multi-digit like '10' to draw from stack)
+  const numberKeyBufferRef = useRef('');
+  const numberKeyTimeoutRef = useRef(null);
+  const [drawToast, setDrawToast] = useState(null); // toast notification for draw action
+
+  // Split stack modal state
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitStackId, setSplitStackId] = useState(null);
+  const [splitCount, setSplitCount] = useState('');
 
   // Fetch game data
   useEffect(() => {
@@ -462,6 +480,50 @@ export default function GameTable() {
           groupSelectedCards();
         }
       }
+
+      // Number keys 0-9: draw cards from hovered/selected stack to hand (TTS-style)
+      if (e.key >= '0' && e.key <= '9') {
+        // Find the stack under the hovered card or selected card
+        let targetStackId = null;
+        if (hoveredTableCard) {
+          const hovCard = tableCards.find(c => c.tableId === hoveredTableCard);
+          if (hovCard && hovCard.inStack) {
+            targetStackId = hovCard.inStack;
+          }
+        }
+        if (!targetStackId && selectedCards.size > 0) {
+          // Check if any selected card is in a stack
+          for (const tid of selectedCards) {
+            const sc = tableCards.find(c => c.tableId === tid);
+            if (sc && sc.inStack) {
+              targetStackId = sc.inStack;
+              break;
+            }
+          }
+        }
+
+        if (targetStackId) {
+          e.preventDefault();
+          // Append digit to buffer
+          numberKeyBufferRef.current += e.key;
+
+          // Clear any existing timeout
+          if (numberKeyTimeoutRef.current) {
+            clearTimeout(numberKeyTimeoutRef.current);
+          }
+
+          // Set a 1-second delay to allow multi-digit input (e.g., '10')
+          const capturedStackId = targetStackId;
+          numberKeyTimeoutRef.current = setTimeout(() => {
+            const count = parseInt(numberKeyBufferRef.current, 10);
+            numberKeyBufferRef.current = '';
+            numberKeyTimeoutRef.current = null;
+            if (count > 0) {
+              drawCardsFromStack(capturedStackId, count);
+            }
+          }, 1000);
+        }
+      }
     }
 
     function handleKeyUp(e) {
@@ -473,6 +535,12 @@ export default function GameTable() {
     // Clear ALT state if window loses focus
     function handleBlur() {
       setAltKeyHeld(false);
+      // Clear number key buffer
+      numberKeyBufferRef.current = '';
+      if (numberKeyTimeoutRef.current) {
+        clearTimeout(numberKeyTimeoutRef.current);
+        numberKeyTimeoutRef.current = null;
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -482,8 +550,12 @@ export default function GameTable() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
+      // Clean up number key timeout
+      if (numberKeyTimeoutRef.current) {
+        clearTimeout(numberKeyTimeoutRef.current);
+      }
     };
-  }, [selectedCards, tableCards]);
+  }, [selectedCards, tableCards, hoveredTableCard]);
 
   // ===== CARD FUNCTIONS =====
 
@@ -870,6 +942,36 @@ export default function GameTable() {
     });
   }
 
+  // ===== STACK FUNCTIONS =====
+
+  // Split a stack: take top N cards and make a new stack
+  function performSplit(stackId, count) {
+    const stackCards = tableCards.filter(c => c.inStack === stackId);
+    if (stackCards.length < 2 || count < 1 || count >= stackCards.length) return;
+
+    const sorted = [...stackCards].sort((a, b) => a.zIndex - b.zIndex);
+    // "Top N" = the N cards with highest zIndex
+    const splitCards = sorted.slice(sorted.length - count);
+    const splitIds = new Set(splitCards.map(c => c.tableId));
+    const remainingCount = sorted.length - count;
+
+    // Only create a new stackId if the split group has 2+ cards
+    const newStackId = count >= 2 ? crypto.randomUUID() : null;
+
+    setTableCards(prev => prev.map(c => {
+      if (c.inStack !== stackId) return c;
+      if (splitIds.has(c.tableId)) {
+        // Split cards: move to new stack (or individual if count=1), offset to the right
+        return { ...c, inStack: newStackId, x: c.x + CARD_WIDTH + 30 };
+      }
+      // Remaining cards: unstack if only 1 left
+      if (remainingCount === 1) {
+        return { ...c, inStack: null };
+      }
+      return c;
+    }));
+  }
+
   // ===== HAND FUNCTIONS =====
 
   // Pick up a card from the table to the player's hand
@@ -890,6 +992,51 @@ export default function GameTable() {
     // Remove from table
     removeCardFromTable(tableId);
     setContextMenu(null);
+  }
+
+  // Draw N cards from a stack to hand (TTS-style number key draw)
+  function drawCardsFromStack(stackId, count) {
+    const stackCards = tableCards.filter(c => c.inStack === stackId);
+    if (stackCards.length === 0) return;
+
+    // Clamp count to available cards
+    const drawCount = Math.min(count, stackCards.length);
+    if (drawCount < 1) return;
+
+    // Sort by zIndex descending to get top cards first
+    const sorted = [...stackCards].sort((a, b) => b.zIndex - a.zIndex);
+    const cardsToDraw = sorted.slice(0, drawCount);
+
+    // Add drawn cards to hand
+    const newHandCards = cardsToDraw.map(card => ({
+      handId: crypto.randomUUID(),
+      cardId: card.cardId,
+      name: card.name,
+      image_path: card.image_path,
+      originalTableId: card.tableId,
+    }));
+    setHandCards(prev => [...prev, ...newHandCards]);
+
+    // Remove drawn cards from table
+    const drawnTableIds = new Set(cardsToDraw.map(c => c.tableId));
+    setTableCards(prev => {
+      const remaining = prev.filter(c => !drawnTableIds.has(c.tableId));
+      // If remaining stack has only 1 card, unstack it
+      const remainingStack = remaining.filter(c => c.inStack === stackId);
+      if (remainingStack.length === 1) {
+        return remaining.map(c => c.inStack === stackId ? { ...c, inStack: null } : c);
+      }
+      return remaining;
+    });
+    setSelectedCards(prev => {
+      const next = new Set(prev);
+      drawnTableIds.forEach(tid => next.delete(tid));
+      return next;
+    });
+
+    // Show draw toast
+    setDrawToast(`Drew ${drawCount} card${drawCount > 1 ? 's' : ''} to hand`);
+    setTimeout(() => setDrawToast(null), 2000);
   }
 
   // Play a card from hand back to the table
@@ -1087,6 +1234,48 @@ export default function GameTable() {
     }
   }
 
+  // Save or update a setup (predefined starting state)
+  async function saveSetup(name) {
+    setSavingSetup(true);
+    try {
+      const stateData = getGameState();
+      let res;
+      if (editingSetupId) {
+        // Update existing setup
+        res = await fetch(`/api/games/${id}/setups/${editingSetupId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, state_data: stateData }),
+        });
+      } else {
+        // Create new setup
+        res = await fetch(`/api/games/${id}/setups`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, state_data: stateData }),
+        });
+      }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Setup save failed');
+      }
+      const saved = await res.json();
+      setShowSetupSaveModal(false);
+      setSetupName('');
+      setSaveToast(editingSetupId ? `Setup "${name}" updated` : `Setup "${name}" saved`);
+      setTimeout(() => setSaveToast(null), 4000);
+      // Update editingSetupId if it was a new setup, so future saves update it
+      setEditingSetupId(saved.id);
+      return saved;
+    } catch (err) {
+      console.error('Setup save failed:', err);
+      setSaveToast(`Setup save failed: ${err.message}`);
+      setTimeout(() => setSaveToast(null), 4000);
+    } finally {
+      setSavingSetup(false);
+    }
+  }
+
   // Load a game state from serialized data
   function loadGameState(stateData) {
     // Parse state_data if it's a string
@@ -1261,6 +1450,72 @@ export default function GameTable() {
       }
     }
     loadSave();
+  }, [loading, game, id, searchParams]);
+
+  // Load setup state from URL query param on mount (setupId or mode=setup&editSetupId)
+  useEffect(() => {
+    if (setupLoadedRef.current) return;
+    if (loading || !game) return;
+
+    const mode = searchParams.get('mode');
+    const setupId = searchParams.get('setupId');
+    const editSetupIdParam = searchParams.get('editSetupId');
+
+    // Enter setup mode if mode=setup
+    if (mode === 'setup') {
+      setSetupMode(true);
+    }
+
+    // If loading a setup to play (setupId param)
+    if (setupId && !editSetupIdParam) {
+      setupLoadedRef.current = true;
+      async function loadSetup() {
+        try {
+          const res = await fetch(`/api/games/${id}/setups/${setupId}`);
+          if (!res.ok) {
+            console.error('Failed to load setup:', res.status);
+            return;
+          }
+          const setup = await res.json();
+          loadGameState(setup.state_data);
+          setSaveToast(`Loaded setup: "${setup.name}"`);
+          setTimeout(() => setSaveToast(null), 4000);
+        } catch (err) {
+          console.error('Failed to load setup:', err);
+        }
+      }
+      loadSetup();
+      return;
+    }
+
+    // If editing an existing setup (mode=setup&editSetupId param)
+    if (mode === 'setup' && editSetupIdParam) {
+      setupLoadedRef.current = true;
+      setEditingSetupId(editSetupIdParam);
+      async function loadSetupForEdit() {
+        try {
+          const res = await fetch(`/api/games/${id}/setups/${editSetupIdParam}`);
+          if (!res.ok) {
+            console.error('Failed to load setup for editing:', res.status);
+            return;
+          }
+          const setup = await res.json();
+          setSetupName(setup.name);
+          loadGameState(setup.state_data);
+          setSaveToast(`Editing setup: "${setup.name}"`);
+          setTimeout(() => setSaveToast(null), 4000);
+        } catch (err) {
+          console.error('Failed to load setup for editing:', err);
+        }
+      }
+      loadSetupForEdit();
+      return;
+    }
+
+    // New setup mode - just enter setup mode with empty table
+    if (mode === 'setup') {
+      setupLoadedRef.current = true;
+    }
   }, [loading, game, id, searchParams]);
 
   if (loading) {
@@ -1957,6 +2212,32 @@ export default function GameTable() {
               </svg>
               <span className="text-[10px]">Save</span>
             </button>
+
+            {/* Save Setup button (visible in setup mode or always as convenience) */}
+            {setupMode && (
+              <button
+                onClick={() => {
+                  if (!setupName && !editingSetupId) {
+                    setShowSetupSaveModal(true);
+                  } else if (editingSetupId) {
+                    // Quick-save existing setup
+                    saveSetup(setupName || 'Untitled Setup');
+                  } else {
+                    setShowSetupSaveModal(true);
+                  }
+                }}
+                data-testid="toolbar-save-setup-btn"
+                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/30 transition-colors"
+                title="Save Setup"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <polyline points="17,21 17,13 7,13 7,21" />
+                  <polyline points="7,3 7,8 15,8" />
+                </svg>
+                <span className="text-[10px]">Setup</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -2215,6 +2496,142 @@ export default function GameTable() {
         </div>
       )}
 
+      {/* Save Setup Modal */}
+      {showSetupSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="setup-save-modal">
+            <h3 className="text-white font-semibold mb-3">{editingSetupId ? 'Update Setup' : 'Save Setup'}</h3>
+            <p className="text-slate-400 text-sm mb-3">
+              {editingSetupId ? 'Update the setup with the current table state.' : 'Save the current table arrangement as a reusable game setup.'}
+            </p>
+            <input
+              type="text"
+              value={setupName}
+              onChange={(e) => setSetupName(e.target.value)}
+              placeholder="Enter setup name..."
+              data-testid="setup-name-input"
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && setupName.trim() && !savingSetup) {
+                  saveSetup(setupName.trim());
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowSetupSaveModal(false); }}
+                data-testid="setup-save-cancel-btn"
+                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => saveSetup(setupName.trim())}
+                disabled={!setupName.trim() || savingSetup}
+                data-testid="setup-save-confirm-btn"
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSetup ? 'Saving...' : (editingSetupId ? 'Update Setup' : 'Save Setup')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setup Mode Banner */}
+      {setupMode && (
+        <div
+          className="fixed top-4 right-4 z-40 bg-emerald-700/90 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-3 backdrop-blur-sm"
+          data-testid="setup-mode-banner"
+          data-ui-element="true"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          </svg>
+          <span className="text-sm font-medium">
+            {editingSetupId ? `Editing Setup: ${setupName}` : 'Setup Editor Mode'}
+          </span>
+          <button
+            onClick={() => setShowSetupSaveModal(true)}
+            data-testid="setup-banner-save-btn"
+            className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+          >
+            {editingSetupId ? 'Save' : 'Save Setup'}
+          </button>
+          <button
+            onClick={() => navigate(`/games/${id}`)}
+            data-testid="setup-banner-exit-btn"
+            className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+          >
+            Exit
+          </button>
+        </div>
+      )}
+
+      {/* Split Stack Modal */}
+      {showSplitModal && splitStackId && (() => {
+        const stackCards = tableCards.filter(c => c.inStack === splitStackId);
+        const maxSplit = stackCards.length - 1;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
+            <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="split-modal">
+              <h3 className="text-white font-semibold mb-3">Split Stack</h3>
+              <p className="text-slate-400 text-sm mb-3">
+                Stack has {stackCards.length} cards. How many cards to split from the top?
+              </p>
+              <input
+                type="number"
+                value={splitCount}
+                onChange={(e) => setSplitCount(e.target.value)}
+                min={1}
+                max={maxSplit}
+                placeholder={`1 to ${maxSplit}`}
+                data-testid="split-count-input"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const n = parseInt(splitCount);
+                    if (n >= 1 && n <= maxSplit) {
+                      performSplit(splitStackId, n);
+                      setShowSplitModal(false);
+                      setSplitStackId(null);
+                      setSplitCount('');
+                    }
+                  }
+                }}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => { setShowSplitModal(false); setSplitStackId(null); setSplitCount(''); }}
+                  data-testid="split-cancel-btn"
+                  className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const n = parseInt(splitCount);
+                    if (n >= 1 && n <= maxSplit) {
+                      performSplit(splitStackId, n);
+                      setShowSplitModal(false);
+                      setSplitStackId(null);
+                      setSplitCount('');
+                    }
+                  }}
+                  disabled={!splitCount || parseInt(splitCount) < 1 || parseInt(splitCount) > maxSplit}
+                  data-testid="split-confirm-btn"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Split
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Save Toast Notification */}
       {saveToast && (
         <div
@@ -2227,6 +2644,22 @@ export default function GameTable() {
           </svg>
           <span className="text-sm font-medium">{saveToast}</span>
           <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+        </div>
+      )}
+
+      {/* Draw Cards Toast Notification */}
+      {drawToast && (
+        <div
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+          data-testid="draw-toast"
+          data-ui-element="true"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M12 8v8" />
+            <path d="M8 12h8" />
+          </svg>
+          <span className="text-sm font-medium" data-testid="draw-toast-text">{drawToast}</span>
         </div>
       )}
 
@@ -2377,17 +2810,9 @@ export default function GameTable() {
                         const sid = contextMenu.stackId;
                         const stackCards = tableCards.filter(c => c.inStack === sid);
                         if (stackCards.length < 2) { setContextMenu(null); return; }
-                        const mid = Math.ceil(stackCards.length / 2);
-                        const sorted = [...stackCards].sort((a, b) => a.zIndex - b.zIndex);
-                        const newStackId = crypto.randomUUID();
-                        const splitIds = new Set(sorted.slice(mid).map(c => c.tableId));
-                        setTableCards(prev => prev.map(c => {
-                          if (c.inStack !== sid) return c;
-                          if (splitIds.has(c.tableId)) {
-                            return { ...c, inStack: newStackId, x: c.x + CARD_WIDTH + 20 };
-                          }
-                          return c;
-                        }));
+                        setSplitStackId(sid);
+                        setSplitCount(Math.floor(stackCards.length / 2).toString());
+                        setShowSplitModal(true);
                         setContextMenu(null);
                       }}
                       data-testid="context-split"
