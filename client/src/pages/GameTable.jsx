@@ -989,6 +989,7 @@ export default function GameTable() {
       onMouseDown={handleGlobalMouseDown}
       onMouseMove={handleGlobalMouseMove}
       onMouseUp={handleGlobalMouseUp}
+      onWheel={handleGlobalWheel}
       onClick={handleTableClick}
       data-testid="game-table-container"
     >
@@ -1920,6 +1921,108 @@ export default function GameTable() {
           onClick={() => setContextMenu(null)}
         />
       )}
+
+      {/* Player Hand Area - bottom of screen, auto-hides when empty */}
+      {handCards.length > 0 && (
+        <div
+          className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none"
+          data-testid="hand-area"
+          data-ui-element="true"
+        >
+          <div className="flex justify-center items-end pb-2 pointer-events-auto">
+            <div
+              className="relative flex items-end justify-center bg-black/40 backdrop-blur-sm rounded-t-xl border border-b-0 border-white/10 px-4 pt-2 pb-1 min-h-[120px]"
+              data-testid="hand-container"
+              style={{ minWidth: Math.min(handCards.length * 90 + 40, 800) }}
+            >
+              <div className="absolute top-1 left-3 text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+                Hand ({handCards.length})
+              </div>
+              <div className="flex items-end justify-center" style={{ gap: '2px' }}>
+                {handCards.map((card, index) => {
+                  const totalCards = handCards.length;
+                  const spreadAngle = Math.min(5, 30 / totalCards);
+                  const centerIndex = (totalCards - 1) / 2;
+                  const rotation = (index - centerIndex) * spreadAngle;
+                  const yOffset = Math.abs(index - centerIndex) * 4;
+                  const isHovered = hoveredHandCard === card.handId;
+                  const isDragging = draggingHandCard === index;
+                  const isDragOver = handDragOverIndex === index;
+                  return (
+                    <div
+                      key={card.handId}
+                      data-testid={`hand-card-${card.handId}`}
+                      data-hand-card="true"
+                      data-card-name={card.name}
+                      draggable
+                      onDragStart={(e) => handleHandDragStart(e, index)}
+                      onDragOver={(e) => handleHandDragOver(e, index)}
+                      onDrop={(e) => handleHandDrop(e, index)}
+                      onDragEnd={handleHandDragEnd}
+                      onMouseEnter={() => setHoveredHandCard(card.handId)}
+                      onMouseLeave={() => setHoveredHandCard(null)}
+                      className={`relative cursor-pointer transition-all duration-200 flex-shrink-0 ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'scale-105' : ''}`}
+                      style={{
+                        width: 80,
+                        height: 112,
+                        transform: `rotate(${rotation}deg) translateY(${isHovered ? -30 - yOffset : -yOffset}px) scale(${isHovered ? 1.15 : 1})`,
+                        zIndex: isHovered ? 100 : index,
+                        marginLeft: index === 0 ? 0 : -10,
+                        transition: 'transform 0.2s ease, opacity 0.15s ease',
+                      }}
+                    >
+                      <div
+                        className={`w-full h-full rounded-lg overflow-hidden border-2 shadow-lg ${isHovered ? 'border-yellow-400 shadow-yellow-400/30' : isDragOver ? 'border-blue-400' : 'border-white/30'}`}
+                        style={{ backgroundColor: '#fff' }}
+                      >
+                        {card.image_path ? (
+                          <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" draggable={false} />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+                            <span className="text-[7px] text-gray-500 text-center leading-tight truncate w-full px-1">{card.name}</span>
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[7px] text-center py-0.5 truncate px-1">{card.name}</div>
+                      </div>
+                      {isHovered && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); playCardFromHand(card.handId); }}
+                          data-testid={`hand-play-${card.handId}`}
+                          className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 hover:bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap z-50 transition-colors"
+                        >
+                          Play
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hand card hover preview - large zoom */}
+      {hoveredHandCard && (() => {
+        const card = handCards.find(c => c.handId === hoveredHandCard);
+        if (!card) return null;
+        return (
+          <div className="fixed z-50 pointer-events-none" data-testid="hand-card-preview" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -70%)' }}>
+            <div className="rounded-xl overflow-hidden border-2 border-yellow-400 shadow-2xl shadow-black/50" style={{ width: 200, height: 280, backgroundColor: '#fff' }}>
+              {card.image_path ? (
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+                  <span className="text-sm text-gray-500 text-center px-4">{card.name}</span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs text-center py-1 px-2 truncate">{card.name}</div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
