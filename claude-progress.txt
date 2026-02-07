@@ -1,5 +1,25 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #45) ---
+
+COMPLETED:
+- Feature #45: Fix dev:client script in root package.json - PASSING
+  - Changed dev:client from 'npx --prefix client vite --port 5173' to 'cd client && npx vite --port 5173'
+  - Changed build from 'npx --prefix client vite build' to 'cd client && npx vite build'
+  - Root cause: --prefix only affects package lookup, not working directory, so Vite ran from project root where there's no index.html
+  - Verified both server (port 3001) and client (port 5173) start correctly together via npm run dev
+  - npm run dev uses concurrently to run both dev:server and dev:client
+  - Full app verified via browser - start screen, game detail, all working correctly
+  - Zero console errors
+  - No mock data patterns in codebase
+
+CHANGES MADE:
+- package.json: Fixed dev:client and build scripts to use 'cd client && npx vite' instead of 'npx --prefix client vite'
+- kill-all-ports.js: Added improved port killing utility script
+- screenshots/f45-app-working.png, f45-game-detail.png: Visual verification
+
+CURRENT STATUS: 45/45 features passing (100%)
+
 --- Session: 2026-02-07 (Agent handling feature #43) ---
 
 COMPLETED:
