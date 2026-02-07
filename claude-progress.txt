@@ -1,5 +1,36 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #47) ---
+
+COMPLETED:
+- Feature #47: Git workflow for Vercel deployment - PASSING
+  - Created .github/workflows/deploy.yml GitHub Actions workflow
+    - Triggers on push to main/master (production deploy)
+    - Triggers on pull_request to main/master (preview deploy)
+    - Uses Vercel CLI with --prebuilt for efficient deployment
+    - Requires 3 GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+    - Node.js 20 with npm caching for fast builds
+    - Deployment URL written to GitHub Step Summary
+  - Created vercel.json configuration
+    - Monorepo setup: builds client (Vite) and serves as static output
+    - API rewrites route /api/* to serverless functions
+    - SPA fallback rewrites all non-API routes to index.html
+    - Custom install and build commands for monorepo structure
+  - Created api/index.js serverless function
+    - Wraps existing Fastify backend as a Vercel serverless handler
+    - Lazy initialization with singleton pattern for cold starts
+    - Registers all existing routes (games, health, saves, setups, cards, categories, card-backs)
+  - Verified: app still works correctly after changes (zero console errors)
+  - Verified: health endpoint returns OK with database connected
+  - No mock data patterns in new files
+
+CHANGES MADE:
+- .github/workflows/deploy.yml: NEW - GitHub Actions workflow for Vercel deployment
+- vercel.json: NEW - Vercel project configuration for monorepo
+- api/index.js: NEW - Serverless API handler wrapping Fastify backend
+
+CURRENT STATUS: 47/47 features passing (100%)
+
 --- Session: 2026-02-07 (Agent handling feature #46) ---
 
 COMPLETED:
