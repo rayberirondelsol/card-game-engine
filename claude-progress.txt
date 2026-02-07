@@ -1,5 +1,55 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #38) ---
+
+COMPLETED:
+- Feature #38: Create and load game setups - PASSING
+  - Enhanced GameDetail.jsx setups panel:
+    - Create Setup button (+ icon) navigates to /games/:id/play?mode=setup
+    - Setup list shows name, timestamp, Load, Edit, Delete buttons
+    - Load button navigates to /games/:id/play?setupId=<id>
+    - Edit button navigates to /games/:id/play?mode=setup&editSetupId=<id>
+    - Delete button with confirmation dialog, removes setup from list
+  - Added setup editor mode in GameTable.jsx:
+    - Setup mode banner (emerald green) with "Setup Editor Mode" / "Editing Setup: <name>"
+    - Save Setup button in banner and toolbar
+    - Save Setup modal with name input (create new or update existing)
+    - saveSetup() function creates via POST or updates via PUT /api/games/:id/setups
+  - Added setupId URL parameter support in GameTable.jsx:
+    - useEffect loads setup via GET /api/games/:id/setups/:setupId on mount
+    - loadGameState() restores all table objects from setup state_data
+    - Toast "Loaded setup: <name>" shown on successful load
+  - Setup state_data stores complete game state:
+    - Camera position and zoom
+    - Loose cards with positions, rotation, face state
+    - Card stacks with child cards
+    - Hand cards
+    - Markers with colors, labels, positions, card attachments
+    - Counters with names and values
+    - Dice with types and values
+    - Notes with text and positions
+  - Verified all feature steps via Playwright browser automation:
+    - Step 1: Setups section visible with Load/Edit/Delete buttons
+    - Step 2: Load setup navigates correctly, cards/markers/counters restored
+    - Step 3: Setup editor mode banner visible
+    - Step 4: Save Setup modal, setup saved successfully
+    - Step 5: Both setups appear in game detail
+    - Step 6: Edit existing setup with correct URL params
+    - Step 7: Delete setup reduces count
+    - Step 8: Data persists after page refresh
+  - Zero console errors
+  - No mock data patterns in codebase (grep verified)
+  - Data persists across server restart (SQLite database)
+  - Test data created and cleaned up
+
+CHANGES MADE:
+- client/src/pages/GameDetail.jsx: Enhanced setups section with Create/Load/Edit/Delete UI
+- client/src/pages/GameTable.jsx: Added setup state variables, saveSetup function, setupId/mode URL params, Save Setup modal, setup mode banner
+- test-feature-38.mjs, test-f38-persistence.mjs: Playwright browser tests
+- screenshots/f38-*.png: Visual verification screenshots (10 screenshots)
+
+CURRENT STATUS: 37/44 features passing (84.1%)
+
 --- Session: 2026-02-07 (Agent handling features #20, #39, #40) ---
 
 COMPLETED:
