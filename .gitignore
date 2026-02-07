@@ -6,3 +6,6 @@ data/
 *.db-shm
 *.db-wal
 .autoforge/
+nul
+.playwright-mcp/
+server/uploads/
