@@ -1303,6 +1303,18 @@ export default function GameTable() {
       onMouseUp={handleGlobalMouseUp}
       onWheel={handleGlobalWheel}
       onClick={handleTableClick}
+      onContextMenu={(e) => {
+        // Only show table context menu if clicking on canvas/background (not on a card)
+        if (e.target === canvasRef.current || e.target.dataset.testid === 'game-table-container') {
+          e.preventDefault();
+          setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            cardTableId: null,
+            stackId: null,
+          });
+        }
+      }}
       data-testid="game-table-container"
     >
       {/* HTML5 Canvas Background */}

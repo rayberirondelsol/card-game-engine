@@ -1173,12 +1173,39 @@ export default function GameDetail() {
                   {saves.map((save) => (
                     <li
                       key={save.id}
+                      data-testid={`save-item-${save.id}`}
                       className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      <span className="text-sm text-[var(--color-text)]">{save.name}</span>
-                      <span className="text-xs text-[var(--color-text-secondary)]">
-                        {save.is_auto_save ? 'Auto' : 'Manual'}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-[var(--color-text)] block truncate">{save.name}</span>
+                        <span className="text-xs text-[var(--color-text-secondary)]">
+                          {save.is_auto_save ? 'Auto' : 'Manual'} · {new Date(save.updated_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => navigate(`/games/${id}/play?saveId=${save.id}`)}
+                          data-testid={`save-load-btn-${save.id}`}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Delete save "${save.name}"?`)) return;
+                            try {
+                              const res = await fetch(`/api/games/${id}/saves/${save.id}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setSaves(prev => prev.filter(s => s.id !== save.id));
+                              }
+                            } catch (err) { console.error('Delete save failed:', err); }
+                          }}
+                          data-testid={`save-delete-btn-${save.id}`}
+                          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
