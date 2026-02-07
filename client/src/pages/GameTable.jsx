@@ -1216,6 +1216,8 @@ export default function GameTable() {
     if (saveLoadedRef.current) return;
     const saveId = searchParams.get('saveId');
     if (!saveId) return;
+    // Wait for game data to load first
+    if (loading || !game) return;
 
     saveLoadedRef.current = true;
     async function loadSave() {
@@ -1233,10 +1235,7 @@ export default function GameTable() {
         console.error('Failed to load save:', err);
       }
     }
-    // Wait for game data and cards to load first
-    if (!loading && game) {
-      loadSave();
-    }
+    loadSave();
   }, [loading, game, id, searchParams]);
 
   if (loading) {
@@ -1364,6 +1363,7 @@ export default function GameTable() {
               data-card-name={card.name}
               data-card-id={card.cardId}
               data-table-card="true"
+              data-rotation={card.rotation || 0}
               data-stack-id={stackId || ''}
               data-stack-size={stackSize}
               data-ui-element="true"
@@ -2238,37 +2238,63 @@ export default function GameTable() {
           data-testid="context-menu"
           data-ui-element="true"
         >
-          <div className="bg-slate-800 rounded-lg shadow-2xl border border-slate-600 py-1 min-w-[160px]">
-            <button
-              onClick={() => { setShowCounterModal(true); setContextMenu(null); }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-            >
-              Add Counter
-            </button>
-            <button
-              onClick={() => { setShowDiceModal(true); setContextMenu(null); }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-            >
-              Add Dice
-            </button>
-            <button
-              onClick={() => { setShowMarkerModal(true); setContextMenu(null); }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-            >
-              Add Marker
-            </button>
-            <button
-              onClick={() => { setShowNoteModal(true); setContextMenu(null); }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-            >
-              Add Note
-            </button>
-            {selectedCards.size > 0 && (
+          <div className="bg-slate-800 rounded-lg shadow-2xl border border-slate-600 py-1 min-w-[180px]">
+            {/* Card-specific actions (shown when right-clicking a card or stack) */}
+            {contextMenu.cardTableId && (
               <>
-                <div className="border-t border-slate-700 my-1" />
+                <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                  {contextMenu.stackId ? 'Stack Actions' : 'Card Actions'}
+                </div>
                 <button
                   onClick={() => {
-                    // Pick up selected cards to hand
+                    setTableCards(prev => prev.map(c => {
+                      if (selectedCards.has(c.tableId)) {
+                        return { ...c, faceDown: !c.faceDown };
+                      }
+                      return c;
+                    }));
+                    setContextMenu(null);
+                  }}
+                  data-testid="context-flip"
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>Flip</span>
+                  <span className="ml-auto text-xs text-slate-500">F</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setTableCards(prev => prev.map(c => {
+                      if (selectedCards.has(c.tableId)) {
+                        return { ...c, rotation: (c.rotation || 0) + 90 };
+                      }
+                      return c;
+                    }));
+                    setContextMenu(null);
+                  }}
+                  data-testid="context-rotate-cw"
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>Rotate CW</span>
+                  <span className="ml-auto text-xs text-slate-500">E</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setTableCards(prev => prev.map(c => {
+                      if (selectedCards.has(c.tableId)) {
+                        return { ...c, rotation: (c.rotation || 0) - 90 };
+                      }
+                      return c;
+                    }));
+                    setContextMenu(null);
+                  }}
+                  data-testid="context-rotate-ccw"
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>Rotate CCW</span>
+                  <span className="ml-auto text-xs text-slate-500">Q</span>
+                </button>
+                <button
+                  onClick={() => {
                     const selected = Array.from(selectedCards);
                     selected.forEach(tid => pickUpToHand(tid));
                     setContextMenu(null);
@@ -2276,8 +2302,110 @@ export default function GameTable() {
                   data-testid="context-pick-up-to-hand"
                   className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-slate-700 hover:text-green-300 transition-colors"
                 >
-                  Pick up to Hand
+                  Pick Up to Hand
                 </button>
+
+                {/* Stack-specific actions */}
+                {contextMenu.stackId && (
+                  <>
+                    <div className="border-t border-slate-700 my-1" />
+                    <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                      Stack
+                    </div>
+                    <button
+                      onClick={() => {
+                        const sid = contextMenu.stackId;
+                        setTableCards(prev => {
+                          const stackCards = prev.filter(c => c.inStack === sid);
+                          const otherCards = prev.filter(c => c.inStack !== sid);
+                          for (let i = stackCards.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            const tempZ = stackCards[i].zIndex;
+                            stackCards[i] = { ...stackCards[i], zIndex: stackCards[j].zIndex };
+                            stackCards[j] = { ...stackCards[j], zIndex: tempZ };
+                          }
+                          return [...otherCards, ...stackCards];
+                        });
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-shuffle"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Shuffle
+                    </button>
+                    <button
+                      onClick={() => {
+                        const sid = contextMenu.stackId;
+                        const stackCards = tableCards.filter(c => c.inStack === sid);
+                        if (stackCards.length < 2) { setContextMenu(null); return; }
+                        const mid = Math.ceil(stackCards.length / 2);
+                        const sorted = [...stackCards].sort((a, b) => a.zIndex - b.zIndex);
+                        const newStackId = crypto.randomUUID();
+                        const splitIds = new Set(sorted.slice(mid).map(c => c.tableId));
+                        setTableCards(prev => prev.map(c => {
+                          if (c.inStack !== sid) return c;
+                          if (splitIds.has(c.tableId)) {
+                            return { ...c, inStack: newStackId, x: c.x + CARD_WIDTH + 20 };
+                          }
+                          return c;
+                        }));
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-split"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Split Stack
+                    </button>
+                    <button
+                      onClick={() => {
+                        const sid = contextMenu.stackId;
+                        setTableCards(prev => prev.map(c => {
+                          if (c.inStack === sid) {
+                            return { ...c, faceDown: !c.faceDown };
+                          }
+                          return c;
+                        }));
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-flip-stack"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Flip Stack
+                    </button>
+                    <button
+                      onClick={() => {
+                        const sid = contextMenu.stackId;
+                        const stackCards = tableCards.filter(c => c.inStack === sid);
+                        const names = stackCards.map(c => c.name).join(', ');
+                        alert(`Stack contents (${stackCards.length} cards):\n${stackCards.map((c, i) => `${i + 1}. ${c.name}${c.faceDown ? ' (face down)' : ''}`).join('\n')}`);
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-browse"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Browse
+                    </button>
+                    <button
+                      onClick={() => {
+                        const sid = contextMenu.stackId;
+                        const stackCards = tableCards.filter(c => c.inStack === sid);
+                        if (stackCards.length === 0) { setContextMenu(null); return; }
+                        const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max, stackCards[0]);
+                        if (stackCards.length <= 2) {
+                          setTableCards(prev => prev.map(c => c.inStack === sid ? { ...c, inStack: null } : c));
+                        }
+                        pickUpToHand(topCard.tableId);
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-draw"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Draw Card
+                    </button>
+                  </>
+                )}
+
+                <div className="border-t border-slate-700 my-1" />
                 <button
                   onClick={() => {
                     selectedCards.forEach(tid => removeCardFromTable(tid));
@@ -2285,10 +2413,44 @@ export default function GameTable() {
                   }}
                   className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
                 >
-                  Remove Selected Card(s)
+                  Remove from Table
                 </button>
               </>
             )}
+
+            {/* General table actions (always shown) */}
+            {!contextMenu.cardTableId && (
+              <>
+                <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                  Table Actions
+                </div>
+                <button
+                  onClick={() => { setShowCounterModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Counter
+                </button>
+                <button
+                  onClick={() => { setShowDiceModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Dice
+                </button>
+                <button
+                  onClick={() => { setShowMarkerModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Marker
+                </button>
+                <button
+                  onClick={() => { setShowNoteModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Note
+                </button>
+              </>
+            )}
+
             <div className="border-t border-slate-700 my-1" />
             <button
               onClick={() => setContextMenu(null)}
