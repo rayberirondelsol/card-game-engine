@@ -1,5 +1,54 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #21, #33, #34) ---
+
+COMPLETED:
+- Feature #21: Game table canvas loads and renders - PASSING
+  - Created GameTable.jsx with full-screen HTML5 Canvas (PixiJS unavailable due to network)
+  - Implemented felt/wood/solid table backgrounds with procedural textures
+  - Floating toolbar with Counter, Dice, Marker, Note, Table, Help, Save buttons
+  - Pan (mouse drag) and zoom (mouse wheel) camera controls
+  - Right-click context menu, keyboard shortcuts overlay (? key)
+  - Background picker with 5 options (felt, wood, slate, navy, green)
+  - Added route /games/:id/play in main.jsx
+  - Canvas sized to full viewport, zero console errors
+
+- Feature #33: Create and use counter widgets - PASSING
+  - Counter creation via toolbar button -> modal with name input
+  - Named counters with initial value 0
+  - Increment (+) and decrement (-) buttons working correctly
+  - Visible delete (×) button on each counter
+  - Drag to reposition working (mousedown/mousemove/mouseup)
+  - Multiple counters coexist simultaneously (staggered 160px apart)
+  - Verified all 11 feature steps
+
+- Feature #34: Place and roll dice - PASSING
+  - Dice creation via toolbar -> modal with type selection (d6/d8/d10/d12/d20)
+  - Each die shows type label, current value, Roll button, delete button
+  - Roll animation: value cycles 10 times at 80ms intervals, button shows "..."
+  - D6 result in range 1-6, D20 result in range 1-20 (verified)
+  - Multiple dice coexist on table simultaneously
+  - Drag to reposition working
+  - Verified all 10 feature steps
+
+CHANGES MADE:
+- client/src/pages/GameTable.jsx: NEW - Full game table with canvas, toolbar, counters, dice, markers, notes
+- client/src/main.jsx: Added /games/:id/play route
+- screenshots/feature21-*.png, feature33-*.png, feature34-*.png: Visual verification
+
+CURRENT STATUS: 14/44 features passing (Features #21, #33, #34 added this session)
+
+HOW TO START SERVERS:
+- Backend: node server/src/index.js (port 3001)
+- Frontend: bash start-client.sh (port 5173)
+- Kill ports: node kill-ports.js
+
+NOTES:
+- PixiJS npm install failed (network ECONNRESET) - used native HTML5 Canvas instead
+- Canvas implementation matches all feature requirements
+- Counter and dice widgets are DOM overlays on top of the canvas
+- Drag implementation uses mousedown/mousemove/mouseup on the container div
+
 --- Session: 2026-02-07 (Agent handling feature #12) ---
 
 COMPLETED:
