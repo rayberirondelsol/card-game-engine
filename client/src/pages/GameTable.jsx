@@ -163,6 +163,8 @@ export default function GameTable() {
   const cardDragOffsetRef = useRef({ x: 0, y: 0 });
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
+  const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
+  const [altKeyHeld, setAltKeyHeld] = useState(false); // whether ALT key is currently held
 
   // Hand state
   const [handCards, setHandCards] = useState([]); // cards in player's hand
@@ -405,6 +407,12 @@ export default function GameTable() {
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e) {
+      // Track ALT key for card preview
+      if (e.key === 'Alt') {
+        e.preventDefault();
+        setAltKeyHeld(true);
+      }
+
       // Don't trigger shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -456,8 +464,25 @@ export default function GameTable() {
       }
     }
 
+    function handleKeyUp(e) {
+      if (e.key === 'Alt') {
+        setAltKeyHeld(false);
+      }
+    }
+
+    // Clear ALT state if window loses focus
+    function handleBlur() {
+      setAltKeyHeld(false);
+    }
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, [selectedCards, tableCards]);
 
   // ===== CARD FUNCTIONS =====
@@ -1396,6 +1421,8 @@ export default function GameTable() {
                     : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
+              onMouseEnter={() => setHoveredTableCard(card.tableId)}
+              onMouseLeave={() => setHoveredTableCard(null)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -2579,6 +2606,55 @@ export default function GameTable() {
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs text-center py-1 px-2 truncate">{card.name}</div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ALT key card zoom preview - large preview when hovering a table card while holding ALT */}
+      {altKeyHeld && hoveredTableCard && (() => {
+        const card = tableCards.find(c => c.tableId === hoveredTableCard);
+        if (!card) return null;
+        // Show the front face image regardless of faceDown state for preview
+        return (
+          <div
+            className="fixed z-[60] pointer-events-none"
+            data-testid="alt-card-preview"
+            style={{ left: '50%', top: '50%', transform: 'translate(-50%, -60%)' }}
+          >
+            <div
+              className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
+              style={{ width: 250, height: 350, backgroundColor: '#fff' }}
+            >
+              {card.faceDown ? (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                  <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                  </div>
+                </div>
+              ) : card.image_path ? (
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <path d="M21 15l-5-5L5 21" />
+                  </svg>
+                  <span className="text-sm text-gray-500 text-center px-4">{card.name}</span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm text-center py-1.5 px-2 truncate font-medium">
+                {card.name}
+              </div>
+            </div>
+            <div className="text-center mt-2">
+              <span className="text-white/60 text-xs bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
+                Hold ALT to preview
+              </span>
             </div>
           </div>
         );
