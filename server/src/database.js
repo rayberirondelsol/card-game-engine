@@ -18,9 +18,18 @@ export async function setupDatabase() {
 
   db = new Database(DB_PATH);
 
+  // Checkpoint any existing WAL data first (recover from crashes)
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (e) {
+    // Checkpoint may fail on first run, that's ok
+  }
+
   // Enable WAL mode for better performance
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  // Ensure writes are synced to disk
+  db.pragma('synchronous = FULL');
 
   // Create tables
   db.exec(`

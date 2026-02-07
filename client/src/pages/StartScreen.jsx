@@ -7,6 +7,7 @@ export default function StartScreen() {
   const [showNewGame, setShowNewGame] = useState(false);
   const [newGameName, setNewGameName] = useState('');
   const [newGameDesc, setNewGameDesc] = useState('');
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     fetchGames();
@@ -36,9 +37,12 @@ export default function StartScreen() {
         body: JSON.stringify({ name: newGameName, description: newGameDesc }),
       });
       if (!res.ok) throw new Error('Failed to create game');
+      const created = await res.json();
       setNewGameName('');
       setNewGameDesc('');
       setShowNewGame(false);
+      setSuccessMessage(`Game "${created.name}" created successfully!`);
+      setTimeout(() => setSuccessMessage(null), 4000);
       fetchGames();
     } catch (err) {
       setError(err.message);
@@ -61,43 +65,67 @@ export default function StartScreen() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
+            <span>{successMessage}</span>
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-500 hover:text-green-700 ml-4"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-[var(--color-text-secondary)]">Loading games...</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {/* Create New Game Card */}
-            <button
-              onClick={() => setShowNewGame(true)}
-              className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[var(--color-primary)] hover:bg-blue-50/50 transition-colors cursor-pointer min-h-[200px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center text-2xl font-light">
-                +
+          <>
+            {games.length === 0 && (
+              <div className="text-center py-8 mb-6">
+                <p className="text-lg text-[var(--color-text-secondary)] mb-2">
+                  No games yet
+                </p>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  Create your first game to get started!
+                </p>
               </div>
-              <span className="text-[var(--color-text-secondary)] font-medium">
-                Create New Game
-              </span>
-            </button>
-
-            {/* Game Cards */}
-            {games.map((game) => (
-              <div
-                key={game.id}
-                className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6 hover:shadow-lg transition-shadow cursor-pointer min-h-[200px] flex flex-col"
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {/* Create New Game Card */}
+              <button
+                onClick={() => setShowNewGame(true)}
+                className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[var(--color-primary)] hover:bg-blue-50/50 transition-colors cursor-pointer min-h-[200px]"
               >
-                <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">
-                  {game.name}
-                </h3>
-                {game.description && (
-                  <p className="text-sm text-[var(--color-text-secondary)] mb-4 flex-1">
-                    {game.description}
-                  </p>
-                )}
-                <div className="text-xs text-[var(--color-text-secondary)] mt-auto">
-                  {game.card_count || 0} cards
+                <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center text-2xl font-light">
+                  +
                 </div>
-              </div>
-            ))}
-          </div>
+                <span className="text-[var(--color-text-secondary)] font-medium">
+                  Create New Game
+                </span>
+              </button>
+
+              {/* Game Cards */}
+              {games.map((game) => (
+                <div
+                  key={game.id}
+                  className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6 hover:shadow-lg transition-shadow cursor-pointer min-h-[200px] flex flex-col"
+                >
+                  <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">
+                    {game.name}
+                  </h3>
+                  {game.description && (
+                    <p className="text-sm text-[var(--color-text-secondary)] mb-4 flex-1">
+                      {game.description}
+                    </p>
+                  )}
+                  <div className="text-xs text-[var(--color-text-secondary)] mt-auto">
+                    {game.card_count || 0} cards
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* New Game Modal */}
