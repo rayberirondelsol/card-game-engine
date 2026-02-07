@@ -1,5 +1,51 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #14, #16, #44) ---
+
+COMPLETED:
+- Feature #14: Single card image upload - PASSING
+  - Backend endpoint POST /api/games/:id/cards/upload already existed
+  - Frontend upload UI with file input and progress indicator already existed
+  - Verified: PNG upload creates card with correct data
+  - Card name derived from filename (e.g., "test-card" from "test-card.png")
+  - Card name editable via PUT endpoint
+  - Image accessible via static file serving (/uploads/...)
+  - Data persists across server restart
+  - No mock data patterns
+
+- Feature #16: Create and manage card categories - PASSING
+  - Created server/src/routes/categories.js with full CRUD:
+    - GET /api/games/:id/categories - list all categories
+    - POST /api/games/:id/categories - create category (with optional parent_category_id)
+    - PUT /api/games/:id/categories/:catId - update category name
+    - DELETE /api/games/:id/categories/:catId - delete category
+  - Supports hierarchical categories (parent_category_id)
+  - Validates non-empty name, prevents circular references
+  - Updated GameDetail.jsx with:
+    - Left sidebar showing category tree with expand/collapse
+    - Create/edit/delete category modals
+    - Category filtering in card grid (All/Uncategorized/specific)
+    - Card-to-category assignment dropdown on each card
+    - Card count badges per category
+    - Add subcategory button on each category
+  - 4-column layout: Categories sidebar | Cards grid | Setups/Saves sidebar
+  - Data persists across server restart
+
+- Feature #44: Category name validation - PASSING
+  - Client-side validation: empty/whitespace name shows "Category name is required" error
+  - Server-side validation: returns 400 with error message
+  - Error displayed in red text below input with red border
+  - Both create and edit modals validate
+  - Valid name → 201 success
+
+CHANGES MADE:
+- server/src/routes/categories.js: NEW - Full categories CRUD API
+- server/src/index.js: Registered categoriesRoutes
+- client/src/pages/GameDetail.jsx: Major update with category sidebar, tree view, modals
+- create-test-card.js: Updated test card creation utility
+
+CURRENT STATUS: 19/44 features passing (43.2%)
+
 --- Session: 2026-02-07 (Agent handling features #21, #33, #34) ---
 
 COMPLETED:
