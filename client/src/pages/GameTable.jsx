@@ -1256,6 +1256,78 @@ export default function GameTable() {
     }
   }
 
+  // Auto-save functionality: periodically save game state
+  const autoSaveIntervalRef = useRef(null);
+  const lastAutoSaveRef = useRef(null);
+  const autoSaveEnabledRef = useRef(true);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle, saving, saved
+
+  // Auto-save function (uses refs to avoid stale closures)
+  const performAutoSaveRef = useRef(null);
+  performAutoSaveRef.current = async function performAutoSave() {
+    // Only auto-save if there's something on the table
+    if (tableCards.length === 0 && handCards.length === 0 && markers.length === 0 && counters.length === 0 && dice.length === 0 && notes.length === 0) {
+      return;
+    }
+
+    try {
+      setAutoSaveStatus('saving');
+      const stateData = getGameState();
+      const res = await fetch(`/api/games/${id}/saves/auto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state_data: stateData }),
+      });
+      if (res.ok) {
+        lastAutoSaveRef.current = new Date().toISOString();
+        setAutoSaveStatus('saved');
+        setSaveToast('Auto-saved');
+        setTimeout(() => setSaveToast(null), 2000);
+        setTimeout(() => setAutoSaveStatus('idle'), 3000);
+        console.log('[Auto-save] Game auto-saved at', lastAutoSaveRef.current);
+      }
+    } catch (err) {
+      console.error('[Auto-save] Failed:', err);
+      setAutoSaveStatus('idle');
+    }
+  };
+
+  // Set up auto-save interval (every 60 seconds)
+  useEffect(() => {
+    if (!game) return;
+
+    // Start auto-save interval
+    const AUTO_SAVE_INTERVAL = 60000; // 60 seconds
+    autoSaveIntervalRef.current = setInterval(() => {
+      if (autoSaveEnabledRef.current && performAutoSaveRef.current) {
+        performAutoSaveRef.current();
+      }
+    }, AUTO_SAVE_INTERVAL);
+
+    // Also auto-save when navigating away
+    function handleBeforeUnload() {
+      if (autoSaveEnabledRef.current && performAutoSaveRef.current) {
+        // Use sendBeacon for reliable save on page unload
+        const stateData = typeof getGameState === 'function' ? getGameState() : null;
+        if (stateData) {
+          navigator.sendBeacon(`/api/games/${id}/saves/auto`,
+            new Blob([JSON.stringify({ state_data: stateData })], { type: 'application/json' })
+          );
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current);
+        autoSaveIntervalRef.current = null;
+      }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [game, id]);
+
   // Save or update a setup (predefined starting state)
   async function saveSetup(name) {
     setSavingSetup(true);
@@ -2132,6 +2204,26 @@ export default function GameTable() {
             </span>
             <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="pan-display">
               Pan: {panPosition.x},{panPosition.y}
+            </span>
+            <span
+              className={`text-xs backdrop-blur-sm px-2 py-1 rounded cursor-pointer ${
+                autoSaveStatus === 'saving' ? 'text-yellow-300 bg-yellow-900/30' :
+                autoSaveStatus === 'saved' ? 'text-green-300 bg-green-900/30' :
+                'text-white/50 bg-black/30'
+              }`}
+              data-testid="auto-save-status"
+              data-auto-save-enabled={autoSaveEnabledRef.current ? 'true' : 'false'}
+              onClick={() => {
+                // Manual auto-save trigger for testing
+                if (performAutoSaveRef.current) {
+                  performAutoSaveRef.current();
+                }
+              }}
+              title="Click to trigger auto-save manually"
+            >
+              {autoSaveStatus === 'saving' ? 'Saving...' :
+               autoSaveStatus === 'saved' ? 'Auto-saved' :
+               'Auto-save: ON'}
             </span>
           </div>
         </div>
