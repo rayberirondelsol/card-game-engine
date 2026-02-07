@@ -1,5 +1,49 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #27, #24, #25) ---
+
+COMPLETED:
+- Feature #27: Hand display and card management - PASSING
+  - Added hand state (handCards array) and hand UI at bottom of screen
+  - Right-click context menu on cards shows "Pick up to Hand" option
+  - Hand displays fanned cards with rotation and arc offset
+  - Hover on hand card shows enlarged preview in center of screen
+  - Drag-to-reorder within hand (HTML5 drag and drop)
+  - "Play" button appears on hover to return card to table
+  - Hand auto-hides when empty (conditional render on handCards.length > 0)
+  - Verified: all 11 feature steps pass via Playwright browser automation
+  - Zero console errors
+
+- Feature #24: Flip card with F key - PASSING
+  - Replaced instant face swap with CSS 3D flip animation
+  - Both front and back faces rendered simultaneously with backface-visibility: hidden
+  - 0.4s ease transition on rotateY(180deg) for smooth flip
+  - perspective: 600px and transformStyle: preserve-3d on container
+  - data-face-down attribute for test verification
+  - Verified: F toggles face-down state, animation visible in mid-flip screenshot
+  - Zero console errors
+
+- Feature #25: Rotate card with Q and E keys - PASSING
+  - E key rotates selected card 90 degrees clockwise
+  - Q key rotates selected card 90 degrees counter-clockwise
+  - Cumulative rotation: 0 -> 90 -> 180 -> 90 -> 0 cycle verified
+  - CSS transition provides smooth rotation animation (0.2s ease)
+  - Added data-rotation attribute for test verification
+  - Verified: all 6 steps pass via Playwright browser automation
+  - Zero console errors
+
+CHANGES MADE:
+- client/src/pages/GameTable.jsx: Major update:
+  - Hand state (handCards, hoveredHandCard, draggingHandCard, handDragOverIndex)
+  - Hand functions (pickUpToHand, playCardFromHand, handleHandDragStart/Over/Drop/End)
+  - Hand UI at bottom of screen with fanned card layout, hover preview, play buttons
+  - Context menu "Pick up to Hand" option for selected cards
+  - 3D flip animation (perspective, preserve-3d, backface-visibility, rotateY transition)
+  - data-rotation and data-face-down attributes for test verification
+- kill-ports.js: Extended to cover ports 5175-5178
+
+CURRENT STATUS: 31/44 features passing (70.5%)
+
 --- Session: 2026-02-07 (Agent handling features #15, #17, #22) ---
 
 COMPLETED:
