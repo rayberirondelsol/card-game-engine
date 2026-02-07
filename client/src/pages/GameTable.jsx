@@ -288,25 +288,10 @@ export default function GameTable() {
 
     // Markers are now rendered as DOM overlays (not on canvas)
 
-    // Draw notes
-    notes.forEach(note => {
-      ctx.fillStyle = '#fef3c7';
-      ctx.fillRect(note.x - 60, note.y - 30, 120, 60);
-      ctx.strokeStyle = '#d97706';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(note.x - 60, note.y - 30, 120, 60);
-      ctx.fillStyle = '#78350f';
-      ctx.font = '11px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const lines = note.text.split('\n').slice(0, 3);
-      lines.forEach((line, i) => {
-        ctx.fillText(line.substring(0, 18), note.x, note.y - 10 + i * 14);
-      });
-    });
+    // Notes are now rendered as DOM overlays (not on canvas)
 
     ctx.restore();
-  }, [background, counters, dice, markers, notes]);
+  }, [background, counters, dice, markers]);
 
   // Set up canvas sizing and render loop
   useEffect(() => {
@@ -336,7 +321,7 @@ export default function GameTable() {
   // Re-render when state changes
   useEffect(() => {
     renderCanvas();
-  }, [background, counters, dice, markers, notes, renderCanvas]);
+  }, [background, counters, dice, markers, renderCanvas]);
 
   // Mouse event handlers for canvas (pan & zoom)
   useEffect(() => {
@@ -2008,6 +1993,104 @@ export default function GameTable() {
           {marker.attachedTo && (
             <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
           )}
+        </div>
+      ))}
+
+      {/* Floating Note Widgets (sticky notes on table) */}
+      {notes.map(note => (
+        <div
+          key={note.id}
+          data-testid={`note-${note.id}`}
+          data-note-id={note.id}
+          data-ui-element="true"
+          className="absolute z-20 select-none group"
+          style={{
+            left: note.x - 80,
+            top: note.y - 50,
+            cursor: draggingObj?.id === note.id ? 'grabbing' : 'grab',
+          }}
+          onMouseDown={(e) => {
+            // Don't start drag when clicking on textarea or buttons
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+            handleObjDragStart(e, 'note', note.id);
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (editingNoteId !== note.id) {
+              startEditingNote(note.id);
+            }
+          }}
+        >
+          <div className="bg-amber-100 rounded-lg border border-amber-300 shadow-lg min-w-[160px] max-w-[200px] relative"
+               style={{ boxShadow: '2px 3px 8px rgba(0,0,0,0.2)' }}>
+            {/* Delete button */}
+            <button
+              onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+              data-testid={`note-delete-${note.id}`}
+              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            >
+              &times;
+            </button>
+            {/* Edit button */}
+            {editingNoteId !== note.id && (
+              <button
+                onClick={(e) => { e.stopPropagation(); startEditingNote(note.id); }}
+                data-testid={`note-edit-${note.id}`}
+                className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                title="Edit note"
+              >
+                &#9998;
+              </button>
+            )}
+            <div className="p-2.5">
+              {editingNoteId === note.id ? (
+                <div>
+                  <textarea
+                    value={editingNoteText}
+                    onChange={(e) => setEditingNoteText(e.target.value)}
+                    data-testid={`note-edit-input-${note.id}`}
+                    className="w-full px-2 py-1 bg-amber-50 border border-amber-400 rounded text-amber-900 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
+                    rows={3}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        saveNoteEdit(note.id);
+                      }
+                      if (e.key === 'Escape') {
+                        setEditingNoteId(null);
+                        setEditingNoteText('');
+                      }
+                      e.stopPropagation();
+                    }}
+                  />
+                  <div className="flex gap-1 justify-end mt-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingNoteId(null); setEditingNoteText(''); }}
+                      className="px-2 py-0.5 text-[10px] text-amber-700 hover:text-amber-900"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); saveNoteEdit(note.id); }}
+                      data-testid={`note-save-edit-${note.id}`}
+                      className="px-2 py-0.5 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="text-amber-900 text-xs whitespace-pre-wrap break-words min-h-[20px]"
+                  data-testid={`note-text-${note.id}`}
+                  title="Double-click to edit"
+                >
+                  {note.text}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ))}
 
