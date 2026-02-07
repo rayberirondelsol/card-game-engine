@@ -1,5 +1,52 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #15, #17, #22) ---
+
+COMPLETED:
+- Feature #15: Batch upload multiple card images - PASSING
+  - Added `multiple` attribute to file input in GameDetail.jsx
+  - Existing handleFileUpload already iterated through multiple files
+  - Verified: 4 images uploaded simultaneously via browser automation
+  - All 4 cards appear in grid with correct names
+  - Card count matches uploaded file count (4)
+  - Cards persist after page refresh
+  - No mock data patterns
+
+- Feature #17: Card back management and assignment - PASSING
+  - Created server/src/routes/card-backs.js with full CRUD + upload
+    - GET /api/games/:id/card-backs
+    - POST /api/games/:id/card-backs/upload
+    - PUT /api/games/:id/card-backs/:cardBackId
+    - DELETE /api/games/:id/card-backs/:cardBackId
+  - Registered routes in server/src/index.js
+  - Added Card Backs section in right sidebar (GameDetail.jsx)
+    - Upload button, card back list with thumbnails, delete buttons
+  - Added card back assignment dropdown on each card
+  - Fixed cards PUT endpoint: replaced COALESCE approach with dynamic SQL for proper null handling
+  - Verified: upload, list, assign to card, persist after refresh
+  - No mock data patterns
+
+- Feature #22: Canvas pan and zoom controls - PASSING
+  - Added React event handlers for pan and zoom (onMouseDown, onMouseMove, onMouseUp, onWheel)
+  - Added reactive zoom display (Zoom: X%) and pan position (Pan: X,Y) in top-right toolbar
+  - Improved panning: works via click+drag on canvas/container background
+  - Improved zoom: mousewheel on canvas/container
+  - Zoom limits: 20% min, 500% max (0.2x to 5x)
+  - Combined native and React event handlers for best compatibility
+  - Verified via Playwright: pan, zoom in, zoom out, limits, combined operations
+  - Zero console errors
+
+CHANGES MADE:
+- client/src/pages/GameDetail.jsx: Added multiple attribute to file input, card backs state/fetch/upload/delete, card back assignment dropdown
+- server/src/routes/card-backs.js: NEW - Full card backs CRUD + upload API
+- server/src/index.js: Registered cardBacksRoutes
+- server/src/routes/cards.js: Fixed PUT endpoint for proper null handling
+- client/src/pages/GameTable.jsx: Added reactive zoom/pan display, React-based event handlers for pan+zoom
+- test-feature-15.mjs, test-feature-17.mjs, test-feature-22.mjs: Playwright browser tests
+- screenshots/f15-*.png, f17-*.png, f22-*.png: Visual verification
+
+CURRENT STATUS: ~21+3 = 24/44 features passing (may be higher if other agents added more)
+
 --- Session: 2026-02-07 (Agent handling features #23, #28, #32) ---
 
 COMPLETED:
