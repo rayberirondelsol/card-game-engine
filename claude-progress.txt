@@ -1,5 +1,42 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #3, #7, #9) ---
+
+COMPLETED:
+- Feature #3: Data persists across server restart - RE-VERIFIED & PASSING
+  - Created RESTART_TEST_12345, stopped server, restarted, verified data survived
+  - No mock data patterns in codebase
+  - Cleaned up test data
+
+- Feature #7: Start screen displays correctly - PASSING
+  - StartScreen component at /client/src/pages/StartScreen.jsx
+  - "Create New Game" button/card with + icon prominently displayed
+  - Responsive grid layout (1-4 columns based on screen size)
+  - Empty state message: "No games yet" / "Create your first game to get started!"
+  - Verified Vite serves compiled JSX correctly
+  - API proxy working through Vite (localhost:5173/api/* -> localhost:3001/api/*)
+
+- Feature #9: Create new game with name and description - PASSING
+  - Added success toast notification (green banner) after game creation
+  - Toast auto-dismisses after 4 seconds, dismissible with X button
+  - Full workflow verified: click Create New Game -> fill form -> submit -> see toast -> game in list
+  - Data persists across server restart (verified)
+  - Cleaned up test data
+
+CHANGES MADE:
+- client/src/pages/StartScreen.jsx: Added successMessage state, success toast UI, parse response JSON
+- server/src/database.js: Added WAL checkpoint on startup for crash recovery, synchronous=FULL
+- Added kill-ports.js: Cross-platform utility to kill processes on dev ports
+- Added start-client.sh: Helper script to start Vite dev server
+
+CURRENT STATUS: 8/44 features passing (Features #1, #2, #3, #4, #5, #7, #9 + others by other agents)
+
+HOW TO START SERVERS:
+- Backend: node server/src/index.js (port 3001)
+- Frontend: bash start-client.sh (port 5173)
+- Kill ports: node kill-ports.js
+- Note: On Windows, use bash start-client.sh to handle cd into client dir
+
 --- Session: 2026-02-06 (Agent handling features #4 and #5) ---
 
 COMPLETED:
