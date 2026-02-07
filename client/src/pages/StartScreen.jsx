@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function StartScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -8,9 +11,18 @@ export default function StartScreen() {
   const [newGameName, setNewGameName] = useState('');
   const [newGameDesc, setNewGameDesc] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // game object to delete
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchGames();
+    // Check for deleted game message from navigation state
+    if (location.state?.deletedGame) {
+      setSuccessMessage(`Game "${location.state.deletedGame}" deleted successfully!`);
+      setTimeout(() => setSuccessMessage(null), 4000);
+      // Clear location state to prevent showing message on refresh
+      window.history.replaceState({}, document.title);
+    }
   }, []);
 
   async function fetchGames() {
@@ -46,6 +58,31 @@ export default function StartScreen() {
       fetchGames();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  function initiateDelete(e, game) {
+    e.stopPropagation(); // Prevent navigating to game detail
+    setDeleteTarget(game);
+  }
+
+  async function handleDeleteGame() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/games/${deleteTarget.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete game');
+      setSuccessMessage(`Game "${deleteTarget.name}" deleted successfully!`);
+      setTimeout(() => setSuccessMessage(null), 4000);
+      setDeleteTarget(null);
+      fetchGames();
+    } catch (err) {
+      setError(err.message);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -109,8 +146,19 @@ export default function StartScreen() {
               {games.map((game) => (
                 <div
                   key={game.id}
-                  className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6 hover:shadow-lg transition-shadow cursor-pointer min-h-[200px] flex flex-col"
+                  onClick={() => navigate(`/games/${game.id}`)}
+                  data-testid={`game-card-${game.id}`}
+                  className="group bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-6 hover:shadow-lg transition-shadow cursor-pointer min-h-[200px] flex flex-col relative"
                 >
+                  {/* Delete button (shown on hover) */}
+                  <button
+                    onClick={(e) => initiateDelete(e, game)}
+                    data-testid={`delete-game-${game.id}`}
+                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-xs w-7 h-7 flex items-center justify-center hover:bg-red-600"
+                    title="Delete game"
+                  >
+                    &times;
+                  </button>
                   <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">
                     {game.name}
                   </h3>
@@ -178,6 +226,39 @@ export default function StartScreen() {
             </div>
           </div>
         )}
+      {/* Delete Game Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="delete-game-modal">
+          <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-semibold text-red-600 mb-4">Delete Game</h2>
+            <p className="text-[var(--color-text)] mb-2">
+              Are you sure you want to delete <strong>"{deleteTarget.name}"</strong>?
+            </p>
+            <p className="text-sm text-[var(--color-text-secondary)] mb-6" data-testid="delete-warning">
+              This will permanently delete this game along with all its cards, setups, and saved games. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                data-testid="delete-game-cancel-btn"
+                className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteGame}
+                disabled={deleting}
+                data-testid="delete-game-confirm-btn"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Deleting...' : 'Delete Game'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
