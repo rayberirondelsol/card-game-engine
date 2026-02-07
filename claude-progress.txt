@@ -1,5 +1,44 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #18, #19) ---
+
+COMPLETED:
+- Feature #18: Edit card name after import - PASSING
+  - Added inline card name editing to GameDetail.jsx
+  - Click card name or pencil icon to enter edit mode
+  - Input field with Enter to save, Escape to cancel, blur to save
+  - Calls PUT /api/games/:id/cards/:cardId with new name
+  - Success toast shown on rename
+  - Verified: name persists after page refresh
+  - Verified: name persists after server restart
+  - No mock data patterns in codebase
+  - Zero console errors
+
+- Feature #19: Delete individual card removes it from database - PASSING
+  - Added GET /api/games/:id/cards/:cardId endpoint to cards.js for individual card lookup
+  - Existing DELETE endpoint and UI handler already worked correctly
+  - Verified via browser automation:
+    - Card visible in UI before deletion
+    - Confirm dialog appears on delete click
+    - Card removed from UI immediately after confirmation
+    - Success toast "Card deleted" shown
+    - Card count drops to 0
+    - Card stays gone after page refresh
+    - API returns 404 for deleted card ID
+    - Cards list API returns empty array
+  - Verified: deletion persists after server restart
+  - No mock data patterns in codebase
+  - Test data cleaned up
+
+CHANGES MADE:
+- client/src/pages/GameDetail.jsx: Added inline card name editing (editingCardId state, startEditCardName, handleSaveCardName, handleCardNameKeyDown functions, inline input with pencil edit icon)
+- server/src/routes/cards.js: Added GET /api/games/:id/cards/:cardId endpoint
+- test-feature-18.mjs: Playwright browser test for card name editing
+- test-feature-19.mjs: Playwright browser test for card deletion
+- screenshots/f18-*.png, f19-*.png: Visual verification screenshots
+
+CURRENT STATUS: 21/44 features passing (Features #18, #19 added this session)
+
 --- Session: 2026-02-07 (Agent handling features #14, #16, #44) ---
 
 COMPLETED:
