@@ -11,6 +11,7 @@ export default function StartScreen() {
   const [newGameName, setNewGameName] = useState('');
   const [newGameDesc, setNewGameDesc] = useState('');
   const [successMessage, setSuccessMessage] = useState(null);
+  const [nameError, setNameError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // game object to delete
   const [deleting, setDeleting] = useState(false);
 
@@ -41,7 +42,12 @@ export default function StartScreen() {
 
   async function createGame(e) {
     e.preventDefault();
-    if (!newGameName.trim()) return;
+    // Validate name field
+    if (!newGameName.trim()) {
+      setNameError('Game name is required');
+      return;
+    }
+    setNameError(null);
     try {
       const res = await fetch('/api/games', {
         method: 'POST',
@@ -131,7 +137,7 @@ export default function StartScreen() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {/* Create New Game Card */}
               <button
-                onClick={() => setShowNewGame(true)}
+                onClick={() => { setShowNewGame(true); setNameError(null); setNewGameName(''); setNewGameDesc(''); }}
                 className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-6 flex flex-col items-center justify-center gap-3 hover:border-[var(--color-primary)] hover:bg-blue-50/50 transition-colors cursor-pointer min-h-[200px]"
               >
                 <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center text-2xl font-light">
@@ -189,11 +195,15 @@ export default function StartScreen() {
                   <input
                     type="text"
                     value={newGameName}
-                    onChange={(e) => setNewGameName(e.target.value)}
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    onChange={(e) => { setNewGameName(e.target.value); if (nameError) setNameError(null); }}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${nameError ? 'border-red-500 focus:ring-red-400' : 'border-[var(--color-border)] focus:ring-[var(--color-primary)]'}`}
                     placeholder="Enter game name..."
                     autoFocus
+                    data-testid="game-name-input"
                   />
+                  {nameError && (
+                    <p className="text-red-500 text-sm mt-1" data-testid="name-error">{nameError}</p>
+                  )}
                 </div>
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
@@ -210,13 +220,15 @@ export default function StartScreen() {
                 <div className="flex gap-3 justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowNewGame(false)}
+                    onClick={() => { setShowNewGame(false); setNameError(null); }}
+                    data-testid="create-game-cancel"
                     className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
+                    data-testid="create-game-submit"
                     className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors"
                   >
                     Create Game
