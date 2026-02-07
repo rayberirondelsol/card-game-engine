@@ -476,12 +476,24 @@ export default function GameTable() {
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
-    // Bring card to front
+    // If card is in a stack, bring the whole stack to front
+    const stackId = card.inStack;
     const newZ = maxZIndex + 1;
-    setMaxZIndex(newZ);
-    setTableCards(prev => prev.map(c =>
-      c.tableId === tableId ? { ...c, zIndex: newZ } : c
-    ));
+
+    if (stackId) {
+      const stackCards = tableCards.filter(c => c.inStack === stackId);
+      setMaxZIndex(newZ + stackCards.length);
+      setTableCards(prev => prev.map(c => {
+        if (c.inStack !== stackId) return c;
+        const idx = stackCards.findIndex(sc => sc.tableId === c.tableId);
+        return { ...c, zIndex: newZ + idx };
+      }));
+    } else {
+      setMaxZIndex(newZ);
+      setTableCards(prev => prev.map(c =>
+        c.tableId === tableId ? { ...c, zIndex: newZ } : c
+      ));
+    }
 
     cardDragOffsetRef.current = {
       x: e.clientX - card.x,
@@ -491,7 +503,13 @@ export default function GameTable() {
 
     // Select the card if not already selected (and not ctrl-clicking)
     if (!e.ctrlKey && !e.metaKey) {
-      setSelectedCards(new Set([tableId]));
+      // For stacks, select all cards in the stack
+      if (stackId) {
+        const stackCardIds = tableCards.filter(c => c.inStack === stackId).map(c => c.tableId);
+        setSelectedCards(new Set(stackCardIds));
+      } else {
+        setSelectedCards(new Set([tableId]));
+      }
     } else {
       // Toggle selection with ctrl
       setSelectedCards(prev => {
@@ -524,22 +542,52 @@ export default function GameTable() {
       setGridHighlight(null);
     }
 
-    setTableCards(prev => prev.map(c =>
-      c.tableId === draggingCard ? { ...c, x: newX, y: newY } : c
-    ));
+    // Move the card (and all cards in the same stack)
+    const card = tableCards.find(c => c.tableId === draggingCard);
+    if (card && card.inStack) {
+      // Move entire stack together
+      const dx = newX - card.x;
+      const dy = newY - card.y;
+      setTableCards(prev => prev.map(c => {
+        if (c.inStack === card.inStack) {
+          return { ...c, x: c.x + dx, y: c.y + dy };
+        }
+        return c;
+      }));
+    } else {
+      setTableCards(prev => prev.map(c =>
+        c.tableId === draggingCard ? { ...c, x: newX, y: newY } : c
+      ));
+    }
   }
 
   // Handle card drag end - snap to grid
   function handleCardDragEnd() {
     if (!draggingCard) return;
 
+    const card = tableCards.find(c => c.tableId === draggingCard);
+
     // Snap to grid on release
-    setTableCards(prev => prev.map(c => {
-      if (c.tableId !== draggingCard) return c;
-      const finalX = shouldSnap(c.x) ? snapToGrid(c.x) : c.x;
-      const finalY = shouldSnap(c.y) ? snapToGrid(c.y) : c.y;
-      return { ...c, x: finalX, y: finalY };
-    }));
+    if (card && card.inStack) {
+      // Snap the whole stack
+      const finalX = shouldSnap(card.x) ? snapToGrid(card.x) : card.x;
+      const finalY = shouldSnap(card.y) ? snapToGrid(card.y) : card.y;
+      const dx = finalX - card.x;
+      const dy = finalY - card.y;
+      setTableCards(prev => prev.map(c => {
+        if (c.inStack === card.inStack) {
+          return { ...c, x: c.x + dx, y: c.y + dy };
+        }
+        return c;
+      }));
+    } else {
+      setTableCards(prev => prev.map(c => {
+        if (c.tableId !== draggingCard) return c;
+        const finalX = shouldSnap(c.x) ? snapToGrid(c.x) : c.x;
+        const finalY = shouldSnap(c.y) ? snapToGrid(c.y) : c.y;
+        return { ...c, x: finalX, y: finalY };
+      }));
+    }
 
     setDraggingCard(null);
     setGridHighlight(null);
@@ -782,81 +830,176 @@ export default function GameTable() {
         />
       )}
 
-      {/* Table Cards */}
-      {tableCards.map(card => {
-        const isDragging = draggingCard === card.tableId;
-        const isSelected = selectedCards.has(card.tableId);
-        return (
-          <div
-            key={card.tableId}
-            data-testid={`table-card-${card.tableId}`}
-            data-card-name={card.name}
-            data-card-id={card.cardId}
-            data-table-card="true"
-            data-ui-element="true"
-            className="absolute select-none"
-            style={{
-              left: card.x - CARD_WIDTH / 2,
-              top: card.y - CARD_HEIGHT / 2,
-              width: CARD_WIDTH,
-              height: CARD_HEIGHT,
-              zIndex: isDragging ? 9999 : card.zIndex,
-              transform: `scale(${isDragging ? 1.1 : 1}) rotate(${card.rotation || 0}deg)`,
-              transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
-              cursor: isDragging ? 'grabbing' : 'grab',
-              filter: isDragging ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-            }}
-            onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
-          >
-            {/* Card visual */}
+      {/* Table Cards - render stacks and individual cards */}
+      {(() => {
+        // Group cards by stack, render only the top card of each stack
+        // Non-stacked cards render individually
+        const stacks = {};
+        const individualCards = [];
+
+        tableCards.forEach(card => {
+          if (card.inStack) {
+            if (!stacks[card.inStack]) stacks[card.inStack] = [];
+            stacks[card.inStack].push(card);
+          } else {
+            individualCards.push(card);
+          }
+        });
+
+        // Sort stack cards by zIndex to find the top card
+        Object.values(stacks).forEach(stack => {
+          stack.sort((a, b) => a.zIndex - b.zIndex);
+        });
+
+        const renderCard = (card, stackSize = 0, stackId = null) => {
+          const isDragging = draggingCard === card.tableId;
+          const isSelected = selectedCards.has(card.tableId);
+          const isStack = stackSize > 1;
+
+          return (
             <div
-              className={`w-full h-full rounded-lg overflow-hidden border-2 ${
-                isSelected ? 'border-blue-400 ring-2 ring-blue-400/50' : 'border-white/30'
-              }`}
-              style={{ backgroundColor: card.faceDown ? '#2d3748' : '#fff' }}
+              key={card.tableId}
+              data-testid={`table-card-${card.tableId}`}
+              data-card-name={card.name}
+              data-card-id={card.cardId}
+              data-table-card="true"
+              data-stack-id={stackId || ''}
+              data-stack-size={stackSize}
+              data-ui-element="true"
+              className="absolute select-none group"
+              style={{
+                left: card.x - CARD_WIDTH / 2,
+                top: card.y - CARD_HEIGHT / 2,
+                width: CARD_WIDTH,
+                height: CARD_HEIGHT + (isStack ? 6 : 0),
+                zIndex: isDragging ? 9999 : card.zIndex,
+                transform: `scale(${isDragging ? 1.1 : 1}) rotate(${card.rotation || 0}deg)`,
+                transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
+                cursor: isDragging ? 'grabbing' : 'grab',
+                filter: isDragging
+                  ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))'
+                  : isStack
+                    ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
+                    : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+              }}
+              onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
+              title={isStack ? `Stack: ${stackSize} cards` : card.name}
             >
-              {card.faceDown ? (
-                // Face-down card back
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-                  <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M12 8v8M8 12h8" />
-                    </svg>
-                  </div>
-                </div>
-              ) : (
-                // Face-up card front
-                <div className="w-full h-full relative bg-white">
-                  {card.image_path ? (
-                    <img
-                      src={card.image_path}
-                      alt={card.name}
-                      className="w-full h-full object-cover"
-                      draggable={false}
+              {/* Stack offset visual - ghost cards behind */}
+              {isStack && (
+                <>
+                  {/* Bottom ghost card */}
+                  <div
+                    className="absolute rounded-lg border border-white/20 bg-slate-600"
+                    style={{
+                      left: 4,
+                      top: 8,
+                      width: CARD_WIDTH - 4,
+                      height: CARD_HEIGHT - 4,
+                    }}
+                  />
+                  {/* Middle ghost card (for 3+ stacks) */}
+                  {stackSize >= 3 && (
+                    <div
+                      className="absolute rounded-lg border border-white/20 bg-slate-500"
+                      style={{
+                        left: 2,
+                        top: 4,
+                        width: CARD_WIDTH - 2,
+                        height: CARD_HEIGHT - 2,
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <path d="M21 15l-5-5L5 21" />
-                      </svg>
-                      <span className="text-[8px] text-gray-500 text-center leading-tight truncate w-full px-1">
-                        {card.name}
-                      </span>
-                    </div>
                   )}
-                  {/* Card name label */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 truncate px-1">
-                    {card.name}
+                </>
+              )}
+
+              {/* Main card visual */}
+              <div
+                className={`absolute top-0 left-0 rounded-lg overflow-hidden border-2 ${
+                  isSelected ? 'border-blue-400 ring-2 ring-blue-400/50' : isStack ? 'border-yellow-400/50' : 'border-white/30'
+                }`}
+                style={{
+                  width: CARD_WIDTH,
+                  height: CARD_HEIGHT,
+                  backgroundColor: card.faceDown ? '#2d3748' : '#fff',
+                }}
+              >
+                {card.faceDown ? (
+                  // Face-down card back
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                    <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M12 8v8M8 12h8" />
+                      </svg>
+                    </div>
                   </div>
+                ) : (
+                  // Face-up card front
+                  <div className="w-full h-full relative bg-white">
+                    {card.image_path ? (
+                      <img
+                        src={card.image_path}
+                        alt={card.name}
+                        className="w-full h-full object-cover"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <path d="M21 15l-5-5L5 21" />
+                        </svg>
+                        <span className="text-[8px] text-gray-500 text-center leading-tight truncate w-full px-1">
+                          {card.name}
+                        </span>
+                      </div>
+                    )}
+                    {/* Card name label */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 truncate px-1">
+                      {card.name}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Stack count badge */}
+              {isStack && (
+                <div
+                  data-testid={`stack-count-${stackId}`}
+                  className="absolute -top-2 -right-2 min-w-[20px] h-5 rounded-full bg-yellow-500 text-black text-[10px] font-bold flex items-center justify-center px-1 shadow-lg z-10"
+                >
+                  {stackSize}
+                </div>
+              )}
+
+              {/* Hover tooltip for stacks */}
+              {isStack && (
+                <div
+                  data-testid={`stack-tooltip-${stackId}`}
+                  className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20"
+                >
+                  Stack: {stackSize} cards
                 </div>
               )}
             </div>
-          </div>
+          );
+        };
+
+        return (
+          <>
+            {/* Render individual (non-stacked) cards */}
+            {individualCards.map(card => renderCard(card, 1, null))}
+
+            {/* Render stacks - only the top card with stack visuals */}
+            {Object.entries(stacks).map(([stackId, stackCards]) => {
+              const topCard = stackCards[stackCards.length - 1]; // highest zIndex
+              return renderCard(topCard, stackCards.length, stackId);
+            })}
+          </>
         );
-      })}
+      })()}
 
       {/* Floating Counter Widgets */}
       {counters.map(counter => (

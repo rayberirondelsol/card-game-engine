@@ -35,6 +35,19 @@ export async function cardsRoutes(fastify) {
     return cards;
   });
 
+  // GET /api/games/:id/cards/:cardId - Get a single card by ID
+  fastify.get('/api/games/:id/cards/:cardId', async (request, reply) => {
+    const db = getDb();
+    const { id, cardId } = request.params;
+
+    const card = db.prepare('SELECT * FROM cards WHERE id = ? AND game_id = ?').get(cardId, id);
+    if (!card) {
+      return reply.status(404).send({ error: 'Card not found' });
+    }
+    console.log('[SQL] SELECT * FROM cards WHERE id = ? AND game_id = ?', cardId, id);
+    return card;
+  });
+
   // POST /api/games/:id/cards/upload - Upload a single card image
   fastify.post('/api/games/:id/cards/upload', async (request, reply) => {
     const db = getDb();
@@ -99,29 +112,37 @@ export async function cardsRoutes(fastify) {
   fastify.put('/api/games/:id/cards/:cardId', async (request, reply) => {
     const db = getDb();
     const { id, cardId } = request.params;
-    const { name, category_id, card_back_id } = request.body || {};
+    const body = request.body || {};
 
     const card = db.prepare('SELECT * FROM cards WHERE id = ? AND game_id = ?').get(cardId, id);
     if (!card) {
       return reply.status(404).send({ error: 'Card not found' });
     }
 
-    const stmt = db.prepare(
-      `UPDATE cards SET
-        name = COALESCE(?, name),
-        category_id = COALESCE(?, category_id),
-        card_back_id = COALESCE(?, card_back_id),
-        updated_at = datetime('now')
-      WHERE id = ? AND game_id = ?`
-    );
-    stmt.run(
-      name || null,
-      category_id !== undefined ? category_id : null,
-      card_back_id !== undefined ? card_back_id : null,
-      cardId,
-      id
-    );
-    console.log('[SQL] UPDATE cards SET ... WHERE id = ? AND game_id = ?', cardId, id);
+    // Build dynamic update - only update fields that were explicitly provided
+    const updates = [];
+    const values = [];
+
+    if ('name' in body && body.name) {
+      updates.push('name = ?');
+      values.push(body.name);
+    }
+    if ('category_id' in body) {
+      updates.push('category_id = ?');
+      values.push(body.category_id);
+    }
+    if ('card_back_id' in body) {
+      updates.push('card_back_id = ?');
+      values.push(body.card_back_id);
+    }
+
+    if (updates.length > 0) {
+      updates.push("updated_at = datetime('now')");
+      values.push(cardId, id);
+      const sql = `UPDATE cards SET ${updates.join(', ')} WHERE id = ? AND game_id = ?`;
+      db.prepare(sql).run(...values);
+      console.log('[SQL]', sql, cardId, id);
+    }
 
     const updated = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
     return updated;

@@ -1033,6 +1033,22 @@ export default function GameDetail() {
                               </option>
                             ))}
                           </select>
+                          {/* Card back assignment dropdown */}
+                          {cardBacks.length > 0 && (
+                            <select
+                              value={card.card_back_id || ''}
+                              onChange={(e) => handleAssignCardBack(card.id, e.target.value || null)}
+                              className="mt-1 w-full text-xs border border-[var(--color-border)] rounded px-1 py-0.5 bg-white text-[var(--color-text)]"
+                              data-testid={`card-back-select-${card.id}`}
+                            >
+                              <option value="">No card back</option>
+                              {cardBacks.map(cb => (
+                                <option key={cb.id} value={cb.id}>
+                                  {cb.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                         {/* Delete button (shown on hover) */}
                         <button
@@ -1054,8 +1070,76 @@ export default function GameDetail() {
             </div>
           </div>
 
-          {/* Right Sidebar - Setups & Saves */}
+          {/* Right Sidebar - Card Backs, Setups & Saves */}
           <div className="lg:col-span-1 space-y-6">
+            {/* Card Backs */}
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="card-backs-section">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide">Card Backs</h2>
+                <div>
+                  <input
+                    ref={cardBackInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    onChange={handleCardBackUpload}
+                    className="hidden"
+                    id="card-back-upload-input"
+                    data-testid="card-back-upload-input"
+                  />
+                  <button
+                    onClick={() => cardBackInputRef.current?.click()}
+                    disabled={uploadingCardBack}
+                    data-testid="upload-card-back-btn"
+                    className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50"
+                    title="Upload card back"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {uploadingCardBack && (
+                <div className="mb-2 px-2 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded text-xs" data-testid="card-back-upload-progress">
+                  Uploading card back...
+                </div>
+              )}
+
+              {cardBacks.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-secondary)]" data-testid="no-card-backs-message">
+                  No card backs uploaded yet.
+                </p>
+              ) : (
+                <ul className="space-y-2" data-testid="card-backs-list">
+                  {cardBacks.map((cb) => (
+                    <li
+                      key={cb.id}
+                      data-testid={`card-back-${cb.id}`}
+                      className="group flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors border border-[var(--color-border)]"
+                    >
+                      <div className="w-10 h-14 rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                        <img
+                          src={cb.image_path}
+                          alt={cb.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <span className="text-xs text-[var(--color-text)] truncate flex-1" data-testid={`card-back-name-${cb.id}`} title={cb.name}>
+                        {cb.name}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteCardBack(cb.id, cb.name)}
+                        data-testid={`delete-card-back-${cb.id}`}
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
+                        title="Delete card back"
+                      >
+                        &times;
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Setups */}
             <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4">
               <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-3">Setups</h2>
