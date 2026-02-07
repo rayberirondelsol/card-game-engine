@@ -1,5 +1,26 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling feature #12) ---
+
+COMPLETED:
+- Feature #12: Game CRUD data persists across page refresh - PASSING
+  - Created game 'PERSIST_TEST_67890' via UI, verified it appeared in game list
+  - Performed full page refresh, verified game persisted (data from SQLite DB)
+  - Navigated to game detail, edited name to 'PERSIST_TEST_UPDATED'
+  - Refreshed page again, verified updated name persisted on detail page
+  - Navigated back to start screen, verified updated name in game list
+  - Deleted game via detail page (Delete button -> confirmation modal -> confirm)
+  - Refreshed page, verified game completely removed from list
+  - No mock data patterns found in codebase (full grep scan)
+  - Zero console errors during entire test
+  - All data flows through real SQLite database (verified SQL queries in backend routes)
+
+CHANGES MADE:
+- test-feature-12.mjs: Playwright browser automation test for CRUD persistence verification
+- screenshots/f12-*.png: Visual verification screenshots for all 8 steps
+
+CURRENT STATUS: 14/44 features passing (Feature #12 added this session)
+
 --- Session: 2026-02-07 (Agent handling feature #11) ---
 
 COMPLETED:
