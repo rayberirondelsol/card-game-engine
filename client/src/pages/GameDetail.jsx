@@ -47,6 +47,12 @@ export default function GameDetail() {
   const [deleteCategoryName, setDeleteCategoryName] = useState('');
   const [deletingCategory, setDeletingCategory] = useState(false);
 
+  // Edit card name state
+  const [editingCardId, setEditingCardId] = useState(null);
+  const [editingCardName, setEditingCardName] = useState('');
+  const [savingCardName, setSavingCardName] = useState(false);
+  const editCardNameRef = useRef(null);
+
   // Expanded categories in tree
   const [expandedCategories, setExpandedCategories] = useState(new Set());
 
@@ -207,6 +213,59 @@ export default function GameDetail() {
       }
     } catch (err) {
       console.error('Assign category error:', err);
+    }
+  }
+
+  function startEditCardName(card) {
+    setEditingCardId(card.id);
+    setEditingCardName(card.name);
+    // Focus the input after render
+    setTimeout(() => {
+      if (editCardNameRef.current) {
+        editCardNameRef.current.focus();
+        editCardNameRef.current.select();
+      }
+    }, 50);
+  }
+
+  async function handleSaveCardName(cardId) {
+    const trimmedName = editingCardName.trim();
+    if (!trimmedName) {
+      // Revert to original name
+      setEditingCardId(null);
+      return;
+    }
+
+    setSavingCardName(true);
+    try {
+      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCards(prev => prev.map(c => c.id === cardId ? { ...c, name: updated.name } : c));
+        setUploadMessage({ type: 'success', text: `Card renamed to "${updated.name}"` });
+        setTimeout(() => setUploadMessage(null), 3000);
+      } else {
+        const errData = await res.json();
+        console.error('Failed to rename card:', errData.error);
+      }
+    } catch (err) {
+      console.error('Error renaming card:', err);
+    } finally {
+      setSavingCardName(false);
+      setEditingCardId(null);
+    }
+  }
+
+  function handleCardNameKeyDown(e, cardId) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveCardName(cardId);
+    } else if (e.key === 'Escape') {
+      setEditingCardId(null);
     }
   }
 
@@ -762,6 +821,7 @@ export default function GameDetail() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/png,image/jpeg,image/jpg"
+                    multiple
                     onChange={handleFileUpload}
                     className="hidden"
                     id="card-upload-input"
@@ -816,13 +876,44 @@ export default function GameDetail() {
                           />
                         </div>
                         <div className="p-2">
-                          <p
-                            className="text-xs text-[var(--color-text)] truncate font-medium"
-                            data-testid={`card-name-${card.id}`}
-                            title={card.name}
-                          >
-                            {card.name}
-                          </p>
+                          {editingCardId === card.id ? (
+                            <input
+                              ref={editCardNameRef}
+                              type="text"
+                              value={editingCardName}
+                              onChange={(e) => setEditingCardName(e.target.value)}
+                              onKeyDown={(e) => handleCardNameKeyDown(e, card.id)}
+                              onBlur={() => handleSaveCardName(card.id)}
+                              disabled={savingCardName}
+                              data-testid={`card-name-input-${card.id}`}
+                              className="w-full text-xs text-[var(--color-text)] font-medium border border-[var(--color-primary)] rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1 group/name">
+                              <p
+                                className="text-xs text-[var(--color-text)] truncate font-medium flex-1 cursor-pointer hover:text-[var(--color-primary)]"
+                                data-testid={`card-name-${card.id}`}
+                                title={`${card.name} (click to edit)`}
+                                onClick={() => startEditCardName(card)}
+                              >
+                                {card.name}
+                              </p>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditCardName(card);
+                                }}
+                                data-testid={`edit-card-name-${card.id}`}
+                                className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-[var(--color-text-secondary)] opacity-0 group-hover/name:opacity-100 hover:text-[var(--color-primary)] transition-opacity"
+                                title="Edit card name"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                           {/* Category assignment dropdown */}
                           <select
                             value={card.category_id || ''}

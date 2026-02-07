@@ -35,6 +35,23 @@ const TABLE_BACKGROUNDS = {
   }
 };
 
+// Grid configuration for snap-to-grid
+const GRID_SIZE = 80; // pixels per grid cell
+const CARD_WIDTH = 100;
+const CARD_HEIGHT = 140;
+const SNAP_THRESHOLD = 20; // pixels within which snap activates
+
+// Snap a value to the nearest grid line
+function snapToGrid(value) {
+  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+// Check if value is close enough to snap
+function shouldSnap(value) {
+  const nearest = snapToGrid(value);
+  return Math.abs(value - nearest) < SNAP_THRESHOLD;
+}
+
 // Draw felt texture pattern
 function drawFeltPattern(ctx, width, height, baseColor) {
   ctx.fillStyle = baseColor;
@@ -127,6 +144,16 @@ export default function GameTable() {
   const [markers, setMarkers] = useState([]);
   const [notes, setNotes] = useState([]);
 
+  // Card state
+  const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
+  const [tableCards, setTableCards] = useState([]); // cards placed on the table
+  const [showCardDrawer, setShowCardDrawer] = useState(false);
+  const [draggingCard, setDraggingCard] = useState(null); // card being dragged on table
+  const [selectedCards, setSelectedCards] = useState(new Set()); // selected card IDs for grouping
+  const cardDragOffsetRef = useRef({ x: 0, y: 0 });
+  const [maxZIndex, setMaxZIndex] = useState(1);
+  const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
+
   // Toolbar modals
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
@@ -135,6 +162,7 @@ export default function GameTable() {
   const [newCounterName, setNewCounterName] = useState('');
   const [newDiceType, setNewDiceType] = useState('d6');
   const [newMarkerColor, setNewMarkerColor] = useState('#ff0000');
+  const [newMarkerLabel, setNewMarkerLabel] = useState('');
   const [newNoteText, setNewNoteText] = useState('');
 
   // Drag state for objects
@@ -162,6 +190,22 @@ export default function GameTable() {
       }
     }
     fetchGame();
+  }, [id]);
+
+  // Fetch available cards from game's card library
+  useEffect(() => {
+    async function fetchCards() {
+      try {
+        const res = await fetch(`/api/games/${id}/cards`);
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableCards(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch cards:', err);
+      }
+    }
+    if (id) fetchCards();
   }, [id]);
 
   // Canvas rendering
@@ -198,7 +242,6 @@ export default function GameTable() {
     ctx.restore();
 
     // Draw game objects (counters, dice, markers, notes) in screen space over the background
-    // We'll draw them with camera transform too for positioning consistency
     ctx.save();
     ctx.translate(width / 2, height / 2);
     ctx.scale(camera.zoom, camera.zoom);
@@ -213,6 +256,14 @@ export default function GameTable() {
       ctx.strokeStyle = 'rgba(255,255,255,0.5)';
       ctx.lineWidth = 2;
       ctx.stroke();
+      // Draw label if present
+      if (marker.label) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(marker.label.substring(0, 3), marker.x, marker.y);
+      }
     });
 
     // Draw notes
@@ -279,8 +330,8 @@ export default function GameTable() {
     }
 
     function handleMouseDown(e) {
-      // Middle mouse button or left click on empty area for panning
-      if (e.button === 1 || (e.button === 0 && !e.target.closest('[data-ui-element]'))) {
+      // Only pan when clicking directly on the canvas (not on card overlays or UI)
+      if (e.button === 1 || (e.button === 0 && e.target === canvas)) {
         isPanningRef.current = true;
         panStartRef.current = {
           x: e.clientX,
@@ -348,16 +399,195 @@ export default function GameTable() {
       if (e.key === '?') {
         setShowShortcuts(prev => !prev);
       }
+
+      // F key - flip selected card(s)
+      if (e.key === 'f' || e.key === 'F') {
+        if (selectedCards.size > 0) {
+          setTableCards(prev => prev.map(c => {
+            if (selectedCards.has(c.tableId)) {
+              return { ...c, faceDown: !c.faceDown };
+            }
+            return c;
+          }));
+        }
+      }
+
+      // E key - rotate 90 clockwise
+      if (e.key === 'e' || e.key === 'E') {
+        if (selectedCards.size > 0) {
+          setTableCards(prev => prev.map(c => {
+            if (selectedCards.has(c.tableId)) {
+              return { ...c, rotation: (c.rotation || 0) + 90 };
+            }
+            return c;
+          }));
+        }
+      }
+
+      // Q key - rotate 90 counter-clockwise
+      if (e.key === 'q' || e.key === 'Q') {
+        if (selectedCards.size > 0) {
+          setTableCards(prev => prev.map(c => {
+            if (selectedCards.has(c.tableId)) {
+              return { ...c, rotation: (c.rotation || 0) - 90 };
+            }
+            return c;
+          }));
+        }
+      }
+
+      // G key - group selected cards into a stack
+      if (e.key === 'g' || e.key === 'G') {
+        if (selectedCards.size >= 2) {
+          groupSelectedCards();
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedCards, tableCards]);
+
+  // ===== CARD FUNCTIONS =====
+
+  // Place a card from the library onto the table
+  function placeCardOnTable(card) {
+    const newZIndex = maxZIndex + 1;
+    setMaxZIndex(newZIndex);
+    const newTableCard = {
+      tableId: crypto.randomUUID(),
+      cardId: card.id,
+      name: card.name,
+      image_path: card.image_path,
+      x: 400 + Math.random() * 200,
+      y: 300 + Math.random() * 200,
+      zIndex: newZIndex,
+      faceDown: false,
+      rotation: 0,
+      inStack: null, // stack ID if in a stack
+    };
+    setTableCards(prev => [...prev, newTableCard]);
+  }
+
+  // Start dragging a card on the table
+  function handleCardDragStart(e, tableId) {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = tableCards.find(c => c.tableId === tableId);
+    if (!card) return;
+
+    // Bring card to front
+    const newZ = maxZIndex + 1;
+    setMaxZIndex(newZ);
+    setTableCards(prev => prev.map(c =>
+      c.tableId === tableId ? { ...c, zIndex: newZ } : c
+    ));
+
+    cardDragOffsetRef.current = {
+      x: e.clientX - card.x,
+      y: e.clientY - card.y,
+    };
+    setDraggingCard(tableId);
+
+    // Select the card if not already selected (and not ctrl-clicking)
+    if (!e.ctrlKey && !e.metaKey) {
+      setSelectedCards(new Set([tableId]));
+    } else {
+      // Toggle selection with ctrl
+      setSelectedCards(prev => {
+        const next = new Set(prev);
+        if (next.has(tableId)) {
+          next.delete(tableId);
+        } else {
+          next.add(tableId);
+        }
+        return next;
+      });
+    }
+  }
+
+  // Handle card drag move
+  function handleCardDragMove(e) {
+    if (!draggingCard) return;
+
+    const newX = e.clientX - cardDragOffsetRef.current.x;
+    const newY = e.clientY - cardDragOffsetRef.current.y;
+
+    // Calculate grid highlight position
+    const snapX = snapToGrid(newX);
+    const snapY = snapToGrid(newY);
+    const showGrid = shouldSnap(newX) || shouldSnap(newY);
+
+    if (showGrid) {
+      setGridHighlight({ x: snapX, y: snapY });
+    } else {
+      setGridHighlight(null);
+    }
+
+    setTableCards(prev => prev.map(c =>
+      c.tableId === draggingCard ? { ...c, x: newX, y: newY } : c
+    ));
+  }
+
+  // Handle card drag end - snap to grid
+  function handleCardDragEnd() {
+    if (!draggingCard) return;
+
+    // Snap to grid on release
+    setTableCards(prev => prev.map(c => {
+      if (c.tableId !== draggingCard) return c;
+      const finalX = shouldSnap(c.x) ? snapToGrid(c.x) : c.x;
+      const finalY = shouldSnap(c.y) ? snapToGrid(c.y) : c.y;
+      return { ...c, x: finalX, y: finalY };
+    }));
+
+    setDraggingCard(null);
+    setGridHighlight(null);
+  }
+
+  // Group selected cards into a stack
+  function groupSelectedCards() {
+    if (selectedCards.size < 2) return;
+    const stackId = crypto.randomUUID();
+    const selectedArray = Array.from(selectedCards);
+
+    // Find the average position for the stack
+    let sumX = 0, sumY = 0, count = 0;
+    const cardsToStack = tableCards.filter(c => selectedCards.has(c.tableId));
+    cardsToStack.forEach(c => { sumX += c.x; sumY += c.y; count++; });
+    const avgX = sumX / count;
+    const avgY = sumY / count;
+
+    // Update cards to be in the stack, stacked at the same position
+    const newZ = maxZIndex + 1;
+    setMaxZIndex(newZ + count);
+
+    setTableCards(prev => prev.map(c => {
+      if (!selectedCards.has(c.tableId)) return c;
+      const idx = selectedArray.indexOf(c.tableId);
+      return {
+        ...c,
+        x: avgX,
+        y: avgY,
+        inStack: stackId,
+        zIndex: newZ + idx,
+      };
+    }));
+
+    setSelectedCards(new Set());
+  }
+
+  // Click on table background to deselect all cards
+  function handleTableClick(e) {
+    if (e.target === canvasRef.current) {
+      setSelectedCards(new Set());
+    }
+  }
 
   // Counter functions
   function createCounter(name) {
     const canvas = canvasRef.current;
-    const offset = counters.length * 160; // Stagger each new counter
+    const offset = counters.length * 160;
     const newCounter = {
       id: crypto.randomUUID(),
       name: name || 'Counter',
@@ -404,12 +634,10 @@ export default function GameTable() {
   }
 
   function rollDie(dieId) {
-    // Start rolling animation
     setDice(prev => prev.map(d =>
       d.id === dieId ? { ...d, rolling: true } : d
     ));
 
-    // Animate rolling
     let count = 0;
     const interval = setInterval(() => {
       setDice(prev => prev.map(d => {
@@ -433,7 +661,6 @@ export default function GameTable() {
   // Drag handlers for floating objects (counters, dice)
   function handleObjDragStart(e, objType, objId) {
     e.preventDefault();
-    const rect = containerRef.current.getBoundingClientRect();
     const obj = objType === 'counter'
       ? counters.find(c => c.id === objId)
       : dice.find(d => d.id === objId);
@@ -468,6 +695,35 @@ export default function GameTable() {
     setDraggingObj(null);
   }
 
+  // Combined mouse move handler
+  function handleGlobalMouseMove(e) {
+    if (draggingCard) {
+      handleCardDragMove(e);
+    } else if (draggingObj) {
+      handleObjDragMove(e);
+    }
+  }
+
+  // Combined mouse up handler
+  function handleGlobalMouseUp(e) {
+    if (draggingCard) {
+      handleCardDragEnd();
+    }
+    if (draggingObj) {
+      handleObjDragEnd();
+    }
+  }
+
+  // Remove card from table
+  function removeCardFromTable(tableId) {
+    setTableCards(prev => prev.filter(c => c.tableId !== tableId));
+    setSelectedCards(prev => {
+      const next = new Set(prev);
+      next.delete(tableId);
+      return next;
+    });
+  }
+
   if (loading) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-slate-900">
@@ -496,17 +752,111 @@ export default function GameTable() {
     <div
       ref={containerRef}
       className="w-screen h-screen relative overflow-hidden select-none"
-      onMouseMove={draggingObj ? handleObjDragMove : undefined}
-      onMouseUp={draggingObj ? handleObjDragEnd : undefined}
+      onMouseMove={handleGlobalMouseMove}
+      onMouseUp={handleGlobalMouseUp}
+      onClick={handleTableClick}
       data-testid="game-table-container"
     >
-      {/* PixiJS Canvas (HTML5 Canvas implementation) */}
+      {/* HTML5 Canvas Background */}
       <canvas
         ref={canvasRef}
         data-testid="game-canvas"
         className="absolute inset-0 w-full h-full"
         style={{ touchAction: 'none' }}
       />
+
+      {/* Grid highlight overlay when dragging cards */}
+      {gridHighlight && draggingCard && (
+        <div
+          data-testid="grid-highlight"
+          className="absolute pointer-events-none z-10"
+          style={{
+            left: gridHighlight.x - CARD_WIDTH / 2 - 4,
+            top: gridHighlight.y - CARD_HEIGHT / 2 - 4,
+            width: CARD_WIDTH + 8,
+            height: CARD_HEIGHT + 8,
+            border: '2px dashed rgba(59, 130, 246, 0.6)',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          }}
+        />
+      )}
+
+      {/* Table Cards */}
+      {tableCards.map(card => {
+        const isDragging = draggingCard === card.tableId;
+        const isSelected = selectedCards.has(card.tableId);
+        return (
+          <div
+            key={card.tableId}
+            data-testid={`table-card-${card.tableId}`}
+            data-card-name={card.name}
+            data-card-id={card.cardId}
+            data-table-card="true"
+            data-ui-element="true"
+            className="absolute select-none"
+            style={{
+              left: card.x - CARD_WIDTH / 2,
+              top: card.y - CARD_HEIGHT / 2,
+              width: CARD_WIDTH,
+              height: CARD_HEIGHT,
+              zIndex: isDragging ? 9999 : card.zIndex,
+              transform: `scale(${isDragging ? 1.1 : 1}) rotate(${card.rotation || 0}deg)`,
+              transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              filter: isDragging ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+            }}
+            onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
+          >
+            {/* Card visual */}
+            <div
+              className={`w-full h-full rounded-lg overflow-hidden border-2 ${
+                isSelected ? 'border-blue-400 ring-2 ring-blue-400/50' : 'border-white/30'
+              }`}
+              style={{ backgroundColor: card.faceDown ? '#2d3748' : '#fff' }}
+            >
+              {card.faceDown ? (
+                // Face-down card back
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                  <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                  </div>
+                </div>
+              ) : (
+                // Face-up card front
+                <div className="w-full h-full relative bg-white">
+                  {card.image_path ? (
+                    <img
+                      src={card.image_path}
+                      alt={card.name}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <path d="M21 15l-5-5L5 21" />
+                      </svg>
+                      <span className="text-[8px] text-gray-500 text-center leading-tight truncate w-full px-1">
+                        {card.name}
+                      </span>
+                    </div>
+                  )}
+                  {/* Card name label */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 truncate px-1">
+                    {card.name}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Floating Counter Widgets */}
       {counters.map(counter => (
@@ -628,12 +978,109 @@ export default function GameTable() {
             </span>
           </div>
           <div className="pointer-events-auto flex items-center gap-2">
+            {/* Card drawer toggle */}
+            <button
+              onClick={() => setShowCardDrawer(prev => !prev)}
+              data-testid="toggle-card-drawer"
+              className={`px-3 py-1.5 backdrop-blur-sm text-white rounded-lg transition-colors text-sm flex items-center gap-2 ${
+                showCardDrawer ? 'bg-blue-600/70 hover:bg-blue-600' : 'bg-black/50 hover:bg-black/70'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 3v18" />
+              </svg>
+              Cards ({availableCards.length})
+            </button>
             <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
               Zoom: {Math.round(cameraRef.current.zoom * 100)}%
             </span>
           </div>
         </div>
       </div>
+
+      {/* Card Drawer Panel */}
+      {showCardDrawer && (
+        <div
+          className="absolute top-12 right-0 bottom-16 w-64 z-30 pointer-events-auto"
+          data-testid="card-drawer"
+          data-ui-element="true"
+        >
+          <div className="h-full bg-black/80 backdrop-blur-md border-l border-white/10 flex flex-col">
+            <div className="p-3 border-b border-white/10">
+              <h3 className="text-white/90 text-sm font-semibold">Card Library</h3>
+              <p className="text-white/50 text-xs mt-1">
+                {availableCards.length === 0
+                  ? 'No cards imported yet. Go to game details to upload cards.'
+                  : `${availableCards.length} card(s) available. Click to place on table.`}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {availableCards.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-white/40 text-xs">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-50">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M12 8v8M8 12h8" />
+                  </svg>
+                  <span>No cards yet</span>
+                  <button
+                    onClick={() => navigate(`/games/${id}`)}
+                    className="mt-2 text-blue-400 hover:text-blue-300 underline text-xs"
+                  >
+                    Import Cards
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {availableCards.map(card => (
+                    <button
+                      key={card.id}
+                      onClick={() => placeCardOnTable(card)}
+                      data-testid={`drawer-card-${card.id}`}
+                      className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
+                      style={{ aspectRatio: '5/7' }}
+                      title={`Place "${card.name}" on table`}
+                    >
+                      {card.image_path ? (
+                        <img
+                          src={card.image_path}
+                          alt={card.name}
+                          className="w-full h-full object-cover"
+                          draggable={false}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <path d="M21 15l-5-5L5 21" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
+                        {card.name}
+                      </div>
+                      <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                          + Place
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {tableCards.length > 0 && (
+              <div className="p-2 border-t border-white/10">
+                <div className="text-white/50 text-xs text-center">
+                  {tableCards.length} card(s) on table
+                  {selectedCards.size > 0 && ` | ${selectedCards.size} selected`}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Floating Toolbar */}
       {showToolbar && (
@@ -861,21 +1308,37 @@ export default function GameTable() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
           <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="marker-modal">
             <h3 className="text-white font-semibold mb-3">Add Marker</h3>
-            <div className="grid grid-cols-6 gap-2 mb-4">
-              {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'].map(color => (
-                <button
-                  key={color}
-                  onClick={() => setNewMarkerColor(color)}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    newMarkerColor === color ? 'border-white scale-125' : 'border-slate-600 hover:border-slate-400'
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+            <div className="mb-3">
+              <label className="text-slate-400 text-xs block mb-1">Color</label>
+              <div className="grid grid-cols-6 gap-2">
+                {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setNewMarkerColor(color)}
+                    data-testid={`marker-color-${color.replace('#', '')}`}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      newMarkerColor === color ? 'border-white scale-125' : 'border-slate-600 hover:border-slate-400'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="text-slate-400 text-xs block mb-1">Label (optional, max 3 chars)</label>
+              <input
+                type="text"
+                value={newMarkerLabel}
+                onChange={(e) => setNewMarkerLabel(e.target.value.substring(0, 3))}
+                placeholder="e.g., HP, ATK"
+                data-testid="marker-label-input"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength={3}
+              />
             </div>
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => setShowMarkerModal(false)}
+                onClick={() => { setShowMarkerModal(false); setNewMarkerLabel(''); }}
                 className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
               >
                 Cancel
@@ -886,10 +1349,12 @@ export default function GameTable() {
                   setMarkers(prev => [...prev, {
                     id: crypto.randomUUID(),
                     color: newMarkerColor,
+                    label: newMarkerLabel.trim(),
                     x: (canvas?.width || 800) / 2,
                     y: (canvas?.height || 600) / 2,
                   }]);
                   setShowMarkerModal(false);
+                  setNewMarkerLabel('');
                 }}
                 data-testid="marker-create-btn"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
@@ -962,11 +1427,12 @@ export default function GameTable() {
             <div className="space-y-2">
               {[
                 ['F', 'Flip card/stack'],
-                ['Q', 'Rotate 90° counter-clockwise'],
-                ['E', 'Rotate 90° clockwise'],
+                ['Q', 'Rotate 90\u00B0 counter-clockwise'],
+                ['E', 'Rotate 90\u00B0 clockwise'],
                 ['ALT', 'Preview card under cursor'],
                 ['G', 'Group selected cards into stack'],
                 ['1-9', 'Draw cards from stack'],
+                ['Ctrl+Click', 'Multi-select cards'],
                 ['?', 'Toggle this help overlay'],
                 ['Scroll', 'Zoom in/out'],
                 ['Click + Drag', 'Pan the table'],
@@ -1017,6 +1483,20 @@ export default function GameTable() {
             >
               Add Note
             </button>
+            {selectedCards.size > 0 && (
+              <>
+                <div className="border-t border-slate-700 my-1" />
+                <button
+                  onClick={() => {
+                    selectedCards.forEach(tid => removeCardFromTable(tid));
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
+                >
+                  Remove Selected Card(s)
+                </button>
+              </>
+            )}
             <div className="border-t border-slate-700 my-1" />
             <button
               onClick={() => setContextMenu(null)}
