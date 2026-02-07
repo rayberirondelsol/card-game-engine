@@ -1,5 +1,43 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-07 (Agent handling features #20, #39, #40) ---
+
+COMPLETED:
+- Feature #20: Game detail screen shows card manager with sidebar - PASSING
+  - Verified 4-column layout: Categories sidebar | Card grid | Right sidebar (Card Backs, Setups, Saves)
+  - Top bar shows game name "F20_TEST_GAME" and back button
+  - Left sidebar shows All Cards (3), Uncategorized (1), Heroes (1), Villains (1), Locations
+  - Card grid shows 3 card thumbnails with names
+  - Import Cards button visible and enabled
+  - Category filtering works: clicking Heroes shows only 1 card, Villains shows 1, etc.
+  - Verified with Playwright browser automation, zero console errors
+  - Test data created and cleaned up
+
+- Feature #39: Right-click context menu on cards and stacks - PASSING
+  - Enhanced context menu with card-specific and stack-specific actions
+  - Card context menu: Flip (F), Rotate CW (E), Rotate CCW (Q), Pick Up to Hand, Remove from Table
+  - Stack context menu adds: Shuffle, Split Stack, Flip Stack, Browse, Draw Card
+  - Table background context menu: Add Counter, Add Dice, Add Marker, Add Note
+  - Click outside (z-40 overlay) closes menu
+  - Actions execute correctly (Flip, Rotate CW, Shuffle all tested)
+  - Verified with Playwright browser automation, zero console errors
+
+- Feature #40: Keyboard shortcut help overlay toggle - PASSING
+  - Overlay shows all required shortcuts: F=Flip, Q=Rotate CCW, E=Rotate CW, ALT=Preview, G=Group
+  - Also shows: 1-9=Draw, Ctrl+Click=Multi-select, ?=Toggle, Scroll=Zoom, Drag=Pan, Right-click=Menu
+  - Semi-transparent backdrop (bg-black/60) confirmed
+  - Toggle via ? key works (on/off)
+  - Toggle via toolbar Help button works
+  - Close via X button works
+  - Verified with Playwright browser automation, zero console errors
+
+CHANGES MADE:
+- client/src/pages/GameTable.jsx: Enhanced context menu with card/stack/table-specific sections, added onContextMenu handler on table container
+- test-feature-20.mjs, test-feature-39.mjs, test-feature-40.mjs: Playwright browser tests
+- screenshots/f20-*.png, f39-*.png, f40-*.png: Visual verification screenshots
+
+CURRENT STATUS: 36/44 features passing (81.8%)
+
 --- Session: 2026-02-07 (Agent handling features #36, #41, #42) ---
 
 COMPLETED:
