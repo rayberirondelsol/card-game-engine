@@ -13,7 +13,10 @@ export default function GameDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [cardBacks, setCardBacks] = useState([]);
+  const [uploadingCardBack, setUploadingCardBack] = useState(false);
   const fileInputRef = useRef(null);
+  const cardBackInputRef = useRef(null);
 
   // Edit game state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -62,6 +65,7 @@ export default function GameDetail() {
     fetchSetups();
     fetchCards();
     fetchCategories();
+    fetchCardBacks();
   }, [id]);
 
   async function fetchGame() {
@@ -123,6 +127,105 @@ export default function GameDetail() {
       }
     } catch (err) {
       // Categories endpoint may not exist yet - that's OK
+    }
+  }
+
+  async function fetchCardBacks() {
+    try {
+      const res = await fetch(`/api/games/${id}/card-backs`);
+      if (res.ok) {
+        const data = await res.json();
+        setCardBacks(data);
+      }
+    } catch (err) {
+      // Card backs endpoint may not exist yet - that's OK
+    }
+  }
+
+  async function handleCardBackUpload(e) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingCardBack(true);
+    setUploadMessage(null);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch(`/api/games/${id}/card-backs/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (err) {
+        failCount++;
+      }
+    }
+
+    // Reset file input
+    if (cardBackInputRef.current) {
+      cardBackInputRef.current.value = '';
+    }
+
+    setUploadingCardBack(false);
+
+    if (successCount > 0) {
+      setUploadMessage({
+        type: 'success',
+        text: `Successfully uploaded ${successCount} card back${successCount > 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`
+      });
+      fetchCardBacks();
+    } else {
+      setUploadMessage({
+        type: 'error',
+        text: 'Card back upload failed. Please try again.'
+      });
+    }
+
+    setTimeout(() => setUploadMessage(null), 5000);
+  }
+
+  async function handleDeleteCardBack(cardBackId, cardBackName) {
+    if (!confirm(`Delete card back "${cardBackName}"? Cards using this back will lose their assignment.`)) return;
+
+    try {
+      const res = await fetch(`/api/games/${id}/card-backs/${cardBackId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setCardBacks(cardBacks.filter(cb => cb.id !== cardBackId));
+        fetchCards(); // Refresh cards since assignments may have changed
+        setUploadMessage({ type: 'success', text: `Card back "${cardBackName}" deleted` });
+        setTimeout(() => setUploadMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error('Delete card back error:', err);
+    }
+  }
+
+  async function handleAssignCardBack(cardId, cardBackId) {
+    try {
+      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_back_id: cardBackId || null }),
+      });
+      if (res.ok) {
+        fetchCards();
+      }
+    } catch (err) {
+      console.error('Assign card back error:', err);
     }
   }
 

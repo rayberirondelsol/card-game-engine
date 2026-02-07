@@ -12,6 +12,7 @@ import { savesRoutes } from './routes/saves.js';
 import { setupsRoutes } from './routes/setups.js';
 import { cardsRoutes } from './routes/cards.js';
 import { categoriesRoutes } from './routes/categories.js';
+import { cardBacksRoutes } from './routes/card-backs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +60,7 @@ async function start() {
   await fastify.register(setupsRoutes);
   await fastify.register(cardsRoutes);
   await fastify.register(categoriesRoutes);
+  await fastify.register(cardBacksRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {
