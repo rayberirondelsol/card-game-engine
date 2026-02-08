@@ -1,57 +1,150 @@
-name: Deploy to Vercel
+name: Deploy to Proxmox Docker VM
 
 on:
   push:
     branches:
       - main
       - master
-  pull_request:
-    branches:
-      - main
-      - master
+  workflow_dispatch:
 
 env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  DOCKER_HOST_IP: 192.168.178.96
+  DOCKER_HOST_SSH_PORT: 2206
+  DOCKER_HOST_USER: root
+  APP_DIR: /opt/card-game-engine
 
 jobs:
-  deploy:
+  build-and-deploy:
+    name: Build & Deploy to Docker VM
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            client/package-lock.json
-            server/package-lock.json
+          context: ./server
+          file: ./server/Dockerfile
+          push: false
+          load: true
+          tags: card-game-engine-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: false
+          load: true
+          tags: card-game-engine-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Pull Vercel environment information
-        run: vercel pull --yes --environment=${{ github.event_name == 'pull_request' && 'preview' || 'production' }} --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build project artifacts
-        run: vercel build ${{ github.event_name != 'pull_request' && '--prod' || '' }} --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel (Production)
-        if: github.event_name == 'push'
+      - name: Save Docker images as tarballs
         run: |
-          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} > deployment-url.txt
-          echo "DEPLOYMENT_URL=$(cat deployment-url.txt)" >> $GITHUB_ENV
-          echo "### Deployment URL" >> $GITHUB_STEP_SUMMARY
-          echo "$(cat deployment-url.txt)" >> $GITHUB_STEP_SUMMARY
+          docker save card-game-engine-backend:latest | gzip > backend.tar.gz
+          docker save card-game-engine-frontend:latest | gzip > frontend.tar.gz
 
-      - name: Deploy to Vercel (Preview)
-        if: github.event_name == 'pull_request'
+      - name: Setup SSH key
         run: |
-          vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} > deployment-url.txt
-          echo "DEPLOYMENT_URL=$(cat deployment-url.txt)" >> $GITHUB_ENV
-          echo "### Preview Deployment URL" >> $GITHUB_STEP_SUMMARY
-          echo "$(cat deployment-url.txt)" >> $GITHUB_STEP_SUMMARY
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DOCKER_VM_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ env.DOCKER_HOST_SSH_PORT }} ${{ env.DOCKER_HOST_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Copy Docker images to VM
+        run: |
+          scp -P ${{ env.DOCKER_HOST_SSH_PORT }} \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            backend.tar.gz frontend.tar.gz \
+            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }}:/tmp/
+
+      - name: Copy docker-compose.yml to VM
+        run: |
+          scp -P ${{ env.DOCKER_HOST_SSH_PORT }} \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            docker-compose.yml \
+            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }}:${{ env.APP_DIR }}/docker-compose.yml
+
+      - name: Deploy containers on VM
+        run: |
+          ssh -p ${{ env.DOCKER_HOST_SSH_PORT }} \
+            -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }} << 'DEPLOY_SCRIPT'
+
+          set -e
+
+          echo "=== Loading Docker images ==="
+          docker load -i /tmp/backend.tar.gz
+          docker load -i /tmp/frontend.tar.gz
+
+          echo "=== Cleaning up image tarballs ==="
+          rm -f /tmp/backend.tar.gz /tmp/frontend.tar.gz
+
+          echo "=== Deploying with docker compose ==="
+          cd /opt/card-game-engine
+          docker compose down --remove-orphans || true
+          docker compose up -d
+
+          echo "=== Waiting for services to start ==="
+          sleep 10
+
+          echo "=== Health check: backend ==="
+          for i in $(seq 1 12); do
+            if docker compose exec -T backend wget --no-verbose --tries=1 --spider http://localhost:3001/api/health 2>/dev/null; then
+              echo "Backend is healthy!"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "Backend health check failed!"
+              docker compose logs backend
+              exit 1
+            fi
+            echo "Attempt $i: Backend not ready yet, waiting..."
+            sleep 5
+          done
+
+          echo "=== Health check: frontend ==="
+          for i in $(seq 1 12); do
+            if docker compose exec -T frontend wget --no-verbose --tries=1 --spider http://localhost:80/ 2>/dev/null; then
+              echo "Frontend is healthy!"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "Frontend health check failed!"
+              docker compose logs frontend
+              exit 1
+            fi
+            echo "Attempt $i: Frontend not ready yet, waiting..."
+            sleep 5
+          done
+
+          echo "=== Pruning old Docker images ==="
+          docker image prune -f
+
+          echo "=== Deployment complete ==="
+          docker compose ps
+
+          DEPLOY_SCRIPT
+
+      - name: Deployment summary
+        run: |
+          echo "### Deployment to Proxmox Docker VM" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Host:** ${{ env.DOCKER_HOST_IP }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Port:** ${{ env.DOCKER_HOST_SSH_PORT }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App URL:** http://${{ env.DOCKER_HOST_IP }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
