@@ -1,5 +1,32 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-08 (Agent handling feature #49) ---
+
+COMPLETED:
+- Feature #49: Workflow Anpassung (Deploy to Proxmox Docker VM) - PASSING
+  - Replaced .github/workflows/deploy.yml:
+    - Removed Vercel deployment (Vercel CLI, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID)
+    - New workflow deploys Docker containers to Proxmox Docker VM at 192.168.178.96
+    - SSH access via custom port 2206 using DOCKER_VM_SSH_KEY secret
+    - Builds backend + frontend Docker images with Buildx + GHA cache
+    - Saves images as gzipped tarballs, transfers via SCP to VM
+    - Copies docker-compose.yml to /opt/card-game-engine on VM
+    - Runs docker compose down/up with health checks for both services
+    - Prunes old images after deployment
+    - Deployment summary in GitHub Actions step summary
+    - SSH key cleanup in always() block
+    - Added workflow_dispatch trigger for manual deployments
+  - Updated .github/workflows/docker-build.yml:
+    - Renamed to "Docker Build (CI)"
+    - Removed push trigger (deploy.yml handles main/master pushes now)
+    - Kept pull_request trigger for CI validation on PRs
+  - Deleted vercel.json (no longer deploying to Vercel)
+
+REQUIRED GITHUB SECRETS:
+  - DOCKER_VM_SSH_KEY: SSH private key for connecting to 192.168.178.96:2206 as root
+
+CURRENT STATUS: 49/49 features passing (100%)
+
 --- Session: 2026-02-08 (Agent handling feature #48) ---
 
 COMPLETED:
