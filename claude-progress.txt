@@ -1,5 +1,46 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-08 (Agent handling feature #48) ---
+
+COMPLETED:
+- Feature #48: Docker containerization and CI pipeline - PASSING
+  - Created multi-stage Dockerfile for backend (Node.js 20 Alpine):
+    - Builder stage: installs python3/make/g++ for better-sqlite3 native compilation
+    - Production stage: minimal Alpine with libstdc++ runtime, copies pre-built node_modules
+    - Health check via wget to /api/health
+    - Volumes for /app/data (SQLite DB) and /app/uploads (card images)
+  - Created multi-stage Dockerfile for frontend (Vite + nginx):
+    - Builder stage: npm ci + vite build for static assets
+    - Production stage: nginx:alpine serving built assets
+    - Health check via wget to localhost:80
+  - Created nginx.conf for production frontend:
+    - Proxies /api/ and /uploads/ to backend:3001
+    - SPA fallback (try_files -> /index.html)
+    - Gzip compression, static asset caching
+    - 10MB client upload limit for card images
+  - Created docker-compose.yml:
+    - backend service with named volumes (db-data, uploads-data)
+    - frontend service depending on backend health
+    - app-network bridge for inter-service communication
+    - Docker Compose syntax validated successfully
+  - Created .dockerignore files for both services
+  - Created GitHub Actions workflow (.github/workflows/docker-build.yml):
+    - Triggered on push/PR to main/master branches
+    - Parallel jobs: build-backend + build-frontend (with Buildx + GHA cache)
+    - Integration test job: docker compose up, health checks, API proxy verification
+    - Cleanup with docker compose down -v on completion
+
+CHANGES MADE:
+- server/Dockerfile: NEW - Multi-stage backend Docker image
+- client/Dockerfile: NEW - Multi-stage frontend Docker image
+- client/nginx.conf: NEW - nginx configuration for production serving + API proxy
+- docker-compose.yml: NEW - Full stack orchestration
+- server/.dockerignore: NEW - Backend build context exclusions
+- client/.dockerignore: NEW - Frontend build context exclusions
+- .github/workflows/docker-build.yml: NEW - CI pipeline for Docker builds on every push
+
+CURRENT STATUS: 48/48 features passing (100%)
+
 --- Session: 2026-02-07 (Agent handling feature #47) ---
 
 COMPLETED:
