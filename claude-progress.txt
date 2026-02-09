@@ -1,5 +1,48 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-09 (Agent handling feature #50) ---
+
+COMPLETED:
+- Feature #50: TTS Import (Tabletop Simulator Workshop addon import) - PASSING
+  - Parses TTS JSON save/mod files and extracts CustomDeck definitions
+  - Downloads sprite sheet images from URLs referenced in TTS files
+  - Slices sprite sheets into individual card images using sharp
+  - Two-step workflow: Analyze (preview decks) -> Execute (import selected decks)
+  - Creates categories per deck automatically
+  - Downloads and assigns card back images
+  - Card nicknames from TTS metadata applied as card names
+  - Supports DeckCustom objects with ContainedObjects and CardID mapping
+  - Full UI modal in GameDetail page with deck selection, card count preview
+  - Select All/Deselect All for deck selection
+  - "Create categories for each deck" option
+  - Import progress indicator
+  - Success message after import
+  - Verified: 4 cards imported from 2x2 sprite sheet with correct names
+  - Verified: Category "Test Deck Alpha" created with all cards assigned
+  - Verified: Card back "Test Deck Alpha Back" created and assigned
+  - Verified: Data persists across server restart
+  - Verified: Zero mock data patterns in codebase
+  - Verified: Zero console errors
+  - Verified: All card images load correctly in browser
+
+CHANGES MADE:
+- server/src/routes/tts-import.js: NEW - Full TTS import with analyze and execute endpoints
+  - POST /api/games/:id/tts-import/analyze - Upload and parse TTS JSON, return deck summaries
+  - POST /api/games/:id/tts-import/execute - Import selected decks with image download/slicing
+  - POST /api/games/:id/tts-import/from-json - Quick one-step import
+  - extractDecksFromTTS() - Recursive TTS object parser
+  - sliceSpriteSheet() - Uses sharp to extract individual cards from sprite sheets
+  - downloadImage() - HTTP/HTTPS image downloader with redirect support
+- server/src/index.js: Registered ttsImportRoutes, increased file size limit to 50MB
+- server/package.json: Added sharp dependency
+- client/src/pages/GameDetail.jsx: Added TTS Import button and full modal UI
+  - TTS file upload and analysis
+  - Deck selection with checkboxes
+  - Import execution with progress feedback
+  - Category creation option
+
+CURRENT STATUS: 50/50 features passing (100%)
+
 --- Session: 2026-02-08 (Agent handling feature #49) ---
 
 COMPLETED:
