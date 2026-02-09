@@ -13,6 +13,7 @@ import { setupsRoutes } from './routes/setups.js';
 import { cardsRoutes } from './routes/cards.js';
 import { categoriesRoutes } from './routes/categories.js';
 import { cardBacksRoutes } from './routes/card-backs.js';
+import { ttsImportRoutes } from './routes/tts-import.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,10 +40,10 @@ async function start() {
     credentials: true
   });
 
-  // Register multipart for file uploads (10MB limit)
+  // Register multipart for file uploads (50MB limit for TTS JSON files)
   await fastify.register(multipart, {
     limits: {
-      fileSize: 10 * 1024 * 1024 // 10MB
+      fileSize: 50 * 1024 * 1024 // 50MB
     }
   });
 
@@ -61,6 +62,7 @@ async function start() {
   await fastify.register(cardsRoutes);
   await fastify.register(categoriesRoutes);
   await fastify.register(cardBacksRoutes);
+  await fastify.register(ttsImportRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {

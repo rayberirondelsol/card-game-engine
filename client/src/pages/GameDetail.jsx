@@ -56,6 +56,17 @@ export default function GameDetail() {
   const [savingCardName, setSavingCardName] = useState(false);
   const editCardNameRef = useRef(null);
 
+  // TTS Import state
+  const [showTtsImportModal, setShowTtsImportModal] = useState(false);
+  const [ttsAnalyzing, setTtsAnalyzing] = useState(false);
+  const [ttsAnalysis, setTtsAnalysis] = useState(null);
+  const [ttsImporting, setTtsImporting] = useState(false);
+  const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
+  const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
+  const [ttsError, setTtsError] = useState('');
+  const [ttsImportProgress, setTtsImportProgress] = useState('');
+  const ttsFileInputRef = useRef(null);
+
   // Expanded categories in tree
   const [expandedCategories, setExpandedCategories] = useState(new Set());
 
@@ -369,6 +380,127 @@ export default function GameDetail() {
       handleSaveCardName(cardId);
     } else if (e.key === 'Escape') {
       setEditingCardId(null);
+    }
+  }
+
+  // --- TTS Import ---
+  function openTtsImportModal() {
+    setShowTtsImportModal(true);
+    setTtsAnalysis(null);
+    setTtsError('');
+    setTtsImporting(false);
+    setTtsImportProgress('');
+    setTtsSelectedDecks(new Set());
+    setTtsCreateCategories(true);
+  }
+
+  async function handleTtsFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset
+    setTtsAnalysis(null);
+    setTtsError('');
+    setTtsAnalyzing(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`/api/games/${id}/tts-import/analyze`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setTtsError(data.error || 'Failed to analyze TTS file');
+        setTtsAnalyzing(false);
+        return;
+      }
+
+      setTtsAnalysis(data);
+      // Select all decks by default
+      const allIndices = new Set(data.decks.map(d => d.index));
+      setTtsSelectedDecks(allIndices);
+    } catch (err) {
+      setTtsError('Failed to upload file: ' + err.message);
+    } finally {
+      setTtsAnalyzing(false);
+      // Reset file input
+      if (ttsFileInputRef.current) {
+        ttsFileInputRef.current.value = '';
+      }
+    }
+  }
+
+  function toggleTtsDeckSelection(deckIndex) {
+    setTtsSelectedDecks(prev => {
+      const next = new Set(prev);
+      if (next.has(deckIndex)) {
+        next.delete(deckIndex);
+      } else {
+        next.add(deckIndex);
+      }
+      return next;
+    });
+  }
+
+  function selectAllTtsDecks() {
+    if (!ttsAnalysis) return;
+    const allIndices = new Set(ttsAnalysis.decks.map(d => d.index));
+    setTtsSelectedDecks(allIndices);
+  }
+
+  function deselectAllTtsDecks() {
+    setTtsSelectedDecks(new Set());
+  }
+
+  async function handleTtsImport() {
+    if (!ttsAnalysis || ttsSelectedDecks.size === 0) return;
+
+    setTtsImporting(true);
+    setTtsImportProgress('Downloading and processing card images...');
+    setTtsError('');
+
+    try {
+      const res = await fetch(`/api/games/${id}/tts-import/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tempId: ttsAnalysis.tempId,
+          selectedDeckIndices: Array.from(ttsSelectedDecks),
+          createCategories: ttsCreateCategories,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setTtsError(data.error || 'Import failed');
+        setTtsImporting(false);
+        setTtsImportProgress('');
+        return;
+      }
+
+      // Success
+      setShowTtsImportModal(false);
+      setUploadMessage({
+        type: 'success',
+        text: data.message || `Imported ${data.totalImported} cards`,
+      });
+      setTimeout(() => setUploadMessage(null), 8000);
+
+      // Refresh cards and categories
+      fetchCards();
+      fetchCategories();
+      fetchCardBacks();
+    } catch (err) {
+      setTtsError('Import failed: ' + err.message);
+    } finally {
+      setTtsImporting(false);
+      setTtsImportProgress('');
     }
   }
 
@@ -930,6 +1062,13 @@ export default function GameDetail() {
                     id="card-upload-input"
                     data-testid="card-upload-input"
                   />
+                  <button
+                    onClick={openTtsImportModal}
+                    data-testid="tts-import-btn"
+                    className="px-3 py-1.5 text-sm border border-purple-400 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-medium"
+                  >
+                    TTS Import
+                  </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
@@ -1496,6 +1635,214 @@ export default function GameDetail() {
                   {deletingCategory ? 'Deleting...' : 'Delete Category'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* TTS Import Modal */}
+        {showTtsImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="tts-import-modal">
+            <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-[var(--color-text)]">
+                  Import from Tabletop Simulator
+                </h2>
+                <button
+                  onClick={() => setShowTtsImportModal(false)}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-xl w-8 h-8 flex items-center justify-center"
+                  data-testid="tts-import-close-btn"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+                Upload a Tabletop Simulator save file (.json) to import card decks. The file can be found in your TTS Mods folder
+                (typically <code className="bg-gray-100 px-1 rounded text-xs">Documents/My Games/Tabletop Simulator/Saves/</code> or Workshop folder).
+              </p>
+
+              {/* File Input */}
+              <div className="mb-4">
+                <input
+                  ref={ttsFileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleTtsFileSelect}
+                  className="hidden"
+                  data-testid="tts-file-input"
+                />
+                <button
+                  onClick={() => ttsFileInputRef.current?.click()}
+                  disabled={ttsAnalyzing || ttsImporting}
+                  data-testid="tts-select-file-btn"
+                  className="w-full px-4 py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:bg-purple-50 hover:border-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
+                >
+                  {ttsAnalyzing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Analyzing TTS file...
+                    </span>
+                  ) : (
+                    <span>
+                      <strong>Choose TTS JSON File</strong>
+                      <br />
+                      <span className="text-xs text-[var(--color-text-secondary)]">Drop or click to select a .json save/mod file</span>
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Error */}
+              {ttsError && (
+                <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" data-testid="tts-import-error">
+                  {ttsError}
+                </div>
+              )}
+
+              {/* Analysis Results */}
+              {ttsAnalysis && (
+                <div data-testid="tts-analysis-results">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-[var(--color-text)]">
+                        Found {ttsAnalysis.deckCount} deck{ttsAnalysis.deckCount !== 1 ? 's' : ''}
+                      </h3>
+                      {ttsAnalysis.saveName && (
+                        <p className="text-xs text-[var(--color-text-secondary)]">
+                          Save: {ttsAnalysis.saveName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAllTtsDecks}
+                        className="text-xs text-purple-600 hover:text-purple-800 underline"
+                        data-testid="tts-select-all"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={deselectAllTtsDecks}
+                        className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] underline"
+                        data-testid="tts-deselect-all"
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Deck List */}
+                  <div className="space-y-2 mb-4 max-h-60 overflow-y-auto" data-testid="tts-deck-list">
+                    {ttsAnalysis.decks.map((deck) => (
+                      <label
+                        key={deck.index}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          ttsSelectedDecks.has(deck.index)
+                            ? 'border-purple-400 bg-purple-50'
+                            : 'border-[var(--color-border)] hover:bg-gray-50'
+                        }`}
+                        data-testid={`tts-deck-item-${deck.index}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={ttsSelectedDecks.has(deck.index)}
+                          onChange={() => toggleTtsDeckSelection(deck.index)}
+                          className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                          data-testid={`tts-deck-checkbox-${deck.index}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--color-text)] truncate">
+                            {deck.nickname}
+                            {deck.isSingleCard && (
+                              <span className="ml-1 text-xs text-[var(--color-text-secondary)]">(single card)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-[var(--color-text-secondary)]">
+                            {deck.totalCards} card{deck.totalCards !== 1 ? 's' : ''}
+                            {deck.sheets.length > 1 && ` across ${deck.sheets.length} sheets`}
+                          </p>
+                        </div>
+                        <span className="text-sm text-purple-600 font-medium">
+                          {deck.totalCards}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Options */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ttsCreateCategories}
+                        onChange={(e) => setTtsCreateCategories(e.target.checked)}
+                        className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                        data-testid="tts-create-categories-checkbox"
+                      />
+                      <span className="text-sm text-[var(--color-text)]">
+                        Create categories for each deck
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Import Progress */}
+                  {ttsImportProgress && (
+                    <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm flex items-center gap-2" data-testid="tts-import-progress">
+                      <svg className="animate-spin h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      {ttsImportProgress}
+                    </div>
+                  )}
+
+                  {/* Import Summary */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {ttsSelectedDecks.size} of {ttsAnalysis.deckCount} decks selected
+                      {' · '}
+                      ~{ttsAnalysis.decks
+                        .filter(d => ttsSelectedDecks.has(d.index))
+                        .reduce((sum, d) => sum + d.totalCards, 0)} cards
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowTtsImportModal(false)}
+                        className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+                        data-testid="tts-import-cancel-btn"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleTtsImport}
+                        disabled={ttsImporting || ttsSelectedDecks.size === 0}
+                        data-testid="tts-import-execute-btn"
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        {ttsImporting ? 'Importing...' : `Import ${ttsSelectedDecks.size} Deck${ttsSelectedDecks.size !== 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* No analysis yet - show instructions */}
+              {!ttsAnalysis && !ttsAnalyzing && !ttsError && (
+                <div className="text-center py-6 text-[var(--color-text-secondary)]" data-testid="tts-import-instructions">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 text-purple-300">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="12" y1="18" x2="12" y2="12" />
+                    <line x1="9" y1="15" x2="15" y2="15" />
+                  </svg>
+                  <p className="text-sm mb-1">Select a TTS save file to get started</p>
+                  <p className="text-xs">
+                    Card sprite sheets will be automatically split into individual cards
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
