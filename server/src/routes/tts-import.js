@@ -367,6 +367,7 @@ export async function ttsImportRoutes(fastify) {
       }
 
       let totalImported = 0;
+      let totalSkipped = 0;
       let totalFailed = 0;
       const importedDecks = [];
 
@@ -377,15 +378,42 @@ export async function ttsImportRoutes(fastify) {
         const cardNames = getCardNames(deck);
         const deckNickname = deck.nickname || `Deck ${deckIndex + 1}`;
 
-        // Optionally create a category for this deck
+        // Reuse existing category or create new one
         let categoryId = null;
         if (createCategories !== false) {
-          const catId = uuidv4();
-          db.prepare(
-            'INSERT INTO categories (id, game_id, name) VALUES (?, ?, ?)'
-          ).run(catId, id, deckNickname);
-          categoryId = catId;
-          console.log(`[TTS Import] Created category "${deckNickname}" (${catId})`);
+          const existingCat = db.prepare(
+            'SELECT id FROM categories WHERE game_id = ? AND name = ?'
+          ).get(id, deckNickname);
+
+          if (existingCat) {
+            categoryId = existingCat.id;
+            console.log(`[TTS Import] Reusing existing category "${deckNickname}" (${categoryId})`);
+          } else {
+            const catId = uuidv4();
+            db.prepare(
+              'INSERT INTO categories (id, game_id, name) VALUES (?, ?, ?)'
+            ).run(catId, id, deckNickname);
+            categoryId = catId;
+            console.log(`[TTS Import] Created category "${deckNickname}" (${catId})`);
+          }
+        }
+
+        // Get existing card names in this category for duplicate detection
+        const existingCards = new Set();
+        if (categoryId) {
+          const rows = db.prepare(
+            'SELECT name FROM cards WHERE game_id = ? AND category_id = ?'
+          ).all(id, categoryId);
+          for (const row of rows) {
+            existingCards.add(row.name);
+          }
+        } else {
+          const rows = db.prepare(
+            'SELECT name FROM cards WHERE game_id = ? AND category_id IS NULL'
+          ).all(id);
+          for (const row of rows) {
+            existingCards.add(row.name);
+          }
         }
 
         // Process each CustomDeck sheet
@@ -407,28 +435,38 @@ export async function ttsImportRoutes(fastify) {
             const faceBuffer = await downloadImage(faceURL);
             console.log(`[TTS Import] Downloaded ${faceBuffer.length} bytes`);
 
-            // Download back image if available
+            // Reuse existing card back or create new one
             let backImagePath = null;
             if (backURL && backURL !== 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/NewTux.svg/120px-NewTux.svg.png') {
-              try {
-                const backBuffer = await downloadImage(backURL);
-                const backFileId = uuidv4();
-                const backFilename = `${backFileId}.png`;
-                const backFilePath = path.join(gameUploadsDir, backFilename);
+              const backName = `${deckNickname} Back`;
+              const existingBack = db.prepare(
+                'SELECT id FROM card_backs WHERE game_id = ? AND name = ?'
+              ).get(id, backName);
 
-                // Convert back image to PNG
-                await sharp(backBuffer).png().toFile(backFilePath);
+              if (existingBack) {
+                backImagePath = existingBack.id;
+                console.log(`[TTS Import] Reusing existing card back "${backName}"`);
+              } else {
+                try {
+                  const backBuffer = await downloadImage(backURL);
+                  const backFileId = uuidv4();
+                  const backFilename = `${backFileId}.png`;
+                  const backFilePath = path.join(gameUploadsDir, backFilename);
 
-                // Create card back entry
-                const cardBackId = uuidv4();
-                const backRelPath = `/uploads/${id}/${backFilename}`;
-                db.prepare(
-                  'INSERT INTO card_backs (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
-                ).run(cardBackId, id, `${deckNickname} Back`, backRelPath);
-                backImagePath = cardBackId;
-                console.log(`[TTS Import] Created card back for deck ${deckKey}`);
-              } catch (backErr) {
-                console.warn(`[TTS Import] Failed to download back image: ${backErr.message}`);
+                  // Convert back image to PNG
+                  await sharp(backBuffer).png().toFile(backFilePath);
+
+                  // Create card back entry
+                  const cardBackId = uuidv4();
+                  const backRelPath = `/uploads/${id}/${backFilename}`;
+                  db.prepare(
+                    'INSERT INTO card_backs (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+                  ).run(cardBackId, id, `${deckNickname} Back`, backRelPath);
+                  backImagePath = cardBackId;
+                  console.log(`[TTS Import] Created card back for deck ${deckKey}`);
+                } catch (backErr) {
+                  console.warn(`[TTS Import] Failed to download back image: ${backErr.message}`);
+                }
               }
             }
 
@@ -443,22 +481,34 @@ export async function ttsImportRoutes(fastify) {
               gameUploadsDir
             );
 
-            // Insert cards into database
-            const insertStmt = db.prepare(
-              'INSERT INTO cards (id, game_id, category_id, card_back_id, name, image_path) VALUES (?, ?, ?, ?, ?, ?)'
-            );
+            // Filter out cards that already exist
+            const newCards = extractedCards.filter(card => !existingCards.has(card.cardName));
+            const skippedCount = extractedCards.length - newCards.length;
+            totalSkipped += skippedCount;
 
-            const insertMany = db.transaction((cardsToInsert) => {
-              for (const card of cardsToInsert) {
-                const cardId = uuidv4();
-                const relativePath = `/uploads/${id}/${card.savedFilename}`;
-                insertStmt.run(cardId, id, categoryId, backImagePath, card.cardName, relativePath);
-              }
-            });
+            if (skippedCount > 0) {
+              console.log(`[TTS Import] Skipped ${skippedCount} existing cards from deck ${deckKey}`);
+            }
 
-            insertMany(extractedCards);
-            totalImported += extractedCards.length;
-            console.log(`[TTS Import] Imported ${extractedCards.length} cards from deck ${deckKey}`);
+            // Insert only new cards into database
+            if (newCards.length > 0) {
+              const insertStmt = db.prepare(
+                'INSERT INTO cards (id, game_id, category_id, card_back_id, name, image_path) VALUES (?, ?, ?, ?, ?, ?)'
+              );
+
+              const insertMany = db.transaction((cardsToInsert) => {
+                for (const card of cardsToInsert) {
+                  const cardId = uuidv4();
+                  const relativePath = `/uploads/${id}/${card.savedFilename}`;
+                  insertStmt.run(cardId, id, categoryId, backImagePath, card.cardName, relativePath);
+                }
+              });
+
+              insertMany(newCards);
+            }
+
+            totalImported += newCards.length;
+            console.log(`[TTS Import] Imported ${newCards.length} new cards from deck ${deckKey}`);
           } catch (sheetErr) {
             console.error(`[TTS Import] Failed to process sheet ${deckKey}:`, sheetErr.message);
             totalFailed++;
@@ -482,9 +532,10 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(200).send({
         success: true,
         totalImported,
+        totalSkipped,
         totalFailed,
         importedDecks,
-        message: `Successfully imported ${totalImported} cards from ${importedDecks.length} deck(s)${totalFailed > 0 ? ` (${totalFailed} sheets failed)` : ''}`
+        message: `Successfully imported ${totalImported} new cards from ${importedDecks.length} deck(s)${totalSkipped > 0 ? ` (${totalSkipped} existing cards skipped)` : ''}${totalFailed > 0 ? ` (${totalFailed} sheets failed)` : ''}`
       });
     } catch (err) {
       console.error('[TTS Import] Execute error:', err);
