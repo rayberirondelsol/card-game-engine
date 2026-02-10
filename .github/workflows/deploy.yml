@@ -8,90 +8,32 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKER_HOST_IP: 192.168.178.96
-  DOCKER_HOST_SSH_PORT: 2206
-  DOCKER_HOST_USER: root
   APP_DIR: /opt/card-game-engine
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy to Docker VM
-    runs-on: ubuntu-latest
+    name: Build & Deploy
+    runs-on: [self-hosted, linux, proxmox]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: false
-          load: true
-          tags: card-game-engine-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./client
-          file: ./client/Dockerfile
-          push: false
-          load: true
-          tags: card-game-engine-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Save Docker images as tarballs
+      - name: Sync source to app directory
         run: |
-          docker save card-game-engine-backend:latest | gzip > backend.tar.gz
-          docker save card-game-engine-frontend:latest | gzip > frontend.tar.gz
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            "${{ github.workspace }}/" "${{ env.APP_DIR }}/"
 
-      - name: Setup SSH key
+      - name: Build and deploy with Docker Compose
+        working-directory: ${{ env.APP_DIR }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DOCKER_VM_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ env.DOCKER_HOST_SSH_PORT }} ${{ env.DOCKER_HOST_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Copy Docker images to VM
-        run: |
-          scp -P ${{ env.DOCKER_HOST_SSH_PORT }} \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            backend.tar.gz frontend.tar.gz \
-            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }}:/tmp/
-
-      - name: Copy docker-compose.yml to VM
-        run: |
-          scp -P ${{ env.DOCKER_HOST_SSH_PORT }} \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            docker-compose.yml \
-            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }}:${{ env.APP_DIR }}/docker-compose.yml
-
-      - name: Deploy containers on VM
-        run: |
-          ssh -p ${{ env.DOCKER_HOST_SSH_PORT }} \
-            -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            ${{ env.DOCKER_HOST_USER }}@${{ env.DOCKER_HOST_IP }} << 'DEPLOY_SCRIPT'
-
           set -e
 
-          echo "=== Loading Docker images ==="
-          docker load -i /tmp/backend.tar.gz
-          docker load -i /tmp/frontend.tar.gz
+          echo "=== Building Docker images ==="
+          docker compose build
 
-          echo "=== Cleaning up image tarballs ==="
-          rm -f /tmp/backend.tar.gz /tmp/frontend.tar.gz
-
-          echo "=== Deploying with docker compose ==="
-          cd /opt/card-game-engine
+          echo "=== Deploying containers ==="
           docker compose down --remove-orphans || true
           docker compose up -d
 
@@ -100,7 +42,7 @@ jobs:
 
           echo "=== Health check: backend ==="
           for i in $(seq 1 12); do
-            if docker compose exec -T backend wget --no-verbose --tries=1 --spider http://localhost:3001/api/health 2>/dev/null; then
+            if docker compose exec -T backend wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health 2>/dev/null; then
               echo "Backend is healthy!"
               break
             fi
@@ -115,7 +57,7 @@ jobs:
 
           echo "=== Health check: frontend ==="
           for i in $(seq 1 12); do
-            if docker compose exec -T frontend wget --no-verbose --tries=1 --spider http://localhost:80/ 2>/dev/null; then
+            if docker compose exec -T frontend wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ 2>/dev/null; then
               echo "Frontend is healthy!"
               break
             fi
@@ -134,17 +76,10 @@ jobs:
           echo "=== Deployment complete ==="
           docker compose ps
 
-          DEPLOY_SCRIPT
-
       - name: Deployment summary
         run: |
           echo "### Deployment to Proxmox Docker VM" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Host:** ${{ env.DOCKER_HOST_IP }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Port:** ${{ env.DOCKER_HOST_SSH_PORT }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **App URL:** http://${{ env.DOCKER_HOST_IP }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Runner:** $(hostname)" >> $GITHUB_STEP_SUMMARY
+          echo "- **App URL:** https://gaming.benjathi.de" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
-
-      - name: Cleanup SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
