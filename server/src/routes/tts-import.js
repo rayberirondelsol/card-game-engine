@@ -8,6 +8,7 @@ import { createWriteStream } from 'fs';
 import https from 'https';
 import http from 'http';
 import sharp from 'sharp';
+import { createWorker } from 'tesseract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,9 +143,54 @@ function getCardNames(deck) {
 }
 
 /**
+ * Extract text from a specific region of a card image using OCR
+ * @param {Buffer} cardImageBuffer - The card image buffer
+ * @param {string} namePosition - Where to look: 'top', 'bottom', 'center'
+ * @param {object} worker - Tesseract worker instance
+ * @returns {string} Extracted text or empty string
+ */
+async function ocrCardName(cardImageBuffer, namePosition, worker) {
+  try {
+    const metadata = await sharp(cardImageBuffer).metadata();
+    const w = metadata.width;
+    const h = metadata.height;
+
+    // Extract a horizontal strip where the name is expected
+    let top, height;
+    if (namePosition === 'top') {
+      top = 0;
+      height = Math.floor(h * 0.15);
+    } else if (namePosition === 'bottom') {
+      top = Math.floor(h * 0.85);
+      height = Math.floor(h * 0.15);
+    } else {
+      // center
+      top = Math.floor(h * 0.4);
+      height = Math.floor(h * 0.2);
+    }
+
+    // Crop the region and enhance for OCR
+    const regionBuffer = await sharp(cardImageBuffer)
+      .extract({ left: 0, top, width: w, height })
+      .greyscale()
+      .normalise()
+      .resize({ width: Math.max(w * 2, 600), fit: 'inside' })
+      .png()
+      .toBuffer();
+
+    const { data: { text } } = await worker.recognize(regionBuffer);
+    const cleaned = text.trim().replace(/\n/g, ' ').replace(/\s+/g, ' ');
+    return cleaned || '';
+  } catch (err) {
+    console.warn('[TTS Import] OCR failed for card:', err.message);
+    return '';
+  }
+}
+
+/**
  * Slice a sprite sheet image into individual card images
  */
-async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir) {
+async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker) {
   const image = sharp(imageBuffer);
   const metadata = await image.metadata();
 
@@ -199,10 +245,17 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
       // Write card image to disk
       writeFileSync(filePath, cardImageBuffer);
 
-      // Determine card name
+      // Determine card name: OCR > TTS nickname > fallback
       const fullCardID = parseInt(deckKey) * 100 + cardIndex;
       const nickname = cardNames[fullCardID] || '';
-      const cardName = nickname || `Card ${cardIndex + 1}`;
+      let cardName = nickname || `Card ${cardIndex + 1}`;
+
+      if (ocrNamePosition && ocrWorker) {
+        const ocrText = await ocrCardName(cardImageBuffer, ocrNamePosition, ocrWorker);
+        if (ocrText) {
+          cardName = ocrText;
+        }
+      }
 
       cards.push({
         fileId,
@@ -332,11 +385,15 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
-    const { tempId, selectedDeckIndices, createCategories } = body;
+    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition } = body;
 
     if (!tempId) {
       return reply.status(400).send({ error: 'Missing tempId from analyze step' });
     }
+
+    // Validate OCR position if provided
+    const validOcrPositions = ['top', 'bottom', 'center'];
+    const useOcr = ocrNamePosition && validOcrPositions.includes(ocrNamePosition);
 
     // Read temp TTS file
     const tempPath = path.join(UPLOADS_DIR, '_tts_temp', `${tempId}.json`);
@@ -370,6 +427,13 @@ export async function ttsImportRoutes(fastify) {
       let totalSkipped = 0;
       let totalFailed = 0;
       const importedDecks = [];
+
+      // Create OCR worker if needed
+      let ocrWorker = null;
+      if (useOcr) {
+        console.log(`[TTS Import] Initializing OCR (name position: ${ocrNamePosition})`);
+        ocrWorker = await createWorker('eng');
+      }
 
       for (const deckIndex of indicesToImport) {
         if (deckIndex < 0 || deckIndex >= allDecks.length) continue;
@@ -478,7 +542,9 @@ export async function ttsImportRoutes(fastify) {
               deckKey,
               deck.deckIDs,
               cardNames,
-              gameUploadsDir
+              gameUploadsDir,
+              useOcr ? ocrNamePosition : null,
+              ocrWorker
             );
 
             // Filter out cards that already exist
@@ -519,6 +585,12 @@ export async function ttsImportRoutes(fastify) {
           nickname: deckNickname,
           categoryId,
         });
+      }
+
+      // Terminate OCR worker
+      if (ocrWorker) {
+        await ocrWorker.terminate();
+        console.log('[TTS Import] OCR worker terminated');
       }
 
       // Clean up temp file

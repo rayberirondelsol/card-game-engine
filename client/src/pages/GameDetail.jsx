@@ -63,9 +63,24 @@ export default function GameDetail() {
   const [ttsImporting, setTtsImporting] = useState(false);
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
+  const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
   const [ttsError, setTtsError] = useState('');
   const [ttsImportProgress, setTtsImportProgress] = useState('');
   const ttsFileInputRef = useRef(null);
+
+  // Card Split Import state
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitAnalyzing, setSplitAnalyzing] = useState(false);
+  const [splitAnalysis, setSplitAnalysis] = useState(null);
+  const [splitImporting, setSplitImporting] = useState(false);
+  const [splitError, setSplitError] = useState('');
+  const [splitSelectedGrid, setSplitSelectedGrid] = useState(null);
+  const [splitCustomCols, setSplitCustomCols] = useState(2);
+  const [splitCustomRows, setSplitCustomRows] = useState(2);
+  const [splitUseCustom, setSplitUseCustom] = useState(false);
+  const [splitCardPrefix, setSplitCardPrefix] = useState('Card');
+  const [splitCategoryId, setSplitCategoryId] = useState('');
+  const splitFileInputRef = useRef(null);
 
   // Expanded categories in tree
   const [expandedCategories, setExpandedCategories] = useState(new Set());
@@ -247,8 +262,10 @@ export default function GameDetail() {
     setUploading(true);
     setUploadMessage(null);
 
-    let successCount = 0;
+    let totalCardsCreated = 0;
+    let filesProcessed = 0;
     let failCount = 0;
+    const autoSplitResults = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -256,21 +273,39 @@ export default function GameDetail() {
       formData.append('file', file);
 
       try {
-        const res = await fetch(`/api/games/${id}/cards/upload`, {
+        // Use auto-import endpoint that detects and splits multi-card images automatically
+        const res = await fetch(`/api/games/${id}/cards/auto-import`, {
           method: 'POST',
           body: formData,
         });
 
         if (res.ok) {
-          successCount++;
+          const data = await res.json();
+          filesProcessed++;
+          totalCardsCreated += data.totalCreated || 1;
+          if (data.autoSplit) {
+            autoSplitResults.push({
+              filename: data.originalFilename,
+              grid: data.detectedGrid,
+              cardsCreated: data.totalCreated,
+            });
+          }
         } else {
           failCount++;
           const errData = await res.json();
-          console.error('Upload failed for', file.name, errData.error);
+          // Fallback: try old upload endpoint if auto-import fails
+          const fallbackRes = await fetch(`/api/games/${id}/cards/upload`, {
+            method: 'POST',
+            body: (() => { const fd = new FormData(); fd.append('file', file); return fd; })(),
+          });
+          if (fallbackRes.ok) {
+            filesProcessed++;
+            totalCardsCreated += 1;
+            failCount--; // Undo the fail count since fallback succeeded
+          }
         }
       } catch (err) {
         failCount++;
-        console.error('Upload error for', file.name, err);
       }
     }
 
@@ -281,11 +316,17 @@ export default function GameDetail() {
 
     setUploading(false);
 
-    if (successCount > 0) {
-      setUploadMessage({
-        type: 'success',
-        text: `Successfully uploaded ${successCount} card${successCount > 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`
-      });
+    if (totalCardsCreated > 0) {
+      let messageText = '';
+      if (autoSplitResults.length > 0) {
+        const splitSummary = autoSplitResults.map(r =>
+          `"${r.filename}" → ${r.grid.cols}×${r.grid.rows} grid (${r.grid.cardType}), ${r.cardsCreated} cards`
+        ).join('; ');
+        messageText = `Auto-detected and split: ${splitSummary}. Total: ${totalCardsCreated} card${totalCardsCreated > 1 ? 's' : ''} created.`;
+      } else {
+        messageText = `Successfully imported ${totalCardsCreated} card${totalCardsCreated > 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`;
+      }
+      setUploadMessage({ type: 'success', text: messageText });
       fetchCards();
     } else {
       setUploadMessage({
@@ -294,8 +335,8 @@ export default function GameDetail() {
       });
     }
 
-    // Auto-dismiss message
-    setTimeout(() => setUploadMessage(null), 5000);
+    // Auto-dismiss message (longer for auto-split results)
+    setTimeout(() => setUploadMessage(null), autoSplitResults.length > 0 ? 10000 : 5000);
   }
 
   async function handleDeleteCard(cardId, cardName) {
@@ -392,6 +433,7 @@ export default function GameDetail() {
     setTtsImportProgress('');
     setTtsSelectedDecks(new Set());
     setTtsCreateCategories(true);
+    setTtsOcrNamePosition('none');
   }
 
   async function handleTtsFileSelect(e) {
@@ -472,6 +514,7 @@ export default function GameDetail() {
           tempId: ttsAnalysis.tempId,
           selectedDeckIndices: Array.from(ttsSelectedDecks),
           createCategories: ttsCreateCategories,
+          ocrNamePosition: ttsOcrNamePosition !== 'none' ? ttsOcrNamePosition : undefined,
         }),
       });
 
@@ -501,6 +544,115 @@ export default function GameDetail() {
     } finally {
       setTtsImporting(false);
       setTtsImportProgress('');
+    }
+  }
+
+  // --- Card Split Import ---
+  function openSplitImportModal() {
+    setShowSplitModal(true);
+    setSplitAnalysis(null);
+    setSplitError('');
+    setSplitImporting(false);
+    setSplitSelectedGrid(null);
+    setSplitUseCustom(false);
+    setSplitCustomCols(2);
+    setSplitCustomRows(2);
+    setSplitCardPrefix('Card');
+    setSplitCategoryId('');
+  }
+
+  async function handleSplitFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSplitAnalysis(null);
+    setSplitError('');
+    setSplitAnalyzing(true);
+    setSplitSelectedGrid(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`/api/games/${id}/cards/analyze-split`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSplitError(data.error || 'Failed to analyze image');
+        setSplitAnalyzing(false);
+        return;
+      }
+
+      setSplitAnalysis(data);
+      // Auto-select best suggestion if available
+      if (data.suggestions && data.suggestions.length > 0) {
+        setSplitSelectedGrid(data.suggestions[0]);
+        setSplitCardPrefix(data.filename.replace(/\.[^.]+$/, '') || 'Card');
+      }
+    } catch (err) {
+      setSplitError('Failed to upload file: ' + err.message);
+    } finally {
+      setSplitAnalyzing(false);
+      if (splitFileInputRef.current) {
+        splitFileInputRef.current.value = '';
+      }
+    }
+  }
+
+  async function handleSplitExecute() {
+    if (!splitAnalysis) return;
+
+    const cols = splitUseCustom ? parseInt(splitCustomCols) : splitSelectedGrid?.cols;
+    const rows = splitUseCustom ? parseInt(splitCustomRows) : splitSelectedGrid?.rows;
+
+    if (!cols || !rows || cols < 1 || rows < 1) {
+      setSplitError('Please select or specify a valid grid layout.');
+      return;
+    }
+
+    setSplitImporting(true);
+    setSplitError('');
+
+    try {
+      const res = await fetch(`/api/games/${id}/cards/execute-split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tempId: splitAnalysis.tempId,
+          cols,
+          rows,
+          cardNamePrefix: splitCardPrefix || 'Card',
+          categoryId: splitCategoryId || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSplitError(data.error || 'Split failed');
+        setSplitImporting(false);
+        return;
+      }
+
+      // Success
+      setShowSplitModal(false);
+      setUploadMessage({
+        type: 'success',
+        text: data.message || `Split into ${data.totalCreated} cards`,
+      });
+      setTimeout(() => setUploadMessage(null), 8000);
+
+      // Refresh cards and categories
+      fetchCards();
+      fetchCategories();
+    } catch (err) {
+      setSplitError('Split failed: ' + err.message);
+    } finally {
+      setSplitImporting(false);
     }
   }
 
@@ -1061,7 +1213,24 @@ export default function GameDetail() {
                     className="hidden"
                     id="card-upload-input"
                     data-testid="card-upload-input"
+                    title="Upload card images - multi-card sheets are automatically detected and split"
                   />
+                  <input
+                    ref={splitFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    onChange={handleSplitFileSelect}
+                    className="hidden"
+                    id="split-upload-input"
+                    data-testid="split-upload-input"
+                  />
+                  <button
+                    onClick={openSplitImportModal}
+                    data-testid="split-import-btn"
+                    className="px-3 py-1.5 text-sm border border-teal-400 text-teal-600 rounded-lg hover:bg-teal-50 transition-colors font-medium"
+                  >
+                    Split Import
+                  </button>
                   <button
                     onClick={openTtsImportModal}
                     data-testid="tts-import-btn"
@@ -1074,16 +1243,21 @@ export default function GameDetail() {
                     disabled={uploading}
                     data-testid="import-cards-btn"
                     className="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Upload card images - multi-card sheets are automatically detected and split"
                   >
-                    {uploading ? 'Uploading...' : 'Import Cards'}
+                    {uploading ? 'Analyzing & Importing...' : 'Import Cards (Auto-Detect)'}
                   </button>
                 </div>
               </div>
 
               {/* Uploading indicator */}
               {uploading && (
-                <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg" data-testid="upload-progress">
-                  Uploading card image...
+                <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg flex items-center gap-2" data-testid="upload-progress">
+                  <svg className="animate-spin h-4 w-4 text-blue-600" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>Analyzing images for multi-card detection and importing...</span>
                 </div>
               )}
 
@@ -1638,6 +1812,298 @@ export default function GameDetail() {
             </div>
           </div>
         )}
+        {/* Card Split Import Modal */}
+        {showSplitModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="split-import-modal">
+            <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-[var(--color-text)]">
+                  Auto-Split Card Sheet
+                </h2>
+                <button
+                  onClick={() => setShowSplitModal(false)}
+                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-xl w-8 h-8 flex items-center justify-center"
+                  data-testid="split-import-close-btn"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+                Upload an image containing multiple cards (e.g., a scanned card sheet or sprite sheet).
+                The system will automatically detect the card grid layout and split it into individual cards.
+              </p>
+
+              {/* File Input */}
+              <div className="mb-4">
+                <button
+                  onClick={() => splitFileInputRef.current?.click()}
+                  disabled={splitAnalyzing || splitImporting}
+                  data-testid="split-select-file-btn"
+                  className="w-full px-4 py-3 border-2 border-dashed border-teal-300 rounded-lg text-teal-600 hover:bg-teal-50 hover:border-teal-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center"
+                >
+                  {splitAnalyzing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Analyzing image...
+                    </span>
+                  ) : (
+                    <span>
+                      <strong>Choose Card Sheet Image</strong>
+                      <br />
+                      <span className="text-xs text-[var(--color-text-secondary)]">PNG or JPG image containing multiple cards in a grid</span>
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Error */}
+              {splitError && (
+                <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" data-testid="split-import-error">
+                  {splitError}
+                </div>
+              )}
+
+              {/* Analysis Results */}
+              {splitAnalysis && (
+                <div data-testid="split-analysis-results">
+                  {/* Image Info */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-[var(--color-text)]" data-testid="split-filename">
+                          {splitAnalysis.filename}
+                        </p>
+                        <p className="text-xs text-[var(--color-text-secondary)]" data-testid="split-dimensions">
+                          {splitAnalysis.width} x {splitAnalysis.height} pixels
+                        </p>
+                      </div>
+                      {splitAnalysis.shouldSplit && splitAnalysis.suggestions.length > 0 && (
+                        <span className="ml-auto px-2 py-1 bg-teal-100 text-teal-700 text-xs rounded-full font-medium" data-testid="split-detected-badge">
+                          Multi-card detected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Grid Suggestions */}
+                  {splitAnalysis.suggestions.length > 0 && (
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-[var(--color-text)] mb-2">Detected Layouts:</h3>
+                      <div className="space-y-2" data-testid="split-suggestions-list">
+                        {splitAnalysis.suggestions.map((suggestion, idx) => (
+                          <label
+                            key={idx}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              !splitUseCustom && splitSelectedGrid === suggestion
+                                ? 'border-teal-400 bg-teal-50'
+                                : 'border-[var(--color-border)] hover:bg-gray-50'
+                            }`}
+                            data-testid={`split-suggestion-${idx}`}
+                          >
+                            <input
+                              type="radio"
+                              name="splitGrid"
+                              checked={!splitUseCustom && splitSelectedGrid === suggestion}
+                              onChange={() => {
+                                setSplitSelectedGrid(suggestion);
+                                setSplitUseCustom(false);
+                              }}
+                              className="w-4 h-4 text-teal-600"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-[var(--color-text)]">
+                                {suggestion.cols} x {suggestion.rows} grid
+                                <span className="ml-2 text-xs text-[var(--color-text-secondary)]">
+                                  ({suggestion.totalCards} cards, ~{suggestion.cardWidth}x{suggestion.cardHeight}px each)
+                                </span>
+                              </p>
+                              <p className="text-xs text-[var(--color-text-secondary)]">
+                                Card type: {suggestion.matchedType}
+                              </p>
+                            </div>
+                            <span className="text-sm text-teal-600 font-medium">
+                              {suggestion.totalCards} cards
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Grid Option */}
+                  <div className="mb-4">
+                    <label
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        splitUseCustom
+                          ? 'border-teal-400 bg-teal-50'
+                          : 'border-[var(--color-border)] hover:bg-gray-50'
+                      }`}
+                      data-testid="split-custom-option"
+                    >
+                      <input
+                        type="radio"
+                        name="splitGrid"
+                        checked={splitUseCustom}
+                        onChange={() => setSplitUseCustom(true)}
+                        className="w-4 h-4 text-teal-600"
+                      />
+                      <span className="text-sm font-medium text-[var(--color-text)]">Custom grid:</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={splitCustomCols}
+                          onChange={(e) => {
+                            setSplitCustomCols(parseInt(e.target.value) || 1);
+                            setSplitUseCustom(true);
+                          }}
+                          data-testid="split-custom-cols"
+                          className="w-16 px-2 py-1 border border-[var(--color-border)] rounded text-sm text-center"
+                        />
+                        <span className="text-sm text-[var(--color-text-secondary)]">columns</span>
+                        <span className="text-sm text-[var(--color-text-secondary)]">x</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={splitCustomRows}
+                          onChange={(e) => {
+                            setSplitCustomRows(parseInt(e.target.value) || 1);
+                            setSplitUseCustom(true);
+                          }}
+                          data-testid="split-custom-rows"
+                          className="w-16 px-2 py-1 border border-[var(--color-border)] rounded text-sm text-center"
+                        />
+                        <span className="text-sm text-[var(--color-text-secondary)]">rows</span>
+                        {splitUseCustom && (
+                          <span className="text-xs text-teal-600 font-medium ml-2">
+                            = {(parseInt(splitCustomCols) || 1) * (parseInt(splitCustomRows) || 1)} cards
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Card Preview Thumbnails */}
+                  {splitAnalysis.previewCards && splitAnalysis.previewCards.length > 0 && !splitUseCustom && (
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-[var(--color-text)] mb-2">Preview (detected cards):</h3>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg" data-testid="split-preview-grid">
+                        {splitAnalysis.previewCards.map((card) => (
+                          <div key={card.index} className="relative aspect-[2.5/3.5] rounded border border-[var(--color-border)] overflow-hidden bg-white">
+                            <img
+                              src={card.thumbnail}
+                              alt={`Card ${card.index + 1}`}
+                              className="w-full h-full object-contain"
+                            />
+                            <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-center text-[10px] py-0.5">
+                              {card.index + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Options */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
+                        Card name prefix:
+                      </label>
+                      <input
+                        type="text"
+                        value={splitCardPrefix}
+                        onChange={(e) => setSplitCardPrefix(e.target.value)}
+                        data-testid="split-card-prefix"
+                        className="w-full px-3 py-1.5 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                        placeholder="Card"
+                      />
+                      <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                        Cards will be named "{splitCardPrefix || 'Card'} 1", "{splitCardPrefix || 'Card'} 2", etc.
+                      </p>
+                    </div>
+                    {categories.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--color-text)] mb-1">
+                          Assign to category:
+                        </label>
+                        <select
+                          value={splitCategoryId}
+                          onChange={(e) => setSplitCategoryId(e.target.value)}
+                          data-testid="split-category-select"
+                          className="w-full px-3 py-1.5 border border-[var(--color-border)] rounded-lg text-sm bg-white"
+                        >
+                          <option value="">No category</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-[var(--color-text-secondary)]" data-testid="split-summary">
+                      {splitUseCustom
+                        ? `Will split into ${(parseInt(splitCustomCols) || 1) * (parseInt(splitCustomRows) || 1)} cards (${parseInt(splitCustomCols) || 1}x${parseInt(splitCustomRows) || 1})`
+                        : splitSelectedGrid
+                        ? `Will split into ${splitSelectedGrid.totalCards} cards (${splitSelectedGrid.cols}x${splitSelectedGrid.rows})`
+                        : 'Select a grid layout'}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowSplitModal(false)}
+                        className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+                        data-testid="split-import-cancel-btn"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSplitExecute}
+                        disabled={splitImporting || (!splitUseCustom && !splitSelectedGrid)}
+                        data-testid="split-import-execute-btn"
+                        className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        {splitImporting ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Splitting...
+                          </span>
+                        ) : 'Split & Import'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* No analysis yet */}
+              {!splitAnalysis && !splitAnalyzing && !splitError && (
+                <div className="text-center py-6 text-[var(--color-text-secondary)]" data-testid="split-import-instructions">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 text-teal-300">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="12" y1="3" x2="12" y2="21" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                  </svg>
+                  <p className="text-sm mb-1">Upload an image to auto-detect card layout</p>
+                  <p className="text-xs">
+                    Works with scanned card sheets, sprite sheets, and multi-card images
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* TTS Import Modal */}
         {showTtsImportModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="tts-import-modal">
@@ -1772,7 +2238,7 @@ export default function GameDetail() {
                   </div>
 
                   {/* Options */}
-                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -1785,6 +2251,28 @@ export default function GameDetail() {
                         Create categories for each deck
                       </span>
                     </label>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-[var(--color-text)]">
+                        Read card names via OCR:
+                      </span>
+                      <select
+                        value={ttsOcrNamePosition}
+                        onChange={(e) => setTtsOcrNamePosition(e.target.value)}
+                        className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-[var(--color-text)] focus:ring-purple-500 focus:border-purple-500"
+                        data-testid="tts-ocr-position-select"
+                      >
+                        <option value="none">Off</option>
+                        <option value="top">Top of card</option>
+                        <option value="center">Center of card</option>
+                        <option value="bottom">Bottom of card</option>
+                      </select>
+                      {ttsOcrNamePosition !== 'none' && (
+                        <span className="text-xs text-amber-600">
+                          (slower import)
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Import Progress */}
