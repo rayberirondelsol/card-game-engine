@@ -155,31 +155,62 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
     const w = metadata.width;
     const h = metadata.height;
 
-    // Extract a horizontal strip where the name is expected
+    // Use a narrow strip targeting just the title text
+    // Trim 10% from each side to avoid edge icons and borders
+    const leftMargin = Math.floor(w * 0.10);
+    const cropWidth = Math.max(Math.floor(w * 0.80), 10);
+
     let top, height;
     if (namePosition === 'top') {
       top = 0;
-      height = Math.floor(h * 0.15);
+      height = Math.max(Math.floor(h * 0.07), 10);
     } else if (namePosition === 'bottom') {
-      top = Math.floor(h * 0.85);
-      height = Math.floor(h * 0.15);
+      height = Math.max(Math.floor(h * 0.07), 10);
+      top = h - height;
     } else {
       // center
-      top = Math.floor(h * 0.4);
-      height = Math.floor(h * 0.2);
+      height = Math.max(Math.floor(h * 0.10), 10);
+      top = Math.floor((h - height) / 2);
     }
 
-    // Crop the region and enhance for OCR
-    const regionBuffer = await sharp(cardImageBuffer)
-      .extract({ left: 0, top, width: w, height })
+    // Crop the title region, upscale aggressively, and enhance for OCR
+    const baseRegion = sharp(cardImageBuffer)
+      .extract({ left: leftMargin, top, width: cropWidth, height })
       .greyscale()
       .normalise()
-      .resize({ width: Math.max(w * 2, 600), fit: 'inside' })
-      .png()
-      .toBuffer();
+      .sharpen({ sigma: 2 })
+      .resize({ width: Math.max(cropWidth * 3, 900), fit: 'inside' });
 
-    const { data: { text } } = await worker.recognize(regionBuffer);
-    const cleaned = text.trim().replace(/\n/g, ' ').replace(/\s+/g, ' ');
+    const normalBuffer = await baseRegion.clone().png().toBuffer();
+    const negatedBuffer = await baseRegion.clone().negate().normalise().png().toBuffer();
+
+    // Use PSM 7 (single text line) for short card titles
+    await worker.setParameters({ tessedit_pageseg_mode: '7' });
+
+    // Try both normal and negated (handles light-on-dark and dark-on-light text)
+    const normalResult = await worker.recognize(normalBuffer);
+    const negatedResult = await worker.recognize(negatedBuffer);
+
+    // Pick the result with higher confidence
+    const { data: { text } } = normalResult.data.confidence >= negatedResult.data.confidence
+      ? normalResult : negatedResult;
+
+    // Clean: keep only letters, digits, spaces, hyphens, apostrophes, roman-numeral-friendly chars
+    let cleaned = text.trim()
+      .replace(/\n/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/[^a-zA-Z0-9\s\-']/g, '')
+      .trim();
+
+    // If the result looks like garbage (mostly single chars separated by spaces), reject it
+    if (cleaned.length > 0) {
+      const words = cleaned.split(/\s+/);
+      const singleCharWords = words.filter(w => w.length === 1 && !/^[IVXLCDM]$/.test(w));
+      if (singleCharWords.length > words.length * 0.5 && words.length > 2) {
+        return '';
+      }
+    }
+
     return cleaned || '';
   } catch (err) {
     console.warn('[TTS Import] OCR failed for card:', err.message);
