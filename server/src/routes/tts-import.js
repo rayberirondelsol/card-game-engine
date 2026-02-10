@@ -712,4 +712,98 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(500).send({ error: 'Import failed: ' + err.message });
     }
   });
+
+  // POST /api/games/:id/ocr-rename - Apply OCR to rename existing cards
+  fastify.post('/api/games/:id/ocr-rename', async (request, reply) => {
+    const db = getDb();
+    const { id } = request.params;
+    const body = request.body || {};
+
+    const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
+    if (!game) {
+      return reply.status(404).send({ error: 'Game not found' });
+    }
+
+    const { ocrNamePosition, categoryId } = body;
+    const validPositions = ['top', 'bottom', 'center'];
+    if (!ocrNamePosition || !validPositions.includes(ocrNamePosition)) {
+      return reply.status(400).send({ error: 'Invalid ocrNamePosition. Must be top, bottom, or center.' });
+    }
+
+    try {
+      // Get cards to process
+      let cardsToProcess;
+      if (categoryId === 'uncategorized') {
+        cardsToProcess = db.prepare(
+          'SELECT id, name, image_path FROM cards WHERE game_id = ? AND category_id IS NULL'
+        ).all(id);
+      } else if (categoryId) {
+        cardsToProcess = db.prepare(
+          'SELECT id, name, image_path FROM cards WHERE game_id = ? AND category_id = ?'
+        ).all(id, categoryId);
+      } else {
+        cardsToProcess = db.prepare(
+          'SELECT id, name, image_path FROM cards WHERE game_id = ?'
+        ).all(id);
+      }
+
+      if (cardsToProcess.length === 0) {
+        return reply.status(200).send({
+          success: true,
+          totalRenamed: 0,
+          totalFailed: 0,
+          message: 'No cards found to process.'
+        });
+      }
+
+      console.log(`[OCR Rename] Processing ${cardsToProcess.length} cards (position: ${ocrNamePosition})`);
+
+      const worker = await createWorker('eng');
+      const updateStmt = db.prepare('UPDATE cards SET name = ? WHERE id = ?');
+
+      let totalRenamed = 0;
+      let totalFailed = 0;
+
+      for (const card of cardsToProcess) {
+        try {
+          // Resolve image path to filesystem path
+          const imagePath = card.image_path.startsWith('/uploads/')
+            ? path.join(UPLOADS_DIR, card.image_path.replace('/uploads/', ''))
+            : path.join(UPLOADS_DIR, id, path.basename(card.image_path));
+
+          if (!existsSync(imagePath)) {
+            console.warn(`[OCR Rename] Image not found: ${imagePath}`);
+            totalFailed++;
+            continue;
+          }
+
+          const imageBuffer = readFileSync(imagePath);
+          const ocrText = await ocrCardName(imageBuffer, ocrNamePosition, worker);
+
+          if (ocrText) {
+            updateStmt.run(ocrText, card.id);
+            totalRenamed++;
+          } else {
+            totalFailed++;
+          }
+        } catch (err) {
+          console.warn(`[OCR Rename] Failed for card ${card.id}:`, err.message);
+          totalFailed++;
+        }
+      }
+
+      await worker.terminate();
+      console.log(`[OCR Rename] Done: ${totalRenamed} renamed, ${totalFailed} failed`);
+
+      return reply.status(200).send({
+        success: true,
+        totalRenamed,
+        totalFailed,
+        message: `Renamed ${totalRenamed} cards via OCR${totalFailed > 0 ? ` (${totalFailed} failed or no text found)` : ''}`
+      });
+    } catch (err) {
+      console.error('[OCR Rename] Error:', err);
+      return reply.status(500).send({ error: 'OCR rename failed: ' + err.message });
+    }
+  });
 }

@@ -64,6 +64,8 @@ export default function GameDetail() {
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
   const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
+  const [ocrRenamePosition, setOcrRenamePosition] = useState('top');
+  const [ocrRenaming, setOcrRenaming] = useState(false);
   const [ttsError, setTtsError] = useState('');
   const [ttsImportProgress, setTtsImportProgress] = useState('');
   const ttsFileInputRef = useRef(null);
@@ -425,6 +427,32 @@ export default function GameDetail() {
   }
 
   // --- TTS Import ---
+  async function handleOcrRename() {
+    if (ocrRenaming) return;
+    setOcrRenaming(true);
+    try {
+      const res = await fetch(`/api/games/${id}/ocr-rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ocrNamePosition: ocrRenamePosition,
+          categoryId: selectedCategoryId === 'uncategorized' ? 'uncategorized' : selectedCategoryId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'OCR rename failed');
+      } else {
+        alert(data.message);
+        fetchCards();
+      }
+    } catch (err) {
+      alert('OCR rename failed: ' + err.message);
+    } finally {
+      setOcrRenaming(false);
+    }
+  }
+
   function openTtsImportModal() {
     setShowTtsImportModal(true);
     setTtsAnalysis(null);
@@ -1238,6 +1266,26 @@ export default function GameDetail() {
                   >
                     TTS Import
                   </button>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={ocrRenamePosition}
+                      onChange={(e) => setOcrRenamePosition(e.target.value)}
+                      className="text-xs border border-gray-300 rounded px-1 py-1.5 bg-white text-[var(--color-text)]"
+                      data-testid="ocr-rename-position"
+                    >
+                      <option value="top">Top</option>
+                      <option value="center">Center</option>
+                      <option value="bottom">Bottom</option>
+                    </select>
+                    <button
+                      onClick={handleOcrRename}
+                      disabled={ocrRenaming}
+                      data-testid="ocr-rename-btn"
+                      className="px-3 py-1.5 text-sm border border-amber-400 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors font-medium disabled:opacity-50"
+                    >
+                      {ocrRenaming ? 'Reading...' : 'OCR Rename'}
+                    </button>
+                  </div>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
