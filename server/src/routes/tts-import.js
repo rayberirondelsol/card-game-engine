@@ -155,31 +155,33 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
     const w = metadata.width;
     const h = metadata.height;
 
-    // Use a narrow strip targeting just the title text
-    // Trim 10% from each side to avoid edge icons and borders
-    const leftMargin = Math.floor(w * 0.10);
-    const cropWidth = Math.max(Math.floor(w * 0.80), 10);
+    // Trim 15% from each side to avoid edge icons, borders, and side text
+    const leftMargin = Math.floor(w * 0.15);
+    const cropWidth = Math.max(Math.floor(w * 0.70), 10);
 
-    let top, height;
+    // Use a very narrow strip targeting only the title text
+    // Skip the frame/border at edges and avoid subtitle/type text
+    let cropTop, cropHeight;
     if (namePosition === 'top') {
-      top = 0;
-      height = Math.max(Math.floor(h * 0.07), 10);
+      cropTop = Math.floor(h * 0.01);     // skip top frame/border
+      cropHeight = Math.max(Math.floor(h * 0.045), 10); // just the title line
     } else if (namePosition === 'bottom') {
-      height = Math.max(Math.floor(h * 0.07), 10);
-      top = h - height;
+      cropHeight = Math.max(Math.floor(h * 0.045), 10);
+      cropTop = Math.floor(h * 0.955) - cropHeight;
     } else {
       // center
-      height = Math.max(Math.floor(h * 0.10), 10);
-      top = Math.floor((h - height) / 2);
+      cropHeight = Math.max(Math.floor(h * 0.06), 10);
+      cropTop = Math.floor((h - cropHeight) / 2);
     }
 
-    // Crop the title region, upscale aggressively, and enhance for OCR
+    // Crop, upscale 5x, and enhance for OCR
     const baseRegion = sharp(cardImageBuffer)
-      .extract({ left: leftMargin, top, width: cropWidth, height })
+      .extract({ left: leftMargin, top: cropTop, width: cropWidth, height: cropHeight })
       .greyscale()
-      .normalise()
+      .linear(1.5, -30)   // boost contrast
       .sharpen({ sigma: 2 })
-      .resize({ width: Math.max(cropWidth * 3, 900), fit: 'inside' });
+      .resize({ width: Math.max(cropWidth * 5, 1500), fit: 'inside' })
+      .normalise();
 
     const normalBuffer = await baseRegion.clone().png().toBuffer();
     const negatedBuffer = await baseRegion.clone().negate().normalise().png().toBuffer();
@@ -192,21 +194,29 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
     const negatedResult = await worker.recognize(negatedBuffer);
 
     // Pick the result with higher confidence
-    const { data: { text } } = normalResult.data.confidence >= negatedResult.data.confidence
+    const best = normalResult.data.confidence >= negatedResult.data.confidence
       ? normalResult : negatedResult;
+    const { text, confidence } = best.data;
 
-    // Clean: keep only letters, digits, spaces, hyphens, apostrophes, roman-numeral-friendly chars
+    // Reject low-confidence results
+    if (confidence < 40) return '';
+
+    // Clean: keep only letters, digits, spaces, hyphens, apostrophes
     let cleaned = text.trim()
       .replace(/\n/g, ' ')
       .replace(/\s+/g, ' ')
       .replace(/[^a-zA-Z0-9\s\-']/g, '')
-      .trim();
+      .trim()
+      .toUpperCase();
 
-    // If the result looks like garbage (mostly single chars separated by spaces), reject it
+    // Reject if too short (likely noise, not a real card name)
+    if (cleaned.length < 3) return '';
+
+    // Reject if mostly single-char gibberish (but allow roman numerals)
     if (cleaned.length > 0) {
       const words = cleaned.split(/\s+/);
-      const singleCharWords = words.filter(w => w.length === 1 && !/^[IVXLCDM]$/.test(w));
-      if (singleCharWords.length > words.length * 0.5 && words.length > 2) {
+      const singleCharWords = words.filter(w => w.length === 1 && !/^[IVXLCDM0-9]$/.test(w));
+      if (singleCharWords.length > words.length * 0.4) {
         return '';
       }
     }
