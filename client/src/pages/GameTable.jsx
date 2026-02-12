@@ -352,6 +352,16 @@ export default function GameTable() {
   // Browse stack modal state
   const [browseStackId, setBrowseStackId] = useState(null);
 
+  // Press-and-hold state for stack interaction
+  const pressHoldTimerRef = useRef(null);
+  const [pressHoldActive, setPressHoldActive] = useState(false);
+  const PRESS_HOLD_DELAY = 250; // milliseconds to distinguish quick-click from press-hold
+
+  // Hand-to-table drag state
+  const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
+  const handToTableDragOffsetRef = useRef({ x: 0, y: 0 });
+  const [handDragPosition, setHandDragPosition] = useState({ x: 0, y: 0 }); // cursor position during hand-to-table drag
+
   // Fetch game data
   useEffect(() => {
     async function fetchGame() {
@@ -776,8 +786,38 @@ export default function GameTable() {
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
-    // If card is in a stack, bring the whole stack to front
     const stackId = card.inStack;
+
+    // If card is in a stack, implement press-and-hold behavior
+    if (stackId) {
+      const stackCards = tableCards.filter(c => c.inStack === stackId);
+
+      // Only apply press-and-hold if stack has 2+ cards
+      if (stackCards.length >= 2) {
+        // Start timer for press-and-hold
+        pressHoldTimerRef.current = setTimeout(() => {
+          // After delay, allow dragging the stack
+          setPressHoldActive(true);
+          startDraggingCard(e, tableId, card, stackId);
+        }, PRESS_HOLD_DELAY);
+
+        // Store initial mouse position to detect if mouse moves (which should cancel quick-click)
+        cardDragOffsetRef.current = {
+          x: e.clientX - card.x,
+          y: e.clientY - card.y,
+          initialX: e.clientX,
+          initialY: e.clientY,
+        };
+        return;
+      }
+    }
+
+    // For single cards or non-stacks, start dragging immediately
+    startDraggingCard(e, tableId, card, stackId);
+  }
+
+  // Helper function to actually start dragging a card
+  function startDraggingCard(e, tableId, card, stackId) {
     const newZ = maxZIndex + 1;
 
     if (stackId) {
@@ -826,6 +866,29 @@ export default function GameTable() {
 
   // Handle card drag move
   function handleCardDragMove(e) {
+    // If timer is active and mouse moves significantly, cancel timer and start dragging
+    if (pressHoldTimerRef.current && cardDragOffsetRef.current.initialX !== undefined) {
+      const dx = Math.abs(e.clientX - cardDragOffsetRef.current.initialX);
+      const dy = Math.abs(e.clientY - cardDragOffsetRef.current.initialY);
+      if (dx > 5 || dy > 5) {
+        // Mouse moved - cancel quick-click, start dragging
+        clearTimeout(pressHoldTimerRef.current);
+        pressHoldTimerRef.current = null;
+        setPressHoldActive(true);
+
+        // Find the card and start dragging
+        if (!draggingCard) {
+          const card = tableCards.find(c =>
+            Math.abs(c.x - (cardDragOffsetRef.current.initialX - cardDragOffsetRef.current.x)) < 10 &&
+            Math.abs(c.y - (cardDragOffsetRef.current.initialY - cardDragOffsetRef.current.y)) < 10
+          );
+          if (card) {
+            startDraggingCard(e, card.tableId, card, card.inStack);
+          }
+        }
+      }
+    }
+
     if (!draggingCard) return;
 
     const newX = e.clientX - cardDragOffsetRef.current.x;
@@ -902,10 +965,62 @@ export default function GameTable() {
 
   // Handle card drag end - snap to grid and detect drop on stack
   function handleCardDragEnd() {
+    // Clear press-hold timer if it exists
+    if (pressHoldTimerRef.current) {
+      clearTimeout(pressHoldTimerRef.current);
+      pressHoldTimerRef.current = null;
+    }
+
+    // If we have a dragging card but press-hold wasn't activated, it's a quick-click
+    const card = draggingCard ? tableCards.find(c => c.tableId === draggingCard) : null;
+
+    if (card && card.inStack && !pressHoldActive) {
+      // Quick-click on stack - draw one card to hand
+      const stackCards = tableCards.filter(c => c.inStack === card.inStack);
+      if (stackCards.length >= 2) {
+        // Find the top card (highest zIndex)
+        const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max);
+
+        // Add to hand
+        const newHandCard = {
+          handId: crypto.randomUUID(),
+          cardId: topCard.cardId,
+          name: topCard.name,
+          image_path: topCard.image_path,
+          faceDown: false,
+        };
+        setHandCards(prev => [...prev, newHandCard]);
+
+        // Remove from table
+        setTableCards(prev => {
+          const remaining = prev.filter(c => c.tableId !== topCard.tableId);
+          // If only one card left in stack, unstack it
+          const remainingInStack = remaining.filter(c => c.inStack === card.inStack);
+          if (remainingInStack.length === 1) {
+            return remaining.map(c => c.inStack === card.inStack ? { ...c, inStack: null } : c);
+          }
+          return remaining;
+        });
+
+        // Show toast
+        setDrawToast('Drew 1 card to hand');
+        setTimeout(() => setDrawToast(null), 2000);
+
+        // Clear state
+        setDraggingCard(null);
+        setPressHoldActive(false);
+        return;
+      }
+    }
+
+    setPressHoldActive(false);
+
     if (!draggingCard) return;
 
-    const card = tableCards.find(c => c.tableId === draggingCard);
-    if (!card) return;
+    if (!card) {
+      setDraggingCard(null);
+      return;
+    }
 
     // Check if card/stack is being dropped on another stack
     const STACK_DROP_THRESHOLD = 80; // Distance in pixels to trigger stack merge
@@ -1270,6 +1385,8 @@ export default function GameTable() {
       handleCardDragMove(e);
     } else if (draggingObj) {
       handleObjDragMove(e);
+    } else if (draggingFromHand) {
+      handleHandToTableDragMove(e);
     }
   }
 
@@ -1284,6 +1401,9 @@ export default function GameTable() {
     }
     if (draggingObj) {
       handleObjDragEnd();
+    }
+    if (draggingFromHand) {
+      handleHandToTableDragEnd(e);
     }
   }
 
@@ -1395,7 +1515,7 @@ export default function GameTable() {
   }
 
   // Play a card from hand back to the table
-  function playCardFromHand(handId, targetStackId = null) {
+  function playCardFromHand(handId, targetStackId = null, x = null, y = null) {
     const card = handCards.find(c => c.handId === handId);
     if (!card) return;
 
@@ -1429,19 +1549,30 @@ export default function GameTable() {
       }
     }
 
-    // If no target stack or stack doesn't exist, place card in center-ish area
+    // If no target stack or stack doesn't exist, place card at specified position or center
     if (!targetStackId) {
       const canvas = canvasRef.current;
-      const centerX = (canvas?.width || 800) / 2;
-      const centerY = (canvas?.height || 600) / 2 - 60;
+      let posX, posY;
+
+      if (x !== null && y !== null) {
+        // Use specified position (from drag-and-drop)
+        posX = x;
+        posY = y;
+      } else {
+        // Use center with slight randomization
+        const centerX = (canvas?.width || 800) / 2;
+        const centerY = (canvas?.height || 600) / 2 - 60;
+        posX = centerX + (Math.random() - 0.5) * 60;
+        posY = centerY + (Math.random() - 0.5) * 60;
+      }
 
       newTableCard = {
         tableId: crypto.randomUUID(),
         cardId: card.cardId,
         name: card.name,
         image_path: card.image_path,
-        x: centerX + (Math.random() - 0.5) * 60,
-        y: centerY + (Math.random() - 0.5) * 60,
+        x: posX,
+        y: posY,
         zIndex: newZIndex,
         faceDown: false,
         rotation: 0,
@@ -1489,6 +1620,56 @@ export default function GameTable() {
   function handleHandDragEnd() {
     setDraggingHandCard(null);
     setHandDragOverIndex(null);
+  }
+
+  // Hand-to-table drag handlers (using mouse events for more control)
+  function handleHandCardMouseDown(e, handId) {
+    // Only initiate hand-to-table drag with left mouse button
+    if (e.button !== 0) return;
+
+    const card = handCards.find(c => c.handId === handId);
+    if (!card) return;
+
+    // Store initial offset
+    handToTableDragOffsetRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+    };
+
+    setDraggingFromHand(handId);
+    e.preventDefault();
+  }
+
+  function handleHandToTableDragMove(e) {
+    if (!draggingFromHand) return;
+
+    // Update cursor position for ghost card rendering
+    setHandDragPosition({ x: e.clientX, y: e.clientY });
+  }
+
+  function handleHandToTableDragEnd(e) {
+    if (!draggingFromHand) return;
+
+    const card = handCards.find(c => c.handId === draggingFromHand);
+    if (!card) {
+      setDraggingFromHand(null);
+      return;
+    }
+
+    // Check if dropped on table (not on hand area)
+    const handContainer = document.querySelector('[data-testid="hand-container"]');
+    if (handContainer) {
+      const handRect = handContainer.getBoundingClientRect();
+      const isOverHand = e.clientX >= handRect.left && e.clientX <= handRect.right &&
+                         e.clientY >= handRect.top && e.clientY <= handRect.bottom;
+
+      if (!isOverHand) {
+        // Dropped on table - place card at mouse position
+        playCardFromHand(draggingFromHand, null, e.clientX, e.clientY);
+      }
+    }
+
+    setDraggingFromHand(null);
   }
 
   // ===== SAVE/LOAD FUNCTIONS =====
@@ -3868,9 +4049,22 @@ export default function GameTable() {
                       onDragOver={(e) => handleHandDragOver(e, index)}
                       onDrop={(e) => handleHandDrop(e, index)}
                       onDragEnd={handleHandDragEnd}
+                      onMouseDown={(e) => {
+                        // Right-click for hand-to-table drag (Alt + left-click also works)
+                        if (e.button === 2 || (e.button === 0 && e.altKey)) {
+                          e.preventDefault();
+                          handleHandCardMouseDown(e, card.handId);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        // Prevent context menu when using right-click for drag
+                        if (draggingFromHand === card.handId) {
+                          e.preventDefault();
+                        }
+                      }}
                       onMouseEnter={() => setHoveredHandCard(card.handId)}
                       onMouseLeave={() => setHoveredHandCard(null)}
-                      className={`relative cursor-pointer transition-all duration-200 flex-shrink-0 ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'scale-105' : ''}`}
+                      className={`relative cursor-pointer transition-all duration-200 flex-shrink-0 ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'scale-105' : ''} ${draggingFromHand === card.handId ? 'opacity-50' : ''}`}
                       style={{
                         width: 80,
                         height: 112,
@@ -3913,7 +4107,7 @@ export default function GameTable() {
       )}
 
       {/* Hand card hover preview - large zoom */}
-      {hoveredHandCard && (() => {
+      {hoveredHandCard && !draggingFromHand && (() => {
         const card = handCards.find(c => c.handId === hoveredHandCard);
         if (!card) return null;
         return (
@@ -3928,6 +4122,37 @@ export default function GameTable() {
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs text-center py-1 px-2 truncate">{card.name}</div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Ghost card during hand-to-table drag */}
+      {draggingFromHand && (() => {
+        const card = handCards.find(c => c.handId === draggingFromHand);
+        if (!card) return null;
+        return (
+          <div
+            className="fixed z-[70] pointer-events-none"
+            data-testid="hand-drag-ghost"
+            style={{
+              left: handDragPosition.x - CARD_WIDTH / 2,
+              top: handDragPosition.y - CARD_HEIGHT / 2,
+            }}
+          >
+            <div
+              className="rounded-lg overflow-hidden border-2 border-blue-400 shadow-2xl shadow-blue-400/50 opacity-70"
+              style={{ width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: '#fff' }}
+            >
+              {card.image_path ? (
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+                  <span className="text-[7px] text-gray-500 text-center leading-tight truncate w-full px-1">{card.name}</span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[7px] text-center py-0.5 truncate px-1">{card.name}</div>
             </div>
           </div>
         );
