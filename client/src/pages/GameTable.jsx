@@ -131,7 +131,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           style={{ width: size, height: size, backgroundColor: color }}
           title={label || 'Circle Token'}
         >
-          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+          {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
       );
 
@@ -142,7 +142,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           style={{ width: size, height: size, backgroundColor: color }}
           title={label || 'Square Token'}
         >
-          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+          {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
       );
 
@@ -163,7 +163,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           </svg>
           {label && (
             <span className={`${textClasses} absolute`} style={{ top: '55%' }}>
-              {label.substring(0, 2)}
+              {label.substring(0, 3)}
             </span>
           )}
         </div>
@@ -186,7 +186,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           </svg>
           {label && (
             <span className={`${textClasses} absolute`}>
-              {label.substring(0, 2)}
+              {label.substring(0, 3)}
             </span>
           )}
         </div>
@@ -209,7 +209,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           </svg>
           {label && (
             <span className={`${textClasses} absolute`}>
-              {label.substring(0, 2)}
+              {label.substring(0, 3)}
             </span>
           )}
         </div>
@@ -232,7 +232,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           </svg>
           {label && (
             <span className={`${textClasses} absolute`}>
-              {label.substring(0, 2)}
+              {label.substring(0, 3)}
             </span>
           )}
         </div>
@@ -244,7 +244,7 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
           className={`${commonClasses} rounded-full`}
           style={{ width: size, height: size, backgroundColor: color }}
         >
-          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+          {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
       );
   }
@@ -288,10 +288,9 @@ export default function GameTable() {
   const [zoomDisplay, setZoomDisplay] = useState(100); // reactive zoom % for display
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 }); // reactive pan position for display
 
-  // Game objects state (counters, dice, markers, notes, tokens)
+  // Game objects state (counters, dice, notes, tokens)
   const [counters, setCounters] = useState([]);
   const [dice, setDice] = useState([]);
-  const [markers, setMarkers] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tokens, setTokens] = useState([]);
 
@@ -318,13 +317,10 @@ export default function GameTable() {
   // Toolbar modals
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
-  const [showMarkerModal, setShowMarkerModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
   const [newDiceType, setNewDiceType] = useState('d6');
-  const [newMarkerColor, setNewMarkerColor] = useState('#ff0000');
-  const [newMarkerLabel, setNewMarkerLabel] = useState('');
   const [newNoteText, setNewNoteText] = useState('');
   const [newTokenShape, setNewTokenShape] = useState('circle');
   const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
@@ -444,12 +440,12 @@ export default function GameTable() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-width / 2 + camera.x, -height / 2 + camera.y);
 
-    // Markers are now rendered as DOM overlays (not on canvas)
+    // Tokens are now rendered as DOM overlays (not on canvas)
 
     // Notes are now rendered as DOM overlays (not on canvas)
 
     ctx.restore();
-  }, [background, counters, dice, markers]);
+  }, [background, counters, dice]);
 
   // Set up canvas sizing and render loop
   useEffect(() => {
@@ -479,7 +475,7 @@ export default function GameTable() {
   // Re-render when state changes
   useEffect(() => {
     renderCanvas();
-  }, [background, counters, dice, markers, renderCanvas]);
+  }, [background, counters, dice, renderCanvas]);
 
   // Mouse event handlers for canvas (pan & zoom)
   useEffect(() => {
@@ -1007,13 +1003,12 @@ export default function GameTable() {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
-  // Drag handlers for floating objects (counters, dice, markers, tokens)
+  // Drag handlers for floating objects (counters, dice, notes, tokens)
   function handleObjDragStart(e, objType, objId) {
     e.preventDefault();
     let obj;
     if (objType === 'counter') obj = counters.find(c => c.id === objId);
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
-    else if (objType === 'marker') obj = markers.find(m => m.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
     if (!obj) return;
@@ -1025,9 +1020,9 @@ export default function GameTable() {
   }
 
   function findNearestCardCorner(px, py) {
-    const MARKER_SNAP_DISTANCE = 30;
+    const TOKEN_SNAP_DISTANCE = 30;
     let nearest = null;
-    let nearestDist = MARKER_SNAP_DISTANCE;
+    let nearestDist = TOKEN_SNAP_DISTANCE;
     const allCards = tableCards.filter(c => {
       if (!c.inStack) return true;
       const stackCards2 = tableCards.filter(sc => sc.inStack === c.inStack);
@@ -1064,38 +1059,30 @@ export default function GameTable() {
       setDice(prev => prev.map(d =>
         d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
       ));
-    } else if (draggingObj.type === 'marker') {
-      setMarkers(prev => prev.map(m =>
-        m.id === draggingObj.id ? { ...m, x: newX, y: newY, attachedTo: null } : m
-      ));
     } else if (draggingObj.type === 'note') {
       setNotes(prev => prev.map(n =>
         n.id === draggingObj.id ? { ...n, x: newX, y: newY } : n
       ));
     } else if (draggingObj.type === 'token') {
       setTokens(prev => prev.map(t =>
-        t.id === draggingObj.id ? { ...t, x: newX, y: newY } : t
+        t.id === draggingObj.id ? { ...t, x: newX, y: newY, attachedTo: null } : t
       ));
     }
   }
 
   function handleObjDragEnd() {
-    if (draggingObj && draggingObj.type === 'marker') {
-      const marker = markers.find(m => m.id === draggingObj.id);
-      if (marker) {
-        const snap = findNearestCardCorner(marker.x, marker.y);
+    if (draggingObj && draggingObj.type === 'token') {
+      const token = tokens.find(t => t.id === draggingObj.id);
+      if (token) {
+        const snap = findNearestCardCorner(token.x, token.y);
         if (snap) {
-          setMarkers(prev => prev.map(m =>
-            m.id === draggingObj.id ? { ...m, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner } : m
+          setTokens(prev => prev.map(t =>
+            t.id === draggingObj.id ? { ...t, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner } : t
           ));
         }
       }
     }
     setDraggingObj(null);
-  }
-
-  function deleteMarker(markerId) {
-    setMarkers(prev => prev.filter(m => m.id !== markerId));
   }
 
   // Note editing state
@@ -1137,6 +1124,7 @@ export default function GameTable() {
       label: label || '',
       x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
       y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      attachedTo: null, // support card attachment
     };
     setTokens(prev => [...prev, newToken]);
     setShowTokenModal(false);
@@ -1420,15 +1408,6 @@ export default function GameTable() {
         name: c.name,
         image_path: c.image_path,
       })),
-      markers: markers.map(m => ({
-        id: m.id,
-        color: m.color,
-        label: m.label || '',
-        x: m.x,
-        y: m.y,
-        attachedTo: m.attachedTo || null,
-        attachedCorner: m.attachedCorner || null,
-      })),
       counters: counters.map(c => ({
         id: c.id,
         name: c.name,
@@ -1457,6 +1436,8 @@ export default function GameTable() {
         label: t.label || '',
         x: t.x,
         y: t.y,
+        attachedTo: t.attachedTo || null,
+        attachedCorner: t.attachedCorner || null,
       })),
       maxZIndex: maxZIndex,
     };
@@ -1501,7 +1482,7 @@ export default function GameTable() {
   const performAutoSaveRef = useRef(null);
   performAutoSaveRef.current = async function performAutoSave() {
     // Only auto-save if there's something on the table
-    if (tableCards.length === 0 && handCards.length === 0 && markers.length === 0 && counters.length === 0 && dice.length === 0 && notes.length === 0) {
+    if (tableCards.length === 0 && handCards.length === 0 && tokens.length === 0 && counters.length === 0 && dice.length === 0 && notes.length === 0) {
       return;
     }
 
@@ -1695,19 +1676,21 @@ export default function GameTable() {
       setHandCards([]);
     }
 
-    // Restore markers
+    // Migrate old markers to tokens (backward compatibility)
+    const migratedTokens = [];
     if (state.markers && Array.isArray(state.markers)) {
-      setMarkers(state.markers.map(m => ({
-        id: m.id || crypto.randomUUID(),
-        color: m.color,
-        label: m.label || '',
-        x: m.x,
-        y: m.y,
-        attachedTo: m.attachedTo || null,
-        attachedCorner: m.attachedCorner || null,
-      })));
-    } else {
-      setMarkers([]);
+      state.markers.forEach(m => {
+        migratedTokens.push({
+          id: m.id || crypto.randomUUID(),
+          shape: 'circle',
+          color: m.color,
+          label: m.label || '',
+          x: m.x,
+          y: m.y,
+          attachedTo: m.attachedTo || null,
+          attachedCorner: m.attachedCorner || null,
+        });
+      });
     }
 
     // Restore counters
@@ -1752,16 +1735,21 @@ export default function GameTable() {
 
     // Restore tokens
     if (state.tokens && Array.isArray(state.tokens)) {
-      setTokens(state.tokens.map(t => ({
+      const restoredTokens = state.tokens.map(t => ({
         id: t.id || crypto.randomUUID(),
         shape: t.shape,
         color: t.color,
         label: t.label || '',
         x: t.x,
         y: t.y,
-      })));
+        attachedTo: t.attachedTo || null,
+        attachedCorner: t.attachedCorner || null,
+      }));
+      // Merge migrated markers with existing tokens
+      setTokens([...restoredTokens, ...migratedTokens]);
     } else {
-      setTokens([]);
+      // Only migrated markers
+      setTokens(migratedTokens);
     }
 
     // Trigger canvas re-render
@@ -2271,52 +2259,6 @@ export default function GameTable() {
         </div>
       ))}
 
-      {/* Floating Marker Widgets */}
-      {markers.map(marker => (
-        <div
-          key={marker.id}
-          data-testid={`marker-${marker.id}`}
-          data-marker-color={marker.color}
-          data-marker-label={marker.label || ''}
-          data-marker-attached={marker.attachedTo || ''}
-          data-ui-element="true"
-          className="absolute z-20 select-none group"
-          style={{
-            left: marker.x - 15,
-            top: marker.y - 15,
-            cursor: draggingObj?.id === marker.id ? 'grabbing' : 'grab',
-          }}
-          onMouseDown={(e) => handleObjDragStart(e, 'marker', marker.id)}
-        >
-          {/* Marker circle */}
-          <div
-            className={`w-[30px] h-[30px] rounded-full border-2 flex items-center justify-center shadow-lg transition-transform ${
-              marker.attachedTo ? 'border-white/80 scale-90' : 'border-white/50'
-            } ${draggingObj?.id === marker.id ? 'scale-125' : ''}`}
-            style={{ backgroundColor: marker.color }}
-            title={marker.label || `Marker (${marker.color})`}
-          >
-            {marker.label && (
-              <span className="text-white text-[8px] font-bold leading-none drop-shadow-sm">
-                {marker.label.substring(0, 3)}
-              </span>
-            )}
-          </div>
-          {/* Delete button on hover */}
-          <button
-            onClick={(e) => { e.stopPropagation(); deleteMarker(marker.id); }}
-            data-testid={`marker-delete-${marker.id}`}
-            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            &times;
-          </button>
-          {/* Attached indicator */}
-          {marker.attachedTo && (
-            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
-          )}
-        </div>
-      ))}
-
       {/* Floating Note Widgets (sticky notes on table) */}
       {notes.map(note => (
         <div
@@ -2441,6 +2383,10 @@ export default function GameTable() {
           >
             &times;
           </button>
+          {/* Attached indicator */}
+          {token.attachedTo && (
+            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
+          )}
         </div>
       ))}
 
@@ -2809,19 +2755,6 @@ export default function GameTable() {
               <span className="text-[10px]">Dice</span>
             </button>
 
-            {/* Marker button */}
-            <button
-              onClick={() => setShowMarkerModal(true)}
-              data-testid="toolbar-marker-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-              title="Add Marker"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="8" />
-              </svg>
-              <span className="text-[10px]">Marker</span>
-            </button>
-
             {/* Note button */}
             <button
               onClick={() => setShowNoteModal(true)}
@@ -3029,69 +2962,6 @@ export default function GameTable() {
         </div>
       )}
 
-      {/* Marker Creation Modal */}
-      {showMarkerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="marker-modal">
-            <h3 className="text-white font-semibold mb-3">Add Marker</h3>
-            <div className="mb-3">
-              <label className="text-slate-400 text-xs block mb-1">Color</label>
-              <div className="grid grid-cols-6 gap-2">
-                {['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'].map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setNewMarkerColor(color)}
-                    data-testid={`marker-color-${color.replace('#', '')}`}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      newMarkerColor === color ? 'border-white scale-125' : 'border-slate-600 hover:border-slate-400'
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className="text-slate-400 text-xs block mb-1">Label (optional, max 3 chars)</label>
-              <input
-                type="text"
-                value={newMarkerLabel}
-                onChange={(e) => setNewMarkerLabel(e.target.value.substring(0, 3))}
-                placeholder="e.g., HP, ATK"
-                data-testid="marker-label-input"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                maxLength={3}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowMarkerModal(false); setNewMarkerLabel(''); }}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const canvas = canvasRef.current;
-                  setMarkers(prev => [...prev, {
-                    id: crypto.randomUUID(),
-                    color: newMarkerColor,
-                    label: newMarkerLabel.trim(),
-                    x: (canvas?.width || 800) / 2,
-                    y: (canvas?.height || 600) / 2,
-                  }]);
-                  setShowMarkerModal(false);
-                  setNewMarkerLabel('');
-                }}
-                data-testid="marker-create-btn"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
-              >
-                Place Marker
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Note Creation Modal */}
       {showNoteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
@@ -3197,7 +3067,7 @@ export default function GameTable() {
                 data-testid="token-label-input"
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-slate-400 text-xs mt-1">Max 2 characters displayed</p>
+              <p className="text-slate-400 text-xs mt-1">Max 3 characters displayed</p>
             </div>
 
             {/* Preview */}
@@ -3763,16 +3633,16 @@ export default function GameTable() {
                   Add Dice
                 </button>
                 <button
-                  onClick={() => { setShowMarkerModal(true); setContextMenu(null); }}
-                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                >
-                  Add Marker
-                </button>
-                <button
                   onClick={() => { setShowNoteModal(true); setContextMenu(null); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   Add Note
+                </button>
+                <button
+                  onClick={() => { setShowTokenModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Token
                 </button>
               </>
             )}
