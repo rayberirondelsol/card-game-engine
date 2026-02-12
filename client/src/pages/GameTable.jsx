@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
+import { getPointerPosition, handleTouchPrevention, isTouchEvent } from '../utils/touchUtils';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -781,11 +782,19 @@ export default function GameTable() {
 
   // Start dragging a card on the table
   function handleCardDragStart(e, tableId) {
-    e.preventDefault();
-    e.stopPropagation();
+    // Prevent default for touch events to avoid scrolling
+    if (isTouchEvent(e)) {
+      handleTouchPrevention(e);
+    } else {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
+    // Get unified pointer position (works for both mouse and touch)
+    const pointer = getPointerPosition(e);
     const stackId = card.inStack;
 
     // If card is in a stack, implement press-and-hold behavior
@@ -801,12 +810,12 @@ export default function GameTable() {
           startDraggingCard(e, tableId, card, stackId);
         }, PRESS_HOLD_DELAY);
 
-        // Store initial mouse position to detect if mouse moves (which should cancel quick-click)
+        // Store initial pointer position to detect if pointer moves (which should cancel quick-click)
         cardDragOffsetRef.current = {
-          x: e.clientX - card.x,
-          y: e.clientY - card.y,
-          initialX: e.clientX,
-          initialY: e.clientY,
+          x: pointer.clientX - card.x,
+          y: pointer.clientY - card.y,
+          initialX: pointer.clientX,
+          initialY: pointer.clientY,
         };
         return;
       }
@@ -819,6 +828,9 @@ export default function GameTable() {
   // Helper function to actually start dragging a card
   function startDraggingCard(e, tableId, card, stackId) {
     const newZ = maxZIndex + 1;
+
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
 
     if (stackId) {
       const stackCards = tableCards.filter(c => c.inStack === stackId);
@@ -836,12 +848,13 @@ export default function GameTable() {
     }
 
     cardDragOffsetRef.current = {
-      x: e.clientX - card.x,
-      y: e.clientY - card.y,
+      x: pointer.clientX - card.x,
+      y: pointer.clientY - card.y,
     };
     setDraggingCard(tableId);
 
     // Select the card if not already selected (and not ctrl-clicking)
+    // Note: Touch events don't have ctrlKey, so they'll always follow the default path
     if (!e.ctrlKey && !e.metaKey) {
       // For stacks, select all cards in the stack
       if (stackId) {
@@ -866,12 +879,15 @@ export default function GameTable() {
 
   // Handle card drag move
   function handleCardDragMove(e) {
-    // If timer is active and mouse moves significantly, cancel timer and start dragging
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+
+    // If timer is active and pointer moves significantly, cancel timer and start dragging
     if (pressHoldTimerRef.current && cardDragOffsetRef.current.initialX !== undefined) {
-      const dx = Math.abs(e.clientX - cardDragOffsetRef.current.initialX);
-      const dy = Math.abs(e.clientY - cardDragOffsetRef.current.initialY);
+      const dx = Math.abs(pointer.clientX - cardDragOffsetRef.current.initialX);
+      const dy = Math.abs(pointer.clientY - cardDragOffsetRef.current.initialY);
       if (dx > 5 || dy > 5) {
-        // Mouse moved - cancel quick-click, start dragging
+        // Pointer moved - cancel quick-click, start dragging
         clearTimeout(pressHoldTimerRef.current);
         pressHoldTimerRef.current = null;
         setPressHoldActive(true);
@@ -891,8 +907,8 @@ export default function GameTable() {
 
     if (!draggingCard) return;
 
-    const newX = e.clientX - cardDragOffsetRef.current.x;
-    const newY = e.clientY - cardDragOffsetRef.current.y;
+    const newX = pointer.clientX - cardDragOffsetRef.current.x;
+    const newY = pointer.clientY - cardDragOffsetRef.current.y;
 
     // Calculate grid highlight position
     const snapX = snapToGrid(newX);
@@ -1238,16 +1254,26 @@ export default function GameTable() {
 
   // Drag handlers for floating objects (counters, dice, notes, tokens)
   function handleObjDragStart(e, objType, objId) {
-    e.preventDefault();
+    // Prevent default for touch events
+    if (isTouchEvent(e)) {
+      handleTouchPrevention(e);
+    } else {
+      e.preventDefault();
+    }
+
     let obj;
     if (objType === 'counter') obj = counters.find(c => c.id === objId);
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
     if (!obj) return;
+
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+
     dragOffsetRef.current = {
-      x: e.clientX - (obj.x || 0),
-      y: e.clientY - (obj.y || 0),
+      x: pointer.clientX - (obj.x || 0),
+      y: pointer.clientY - (obj.y || 0),
     };
     setDraggingObj({ type: objType, id: objId });
   }
@@ -1282,8 +1308,11 @@ export default function GameTable() {
 
   function handleObjDragMove(e) {
     if (!draggingObj) return;
-    const newX = e.clientX - dragOffsetRef.current.x;
-    const newY = e.clientY - dragOffsetRef.current.y;
+
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+    const newX = pointer.clientX - dragOffsetRef.current.x;
+    const newY = pointer.clientY - dragOffsetRef.current.y;
     if (draggingObj.type === 'counter') {
       setCounters(prev => prev.map(c =>
         c.id === draggingObj.id ? { ...c, x: newX, y: newY } : c
@@ -1370,12 +1399,14 @@ export default function GameTable() {
     setTokens(prev => prev.filter(t => t.id !== tokenId));
   }
 
-  // Combined mouse move handler (React events on container)
-  function handleGlobalMouseMove(e) {
+  // Combined move handler (works for both mouse and touch)
+  function handleGlobalMove(e) {
+    const pointer = getPointerPosition(e);
+
     // Handle panning via React events as well (for better Playwright compatibility)
     if (isPanningRef.current) {
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
+      const dx = pointer.clientX - panStartRef.current.x;
+      const dy = pointer.clientY - panStartRef.current.y;
       const camera = cameraRef.current;
       camera.x = panStartRef.current.camX + dx / camera.zoom;
       camera.y = panStartRef.current.camY + dy / camera.zoom;
@@ -1390,8 +1421,18 @@ export default function GameTable() {
     }
   }
 
-  // Combined mouse up handler (React events on container)
-  function handleGlobalMouseUp(e) {
+  // Mouse move handler (React events on container)
+  function handleGlobalMouseMove(e) {
+    handleGlobalMove(e);
+  }
+
+  // Touch move handler
+  function handleGlobalTouchMove(e) {
+    handleGlobalMove(e);
+  }
+
+  // Combined end handler (works for both mouse and touch)
+  function handleGlobalEnd(e) {
     if (isPanningRef.current) {
       isPanningRef.current = false;
       if (canvasRef.current) canvasRef.current.style.cursor = 'default';
@@ -1405,6 +1446,16 @@ export default function GameTable() {
     if (draggingFromHand) {
       handleHandToTableDragEnd(e);
     }
+  }
+
+  // Mouse up handler (React events on container)
+  function handleGlobalMouseUp(e) {
+    handleGlobalEnd(e);
+  }
+
+  // Touch end handler
+  function handleGlobalTouchEnd(e) {
+    handleGlobalEnd(e);
   }
 
   // Remove card from table
@@ -1622,29 +1673,48 @@ export default function GameTable() {
     setHandDragOverIndex(null);
   }
 
-  // Hand-to-table drag handlers (using mouse events for more control)
-  function handleHandCardMouseDown(e, handId) {
-    // Only initiate hand-to-table drag with left mouse button
-    if (e.button !== 0) return;
+  // Hand-to-table drag handlers (using mouse/touch events for more control)
+  function handleHandCardStart(e, handId) {
+    // Only initiate hand-to-table drag with left mouse button (or any touch)
+    if (!isTouchEvent(e) && e.button !== 0) return;
 
     const card = handCards.find(c => c.handId === handId);
     if (!card) return;
 
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+
     // Store initial offset
     handToTableDragOffsetRef.current = {
-      x: e.clientX,
-      y: e.clientY,
+      x: pointer.clientX,
+      y: pointer.clientY,
     };
 
     setDraggingFromHand(handId);
     e.preventDefault();
   }
 
+  // Mouse down handler for hand cards (backward compatibility)
+  function handleHandCardMouseDown(e, handId) {
+    handleHandCardStart(e, handId);
+  }
+
+  // Touch start handler for hand cards
+  function handleHandCardTouchStart(e, handId) {
+    if (isTouchEvent(e)) {
+      handleTouchPrevention(e);
+    }
+    handleHandCardStart(e, handId);
+  }
+
   function handleHandToTableDragMove(e) {
     if (!draggingFromHand) return;
 
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+
     // Update cursor position for ghost card rendering
-    setHandDragPosition({ x: e.clientX, y: e.clientY });
+    setHandDragPosition({ x: pointer.clientX, y: pointer.clientY });
   }
 
   function handleHandToTableDragEnd(e) {
@@ -1656,16 +1726,19 @@ export default function GameTable() {
       return;
     }
 
+    // Get unified pointer position
+    const pointer = getPointerPosition(e);
+
     // Check if dropped on table (not on hand area)
     const handContainer = document.querySelector('[data-testid="hand-container"]');
     if (handContainer) {
       const handRect = handContainer.getBoundingClientRect();
-      const isOverHand = e.clientX >= handRect.left && e.clientX <= handRect.right &&
-                         e.clientY >= handRect.top && e.clientY <= handRect.bottom;
+      const isOverHand = pointer.clientX >= handRect.left && pointer.clientX <= handRect.right &&
+                         pointer.clientY >= handRect.top && pointer.clientY <= handRect.bottom;
 
       if (!isOverHand) {
-        // Dropped on table - place card at mouse position
-        playCardFromHand(draggingFromHand, null, e.clientX, e.clientY);
+        // Dropped on table - place card at pointer position
+        playCardFromHand(draggingFromHand, null, pointer.clientX, pointer.clientY);
       }
     }
 
@@ -2215,23 +2288,39 @@ export default function GameTable() {
     renderCanvas();
   }
 
-  // React onMouseDown handler for panning (backup for native event approach)
-  function handleGlobalMouseDown(e) {
+  // Combined start handler for panning (works for both mouse and touch)
+  function handleGlobalStart(e) {
+    const pointer = getPointerPosition(e);
     const isCanvas = e.target === canvasRef.current;
     const isContainer = e.target === containerRef.current;
     const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
     const isTableCard = e.target.closest && e.target.closest('[data-table-card]');
 
-    if (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement && !isTableCard)) {
+    // For mouse: check button; for touch: no button check needed
+    const isTouchStart = isTouchEvent(e);
+    const isValidMouseStart = !isTouchStart && (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement && !isTableCard));
+    const isValidTouchStart = isTouchStart && (isCanvas || isContainer) && !isUIElement && !isTableCard;
+
+    if (isValidMouseStart || isValidTouchStart) {
       isPanningRef.current = true;
       panStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
+        x: pointer.clientX,
+        y: pointer.clientY,
         camX: cameraRef.current.x,
         camY: cameraRef.current.y,
       };
       if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
     }
+  }
+
+  // Mouse down handler for panning (backup for native event approach)
+  function handleGlobalMouseDown(e) {
+    handleGlobalStart(e);
+  }
+
+  // Touch start handler for panning
+  function handleGlobalTouchStart(e) {
+    handleGlobalStart(e);
   }
 
   return (
@@ -2241,6 +2330,9 @@ export default function GameTable() {
       onMouseDown={handleGlobalMouseDown}
       onMouseMove={handleGlobalMouseMove}
       onMouseUp={handleGlobalMouseUp}
+      onTouchStart={handleGlobalTouchStart}
+      onTouchMove={handleGlobalTouchMove}
+      onTouchEnd={handleGlobalTouchEnd}
       onWheel={handleGlobalWheel}
       onClick={handleTableClick}
       onContextMenu={(e) => {
@@ -2339,6 +2431,7 @@ export default function GameTable() {
                       : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
+              onTouchStart={(e) => handleCardDragStart(e, card.tableId)}
               onMouseEnter={(e) => {
                 setHoveredTableCard(card.tableId);
                 setMousePosition({ x: e.clientX, y: e.clientY });
@@ -2518,6 +2611,7 @@ export default function GameTable() {
             cursor: draggingObj?.id === counter.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'counter', counter.id)}
+          onTouchStart={(e) => handleObjDragStart(e, 'counter', counter.id)}
         >
           <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-3 shadow-xl min-w-[140px]">
             <div className="text-xs text-slate-400 text-center mb-1 font-medium truncate" data-testid={`counter-name-${counter.id}`}>
@@ -2570,6 +2664,7 @@ export default function GameTable() {
             cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'die', die.id)}
+          onTouchStart={(e) => handleObjDragStart(e, 'die', die.id)}
         >
           <div
             className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`}
@@ -2620,6 +2715,11 @@ export default function GameTable() {
           }}
           onMouseDown={(e) => {
             // Don't start drag when clicking on textarea or buttons
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
+            handleObjDragStart(e, 'note', note.id);
+          }}
+          onTouchStart={(e) => {
+            // Don't start drag when touching textarea or buttons
             if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
             handleObjDragStart(e, 'note', note.id);
           }}
@@ -2719,6 +2819,7 @@ export default function GameTable() {
             cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
+          onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
         >
           <TokenShape shape={token.shape} color={token.color} size={30} label={token.label} />
           {/* Delete button on hover */}
@@ -4055,6 +4156,11 @@ export default function GameTable() {
                           e.preventDefault();
                           handleHandCardMouseDown(e, card.handId);
                         }
+                      }}
+                      onTouchStart={(e) => {
+                        // Long press for hand-to-table drag on touch devices
+                        // For now, treat any touch as potential hand-to-table drag
+                        handleHandCardTouchStart(e, card.handId);
                       }}
                       onContextMenu={(e) => {
                         // Prevent context menu when using right-click for drag
