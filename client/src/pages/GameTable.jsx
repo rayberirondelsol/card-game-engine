@@ -164,6 +164,8 @@ export default function GameTable() {
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
+  const [categories, setCategories] = useState([]); // card categories/folders
+  const [expandedCategories, setExpandedCategories] = useState(new Set()); // expanded category IDs
   const [tableCards, setTableCards] = useState([]); // cards placed on the table
   const [showCardDrawer, setShowCardDrawer] = useState(false);
   const [draggingCard, setDraggingCard] = useState(null); // card being dragged on table
@@ -245,6 +247,22 @@ export default function GameTable() {
       }
     }
     if (id) fetchCards();
+  }, [id]);
+
+  // Fetch categories
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch(`/api/games/${id}/categories`);
+        if (res.ok) {
+          const data = await res.json();
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+      }
+    }
+    if (id) fetchCategories();
   }, [id]);
 
   // Canvas rendering
@@ -568,6 +586,48 @@ export default function GameTable() {
       inStack: null, // stack ID if in a stack
     };
     setTableCards(prev => [...prev, newTableCard]);
+  }
+
+  // Place an entire category (all cards in a category) as a stack on the table
+  function placeCategoryAsStack(categoryId) {
+    const categoryCards = availableCards.filter(card => card.category_id === categoryId);
+    if (categoryCards.length === 0) {
+      console.warn('No cards in this category to place');
+      return;
+    }
+
+    // Create a unique stack ID for this category stack
+    const stackId = crypto.randomUUID();
+
+    // Calculate position for the stack (centered area with slight offset)
+    const existingCount = tableCards.length;
+    const col = existingCount % 4;
+    const row = Math.floor(existingCount / 4);
+    const stackX = 250 + col * 150;
+    const stackY = 300 + row * 180;
+
+    // Create table cards for each card in the category
+    const newTableCards = categoryCards.map((card, index) => {
+      const newZIndex = maxZIndex + 1 + index;
+      return {
+        tableId: crypto.randomUUID(),
+        cardId: card.id,
+        name: card.name,
+        image_path: card.image_path,
+        x: stackX,
+        y: stackY,
+        zIndex: newZIndex,
+        faceDown: false,
+        rotation: 0,
+        inStack: stackId, // All cards belong to the same stack
+      };
+    });
+
+    // Update max z-index
+    setMaxZIndex(maxZIndex + categoryCards.length);
+
+    // Add all cards to the table at once
+    setTableCards(prev => [...prev, ...newTableCards]);
   }
 
   // Start dragging a card on the table
@@ -2261,42 +2321,162 @@ export default function GameTable() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {availableCards.map(card => (
-                    <button
-                      key={card.id}
-                      onClick={() => placeCardOnTable(card)}
-                      data-testid={`drawer-card-${card.id}`}
-                      className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
-                      style={{ aspectRatio: '5/7' }}
-                      title={`Place "${card.name}" on table`}
-                    >
-                      {card.image_path ? (
-                        <img
-                          src={card.image_path}
-                          alt={card.name}
-                          className="w-full h-full object-cover"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-slate-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <circle cx="8.5" cy="8.5" r="1.5" />
-                            <path d="M21 15l-5-5L5 21" />
-                          </svg>
+                <div className="space-y-2">
+                  {/* Categories */}
+                  {categories.map(category => {
+                    const categoryCards = availableCards.filter(c => c.category_id === category.id);
+                    const isExpanded = expandedCategories.has(category.id);
+                    if (categoryCards.length === 0) return null;
+                    return (
+                      <div key={category.id} className="border border-white/10 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-1 bg-slate-700/30 p-2">
+                          <button
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(category.id)) {
+                                  next.delete(category.id);
+                                } else {
+                                  next.add(category.id);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="text-white/60 hover:text-white/90 transition-colors"
+                            data-testid={`category-toggle-${category.id}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                          </button>
+                          <span className="text-white/80 text-xs font-medium flex-1 truncate" title={category.name}>
+                            {category.name} ({categoryCards.length})
+                          </span>
+                          <button
+                            onClick={() => placeCategoryAsStack(category.id)}
+                            data-testid={`place-category-stack-${category.id}`}
+                            className="text-emerald-400 hover:text-emerald-300 text-[10px] px-2 py-0.5 rounded bg-emerald-900/30 hover:bg-emerald-900/50 transition-colors font-medium"
+                            title={`Place all ${categoryCards.length} cards as a stack`}
+                          >
+                            + Stack
+                          </button>
                         </div>
-                      )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
-                        {card.name}
+                        {isExpanded && (
+                          <div className="grid grid-cols-2 gap-2 p-2 bg-black/20">
+                            {categoryCards.map(card => (
+                              <button
+                                key={card.id}
+                                onClick={() => placeCardOnTable(card)}
+                                data-testid={`drawer-card-${card.id}`}
+                                className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
+                                style={{ aspectRatio: '5/7' }}
+                                title={`Place "${card.name}" on table`}
+                              >
+                                {card.image_path ? (
+                                  <img
+                                    src={card.image_path}
+                                    alt={card.name}
+                                    className="w-full h-full object-cover"
+                                    draggable={false}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                                      <circle cx="8.5" cy="8.5" r="1.5" />
+                                      <path d="M21 15l-5-5L5 21" />
+                                    </svg>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
+                                  {card.name}
+                                </div>
+                                <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                    + Place
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-                          + Place
-                        </span>
+                    );
+                  })}
+
+                  {/* Uncategorized cards */}
+                  {(() => {
+                    const uncategorizedCards = availableCards.filter(c => !c.category_id);
+                    if (uncategorizedCards.length === 0) return null;
+                    const isExpanded = expandedCategories.has('uncategorized');
+                    return (
+                      <div className="border border-white/10 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-1 bg-slate-700/30 p-2">
+                          <button
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has('uncategorized')) {
+                                  next.delete('uncategorized');
+                                } else {
+                                  next.add('uncategorized');
+                                }
+                                return next;
+                              });
+                            }}
+                            className="text-white/60 hover:text-white/90 transition-colors"
+                            data-testid="category-toggle-uncategorized"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                          </button>
+                          <span className="text-white/80 text-xs font-medium flex-1 truncate">
+                            Uncategorized ({uncategorizedCards.length})
+                          </span>
+                        </div>
+                        {isExpanded && (
+                          <div className="grid grid-cols-2 gap-2 p-2 bg-black/20">
+                            {uncategorizedCards.map(card => (
+                              <button
+                                key={card.id}
+                                onClick={() => placeCardOnTable(card)}
+                                data-testid={`drawer-card-${card.id}`}
+                                className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
+                                style={{ aspectRatio: '5/7' }}
+                                title={`Place "${card.name}" on table`}
+                              >
+                                {card.image_path ? (
+                                  <img
+                                    src={card.image_path}
+                                    alt={card.name}
+                                    className="w-full h-full object-cover"
+                                    draggable={false}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                                      <circle cx="8.5" cy="8.5" r="1.5" />
+                                      <path d="M21 15l-5-5L5 21" />
+                                    </svg>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
+                                  {card.name}
+                                </div>
+                                <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                    + Place
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })()}
                 </div>
               )}
             </div>
