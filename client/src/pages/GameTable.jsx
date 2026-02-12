@@ -118,6 +118,138 @@ function drawSolidBackground(ctx, width, height, color) {
   ctx.fillRect(0, 0, width, height);
 }
 
+// Token shape components
+function TokenShape({ shape, color, size = 30, label = '' }) {
+  const commonClasses = "flex items-center justify-center shadow-lg border-2 border-white/60";
+  const textClasses = "text-white text-[10px] font-bold leading-none drop-shadow-sm";
+
+  switch (shape) {
+    case 'circle':
+      return (
+        <div
+          className={`${commonClasses} rounded-full`}
+          style={{ width: size, height: size, backgroundColor: color }}
+          title={label || 'Circle Token'}
+        >
+          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+        </div>
+      );
+
+    case 'square':
+      return (
+        <div
+          className={`${commonClasses} rounded-sm`}
+          style={{ width: size, height: size, backgroundColor: color }}
+          title={label || 'Square Token'}
+        >
+          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+        </div>
+      );
+
+    case 'triangle':
+      return (
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: size, height: size }}
+          title={label || 'Triangle Token'}
+        >
+          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+            <polygon
+              points="50,10 90,90 10,90"
+              fill={color}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth="4"
+            />
+          </svg>
+          {label && (
+            <span className={`${textClasses} absolute`} style={{ top: '55%' }}>
+              {label.substring(0, 2)}
+            </span>
+          )}
+        </div>
+      );
+
+    case 'star':
+      return (
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: size, height: size }}
+          title={label || 'Star Token'}
+        >
+          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+            <polygon
+              points="50,5 61,38 95,38 68,58 79,91 50,71 21,91 32,58 5,38 39,38"
+              fill={color}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth="3"
+            />
+          </svg>
+          {label && (
+            <span className={`${textClasses} absolute`}>
+              {label.substring(0, 2)}
+            </span>
+          )}
+        </div>
+      );
+
+    case 'hexagon':
+      return (
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: size, height: size }}
+          title={label || 'Hexagon Token'}
+        >
+          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+            <polygon
+              points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5"
+              fill={color}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth="4"
+            />
+          </svg>
+          {label && (
+            <span className={`${textClasses} absolute`}>
+              {label.substring(0, 2)}
+            </span>
+          )}
+        </div>
+      );
+
+    case 'diamond':
+      return (
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: size, height: size }}
+          title={label || 'Diamond Token'}
+        >
+          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+            <polygon
+              points="50,10 90,50 50,90 10,50"
+              fill={color}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth="4"
+            />
+          </svg>
+          {label && (
+            <span className={`${textClasses} absolute`}>
+              {label.substring(0, 2)}
+            </span>
+          )}
+        </div>
+      );
+
+    default:
+      return (
+        <div
+          className={`${commonClasses} rounded-full`}
+          style={{ width: size, height: size, backgroundColor: color }}
+        >
+          {label && <span className={textClasses}>{label.substring(0, 2)}</span>}
+        </div>
+      );
+  }
+}
+
 export default function GameTable() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -156,11 +288,12 @@ export default function GameTable() {
   const [zoomDisplay, setZoomDisplay] = useState(100); // reactive zoom % for display
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 }); // reactive pan position for display
 
-  // Game objects state (counters, dice, markers, notes)
+  // Game objects state (counters, dice, markers, notes, tokens)
   const [counters, setCounters] = useState([]);
   const [dice, setDice] = useState([]);
   const [markers, setMarkers] = useState([]);
   const [notes, setNotes] = useState([]);
+  const [tokens, setTokens] = useState([]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -187,11 +320,18 @@ export default function GameTable() {
   const [showDiceModal, setShowDiceModal] = useState(false);
   const [showMarkerModal, setShowMarkerModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
   const [newDiceType, setNewDiceType] = useState('d6');
   const [newMarkerColor, setNewMarkerColor] = useState('#ff0000');
   const [newMarkerLabel, setNewMarkerLabel] = useState('');
   const [newNoteText, setNewNoteText] = useState('');
+  const [newTokenShape, setNewTokenShape] = useState('circle');
+  const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
+  const [newTokenLabel, setNewTokenLabel] = useState('');
+
+  // Legend state
+  const [showLegend, setShowLegend] = useState(true);
 
   // Drag state for objects
   const [draggingObj, setDraggingObj] = useState(null);
@@ -867,7 +1007,7 @@ export default function GameTable() {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
-  // Drag handlers for floating objects (counters, dice, markers)
+  // Drag handlers for floating objects (counters, dice, markers, tokens)
   function handleObjDragStart(e, objType, objId) {
     e.preventDefault();
     let obj;
@@ -875,6 +1015,7 @@ export default function GameTable() {
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
     else if (objType === 'marker') obj = markers.find(m => m.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
+    else if (objType === 'token') obj = tokens.find(t => t.id === objId);
     if (!obj) return;
     dragOffsetRef.current = {
       x: e.clientX - (obj.x || 0),
@@ -931,6 +1072,10 @@ export default function GameTable() {
       setNotes(prev => prev.map(n =>
         n.id === draggingObj.id ? { ...n, x: newX, y: newY } : n
       ));
+    } else if (draggingObj.type === 'token') {
+      setTokens(prev => prev.map(t =>
+        t.id === draggingObj.id ? { ...t, x: newX, y: newY } : t
+      ));
     }
   }
 
@@ -980,6 +1125,28 @@ export default function GameTable() {
     }
     setEditingNoteId(null);
     setEditingNoteText('');
+  }
+
+  // Token functions
+  function createToken(shape, color, label) {
+    const canvas = canvasRef.current;
+    const newToken = {
+      id: crypto.randomUUID(),
+      shape: shape,
+      color: color,
+      label: label || '',
+      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+    };
+    setTokens(prev => [...prev, newToken]);
+    setShowTokenModal(false);
+    setNewTokenShape('circle');
+    setNewTokenColor('#3b82f6');
+    setNewTokenLabel('');
+  }
+
+  function deleteToken(tokenId) {
+    setTokens(prev => prev.filter(t => t.id !== tokenId));
   }
 
   // Combined mouse move handler (React events on container)
@@ -1283,6 +1450,14 @@ export default function GameTable() {
         x: n.x,
         y: n.y,
       })),
+      tokens: tokens.map(t => ({
+        id: t.id,
+        shape: t.shape,
+        color: t.color,
+        label: t.label || '',
+        x: t.x,
+        y: t.y,
+      })),
       maxZIndex: maxZIndex,
     };
   }
@@ -1573,6 +1748,20 @@ export default function GameTable() {
       })));
     } else {
       setNotes([]);
+    }
+
+    // Restore tokens
+    if (state.tokens && Array.isArray(state.tokens)) {
+      setTokens(state.tokens.map(t => ({
+        id: t.id || crypto.randomUUID(),
+        shape: t.shape,
+        color: t.color,
+        label: t.label || '',
+        x: t.x,
+        y: t.y,
+      })));
+    } else {
+      setTokens([]);
     }
 
     // Trigger canvas re-render
@@ -2226,6 +2415,35 @@ export default function GameTable() {
         </div>
       ))}
 
+      {/* Floating Token Widgets */}
+      {tokens.map(token => (
+        <div
+          key={token.id}
+          data-testid={`token-${token.id}`}
+          data-token-shape={token.shape}
+          data-token-color={token.color}
+          data-token-label={token.label || ''}
+          data-ui-element="true"
+          className="absolute z-20 select-none group"
+          style={{
+            left: token.x - 15,
+            top: token.y - 15,
+            cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
+          }}
+          onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
+        >
+          <TokenShape shape={token.shape} color={token.color} size={30} label={token.label} />
+          {/* Delete button on hover */}
+          <button
+            onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
+            data-testid={`token-delete-${token.id}`}
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            &times;
+          </button>
+        </div>
+      ))}
+
       {/* Top bar with game name and back button */}
       <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none" data-ui-element="true">
         <div className="flex items-center justify-between p-3">
@@ -2288,6 +2506,64 @@ export default function GameTable() {
           </div>
         </div>
       </div>
+
+      {/* Token Legend */}
+      {showLegend && tokens.length > 0 && (
+        <div
+          className="absolute top-16 right-4 z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 max-w-xs"
+          data-testid="token-legend"
+          data-ui-element="true"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-white/90 text-sm font-semibold">Token Legend</h4>
+            <button
+              onClick={() => setShowLegend(false)}
+              className="text-white/60 hover:text-white/90 transition-colors"
+              title="Hide Legend"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {tokens.map(token => (
+              <div
+                key={token.id}
+                className="flex items-center gap-2 text-white/80 text-xs"
+                data-testid={`legend-token-${token.id}`}
+              >
+                <TokenShape shape={token.shape} color={token.color} size={20} label={token.label} />
+                <span className="flex-1">
+                  {token.label && <span className="font-semibold">{token.label}: </span>}
+                  <span className="capitalize">{token.shape}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Legend Toggle Button (when legend is hidden) */}
+      {!showLegend && tokens.length > 0 && (
+        <button
+          onClick={() => setShowLegend(true)}
+          className="absolute top-16 right-4 z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-2 text-white/80 hover:text-white/90 transition-colors"
+          data-testid="show-legend-btn"
+          data-ui-element="true"
+          title="Show Token Legend"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+        </button>
+      )}
 
       {/* Card Drawer Panel */}
       {showCardDrawer && (
@@ -2558,6 +2834,19 @@ export default function GameTable() {
                 <polyline points="14,2 14,8 20,8" />
               </svg>
               <span className="text-[10px]">Note</span>
+            </button>
+
+            {/* Token button */}
+            <button
+              onClick={() => setShowTokenModal(true)}
+              data-testid="toolbar-token-btn"
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              title="Add Token"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+              </svg>
+              <span className="text-[10px]">Token</span>
             </button>
 
             <div className="w-px h-8 bg-white/20 mx-1" />
@@ -2842,6 +3131,102 @@ export default function GameTable() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Token Modal */}
+      {showTokenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 w-96 shadow-2xl border border-slate-600" data-testid="token-modal">
+            <h3 className="text-white font-semibold mb-4">Add Token</h3>
+
+            {/* Shape Selection */}
+            <div className="mb-4">
+              <label className="block text-slate-300 text-sm mb-2">Shape</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
+                  <button
+                    key={shape}
+                    onClick={() => setNewTokenShape(shape)}
+                    data-testid={`token-shape-${shape}`}
+                    className={`p-3 rounded-lg border-2 transition-all flex items-center justify-center ${
+                      newTokenShape === shape
+                        ? 'border-blue-500 bg-blue-500/20'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-700'
+                    }`}
+                  >
+                    <TokenShape shape={shape} color={newTokenColor} size={24} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color Picker */}
+            <div className="mb-4">
+              <label className="block text-slate-300 text-sm mb-2">Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={newTokenColor}
+                  onChange={(e) => setNewTokenColor(e.target.value)}
+                  data-testid="token-color-input"
+                  className="w-12 h-10 rounded cursor-pointer bg-slate-700 border border-slate-600"
+                />
+                <input
+                  type="text"
+                  value={newTokenColor}
+                  onChange={(e) => setNewTokenColor(e.target.value)}
+                  placeholder="#3b82f6"
+                  className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Label Input */}
+            <div className="mb-4">
+              <label className="block text-slate-300 text-sm mb-2">Label (optional)</label>
+              <input
+                type="text"
+                value={newTokenLabel}
+                onChange={(e) => setNewTokenLabel(e.target.value)}
+                placeholder="e.g., A, 1, HP"
+                maxLength={3}
+                data-testid="token-label-input"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-slate-400 text-xs mt-1">Max 2 characters displayed</p>
+            </div>
+
+            {/* Preview */}
+            <div className="mb-4 p-3 bg-slate-700 rounded-lg">
+              <p className="text-slate-300 text-sm mb-2">Preview:</p>
+              <div className="flex items-center justify-center p-4">
+                <TokenShape shape={newTokenShape} color={newTokenColor} size={40} label={newTokenLabel} />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowTokenModal(false);
+                  setNewTokenShape('circle');
+                  setNewTokenColor('#3b82f6');
+                  setNewTokenLabel('');
+                }}
+                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => createToken(newTokenShape, newTokenColor, newTokenLabel)}
+                data-testid="token-create-btn"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+              >
+                Add Token
               </button>
             </div>
           </div>
