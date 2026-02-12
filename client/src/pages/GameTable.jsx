@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import HoverCard from '../components/HoverCard';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -306,6 +307,7 @@ export default function GameTable() {
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
   const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // mouse position for hover preview
   const [altKeyHeld, setAltKeyHeld] = useState(false); // whether ALT key is currently held
 
   // Hand state
@@ -2007,8 +2009,16 @@ export default function GameTable() {
                     : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
-              onMouseEnter={() => setHoveredTableCard(card.tableId)}
-              onMouseLeave={() => setHoveredTableCard(null)}
+              onMouseEnter={(e) => {
+                setHoveredTableCard(card.tableId);
+                setMousePosition({ x: e.clientX, y: e.clientY });
+              }}
+              onMouseMove={(e) => {
+                setMousePosition({ x: e.clientX, y: e.clientY });
+              }}
+              onMouseLeave={() => {
+                setHoveredTableCard(null);
+              }}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -3765,6 +3775,23 @@ export default function GameTable() {
               <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs text-center py-1 px-2 truncate">{card.name}</div>
             </div>
           </div>
+        );
+      })()}
+
+      {/* Hover-to-enlarge preview - shows enlarged card on hover (without ALT key requirement) */}
+      {hoveredTableCard && !draggingCard && (() => {
+        const card = tableCards.find(c => c.tableId === hoveredTableCard);
+        if (!card) return null;
+        return (
+          <HoverCard
+            card={card}
+            imagePath={card.image_path}
+            cardName={card.name}
+            faceDown={card.faceDown}
+            mouseX={mousePosition.x}
+            mouseY={mousePosition.y}
+            scale={2.5}
+          />
         );
       })()}
 
