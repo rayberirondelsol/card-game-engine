@@ -306,6 +306,7 @@ export default function GameTable() {
   const cardDragOffsetRef = useRef({ x: 0, y: 0 });
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
+  const [stackDropTarget, setStackDropTarget] = useState(null); // stackId of stack being targeted for drop
   const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // mouse position for hover preview
   const [altKeyHeld, setAltKeyHeld] = useState(false); // whether ALT key is currently held
@@ -841,8 +842,47 @@ export default function GameTable() {
       setGridHighlight(null);
     }
 
-    // Move the card (and all cards in the same stack)
+    // Check if hovering over a stack for visual feedback
     const card = tableCards.find(c => c.tableId === draggingCard);
+    const STACK_DROP_THRESHOLD = 80;
+    let targetStack = null;
+
+    if (card) {
+      if (card.inStack) {
+        // Dragging a stack - check for other stacks
+        const otherStacks = tableCards.filter(c => c.inStack && c.inStack !== card.inStack);
+        const stacksByID = {};
+        otherStacks.forEach(c => {
+          if (!stacksByID[c.inStack]) {
+            stacksByID[c.inStack] = c;
+          }
+        });
+
+        for (const otherCard of Object.values(stacksByID)) {
+          const dist = Math.sqrt((newX - otherCard.x) ** 2 + (newY - otherCard.y) ** 2);
+          if (dist < STACK_DROP_THRESHOLD) {
+            targetStack = otherCard.inStack;
+            break;
+          }
+        }
+      } else {
+        // Dragging a single card - check all stacks
+        for (const otherCard of tableCards) {
+          if (otherCard.tableId === draggingCard) continue;
+          if (!otherCard.inStack) continue;
+
+          const dist = Math.sqrt((newX - otherCard.x) ** 2 + (newY - otherCard.y) ** 2);
+          if (dist < STACK_DROP_THRESHOLD) {
+            targetStack = otherCard.inStack;
+            break;
+          }
+        }
+      }
+    }
+
+    setStackDropTarget(targetStack);
+
+    // Move the card (and all cards in the same stack)
     if (card && card.inStack) {
       // Move entire stack together
       const dx = newX - card.x;
@@ -860,14 +900,89 @@ export default function GameTable() {
     }
   }
 
-  // Handle card drag end - snap to grid
+  // Handle card drag end - snap to grid and detect drop on stack
   function handleCardDragEnd() {
     if (!draggingCard) return;
 
     const card = tableCards.find(c => c.tableId === draggingCard);
+    if (!card) return;
 
-    // Snap to grid on release
-    if (card && card.inStack) {
+    // Check if card/stack is being dropped on another stack
+    const STACK_DROP_THRESHOLD = 80; // Distance in pixels to trigger stack merge
+    let targetStack = null;
+
+    // Only check for stack merge if not already in the same stack
+    if (card.inStack) {
+      // If dragging a whole stack, check if it's dropped on another stack
+      const otherStacks = tableCards.filter(c => c.inStack && c.inStack !== card.inStack);
+      const stacksByID = {};
+      otherStacks.forEach(c => {
+        if (!stacksByID[c.inStack]) {
+          stacksByID[c.inStack] = c;
+        }
+      });
+
+      for (const otherCard of Object.values(stacksByID)) {
+        const dist = Math.sqrt((card.x - otherCard.x) ** 2 + (card.y - otherCard.y) ** 2);
+        if (dist < STACK_DROP_THRESHOLD) {
+          targetStack = otherCard.inStack;
+          break;
+        }
+      }
+    } else {
+      // Single card being dropped - check all stacks
+      for (const otherCard of tableCards) {
+        if (otherCard.tableId === draggingCard) continue;
+        if (!otherCard.inStack) continue;
+
+        const dist = Math.sqrt((card.x - otherCard.x) ** 2 + (card.y - otherCard.y) ** 2);
+        if (dist < STACK_DROP_THRESHOLD) {
+          targetStack = otherCard.inStack;
+          break;
+        }
+      }
+    }
+
+    // If dropped on a stack, merge them
+    if (targetStack) {
+      const targetStackCards = tableCards.filter(c => c.inStack === targetStack);
+      const targetPosition = targetStackCards[0]; // Get position from any card in target stack
+      const maxTargetZ = Math.max(...targetStackCards.map(c => c.zIndex));
+
+      if (card.inStack) {
+        // Merging two stacks - add all cards from dragged stack to target stack
+        const draggingStackCards = tableCards.filter(c => c.inStack === card.inStack);
+        setTableCards(prev => prev.map(c => {
+          if (c.inStack === card.inStack) {
+            const idx = draggingStackCards.findIndex(sc => sc.tableId === c.tableId);
+            return {
+              ...c,
+              inStack: targetStack,
+              x: targetPosition.x,
+              y: targetPosition.y,
+              zIndex: maxTargetZ + idx + 1,
+            };
+          }
+          return c;
+        }));
+        setMaxZIndex(Math.max(maxZIndex, maxTargetZ + draggingStackCards.length));
+      } else {
+        // Adding single card to stack - place it on top
+        setTableCards(prev => prev.map(c =>
+          c.tableId === draggingCard
+            ? { ...c, inStack: targetStack, x: targetPosition.x, y: targetPosition.y, zIndex: maxTargetZ + 1 }
+            : c
+        ));
+        setMaxZIndex(Math.max(maxZIndex, maxTargetZ + 1));
+      }
+
+      setDraggingCard(null);
+      setGridHighlight(null);
+      return;
+    }
+
+    // No stack merge - just snap to grid on release
+    if (card.inStack) {
       // Snap the whole stack
       const finalX = shouldSnap(card.x) ? snapToGrid(card.x) : card.x;
       const finalY = shouldSnap(card.y) ? snapToGrid(card.y) : card.y;
@@ -890,6 +1005,7 @@ export default function GameTable() {
 
     setDraggingCard(null);
     setGridHighlight(null);
+    setStackDropTarget(null);
   }
 
   // Group selected cards into a stack
@@ -1279,30 +1395,60 @@ export default function GameTable() {
   }
 
   // Play a card from hand back to the table
-  function playCardFromHand(handId) {
+  function playCardFromHand(handId, targetStackId = null) {
     const card = handCards.find(c => c.handId === handId);
     if (!card) return;
 
     const newZIndex = maxZIndex + 1;
     setMaxZIndex(newZIndex);
 
-    // Place card in center-ish area of screen
-    const canvas = canvasRef.current;
-    const centerX = (canvas?.width || 800) / 2;
-    const centerY = (canvas?.height || 600) / 2 - 60;
+    let newTableCard;
 
-    const newTableCard = {
-      tableId: crypto.randomUUID(),
-      cardId: card.cardId,
-      name: card.name,
-      image_path: card.image_path,
-      x: centerX + (Math.random() - 0.5) * 60,
-      y: centerY + (Math.random() - 0.5) * 60,
-      zIndex: newZIndex,
-      faceDown: false,
-      rotation: 0,
-      inStack: null,
-    };
+    // If target stack is specified, add card to that stack
+    if (targetStackId) {
+      const stackCards = tableCards.filter(c => c.inStack === targetStackId);
+      if (stackCards.length > 0) {
+        const stackPosition = stackCards[0];
+        const maxStackZ = Math.max(...stackCards.map(c => c.zIndex));
+        newTableCard = {
+          tableId: crypto.randomUUID(),
+          cardId: card.cardId,
+          name: card.name,
+          image_path: card.image_path,
+          x: stackPosition.x,
+          y: stackPosition.y,
+          zIndex: maxStackZ + 1,
+          faceDown: false,
+          rotation: 0,
+          inStack: targetStackId,
+        };
+        setMaxZIndex(Math.max(maxZIndex, maxStackZ + 1));
+      } else {
+        // Stack doesn't exist, play as normal
+        targetStackId = null;
+      }
+    }
+
+    // If no target stack or stack doesn't exist, place card in center-ish area
+    if (!targetStackId) {
+      const canvas = canvasRef.current;
+      const centerX = (canvas?.width || 800) / 2;
+      const centerY = (canvas?.height || 600) / 2 - 60;
+
+      newTableCard = {
+        tableId: crypto.randomUUID(),
+        cardId: card.cardId,
+        name: card.name,
+        image_path: card.image_path,
+        x: centerX + (Math.random() - 0.5) * 60,
+        y: centerY + (Math.random() - 0.5) * 60,
+        zIndex: newZIndex,
+        faceDown: false,
+        rotation: 0,
+        inStack: null,
+      };
+    }
+
     setTableCards(prev => [...prev, newTableCard]);
 
     // Remove from hand
@@ -1980,6 +2126,7 @@ export default function GameTable() {
           const isDragging = draggingCard === card.tableId;
           const isSelected = selectedCards.has(card.tableId);
           const isStack = stackSize > 1;
+          const isDropTarget = stackDropTarget === stackId; // Highlight if this stack is a drop target
 
           return (
             <div
@@ -1999,14 +2146,16 @@ export default function GameTable() {
                 width: CARD_WIDTH,
                 height: CARD_HEIGHT + (isStack ? 6 : 0),
                 zIndex: isDragging ? 9999 : card.zIndex,
-                transform: `scale(${isDragging ? 1.1 : 1}) rotate(${card.rotation || 0}deg)`,
+                transform: `scale(${isDragging ? 1.1 : isDropTarget ? 1.05 : 1}) rotate(${card.rotation || 0}deg)`,
                 transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
                 cursor: isDragging ? 'grabbing' : 'grab',
                 filter: isDragging
                   ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.5))'
-                  : isStack
-                    ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
-                    : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                  : isDropTarget
+                    ? 'drop-shadow(0 6px 12px rgba(34,197,94,0.6))'
+                    : isStack
+                      ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))'
+                      : 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
               onMouseEnter={(e) => {
@@ -2066,7 +2215,13 @@ export default function GameTable() {
               {/* Main card visual with flip animation */}
               <div
                 className={`absolute top-0 left-0 rounded-lg overflow-hidden border-2 ${
-                  isSelected ? 'border-blue-400 ring-2 ring-blue-400/50' : isStack ? 'border-yellow-400/50' : 'border-white/30'
+                  isDropTarget
+                    ? 'border-green-500 ring-4 ring-green-500/50'
+                    : isSelected
+                      ? 'border-blue-400 ring-2 ring-blue-400/50'
+                      : isStack
+                        ? 'border-yellow-400/50'
+                        : 'border-white/30'
                 }`}
                 data-testid={`card-face-container-${card.tableId}`}
                 data-face-down={card.faceDown ? 'true' : 'false'}
