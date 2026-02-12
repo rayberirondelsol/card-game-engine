@@ -2,9 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { mkdirSync, existsSync, unlinkSync } from 'fs';
+import { mkdirSync, existsSync, unlinkSync, writeFileSync } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -175,5 +176,411 @@ export async function cardsRoutes(fastify) {
     console.log('[SQL] DELETE FROM cards WHERE id = ? AND game_id = ?', cardId, id);
 
     return { success: true, message: 'Card deleted' };
+  });
+
+  // POST /api/games/:id/cards/analyze-split - Analyze an image to detect grid layout
+  fastify.post('/api/games/:id/cards/analyze-split', async (request, reply) => {
+    const db = getDb();
+    const { id } = request.params;
+
+    // Verify game exists
+    const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
+    if (!game) {
+      return reply.status(404).send({ error: 'Game not found' });
+    }
+
+    try {
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({ error: 'No file uploaded' });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+      if (!allowedTypes.includes(data.mimetype)) {
+        return reply.status(400).send({ error: 'Invalid file type. Only PNG, JPG, and JPEG are allowed.' });
+      }
+
+      // Read the image buffer
+      const chunks = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const imageBuffer = Buffer.concat(chunks);
+
+      // Get image metadata
+      const image = sharp(imageBuffer);
+      const metadata = await image.metadata();
+
+      // Suggest common grid layouts based on aspect ratio
+      const aspectRatio = metadata.width / metadata.height;
+      const suggestedGrids = [];
+
+      // Common card layouts
+      const commonLayouts = [
+        { cols: 10, rows: 7, name: 'Standard TTS (10x7)' },
+        { cols: 8, rows: 6, name: 'Medium (8x6)' },
+        { cols: 5, rows: 4, name: 'Small (5x4)' },
+        { cols: 6, rows: 3, name: 'Wide (6x3)' },
+        { cols: 4, rows: 4, name: 'Square (4x4)' },
+        { cols: 3, rows: 3, name: 'Small Square (3x3)' },
+      ];
+
+      for (const layout of commonLayouts) {
+        const layoutAspect = layout.cols / layout.rows;
+        const diff = Math.abs(aspectRatio - layoutAspect);
+
+        if (diff < 0.3) { // Reasonable tolerance
+          suggestedGrids.push({
+            cols: layout.cols,
+            rows: layout.rows,
+            name: layout.name,
+            totalCards: layout.cols * layout.rows,
+          });
+        }
+      }
+
+      // If no good matches, suggest based on dimensions
+      if (suggestedGrids.length === 0) {
+        const cols = Math.round(Math.sqrt(aspectRatio * 20));
+        const rows = Math.round(20 / Math.sqrt(aspectRatio));
+        suggestedGrids.push({
+          cols,
+          rows,
+          name: `Auto-detected (${cols}x${rows})`,
+          totalCards: cols * rows,
+        });
+      }
+
+      // Store image temporarily for execute step
+      const tempId = uuidv4();
+      const tempDir = path.join(UPLOADS_DIR, 'temp');
+      if (!existsSync(tempDir)) {
+        mkdirSync(tempDir, { recursive: true });
+      }
+      const tempPath = path.join(tempDir, `${tempId}.png`);
+      writeFileSync(tempPath, imageBuffer);
+
+      return {
+        tempId,
+        imageWidth: metadata.width,
+        imageHeight: metadata.height,
+        suggestedGrids,
+      };
+    } catch (err) {
+      console.error('[Cards] Analyze-split error:', err);
+      return reply.status(500).send({ error: 'Failed to analyze image' });
+    }
+  });
+
+  // POST /api/games/:id/cards/execute-split - Execute sprite sheet splitting
+  fastify.post('/api/games/:id/cards/execute-split', async (request, reply) => {
+    const db = getDb();
+    const { id } = request.params;
+
+    // Verify game exists
+    const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
+    if (!game) {
+      return reply.status(404).send({ error: 'Game not found' });
+    }
+
+    try {
+      const body = request.body;
+      const { tempId, cols, rows, cardPrefix, categoryId } = body;
+
+      if (!tempId || !cols || !rows) {
+        return reply.status(400).send({ error: 'Missing required parameters: tempId, cols, rows' });
+      }
+
+      // Load temp image
+      const tempPath = path.join(UPLOADS_DIR, 'temp', `${tempId}.png`);
+      if (!existsSync(tempPath)) {
+        return reply.status(404).send({ error: 'Temporary image not found. Please re-upload.' });
+      }
+
+      const imageBuffer = await sharp(tempPath).toBuffer();
+      const image = sharp(imageBuffer);
+      const metadata = await image.metadata();
+
+      const cardWidth = Math.floor(metadata.width / cols);
+      const cardHeight = Math.floor(metadata.height / rows);
+      const totalCards = cols * rows;
+
+      // Create game-specific upload directory
+      const gameUploadsDir = path.join(UPLOADS_DIR, id);
+      if (!existsSync(gameUploadsDir)) {
+        mkdirSync(gameUploadsDir, { recursive: true });
+      }
+
+      // Verify category if provided
+      if (categoryId && categoryId !== 'none') {
+        const category = db.prepare('SELECT id FROM categories WHERE id = ? AND game_id = ?').get(categoryId, id);
+        if (!category) {
+          return reply.status(400).send({ error: 'Invalid category ID' });
+        }
+      }
+
+      const importedCards = [];
+      const prefix = cardPrefix || 'Card';
+
+      // Use transaction for atomic batch insert
+      const insertCard = db.prepare(
+        'INSERT INTO cards (id, game_id, name, image_path, category_id) VALUES (?, ?, ?, ?, ?)'
+      );
+
+      const transaction = db.transaction((cardsData) => {
+        for (const cardData of cardsData) {
+          insertCard.run(
+            cardData.id,
+            cardData.game_id,
+            cardData.name,
+            cardData.image_path,
+            cardData.category_id
+          );
+        }
+      });
+
+      // Extract each card from the grid
+      for (let cardIndex = 0; cardIndex < totalCards; cardIndex++) {
+        const row = Math.floor(cardIndex / cols);
+        const col = cardIndex % cols;
+
+        const left = col * cardWidth;
+        const top = row * cardHeight;
+
+        try {
+          const cardImageBuffer = await sharp(imageBuffer)
+            .extract({
+              left,
+              top,
+              width: cardWidth,
+              height: cardHeight,
+            })
+            .png()
+            .toBuffer();
+
+          // Generate filename
+          const fileId = uuidv4();
+          const savedFilename = `${fileId}.png`;
+          const filePath = path.join(gameUploadsDir, savedFilename);
+
+          // Write card image to disk
+          writeFileSync(filePath, cardImageBuffer);
+
+          // Store relative path for serving
+          const relativePath = `/uploads/${id}/${savedFilename}`;
+
+          const cardId = uuidv4();
+          const cardName = `${prefix} ${cardIndex + 1}`;
+
+          importedCards.push({
+            id: cardId,
+            game_id: id,
+            name: cardName,
+            image_path: relativePath,
+            category_id: (categoryId && categoryId !== 'none') ? categoryId : null,
+          });
+        } catch (err) {
+          console.error(`[Cards] Failed to extract card index ${cardIndex}:`, err.message);
+        }
+      }
+
+      // Insert all cards in a transaction
+      transaction(importedCards);
+
+      // Clean up temp file
+      try {
+        unlinkSync(tempPath);
+      } catch (err) {
+        console.error('[Cards] Failed to delete temp file:', err);
+      }
+
+      console.log(`[Cards] Successfully split and imported ${importedCards.length} cards`);
+
+      return {
+        success: true,
+        totalImported: importedCards.length,
+        cards: importedCards,
+      };
+    } catch (err) {
+      console.error('[Cards] Execute-split error:', err);
+      return reply.status(500).send({ error: 'Failed to execute split' });
+    }
+  });
+
+  // POST /api/games/:id/cards/auto-import - Auto-detect and import cards (single or split)
+  fastify.post('/api/games/:id/cards/auto-import', async (request, reply) => {
+    const db = getDb();
+    const { id } = request.params;
+
+    // Verify game exists
+    const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
+    if (!game) {
+      return reply.status(404).send({ error: 'Game not found' });
+    }
+
+    try {
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({ error: 'No file uploaded' });
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+      if (!allowedTypes.includes(data.mimetype)) {
+        return reply.status(400).send({ error: 'Invalid file type. Only PNG, JPG, and JPEG are allowed.' });
+      }
+
+      // Read the image buffer
+      const chunks = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const imageBuffer = Buffer.concat(chunks);
+
+      // Get image metadata
+      const image = sharp(imageBuffer);
+      const metadata = await image.metadata();
+
+      // Auto-detect if this looks like a sprite sheet
+      // Heuristic: if the image is very large or has a grid-like aspect ratio, try to split it
+      const isLikelyGrid = metadata.width > 2000 || metadata.height > 2000;
+      const aspectRatio = metadata.width / metadata.height;
+      const hasGridAspect = (
+        Math.abs(aspectRatio - 10/7) < 0.2 ||  // TTS standard
+        Math.abs(aspectRatio - 8/6) < 0.2 ||    // Common grid
+        Math.abs(aspectRatio - 5/4) < 0.2       // Common grid
+      );
+
+      if (isLikelyGrid || hasGridAspect) {
+        // Try to auto-split with 10x7 grid (TTS standard)
+        const cols = 10;
+        const rows = 7;
+        const cardWidth = Math.floor(metadata.width / cols);
+        const cardHeight = Math.floor(metadata.height / rows);
+
+        // Create game-specific upload directory
+        const gameUploadsDir = path.join(UPLOADS_DIR, id);
+        if (!existsSync(gameUploadsDir)) {
+          mkdirSync(gameUploadsDir, { recursive: true });
+        }
+
+        const importedCards = [];
+        const totalCards = cols * rows;
+
+        // Derive card name prefix from original filename
+        const prefix = path.basename(data.filename, path.extname(data.filename));
+
+        const insertCard = db.prepare(
+          'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+        );
+
+        const transaction = db.transaction((cardsData) => {
+          for (const cardData of cardsData) {
+            insertCard.run(
+              cardData.id,
+              cardData.game_id,
+              cardData.name,
+              cardData.image_path
+            );
+          }
+        });
+
+        // Extract each card from the grid
+        for (let cardIndex = 0; cardIndex < totalCards; cardIndex++) {
+          const row = Math.floor(cardIndex / cols);
+          const col = cardIndex % cols;
+
+          const left = col * cardWidth;
+          const top = row * cardHeight;
+
+          try {
+            const cardImageBuffer = await sharp(imageBuffer)
+              .extract({
+                left,
+                top,
+                width: cardWidth,
+                height: cardHeight,
+              })
+              .png()
+              .toBuffer();
+
+            // Generate filename
+            const fileId = uuidv4();
+            const savedFilename = `${fileId}.png`;
+            const filePath = path.join(gameUploadsDir, savedFilename);
+
+            // Write card image to disk
+            writeFileSync(filePath, cardImageBuffer);
+
+            // Store relative path for serving
+            const relativePath = `/uploads/${id}/${savedFilename}`;
+
+            const cardId = uuidv4();
+            const cardName = `${prefix} ${cardIndex + 1}`;
+
+            importedCards.push({
+              id: cardId,
+              game_id: id,
+              name: cardName,
+              image_path: relativePath,
+            });
+          } catch (err) {
+            console.error(`[Cards] Failed to extract card index ${cardIndex}:`, err.message);
+          }
+        }
+
+        // Insert all cards in a transaction
+        transaction(importedCards);
+
+        console.log(`[Cards] Auto-imported ${importedCards.length} cards from grid`);
+
+        return {
+          success: true,
+          autoSplit: true,
+          gridDetected: { cols, rows },
+          totalImported: importedCards.length,
+        };
+      } else {
+        // Import as single card
+        const gameUploadsDir = path.join(UPLOADS_DIR, id);
+        if (!existsSync(gameUploadsDir)) {
+          mkdirSync(gameUploadsDir, { recursive: true });
+        }
+
+        // Generate unique filename
+        const ext = path.extname(data.filename) || '.png';
+        const fileId = uuidv4();
+        const savedFilename = `${fileId}${ext}`;
+        const filePath = path.join(gameUploadsDir, savedFilename);
+
+        // Save file to disk
+        writeFileSync(filePath, imageBuffer);
+
+        // Derive card name from original filename
+        const cardName = path.basename(data.filename, path.extname(data.filename));
+
+        // Store relative path for serving
+        const relativePath = `/uploads/${id}/${savedFilename}`;
+
+        // Insert card into database
+        const cardId = uuidv4();
+        const stmt = db.prepare(
+          'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+        );
+        stmt.run(cardId, id, cardName, relativePath);
+
+        console.log(`[Cards] Auto-imported single card: ${cardName}`);
+
+        return {
+          success: true,
+          autoSplit: false,
+          totalImported: 1,
+        };
+      }
+    } catch (err) {
+      console.error('[Cards] Auto-import error:', err);
+      return reply.status(500).send({ error: 'Failed to auto-import card(s)' });
+    }
   });
 }

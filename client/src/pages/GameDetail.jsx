@@ -1232,6 +1232,7 @@ export default function GameDetail() {
                   )}
                 </h2>
                 <div className="flex items-center gap-2">
+                  {/* Hidden file inputs */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1241,7 +1242,6 @@ export default function GameDetail() {
                     className="hidden"
                     id="card-upload-input"
                     data-testid="card-upload-input"
-                    title="Upload card images - multi-card sheets are automatically detected and split"
                   />
                   <input
                     ref={splitFileInputRef}
@@ -1252,49 +1252,77 @@ export default function GameDetail() {
                     id="split-upload-input"
                     data-testid="split-upload-input"
                   />
-                  <button
-                    onClick={openSplitImportModal}
-                    data-testid="split-import-btn"
-                    className="px-3 py-1.5 text-sm border border-teal-400 text-teal-600 rounded-lg hover:bg-teal-50 transition-colors font-medium"
-                  >
-                    Split Import
-                  </button>
-                  <button
-                    onClick={openTtsImportModal}
-                    data-testid="tts-import-btn"
-                    className="px-3 py-1.5 text-sm border border-purple-400 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-medium"
-                  >
-                    TTS Import
-                  </button>
-                  <div className="flex items-center gap-1">
+
+                  {/* Import Options Dropdown */}
+                  <div className="relative group">
+                    <select
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === 'auto') {
+                          fileInputRef.current?.click();
+                        } else if (value === 'split') {
+                          openSplitImportModal();
+                        } else if (value === 'tts') {
+                          openTtsImportModal();
+                        } else if (value === 'ocr') {
+                          handleOcrRename();
+                        }
+                        // Reset selection after action
+                        e.target.value = '';
+                      }}
+                      disabled={uploading || ocrRenaming}
+                      className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium"
+                      data-testid="import-dropdown"
+                    >
+                      <option value="">Import Cards...</option>
+                      <option value="auto" title="Automatically detect and import single cards or multi-card sheets">
+                        🔄 Auto-Detect Import
+                      </option>
+                      <option value="split" title="Manually split a sprite sheet into individual cards with custom grid settings">
+                        ✂️ Manual Split Import
+                      </option>
+                      <option value="tts" title="Import cards from Tabletop Simulator JSON save files">
+                        🎲 TTS Import
+                      </option>
+                      <option value="ocr" title="Rename existing cards using OCR text recognition">
+                        🔤 OCR Rename Cards
+                      </option>
+                    </select>
+
+                    {/* Tooltip on hover */}
+                    <div className="absolute left-0 top-full mt-2 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-xl">
+                      <div className="space-y-2">
+                        <div className="font-semibold border-b border-gray-700 pb-1">Import Options:</div>
+                        <div>
+                          <strong>🔄 Auto-Detect:</strong> Upload images and let the system automatically detect if they're sprite sheets (10x7 grid) or single cards.
+                        </div>
+                        <div>
+                          <strong>✂️ Manual Split:</strong> Upload a sprite sheet and manually specify the grid dimensions to split it into individual cards.
+                        </div>
+                        <div>
+                          <strong>🎲 TTS Import:</strong> Import cards directly from Tabletop Simulator JSON save files with automatic sprite sheet processing.
+                        </div>
+                        <div>
+                          <strong>🔤 OCR Rename:</strong> Use optical character recognition to automatically rename existing cards based on text found in the images.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* OCR Position Selector (shown when needed) */}
+                  {ocrRenaming && (
                     <select
                       value={ocrRenamePosition}
                       onChange={(e) => setOcrRenamePosition(e.target.value)}
-                      className="text-xs border border-gray-300 rounded px-1 py-1.5 bg-white text-[var(--color-text)]"
+                      className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-[var(--color-text)]"
                       data-testid="ocr-rename-position"
+                      title="Select where to look for card names: top, center, or bottom of the card"
                     >
-                      <option value="top">Top</option>
-                      <option value="center">Center</option>
-                      <option value="bottom">Bottom</option>
+                      <option value="top">OCR: Top</option>
+                      <option value="center">OCR: Center</option>
+                      <option value="bottom">OCR: Bottom</option>
                     </select>
-                    <button
-                      onClick={handleOcrRename}
-                      disabled={ocrRenaming}
-                      data-testid="ocr-rename-btn"
-                      className="px-3 py-1.5 text-sm border border-amber-400 text-amber-600 rounded-lg hover:bg-amber-50 transition-colors font-medium disabled:opacity-50"
-                    >
-                      {ocrRenaming ? 'Reading...' : 'OCR Rename'}
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    data-testid="import-cards-btn"
-                    className="px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Upload card images - multi-card sheets are automatically detected and split"
-                  >
-                    {uploading ? 'Analyzing & Importing...' : 'Import Cards (Auto-Detect)'}
-                  </button>
+                  )}
                 </div>
               </div>
 
