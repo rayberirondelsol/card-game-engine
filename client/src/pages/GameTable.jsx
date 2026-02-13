@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
-import { getPointerPosition, handleTouchPrevention, isTouchEvent } from '../utils/touchUtils';
+import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone } from '../utils/touchUtils';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -362,6 +362,43 @@ export default function GameTable() {
   const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
   const handToTableDragOffsetRef = useRef({ x: 0, y: 0 });
   const [handDragPosition, setHandDragPosition] = useState({ x: 0, y: 0 }); // cursor position during hand-to-table drag
+
+  // Device detection and debugging on mount
+  useEffect(() => {
+    console.log('='.repeat(80));
+    console.log('[GameTable] Component mounted - running device detection');
+    console.log('='.repeat(80));
+
+    // Log comprehensive device information
+    const deviceInfo = getDeviceInfo();
+
+    // Log individual device type checks
+    console.log('[GameTable] Device Type Checks:', {
+      isTouchDevice: isTouchDevice(),
+      isMobileDevice: isMobileDevice(),
+      isTabletDevice: isTabletDevice(),
+      isSmartphone: isSmartphone()
+    });
+
+    // Log window resize events
+    const handleResize = () => {
+      console.log('[GameTable] Window resized:', {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        isMobile: isMobileDevice(),
+        isTablet: isTabletDevice(),
+        isSmartphone: isSmartphone()
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    console.log('='.repeat(80));
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // Fetch game data
   useEffect(() => {
@@ -1428,6 +1465,13 @@ export default function GameTable() {
 
   // Touch move handler
   function handleGlobalTouchMove(e) {
+    console.log('[GameTable] Touch move event detected:', {
+      type: e.type,
+      touchCount: e.touches ? e.touches.length : 0,
+      isPanning: isPanningRef.current,
+      draggingCard: !!draggingCard,
+      draggingObj: !!draggingObj
+    });
     handleGlobalMove(e);
   }
 
@@ -1455,6 +1499,13 @@ export default function GameTable() {
 
   // Touch end handler
   function handleGlobalTouchEnd(e) {
+    console.log('[GameTable] Touch end event detected:', {
+      type: e.type,
+      changedTouchCount: e.changedTouches ? e.changedTouches.length : 0,
+      isPanning: isPanningRef.current,
+      draggingCard: !!draggingCard,
+      draggingObj: !!draggingObj
+    });
     handleGlobalEnd(e);
   }
 
@@ -1701,6 +1752,11 @@ export default function GameTable() {
 
   // Touch start handler for hand cards
   function handleHandCardTouchStart(e, handId) {
+    console.log('[GameTable] Hand card touch start:', {
+      type: e.type,
+      handId,
+      touchCount: e.touches ? e.touches.length : 0
+    });
     if (isTouchEvent(e)) {
       handleTouchPrevention(e);
     }
@@ -2320,6 +2376,12 @@ export default function GameTable() {
 
   // Touch start handler for panning
   function handleGlobalTouchStart(e) {
+    console.log('[GameTable] Touch start event detected:', {
+      type: e.type,
+      touchCount: e.touches ? e.touches.length : 0,
+      target: e.target.tagName,
+      targetClass: e.target.className
+    });
     handleGlobalStart(e);
   }
 

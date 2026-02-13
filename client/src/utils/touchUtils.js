@@ -12,11 +12,19 @@
  * @returns {boolean} True if device has touch capability
  */
 export function isTouchDevice() {
-  return (
-    'ontouchstart' in window ||
-    navigator.maxTouchPoints > 0 ||
-    navigator.msMaxTouchPoints > 0
-  );
+  const hasOntouchstart = 'ontouchstart' in window;
+  const hasMaxTouchPoints = navigator.maxTouchPoints > 0;
+  const hasMsMaxTouchPoints = navigator.msMaxTouchPoints > 0;
+  const result = hasOntouchstart || hasMaxTouchPoints || hasMsMaxTouchPoints;
+
+  console.log('[TouchDetection] isTouchDevice() called:', {
+    hasOntouchstart,
+    maxTouchPoints: navigator.maxTouchPoints,
+    msMaxTouchPoints: navigator.msMaxTouchPoints,
+    result
+  });
+
+  return result;
 }
 
 /**
@@ -25,35 +33,50 @@ export function isTouchDevice() {
  * @returns {{clientX: number, clientY: number, pageX: number, pageY: number}}
  */
 export function getPointerPosition(e) {
+  let position;
+  let source;
+
   // Handle touch events
   if (e.touches && e.touches.length > 0) {
     const touch = e.touches[0];
-    return {
+    position = {
       clientX: touch.clientX,
       clientY: touch.clientY,
       pageX: touch.pageX,
       pageY: touch.pageY,
     };
+    source = 'touches';
   }
-
   // Handle touchend events (use changedTouches)
-  if (e.changedTouches && e.changedTouches.length > 0) {
+  else if (e.changedTouches && e.changedTouches.length > 0) {
     const touch = e.changedTouches[0];
-    return {
+    position = {
       clientX: touch.clientX,
       clientY: touch.clientY,
       pageX: touch.pageX,
       pageY: touch.pageY,
     };
+    source = 'changedTouches';
+  }
+  // Handle mouse events
+  else {
+    position = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      pageX: e.pageX,
+      pageY: e.pageY,
+    };
+    source = 'mouse';
   }
 
-  // Handle mouse events
-  return {
-    clientX: e.clientX,
-    clientY: e.clientY,
-    pageX: e.pageX,
-    pageY: e.pageY,
-  };
+  console.log('[TouchDetection] getPointerPosition():', {
+    eventType: e.type,
+    source,
+    position,
+    touchCount: e.touches ? e.touches.length : 0
+  });
+
+  return position;
 }
 
 /**
@@ -146,7 +169,14 @@ export function debounce(func, wait) {
  * @returns {boolean} True if event is a touch event
  */
 export function isTouchEvent(e) {
-  return e.type.startsWith('touch');
+  const result = e.type.startsWith('touch');
+  console.log('[TouchDetection] isTouchEvent():', {
+    eventType: e.type,
+    result,
+    hasTouches: !!e.touches,
+    touchCount: e.touches ? e.touches.length : 0
+  });
+  return result;
 }
 
 /**
@@ -221,7 +251,18 @@ export function removeListener(element, event, handler) {
  * @returns {boolean} True if likely mobile
  */
 export function isMobileDevice() {
-  return isTouchDevice() && window.innerWidth < 768;
+  const isTouch = isTouchDevice();
+  const width = window.innerWidth;
+  const result = isTouch && width < 768;
+
+  console.log('[TouchDetection] isMobileDevice() called:', {
+    isTouch,
+    windowWidth: width,
+    threshold: 768,
+    result
+  });
+
+  return result;
 }
 
 /**
@@ -229,5 +270,76 @@ export function isMobileDevice() {
  * @returns {boolean} True if likely tablet
  */
 export function isTabletDevice() {
-  return isTouchDevice() && window.innerWidth >= 768 && window.innerWidth < 1024;
+  const isTouch = isTouchDevice();
+  const width = window.innerWidth;
+  const result = isTouch && width >= 768 && width < 1024;
+
+  console.log('[TouchDetection] isTabletDevice() called:', {
+    isTouch,
+    windowWidth: width,
+    minThreshold: 768,
+    maxThreshold: 1024,
+    result
+  });
+
+  return result;
+}
+
+/**
+ * Check if device is likely a smartphone (touch device with small screen)
+ * @returns {boolean} True if likely smartphone
+ */
+export function isSmartphone() {
+  const isTouch = isTouchDevice();
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const result = isTouch && width < 768;
+
+  console.log('[TouchDetection] isSmartphone() called:', {
+    isTouch,
+    windowWidth: width,
+    windowHeight: height,
+    threshold: 768,
+    result
+  });
+
+  return result;
+}
+
+/**
+ * Get comprehensive device information for debugging
+ * @returns {Object} Device information object
+ */
+export function getDeviceInfo() {
+  const info = {
+    // Touch detection
+    hasOntouchstart: 'ontouchstart' in window,
+    maxTouchPoints: navigator.maxTouchPoints,
+    msMaxTouchPoints: navigator.msMaxTouchPoints,
+    isTouchDevice: isTouchDevice(),
+
+    // Screen dimensions
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    screenWidth: window.screen.width,
+    screenHeight: window.screen.height,
+    devicePixelRatio: window.devicePixelRatio,
+
+    // Device classification
+    isMobile: isMobileDevice(),
+    isTablet: isTabletDevice(),
+    isSmartphone: isSmartphone(),
+
+    // User agent
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+
+    // Additional capabilities
+    hasPointerEvents: 'PointerEvent' in window,
+    orientation: window.screen.orientation ? window.screen.orientation.type : 'unknown'
+  };
+
+  console.log('[TouchDetection] Device Info:', info);
+
+  return info;
 }
