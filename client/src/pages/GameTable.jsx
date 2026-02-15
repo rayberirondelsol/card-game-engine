@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
-import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone } from '../utils/touchUtils';
+import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -123,7 +123,7 @@ function drawSolidBackground(ctx, width, height, color) {
 // Token shape components
 function TokenShape({ shape, color, size = 30, label = '' }) {
   const commonClasses = "flex items-center justify-center shadow-lg border-2 border-white/60";
-  const textClasses = "text-white text-[10px] font-bold leading-none drop-shadow-sm";
+  const textClasses = "text-white sm:text-[10px] text-xs font-bold leading-none drop-shadow-sm";
 
   switch (shape) {
     case 'circle':
@@ -287,6 +287,9 @@ export default function GameTable() {
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
+  const isPinchingRef = useRef(false);
+  const pinchStartDistanceRef = useRef(0);
+  const pinchStartZoomRef = useRef(1);
   const [zoomDisplay, setZoomDisplay] = useState(100); // reactive zoom % for display
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 }); // reactive pan position for display
 
@@ -357,6 +360,11 @@ export default function GameTable() {
   const pressHoldTimerRef = useRef(null);
   const [pressHoldActive, setPressHoldActive] = useState(false);
   const PRESS_HOLD_DELAY = 250; // milliseconds to distinguish quick-click from press-hold
+
+  // Double-tap detection for mobile gestures
+  const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0 });
+  const DOUBLE_TAP_DELAY = 300; // milliseconds
+  const DOUBLE_TAP_DISTANCE = 30; // pixels
 
   // Hand-to-table drag state
   const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
@@ -818,7 +826,64 @@ export default function GameTable() {
   }
 
   // Start dragging a card on the table
+  // Double-tap detection for flipping cards on mobile
+  function handleCardDoubleTap(e, tableId) {
+    const now = Date.now();
+    const pointer = getPointerPosition(e);
+    const lastTap = lastTapRef.current;
+
+    // Check if this is a double-tap (within time and distance threshold)
+    const timeSinceLastTap = now - lastTap.time;
+    const distance = Math.sqrt(
+      Math.pow(pointer.clientX - lastTap.x, 2) +
+      Math.pow(pointer.clientY - lastTap.y, 2)
+    );
+
+    if (
+      timeSinceLastTap < DOUBLE_TAP_DELAY &&
+      distance < DOUBLE_TAP_DISTANCE &&
+      lastTap.cardId === tableId
+    ) {
+      // Double-tap detected - flip the card
+      console.log('[GameTable] Double-tap detected, flipping card:', tableId);
+      setTableCards(prev => prev.map(c => {
+        if (c.tableId === tableId) {
+          return { ...c, faceDown: !c.faceDown };
+        }
+        return c;
+      }));
+
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+
+      // Reset tap tracking
+      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
+      return true; // Indicate double-tap was handled
+    }
+
+    // Store this tap for next comparison
+    lastTapRef.current = {
+      time: now,
+      cardId: tableId,
+      x: pointer.clientX,
+      y: pointer.clientY
+    };
+
+    return false; // Not a double-tap
+  }
+
   function handleCardDragStart(e, tableId) {
+    // Check for double-tap on touch devices (for flipping cards)
+    if (isTouchEvent(e)) {
+      const isDoubleTap = handleCardDoubleTap(e, tableId);
+      if (isDoubleTap) {
+        e.preventDefault();
+        return; // Don't start dragging if double-tap was detected
+      }
+    }
+
     // Prevent default for touch events to avoid scrolling
     if (isTouchEvent(e)) {
       handleTouchPrevention(e);
@@ -1438,6 +1503,11 @@ export default function GameTable() {
 
   // Combined move handler (works for both mouse and touch)
   function handleGlobalMove(e) {
+    // Don't handle normal move if we're pinching (pinch is handled separately)
+    if (isPinchingRef.current) {
+      return;
+    }
+
     const pointer = getPointerPosition(e);
 
     // Handle panning via React events as well (for better Playwright compatibility)
@@ -1463,16 +1533,64 @@ export default function GameTable() {
     handleGlobalMove(e);
   }
 
-  // Touch move handler
+  // Touch move handler with pinch-to-zoom support
   function handleGlobalTouchMove(e) {
+    const touchCount = e.touches ? e.touches.length : 0;
     console.log('[GameTable] Touch move event detected:', {
       type: e.type,
-      touchCount: e.touches ? e.touches.length : 0,
+      touchCount,
       isPanning: isPanningRef.current,
+      isPinching: isPinchingRef.current,
       draggingCard: !!draggingCard,
       draggingObj: !!draggingObj
     });
-    handleGlobalMove(e);
+
+    // Handle two-finger pinch zoom
+    if (isPinchingRef.current && touchCount === 2) {
+      e.preventDefault(); // Prevent default touch behavior
+
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = getTouchDistance(touch1, touch2);
+      const center = getTouchCenter(touch1, touch2);
+
+      // Calculate zoom change based on distance change
+      const distanceRatio = currentDistance / pinchStartDistanceRef.current;
+      const newZoom = Math.max(0.2, Math.min(5, pinchStartZoomRef.current * distanceRatio));
+
+      // Get canvas position for zooming toward pinch center
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const canvasX = center.x - rect.left;
+        const canvasY = center.y - rect.top;
+
+        // Convert to world coordinates before zoom
+        const camera = cameraRef.current;
+        const worldX = (canvasX - rect.width / 2) / camera.zoom + camera.x;
+        const worldY = (canvasY - rect.height / 2) / camera.zoom + camera.y;
+
+        // Apply new zoom
+        camera.zoom = newZoom;
+
+        // Adjust camera position to zoom toward pinch center
+        camera.x = worldX - (canvasX - rect.width / 2) / camera.zoom;
+        camera.y = worldY - (canvasY - rect.height / 2) / camera.zoom;
+
+        setZoomDisplay(Math.round(camera.zoom * 100));
+        setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
+        renderCanvas();
+
+        console.log('[GameTable] Pinch zoom:', {
+          distance: currentDistance,
+          ratio: distanceRatio.toFixed(2),
+          zoom: camera.zoom.toFixed(2)
+        });
+      }
+    } else {
+      // Normal touch move (panning or dragging)
+      handleGlobalMove(e);
+    }
   }
 
   // Combined end handler (works for both mouse and touch)
@@ -1497,15 +1615,27 @@ export default function GameTable() {
     handleGlobalEnd(e);
   }
 
-  // Touch end handler
+  // Touch end handler with pinch cleanup
   function handleGlobalTouchEnd(e) {
+    const remainingTouches = e.touches ? e.touches.length : 0;
     console.log('[GameTable] Touch end event detected:', {
       type: e.type,
       changedTouchCount: e.changedTouches ? e.changedTouches.length : 0,
+      remainingTouches,
       isPanning: isPanningRef.current,
+      isPinching: isPinchingRef.current,
       draggingCard: !!draggingCard,
       draggingObj: !!draggingObj
     });
+
+    // Clean up pinch state when fingers are lifted
+    if (isPinchingRef.current && remainingTouches < 2) {
+      isPinchingRef.current = false;
+      pinchStartDistanceRef.current = 0;
+      pinchStartZoomRef.current = 1;
+      console.log('[GameTable] Pinch ended');
+    }
+
     handleGlobalEnd(e);
   }
 
@@ -2346,6 +2476,11 @@ export default function GameTable() {
 
   // Combined start handler for panning (works for both mouse and touch)
   function handleGlobalStart(e) {
+    // Don't start panning if we're pinching
+    if (isPinchingRef.current) {
+      return;
+    }
+
     const pointer = getPointerPosition(e);
     const isCanvas = e.target === canvasRef.current;
     const isContainer = e.target === containerRef.current;
@@ -2374,15 +2509,35 @@ export default function GameTable() {
     handleGlobalStart(e);
   }
 
-  // Touch start handler for panning
+  // Touch start handler for panning and pinch-to-zoom
   function handleGlobalTouchStart(e) {
+    const touchCount = e.touches ? e.touches.length : 0;
     console.log('[GameTable] Touch start event detected:', {
       type: e.type,
-      touchCount: e.touches ? e.touches.length : 0,
+      touchCount,
       target: e.target.tagName,
       targetClass: e.target.className
     });
-    handleGlobalStart(e);
+
+    // Detect two-finger pinch for zoom
+    if (touchCount === 2) {
+      e.preventDefault(); // Prevent default pinch-zoom behavior
+      isPinchingRef.current = true;
+      isPanningRef.current = false; // Stop panning when pinching starts
+
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      pinchStartDistanceRef.current = getTouchDistance(touch1, touch2);
+      pinchStartZoomRef.current = cameraRef.current.zoom;
+
+      console.log('[GameTable] Pinch started:', {
+        distance: pinchStartDistanceRef.current,
+        currentZoom: pinchStartZoomRef.current
+      });
+    } else {
+      // Single touch - normal panning behavior
+      handleGlobalStart(e);
+    }
   }
 
   return (
@@ -2596,13 +2751,13 @@ export default function GameTable() {
                           <circle cx="8.5" cy="8.5" r="1.5" />
                           <path d="M21 15l-5-5L5 21" />
                         </svg>
-                        <span className="text-[8px] text-gray-500 text-center leading-tight truncate w-full px-1">
+                        <span className="sm:text-[8px] text-xs text-gray-500 text-center leading-tight truncate w-full px-1">
                           {card.name}
                         </span>
                       </div>
                     )}
                     {/* Card name label */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 truncate px-1">
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white sm:text-[8px] text-xs text-center py-0.5 truncate px-1">
                       {card.name}
                     </div>
                   </div>
@@ -2626,7 +2781,7 @@ export default function GameTable() {
               {isStack && (
                 <div
                   data-testid={`stack-count-${stackId}`}
-                  className="absolute -top-2 -right-2 min-w-[20px] h-5 rounded-full bg-yellow-500 text-black text-[10px] font-bold flex items-center justify-center px-1 shadow-lg z-10"
+                  className="absolute -top-2 -right-2 min-w-[20px] h-5 rounded-full bg-yellow-500 text-black sm:text-[10px] text-xs font-bold flex items-center justify-center px-1 shadow-lg z-10"
                 >
                   {stackSize}
                 </div>
@@ -2636,7 +2791,7 @@ export default function GameTable() {
               {isStack && (
                 <div
                   data-testid={`stack-tooltip-${stackId}`}
-                  className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20"
+                  className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white sm:text-[10px] text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20"
                 >
                   Stack: {stackSize} cards
                 </div>
@@ -2683,7 +2838,7 @@ export default function GameTable() {
               <button
                 onClick={(e) => { e.stopPropagation(); decrementCounter(counter.id); }}
                 data-testid={`counter-decrement-${counter.id}`}
-                className="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                className="w-11 h-11 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xl flex items-center justify-center transition-colors"
               >
                 -
               </button>
@@ -2696,7 +2851,7 @@ export default function GameTable() {
               <button
                 onClick={(e) => { e.stopPropagation(); incrementCounter(counter.id); }}
                 data-testid={`counter-increment-${counter.id}`}
-                className="w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                className="w-11 h-11 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold text-xl flex items-center justify-center transition-colors"
               >
                 +
               </button>
@@ -2704,7 +2859,7 @@ export default function GameTable() {
             <button
               onClick={(e) => { e.stopPropagation(); deleteCounter(counter.id); }}
               data-testid={`counter-delete-${counter.id}`}
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white text-xs flex items-center justify-center transition-colors"
+              className="absolute -top-2 -right-2 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center transition-colors"
             >
               &times;
             </button>
@@ -2732,7 +2887,7 @@ export default function GameTable() {
             className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`}
             style={{ minWidth: '70px' }}
           >
-            <div className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">
+            <div className="sm:text-[10px] text-xs text-slate-400 uppercase font-bold mb-0.5">
               {die.type}
             </div>
             <div
@@ -2746,14 +2901,14 @@ export default function GameTable() {
                 onClick={(e) => { e.stopPropagation(); rollDie(die.id); }}
                 disabled={die.rolling}
                 data-testid={`die-roll-${die.id}`}
-                className="flex-1 px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-medium transition-colors disabled:opacity-50"
+                className="flex-1 h-11 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {die.rolling ? '...' : 'Roll'}
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteDie(die.id); }}
                 data-testid={`die-delete-${die.id}`}
-                className="px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white text-[10px] transition-colors"
+                className="w-11 h-11 rounded bg-red-600 hover:bg-red-500 text-white text-base flex items-center justify-center transition-colors"
               >
                 &times;
               </button>
@@ -2798,7 +2953,7 @@ export default function GameTable() {
             <button
               onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
               data-testid={`note-delete-${note.id}`}
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute -top-2 -right-2 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
               &times;
             </button>
@@ -2807,7 +2962,7 @@ export default function GameTable() {
               <button
                 onClick={(e) => { e.stopPropagation(); startEditingNote(note.id); }}
                 data-testid={`note-edit-${note.id}`}
-                className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                className="absolute -top-2 -left-2 w-11 h-11 rounded-full bg-blue-500 hover:bg-blue-400 text-white text-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
                 title="Edit note"
               >
                 &#9998;
@@ -2838,14 +2993,14 @@ export default function GameTable() {
                   <div className="flex gap-1 justify-end mt-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); setEditingNoteId(null); setEditingNoteText(''); }}
-                      className="px-2 py-0.5 text-[10px] text-amber-700 hover:text-amber-900"
+                      className="px-2 py-0.5 sm:text-[10px] text-xs text-amber-700 hover:text-amber-900"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); saveNoteEdit(note.id); }}
                       data-testid={`note-save-edit-${note.id}`}
-                      className="px-2 py-0.5 text-[10px] bg-amber-500 text-white rounded hover:bg-amber-600"
+                      className="px-2 py-0.5 sm:text-[10px] text-xs bg-amber-500 text-white rounded hover:bg-amber-600"
                     >
                       Save
                     </button>
@@ -2888,7 +3043,7 @@ export default function GameTable() {
           <button
             onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
             data-testid={`token-delete-${token.id}`}
-            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 hover:bg-red-400 text-white text-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute -top-1 -right-1 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
           >
             &times;
           </button>
@@ -2906,7 +3061,7 @@ export default function GameTable() {
             <button
               onClick={() => navigate(`/games/${id}`)}
               data-testid="back-to-game-btn"
-              className="px-3 py-1.5 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors text-sm flex items-center gap-2"
+              className="px-4 py-3 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors text-sm flex items-center gap-2 min-h-[44px]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -2922,7 +3077,7 @@ export default function GameTable() {
             <button
               onClick={() => setShowCardDrawer(prev => !prev)}
               data-testid="toggle-card-drawer"
-              className={`px-3 py-1.5 backdrop-blur-sm text-white rounded-lg transition-colors text-sm flex items-center gap-2 ${
+              className={`px-4 py-3 backdrop-blur-sm text-white rounded-lg transition-colors text-sm flex items-center gap-2 min-h-[44px] ${
                 showCardDrawer ? 'bg-blue-600/70 hover:bg-blue-600' : 'bg-black/50 hover:bg-black/70'
               }`}
             >
@@ -3023,7 +3178,7 @@ export default function GameTable() {
       {/* Card Drawer Panel */}
       {showCardDrawer && (
         <div
-          className="absolute top-12 right-0 bottom-16 w-64 z-30 pointer-events-auto"
+          className="absolute top-12 right-0 bottom-16 sm:w-64 w-full z-30 pointer-events-auto"
           data-testid="card-drawer"
           data-ui-element="true"
         >
@@ -3086,7 +3241,7 @@ export default function GameTable() {
                           <button
                             onClick={() => placeCategoryAsStack(category.id)}
                             data-testid={`place-category-stack-${category.id}`}
-                            className="text-emerald-400 hover:text-emerald-300 text-[10px] px-2 py-0.5 rounded bg-emerald-900/30 hover:bg-emerald-900/50 transition-colors font-medium"
+                            className="text-emerald-400 hover:text-emerald-300 sm:text-[10px] text-xs px-2 py-0.5 rounded bg-emerald-900/30 hover:bg-emerald-900/50 transition-colors font-medium"
                             title={`Place all ${categoryCards.length} cards as a stack`}
                           >
                             + Stack
@@ -3119,11 +3274,11 @@ export default function GameTable() {
                                     </svg>
                                   </div>
                                 )}
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white sm:text-[9px] text-xs text-center py-0.5 truncate px-1">
                                   {card.name}
                                 </div>
                                 <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                  <span className="bg-blue-600 text-white sm:text-[10px] text-xs px-2 py-0.5 rounded-full font-medium">
                                     + Place
                                   </span>
                                 </div>
@@ -3193,11 +3348,11 @@ export default function GameTable() {
                                     </svg>
                                   </div>
                                 )}
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5 truncate px-1">
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white sm:text-[9px] text-xs text-center py-0.5 truncate px-1">
                                   {card.name}
                                 </div>
                                 <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                  <span className="bg-blue-600 text-white sm:text-[10px] text-xs px-2 py-0.5 rounded-full font-medium">
                                     + Place
                                   </span>
                                 </div>
@@ -3235,7 +3390,7 @@ export default function GameTable() {
             <button
               onClick={() => setShowCounterModal(true)}
               data-testid="toolbar-counter-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Add Counter"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3244,14 +3399,14 @@ export default function GameTable() {
                 <path d="M17 12h.01" />
                 <path d="M7 12h.01" />
               </svg>
-              <span className="text-[10px]">Counter</span>
+              <span className="sm:text-[10px] text-xs">Counter</span>
             </button>
 
             {/* Dice button */}
             <button
               onClick={() => setShowDiceModal(true)}
               data-testid="toolbar-dice-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Add Dice"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3261,34 +3416,34 @@ export default function GameTable() {
                 <circle cx="8.5" cy="15.5" r="1.5" fill="currentColor" />
                 <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" />
               </svg>
-              <span className="text-[10px]">Dice</span>
+              <span className="sm:text-[10px] text-xs">Dice</span>
             </button>
 
             {/* Note button */}
             <button
               onClick={() => setShowNoteModal(true)}
               data-testid="toolbar-note-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Add Note"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14,2 14,8 20,8" />
               </svg>
-              <span className="text-[10px]">Note</span>
+              <span className="sm:text-[10px] text-xs">Note</span>
             </button>
 
             {/* Token button */}
             <button
               onClick={() => setShowTokenModal(true)}
               data-testid="toolbar-token-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Add Token"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
               </svg>
-              <span className="text-[10px]">Token</span>
+              <span className="sm:text-[10px] text-xs">Token</span>
             </button>
 
             <div className="w-px h-8 bg-white/20 mx-1" />
@@ -3297,20 +3452,20 @@ export default function GameTable() {
             <button
               onClick={() => setShowBgPicker(prev => !prev)}
               data-testid="toolbar-bg-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Change Background"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
               </svg>
-              <span className="text-[10px]">Table</span>
+              <span className="sm:text-[10px] text-xs">Table</span>
             </button>
 
             {/* Shortcuts help */}
             <button
               onClick={() => setShowShortcuts(prev => !prev)}
               data-testid="toolbar-shortcuts-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Keyboard Shortcuts (?)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3318,14 +3473,14 @@ export default function GameTable() {
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span className="text-[10px]">Help</span>
+              <span className="sm:text-[10px] text-xs">Help</span>
             </button>
 
             {/* Save button */}
             <button
               onClick={() => setShowSaveModal(true)}
               data-testid="toolbar-save-btn"
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
               title="Save Game"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3333,7 +3488,7 @@ export default function GameTable() {
                 <polyline points="17,21 17,13 7,13 7,21" />
                 <polyline points="7,3 7,8 15,8" />
               </svg>
-              <span className="text-[10px]">Save</span>
+              <span className="sm:text-[10px] text-xs">Save</span>
             </button>
 
             {/* Save Setup button (visible in setup mode or always as convenience) */}
@@ -3358,7 +3513,7 @@ export default function GameTable() {
                   <polyline points="17,21 17,13 7,13 7,21" />
                   <polyline points="7,3 7,8 15,8" />
                 </svg>
-                <span className="text-[10px]">Setup</span>
+                <span className="sm:text-[10px] text-xs">Setup</span>
               </button>
             )}
           </div>
@@ -3394,8 +3549,8 @@ export default function GameTable() {
 
       {/* Counter Creation Modal */}
       {showCounterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="counter-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="counter-modal">
             <h3 className="text-white font-semibold mb-3">Create Counter</h3>
             <input
               type="text"
@@ -3433,8 +3588,8 @@ export default function GameTable() {
 
       {/* Dice Creation Modal */}
       {showDiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="dice-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="dice-modal">
             <h3 className="text-white font-semibold mb-3">Add Dice</h3>
             <div className="grid grid-cols-3 gap-2 mb-4">
               {['d6', 'd8', 'd10', 'd12', 'd20'].map(type => (
@@ -3473,8 +3628,8 @@ export default function GameTable() {
 
       {/* Note Creation Modal */}
       {showNoteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="note-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="note-modal">
             <h3 className="text-white font-semibold mb-3">Add Note</h3>
             <textarea
               value={newNoteText}
@@ -3518,8 +3673,8 @@ export default function GameTable() {
 
       {/* Token Modal */}
       {showTokenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-96 shadow-2xl border border-slate-600" data-testid="token-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="token-modal">
             <h3 className="text-white font-semibold mb-4">Add Token</h3>
 
             {/* Shape Selection */}
@@ -3614,8 +3769,8 @@ export default function GameTable() {
 
       {/* Save Game Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="save-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="save-modal">
             <h3 className="text-white font-semibold mb-3">Save Game</h3>
             <input
               type="text"
@@ -3654,8 +3809,8 @@ export default function GameTable() {
 
       {/* Save Setup Modal */}
       {showSetupSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="setup-save-modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
+          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="setup-save-modal">
             <h3 className="text-white font-semibold mb-3">{editingSetupId ? 'Update Setup' : 'Save Setup'}</h3>
             <p className="text-slate-400 text-sm mb-3">
               {editingSetupId ? 'Update the setup with the current table state.' : 'Save the current table arrangement as a reusable game setup.'}
@@ -3845,10 +4000,10 @@ export default function GameTable() {
                               <circle cx="8.5" cy="8.5" r="1.5" />
                               <path d="M21 15l-5-5L5 21" />
                             </svg>
-                            <span className="text-[9px] text-gray-500 text-center px-1">{card.name}</span>
+                            <span className="sm:text-[9px] text-xs text-gray-500 text-center px-1">{card.name}</span>
                           </div>
                         )}
-                        <div className="absolute top-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                        <div className="absolute top-1 left-1 bg-black/70 text-white sm:text-[9px] text-xs px-1.5 py-0.5 rounded font-mono">
                           {index + 1}
                         </div>
                       </div>
@@ -3856,7 +4011,7 @@ export default function GameTable() {
                         {card.name}
                       </span>
                       {card.faceDown && (
-                        <span className="text-slate-500 text-[10px]">(face down)</span>
+                        <span className="text-slate-500 sm:text-[10px] text-xs">(face down)</span>
                       )}
                     </div>
                   ))}
@@ -3958,7 +4113,7 @@ export default function GameTable() {
             {/* Card-specific actions (shown when right-clicking a card or stack) */}
             {contextMenu.cardTableId && (
               <>
-                <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
                   {contextMenu.stackId ? 'Stack Actions' : 'Card Actions'}
                 </div>
                 <button
@@ -3972,7 +4127,7 @@ export default function GameTable() {
                     setContextMenu(null);
                   }}
                   data-testid="context-flip"
-                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                  className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
                 >
                   <span>Flip</span>
                   <span className="ml-auto text-xs text-slate-500">F</span>
@@ -3988,7 +4143,7 @@ export default function GameTable() {
                     setContextMenu(null);
                   }}
                   data-testid="context-rotate-cw"
-                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                  className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
                 >
                   <span>Rotate CW</span>
                   <span className="ml-auto text-xs text-slate-500">E</span>
@@ -4004,7 +4159,7 @@ export default function GameTable() {
                     setContextMenu(null);
                   }}
                   data-testid="context-rotate-ccw"
-                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                  className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
                 >
                   <span>Rotate CCW</span>
                   <span className="ml-auto text-xs text-slate-500">Q</span>
@@ -4025,7 +4180,7 @@ export default function GameTable() {
                 {contextMenu.stackId && (
                   <>
                     <div className="border-t border-slate-700 my-1" />
-                    <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                    <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
                       Stack
                     </div>
                     <button
@@ -4126,7 +4281,7 @@ export default function GameTable() {
             {/* General table actions (always shown) */}
             {!contextMenu.cardTableId && (
               <>
-                <div className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
                   Table Actions
                 </div>
                 <button
@@ -4184,17 +4339,20 @@ export default function GameTable() {
         >
           <div className="flex justify-center items-end pb-2 pointer-events-auto">
             <div
-              className="relative flex items-end justify-center bg-black/40 backdrop-blur-sm rounded-t-xl border border-b-0 border-white/10 px-4 pt-2 pb-1 min-h-[120px]"
+              className="relative flex items-end justify-center bg-black/40 backdrop-blur-sm rounded-t-xl border border-b-0 border-white/10 sm:px-4 px-2 pt-2 pb-1 sm:min-h-[120px] min-h-[100px]"
               data-testid="hand-container"
               style={{ minWidth: Math.min(handCards.length * 90 + 40, 800) }}
             >
-              <div className="absolute top-1 left-3 text-white/40 text-[10px] uppercase tracking-wider font-semibold">
+              <div className="absolute top-1 left-3 text-white/40 sm:text-[10px] text-xs uppercase tracking-wider font-semibold">
                 Hand ({handCards.length})
               </div>
               <div className="flex items-end justify-center" style={{ gap: '2px' }}>
                 {handCards.map((card, index) => {
+                  const isMobile = window.innerWidth < 640;
+                  const cardWidth = isMobile ? 60 : 80;
+                  const cardHeight = isMobile ? 84 : 112;
                   const totalCards = handCards.length;
-                  const spreadAngle = Math.min(5, 30 / totalCards);
+                  const spreadAngle = isMobile ? Math.min(3, 20 / totalCards) : Math.min(5, 30 / totalCards);
                   const centerIndex = (totalCards - 1) / 2;
                   const rotation = (index - centerIndex) * spreadAngle;
                   const yOffset = Math.abs(index - centerIndex) * 4;
@@ -4234,11 +4392,11 @@ export default function GameTable() {
                       onMouseLeave={() => setHoveredHandCard(null)}
                       className={`relative cursor-pointer transition-all duration-200 flex-shrink-0 ${isDragging ? 'opacity-30' : ''} ${isDragOver ? 'scale-105' : ''} ${draggingFromHand === card.handId ? 'opacity-50' : ''}`}
                       style={{
-                        width: 80,
-                        height: 112,
+                        width: cardWidth,
+                        height: cardHeight,
                         transform: `rotate(${rotation}deg) translateY(${isHovered ? -30 - yOffset : -yOffset}px) scale(${isHovered ? 1.15 : 1})`,
                         zIndex: isHovered ? 100 : index,
-                        marginLeft: index === 0 ? 0 : -10,
+                        marginLeft: index === 0 ? 0 : (isMobile ? -8 : -10),
                         transition: 'transform 0.2s ease, opacity 0.15s ease',
                       }}
                     >
@@ -4251,16 +4409,16 @@ export default function GameTable() {
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
-                            <span className="text-[7px] text-gray-500 text-center leading-tight truncate w-full px-1">{card.name}</span>
+                            <span className="sm:text-[7px] text-[9px] text-gray-500 text-center leading-tight truncate w-full px-1">{card.name}</span>
                           </div>
                         )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[7px] text-center py-0.5 truncate px-1">{card.name}</div>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white sm:text-[7px] text-[9px] text-center py-0.5 truncate px-1">{card.name}</div>
                       </div>
                       {isHovered && (
                         <button
                           onClick={(e) => { e.stopPropagation(); playCardFromHand(card.handId); }}
                           data-testid={`hand-play-${card.handId}`}
-                          className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 hover:bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap z-50 transition-colors"
+                          className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600 hover:bg-green-500 text-white sm:text-[9px] text-xs font-bold px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap z-50 transition-colors"
                         >
                           Play
                         </button>
