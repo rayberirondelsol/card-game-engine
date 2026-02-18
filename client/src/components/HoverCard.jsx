@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
  * @param {string} props.imagePath - Path to the card image
  * @param {string} props.cardName - Name of the card
  * @param {boolean} props.faceDown - Whether the card is face down
+ * @param {string} props.cardBackImageUrl - URL of the assigned card back image (if any)
  * @param {number} props.mouseX - Mouse X position for positioning the preview
  * @param {number} props.mouseY - Mouse Y position for positioning the preview
  * @param {number} props.scale - Scale factor for the preview (default: 2.5)
@@ -16,6 +17,7 @@ export default function HoverCard({
   imagePath,
   cardName,
   faceDown = false,
+  cardBackImageUrl = null,
   mouseX = 0,
   mouseY = 0,
   scale = 2.5
@@ -141,35 +143,44 @@ export default function HoverCard({
             </div>
           </div>
 
-          {/* Back face */}
+          {/* Back face - show card back image if assigned, otherwise blue gradient fallback */}
           <div
-            className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700"
+            className={`absolute inset-0 flex items-center justify-center ${!cardBackImageUrl ? 'bg-gradient-to-br from-blue-900 to-blue-700' : ''}`}
             style={{
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)'
             }}
           >
-            <div
-              className="rounded border-4 border-blue-400/30 flex items-center justify-center"
-              style={{
-                width: scaledWidth * 0.6,
-                height: scaledHeight * 0.7,
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width={48 * scale / 2}
-                height={48 * scale / 2}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(147,197,253,0.5)"
-                strokeWidth="1.5"
+            {cardBackImageUrl ? (
+              <img
+                src={cardBackImageUrl}
+                alt="Card back"
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <div
+                className="rounded border-4 border-blue-400/30 flex items-center justify-center"
+                style={{
+                  width: scaledWidth * 0.6,
+                  height: scaledHeight * 0.7,
+                }}
               >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M12 8v8M8 12h8" />
-              </svg>
-            </div>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width={48 * scale / 2}
+                  height={48 * scale / 2}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="rgba(147,197,253,0.5)"
+                  strokeWidth="1.5"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M12 8v8M8 12h8" />
+                </svg>
+              </div>
+            )}
           </div>
         </div>
       </div>

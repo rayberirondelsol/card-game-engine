@@ -297,6 +297,25 @@ export default function GameTable() {
   const [zoomDisplay, setZoomDisplay] = useState(100); // reactive zoom % for display
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 }); // reactive pan position for display
 
+  // Convert screen (pixel) coordinates to world coordinates accounting for camera zoom and pan
+  // The CSS transform on the world wrapper is: scale(zoom) translate(cam.x, cam.y) with transform-origin 50% 50%
+  // This means: screenPos = center + (worldPos + cam - center) * zoom  (where center is container center)
+  //           => worldPos = (screenPos - center) / zoom - cam + center
+  function screenToWorld(screenX, screenY) {
+    const container = containerRef.current;
+    if (!container) return { x: screenX, y: screenY };
+    const rect = container.getBoundingClientRect();
+    const camera = cameraRef.current;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const relX = screenX - rect.left;
+    const relY = screenY - rect.top;
+    return {
+      x: (relX - centerX) / camera.zoom - camera.x + centerX,
+      y: (relY - centerY) / camera.zoom - camera.y + centerY,
+    };
+  }
+
   // Game objects state (counters, dice, notes, tokens)
   const [counters, setCounters] = useState([]);
   const [dice, setDice] = useState([]);
@@ -306,6 +325,7 @@ export default function GameTable() {
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
   const [categories, setCategories] = useState([]); // card categories/folders
+  const [cardBacks, setCardBacks] = useState([]); // card back images for the game
   const [expandedCategories, setExpandedCategories] = useState(new Set()); // expanded category IDs
   const [tableCards, setTableCards] = useState([]); // cards placed on the table
   const [showCardDrawer, setShowCardDrawer] = useState(false);
@@ -371,6 +391,12 @@ export default function GameTable() {
   const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0 });
   const DOUBLE_TAP_DELAY = 300; // milliseconds
   const DOUBLE_TAP_DISTANCE = 30; // pixels
+
+  // Long-press card preview for touch devices (Feature #58)
+  const [longPressPreviewCard, setLongPressPreviewCard] = useState(null); // tableId of card being previewed via long-press
+  const longPressPreviewTimerRef = useRef(null);
+  const longPressPreviewTouchPosRef = useRef({ x: 0, y: 0 }); // initial touch position to detect movement
+  const LONG_PRESS_PREVIEW_DELAY = 500; // milliseconds for long-press to trigger preview
 
   // Hand-to-table drag state
   const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
@@ -483,6 +509,31 @@ export default function GameTable() {
     if (id) fetchCategories();
   }, [id]);
 
+  // Fetch card backs for the game
+  useEffect(() => {
+    async function fetchCardBacks() {
+      try {
+        const res = await fetch(`/api/games/${id}/card-backs`);
+        if (res.ok) {
+          const data = await res.json();
+          setCardBacks(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch card backs:', err);
+      }
+    }
+    if (id) fetchCardBacks();
+  }, [id]);
+
+  // Build a lookup map from card_back_id to image_path for quick access
+  const cardBackMap = React.useMemo(() => {
+    const map = {};
+    cardBacks.forEach(cb => {
+      map[cb.id] = cb.image_path;
+    });
+    return map;
+  }, [cardBacks]);
+
   // Canvas rendering
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -504,15 +555,25 @@ export default function GameTable() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-width / 2 + camera.x, -height / 2 + camera.y);
 
-    // Draw background
+    // Draw background - size must account for zoom so it always fills the viewport
+    // At any zoom level, we need the background to cover what's visible
+    const bgScale = Math.max(3, 3 / camera.zoom);
     const bg = TABLE_BACKGROUNDS[background];
+    const bgW = width * bgScale;
+    const bgH = height * bgScale;
+    // Offset background drawing to center it around the camera view
+    const bgOffsetX = -(bgW - width) / 2 - camera.x;
+    const bgOffsetY = -(bgH - height) / 2 - camera.y;
+    ctx.save();
+    ctx.translate(bgOffsetX, bgOffsetY);
     if (bg.pattern === 'felt') {
-      drawFeltPattern(ctx, width * 3, height * 3, bg.color);
+      drawFeltPattern(ctx, bgW, bgH, bg.color);
     } else if (bg.pattern === 'wood') {
-      drawWoodPattern(ctx, width * 3, height * 3, bg.color);
+      drawWoodPattern(ctx, bgW, bgH, bg.color);
     } else {
-      drawSolidBackground(ctx, width * 3, height * 3, bg.color);
+      drawSolidBackground(ctx, bgW, bgH, bg.color);
     }
+    ctx.restore();
 
     ctx.restore();
 
@@ -567,9 +628,24 @@ export default function GameTable() {
     function handleWheel(e) {
       e.preventDefault();
       const camera = cameraRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+
+      // Convert cursor to world coordinates before zoom
+      const worldX = (cursorX - rect.width / 2) / camera.zoom + camera.x;
+      const worldY = (cursorY - rect.height / 2) / camera.zoom + camera.y;
+
+      // Apply zoom
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+
+      // Adjust camera to keep world point under cursor fixed
+      camera.x = worldX - (cursorX - rect.width / 2) / camera.zoom;
+      camera.y = worldY - (cursorY - rect.height / 2) / camera.zoom;
+
       setZoomDisplay(Math.round(camera.zoom * 100));
+      setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
       renderCanvas();
     }
 
@@ -796,6 +872,7 @@ export default function GameTable() {
       cardId: card.id,
       name: card.name,
       image_path: card.image_path,
+      card_back_id: card.card_back_id || null,
       x: 250 + col * 150 + (Math.random() - 0.5) * 30,
       y: 300 + row * 180 + (Math.random() - 0.5) * 30,
       zIndex: newZIndex,
@@ -832,6 +909,7 @@ export default function GameTable() {
         cardId: card.id,
         name: card.name,
         image_path: card.image_path,
+        card_back_id: card.card_back_id || null,
         x: stackX,
         y: stackY,
         zIndex: newZIndex,
@@ -913,6 +991,29 @@ export default function GameTable() {
       e.stopPropagation();
     }
 
+    // Start long-press preview timer for touch devices (Feature #58)
+    if (isTouchEvent(e)) {
+      const touchPtr = getPointerPosition(e);
+      longPressPreviewTouchPosRef.current = { x: touchPtr.clientX, y: touchPtr.clientY };
+      if (longPressPreviewTimerRef.current) {
+        clearTimeout(longPressPreviewTimerRef.current);
+      }
+      longPressPreviewTimerRef.current = setTimeout(() => {
+        longPressPreviewTimerRef.current = null;
+        triggerHaptic('action');
+        setLongPressPreviewCard(tableId);
+        setDraggingCard(null);
+        setGridHighlight(null);
+        setStackDropTarget(null);
+        if (pressHoldTimerRef.current) {
+          clearTimeout(pressHoldTimerRef.current);
+          pressHoldTimerRef.current = null;
+        }
+        setPressHoldActive(false);
+        pendingStackRef.current = null;
+      }, LONG_PRESS_PREVIEW_DELAY);
+    }
+
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
@@ -942,10 +1043,11 @@ export default function GameTable() {
           startDraggingCard(e, topCard.tableId, topCard, stackId);
         }, PRESS_HOLD_DELAY);
 
-        // Store initial pointer position to detect if pointer moves
+        // Store initial pointer position to detect if pointer moves (use world coords for offset)
+        const worldPos = screenToWorld(pointer.clientX, pointer.clientY);
         cardDragOffsetRef.current = {
-          x: pointer.clientX - topCard.x,
-          y: pointer.clientY - topCard.y,
+          x: worldPos.x - topCard.x,
+          y: worldPos.y - topCard.y,
           initialX: pointer.clientX,
           initialY: pointer.clientY,
         };
@@ -982,9 +1084,10 @@ export default function GameTable() {
       ));
     }
 
+    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
     cardDragOffsetRef.current = {
-      x: pointer.clientX - card.x,
-      y: pointer.clientY - card.y,
+      x: worldPointer.x - card.x,
+      y: worldPointer.y - card.y,
     };
     setDraggingCard(tableId);
 
@@ -1016,6 +1119,16 @@ export default function GameTable() {
   function handleCardDragMove(e) {
     // Get unified pointer position
     const pointer = getPointerPosition(e);
+
+    // Cancel long-press preview timer if finger moves (Feature #58)
+    if (longPressPreviewTimerRef.current) {
+      const lpDx = Math.abs(pointer.clientX - longPressPreviewTouchPosRef.current.x);
+      const lpDy = Math.abs(pointer.clientY - longPressPreviewTouchPosRef.current.y);
+      if (lpDx > 8 || lpDy > 8) {
+        clearTimeout(longPressPreviewTimerRef.current);
+        longPressPreviewTimerRef.current = null;
+      }
+    }
 
     // If timer is active and pointer moves significantly, cancel timer and detach top card from stack
     if (pressHoldTimerRef.current && cardDragOffsetRef.current.initialX !== undefined) {
@@ -1069,8 +1182,9 @@ export default function GameTable() {
 
     if (!draggingCard) return;
 
-    const newX = pointer.clientX - cardDragOffsetRef.current.x;
-    const newY = pointer.clientY - cardDragOffsetRef.current.y;
+    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
+    const newX = worldPointer.x - cardDragOffsetRef.current.x;
+    const newY = worldPointer.y - cardDragOffsetRef.current.y;
 
     // Calculate grid highlight position
     const snapX = snapToGrid(newX);
@@ -1143,6 +1257,12 @@ export default function GameTable() {
 
   // Handle card drag end - snap to grid and detect drop on stack
   function handleCardDragEnd() {
+    // Clear long-press preview timer (Feature #58)
+    if (longPressPreviewTimerRef.current) {
+      clearTimeout(longPressPreviewTimerRef.current);
+      longPressPreviewTimerRef.current = null;
+    }
+
     // Clear press-hold timer if it exists
     if (pressHoldTimerRef.current) {
       clearTimeout(pressHoldTimerRef.current);
@@ -1407,12 +1527,13 @@ export default function GameTable() {
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
     if (!obj) return;
 
-    // Get unified pointer position
+    // Get unified pointer position (convert to world coords for offset)
     const pointer = getPointerPosition(e);
+    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
 
     dragOffsetRef.current = {
-      x: pointer.clientX - (obj.x || 0),
-      y: pointer.clientY - (obj.y || 0),
+      x: worldPointer.x - (obj.x || 0),
+      y: worldPointer.y - (obj.y || 0),
     };
     setDraggingObj({ type: objType, id: objId });
   }
@@ -1448,10 +1569,11 @@ export default function GameTable() {
   function handleObjDragMove(e) {
     if (!draggingObj) return;
 
-    // Get unified pointer position
+    // Get unified pointer position (convert to world coords)
     const pointer = getPointerPosition(e);
-    const newX = pointer.clientX - dragOffsetRef.current.x;
-    const newY = pointer.clientY - dragOffsetRef.current.y;
+    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
+    const newX = worldPointer.x - dragOffsetRef.current.x;
+    const newY = worldPointer.y - dragOffsetRef.current.y;
     if (draggingObj.type === 'counter') {
       setCounters(prev => prev.map(c =>
         c.id === draggingObj.id ? { ...c, x: newX, y: newY } : c
@@ -1685,6 +1807,13 @@ export default function GameTable() {
     // Cancel haptic feedback
     cancelHaptic();
 
+    // 0. Clear long-press preview timer (Feature #58)
+    if (longPressPreviewTimerRef.current) {
+      clearTimeout(longPressPreviewTimerRef.current);
+      longPressPreviewTimerRef.current = null;
+    }
+    setLongPressPreviewCard(null);
+
     // 1. Clear press-hold timer
     if (pressHoldTimerRef.current) {
       clearTimeout(pressHoldTimerRef.current);
@@ -1781,6 +1910,7 @@ export default function GameTable() {
       cardId: card.cardId,
       name: card.name,
       image_path: card.image_path,
+      card_back_id: card.card_back_id || null,
       originalTableId: card.tableId,
     };
     setHandCards(prev => [...prev, handCard]);
@@ -1809,6 +1939,7 @@ export default function GameTable() {
       cardId: card.cardId,
       name: card.name,
       image_path: card.image_path,
+      card_back_id: card.card_back_id || null,
       originalTableId: card.tableId,
     }));
     setHandCards(prev => [...prev, ...newHandCards]);
@@ -1856,6 +1987,7 @@ export default function GameTable() {
           cardId: card.cardId,
           name: card.name,
           image_path: card.image_path,
+          card_back_id: card.card_back_id || null,
           x: stackPosition.x,
           y: stackPosition.y,
           zIndex: maxStackZ + 1,
@@ -1876,11 +2008,12 @@ export default function GameTable() {
       let posX, posY;
 
       if (x !== null && y !== null) {
-        // Use specified position (from drag-and-drop)
-        posX = x;
-        posY = y;
+        // Use specified position (from drag-and-drop) - convert screen to world coords
+        const worldPos = screenToWorld(x, y);
+        posX = worldPos.x;
+        posY = worldPos.y;
       } else {
-        // Use center with slight randomization
+        // Use center with slight randomization (these are already world coords)
         const centerX = (canvas?.width || 800) / 2;
         const centerY = (canvas?.height || 600) / 2 - 60;
         posX = centerX + (Math.random() - 0.5) * 60;
@@ -1892,6 +2025,7 @@ export default function GameTable() {
         cardId: card.cardId,
         name: card.name,
         image_path: card.image_path,
+        card_back_id: card.card_back_id || null,
         x: posX,
         y: posY,
         zIndex: newZIndex,
@@ -2051,6 +2185,7 @@ export default function GameTable() {
           cardId: c.cardId,
           name: c.name,
           image_path: c.image_path,
+          card_back_id: c.card_back_id || null,
           faceDown: c.faceDown,
           rotation: c.rotation || 0,
           zIndex: c.zIndex,
@@ -2071,6 +2206,7 @@ export default function GameTable() {
         cardId: c.cardId,
         name: c.name,
         image_path: c.image_path,
+        card_back_id: c.card_back_id || null,
         x: c.x,
         y: c.y,
         zIndex: c.zIndex,
@@ -2084,6 +2220,7 @@ export default function GameTable() {
         cardId: c.cardId,
         name: c.name,
         image_path: c.image_path,
+        card_back_id: c.card_back_id || null,
       })),
       counters: counters.map(c => ({
         id: c.id,
@@ -2302,6 +2439,7 @@ export default function GameTable() {
           cardId: c.cardId,
           name: c.name,
           image_path: c.image_path,
+          card_back_id: c.card_back_id || null,
           x: c.x,
           y: c.y,
           zIndex: c.zIndex || 1,
@@ -2324,6 +2462,7 @@ export default function GameTable() {
               cardId: c.cardId,
               name: c.name,
               image_path: c.image_path,
+              card_back_id: c.card_back_id || null,
               x: stack.x,
               y: stack.y,
               zIndex: c.zIndex || 1,
@@ -2348,6 +2487,7 @@ export default function GameTable() {
         cardId: c.cardId,
         name: c.name,
         image_path: c.image_path,
+        card_back_id: c.card_back_id || null,
       })));
     } else {
       setHandCards([]);
@@ -2557,9 +2697,31 @@ export default function GameTable() {
     if (isUIElement) return;
 
     const camera = cameraRef.current;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+    const container = containerRef.current;
+    const rect = container ? container.getBoundingClientRect() : null;
+
+    if (rect) {
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+
+      // Convert cursor to world coordinates before zoom
+      const worldX = (cursorX - rect.width / 2) / camera.zoom + camera.x;
+      const worldY = (cursorY - rect.height / 2) / camera.zoom + camera.y;
+
+      // Apply zoom
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+
+      // Adjust camera to keep world point under cursor fixed
+      camera.x = worldX - (cursorX - rect.width / 2) / camera.zoom;
+      camera.y = worldY - (cursorY - rect.height / 2) / camera.zoom;
+    } else {
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+    }
+
     setZoomDisplay(Math.round(camera.zoom * 100));
+    setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
     renderCanvas();
   }
 
@@ -2809,6 +2971,16 @@ export default function GameTable() {
         style={{ touchAction: 'none' }}
       />
 
+      {/* World-space transform wrapper - applies camera zoom and pan to all table objects */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        data-testid="world-transform-wrapper"
+        style={{
+          transformOrigin: '50% 50%',
+          transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+          willChange: 'transform',
+        }}
+      >
       {/* Grid highlight overlay when dragging cards */}
       {gridHighlight && draggingCard && (
         <div
@@ -2864,7 +3036,7 @@ export default function GameTable() {
               data-stack-id={stackId || ''}
               data-stack-size={stackSize}
               data-ui-element="true"
-              className="absolute select-none group"
+              className="absolute select-none group pointer-events-auto"
               style={{
                 left: card.x - CARD_WIDTH / 2,
                 top: card.y - CARD_HEIGHT / 2,
@@ -2997,17 +3169,26 @@ export default function GameTable() {
                     </div>
                   </div>
 
-                  {/* Back face */}
+                  {/* Back face - show card back image if assigned, otherwise blue gradient fallback */}
                   <div
-                    className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700"
+                    className={`absolute inset-0 flex items-center justify-center ${!(card.card_back_id && cardBackMap[card.card_back_id]) ? 'bg-gradient-to-br from-blue-900 to-blue-700' : ''}`}
                     style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                   >
-                    <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M12 8v8M8 12h8" />
-                      </svg>
-                    </div>
+                    {card.card_back_id && cardBackMap[card.card_back_id] ? (
+                      <img
+                        src={cardBackMap[card.card_back_id]}
+                        alt="Card back"
+                        className="w-full h-full object-cover"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className="w-16 h-20 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M12 8v8M8 12h8" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3056,7 +3237,7 @@ export default function GameTable() {
           data-testid={`counter-${counter.id}`}
           data-counter-name={counter.name}
           data-ui-element="true"
-          className="absolute z-20 select-none"
+          className="absolute z-20 select-none pointer-events-auto"
           style={{
             left: counter.x - 70,
             top: counter.y - 40,
@@ -3109,7 +3290,7 @@ export default function GameTable() {
           data-testid={`die-${die.id}`}
           data-die-type={die.type}
           data-ui-element="true"
-          className="absolute z-20 select-none"
+          className="absolute z-20 select-none pointer-events-auto"
           style={{
             left: die.x - 35,
             top: die.y - 35,
@@ -3159,7 +3340,7 @@ export default function GameTable() {
           data-testid={`note-${note.id}`}
           data-note-id={note.id}
           data-ui-element="true"
-          className="absolute z-20 select-none group"
+          className="absolute z-20 select-none group pointer-events-auto"
           style={{
             left: note.x - 80,
             top: note.y - 50,
@@ -3264,7 +3445,7 @@ export default function GameTable() {
           data-token-color={token.color}
           data-token-label={token.label || ''}
           data-ui-element="true"
-          className="absolute z-20 select-none group"
+          className="absolute z-20 select-none group pointer-events-auto"
           style={{
             left: token.x - 15,
             top: token.y - 15,
@@ -3288,6 +3469,7 @@ export default function GameTable() {
           )}
         </div>
       ))}
+      </div>{/* End world-space transform wrapper */}
 
       {/* Top bar with game name and back button - compact in landscape */}
       <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
@@ -4813,8 +4995,8 @@ export default function GameTable() {
         isLandscape={isMobileLandscape}
       />
 
-      {/* Hover-to-enlarge preview - shows enlarged card on hover (without ALT key requirement) */}
-      {hoveredTableCard && !draggingCard && (() => {
+      {/* Hover-to-enlarge preview - shows enlarged card on hover (desktop only, Feature #58) */}
+      {hoveredTableCard && !draggingCard && !isTouchCapableRef.current && (() => {
         const card = tableCards.find(c => c.tableId === hoveredTableCard);
         if (!card) return null;
         return (
@@ -4830,8 +5012,68 @@ export default function GameTable() {
         );
       })()}
 
-      {/* ALT key card zoom preview - large preview when hovering a table card while holding ALT */}
-      {altKeyHeld && hoveredTableCard && (() => {
+      {/* Long-press card preview popup for touch devices (Feature #58) */}
+      {longPressPreviewCard && (() => {
+        const previewCard = tableCards.find(c => c.tableId === longPressPreviewCard);
+        if (!previewCard) return null;
+        return (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center"
+            data-testid="longpress-card-preview-overlay"
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              setLongPressPreviewCard(null);
+            }}
+            onClick={() => setLongPressPreviewCard(null)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="relative z-10"
+              data-testid="longpress-card-preview"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              <div
+                className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
+                style={{ width: 280, height: 392, backgroundColor: '#fff' }}
+              >
+                {previewCard.faceDown ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                    <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M12 8v8M8 12h8" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : previewCard.image_path ? (
+                  <img src={previewCard.image_path} alt={previewCard.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <path d="M21 15l-5-5L5 21" />
+                    </svg>
+                    <span className="text-sm text-gray-500 text-center px-4">{previewCard.name}</span>
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm text-center py-1.5 px-2 truncate font-medium">
+                  {previewCard.name}
+                </div>
+              </div>
+              <div className="text-center mt-3">
+                <span className="text-white/80 text-xs bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
+                  Tap anywhere to close
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ALT key card zoom preview - desktop only (Feature #58) */}
+      {altKeyHeld && hoveredTableCard && !isTouchCapableRef.current && (() => {
         const card = tableCards.find(c => c.tableId === hoveredTableCard);
         if (!card) return null;
         // Show the front face image regardless of faceDown state for preview
