@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
 import SwipeModal from '../components/SwipeModal';
 import MobileActionBar from '../components/MobileActionBar';
+import { useOrientationLayout } from '../hooks/useOrientationLayout';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 
@@ -386,6 +387,12 @@ export default function GameTable() {
   const isTouchCapableRef = useRef(
     typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
   );
+
+  // Orientation detection for landscape layout optimization
+  const { isLandscape, isMobileLandscape, isTabletLandscape, layoutMode } = useOrientationLayout();
+
+  // Track if hand area is collapsed in landscape mode
+  const [handCollapsed, setHandCollapsed] = useState(false);
 
   // Device detection and debugging on mount
   useEffect(() => {
@@ -3648,118 +3655,125 @@ export default function GameTable() {
         </div>
       )}
 
-      {/* Floating Toolbar */}
+      {/* Floating Toolbar - landscape: vertical on left side, portrait: horizontal at bottom */}
       {showToolbar && (
         <div
-          className="absolute left-1/2 transform -translate-x-1/2 z-30"
-          style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
+          className={`absolute z-30 transition-all duration-300 ease-in-out ${
+            isMobileLandscape
+              ? 'top-1/2 -translate-y-1/2 left-0'
+              : 'left-1/2 -translate-x-1/2'
+          }`}
+          style={isMobileLandscape
+            ? { left: 'env(safe-area-inset-left, 0px)' }
+            : { bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }
+          }
           data-testid="floating-toolbar"
           data-ui-element="true"
         >
-          <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 shadow-2xl border border-white/10">
+          <div className={`flex ${isMobileLandscape ? 'flex-col' : 'flex-row'} items-center gap-0.5 bg-black/70 backdrop-blur-md rounded-xl ${isMobileLandscape ? 'px-1 py-2' : 'px-3 py-2'} shadow-2xl border border-white/10`}>
             {/* Counter button */}
             <button
               onClick={() => setShowCounterModal(true)}
               data-testid="toolbar-counter-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Counter"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="6" width="20" height="12" rx="2" />
                 <path d="M12 12h.01" />
                 <path d="M17 12h.01" />
                 <path d="M7 12h.01" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Counter</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Counter</span>}
             </button>
 
             {/* Dice button */}
             <button
               onClick={() => setShowDiceModal(true)}
               data-testid="toolbar-dice-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Dice"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
                 <circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" />
                 <circle cx="8.5" cy="15.5" r="1.5" fill="currentColor" />
                 <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Dice</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Dice</span>}
             </button>
 
             {/* Note button */}
             <button
               onClick={() => setShowNoteModal(true)}
               data-testid="toolbar-note-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Note"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14,2 14,8 20,8" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Note</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Note</span>}
             </button>
 
             {/* Token button */}
             <button
               onClick={() => setShowTokenModal(true)}
               data-testid="toolbar-token-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Token"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Token</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Token</span>}
             </button>
 
-            <div className="w-px h-8 bg-white/20 mx-1" />
+            <div className={isMobileLandscape ? 'h-px w-8 bg-white/20 my-0.5' : 'w-px h-8 bg-white/20 mx-1'} />
 
             {/* Background picker */}
             <button
               onClick={() => setShowBgPicker(prev => !prev)}
               data-testid="toolbar-bg-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Change Background"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Table</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Table</span>}
             </button>
 
             {/* Shortcuts help */}
             <button
               onClick={() => setShowShortcuts(prev => !prev)}
               data-testid="toolbar-shortcuts-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Keyboard Shortcuts (?)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Help</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Help</span>}
             </button>
 
             {/* Save button */}
             <button
               onClick={() => setShowSaveModal(true)}
               data-testid="toolbar-save-btn"
-              className="flex flex-col items-center gap-0.5 px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px]"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Save Game"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                 <polyline points="17,21 17,13 7,13 7,21" />
                 <polyline points="7,3 7,8 15,8" />
               </svg>
-              <span className="sm:text-[10px] text-xs">Save</span>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Save</span>}
             </button>
 
             {/* Save Setup button (visible in setup mode or always as convenience) */}
@@ -3776,15 +3790,15 @@ export default function GameTable() {
                   }
                 }}
                 data-testid="toolbar-save-setup-btn"
-                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/30 transition-colors"
+                className={`flex flex-col items-center gap-0.5 rounded-lg text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/30 transition-colors ${isMobileLandscape ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
                 title="Save Setup"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                   <polyline points="17,21 17,13 7,13 7,21" />
                   <polyline points="7,3 7,8 15,8" />
                 </svg>
-                <span className="sm:text-[10px] text-xs">Setup</span>
+                {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Setup</span>}
               </button>
             )}
           </div>
@@ -4594,32 +4608,54 @@ export default function GameTable() {
       )}
 
       {/* Player Hand Area - bottom of screen, auto-hides when empty */}
+      {/* In landscape mobile: reduced height, collapsible via toggle */}
       {handCards.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none safe-area-bottom"
+          className={`absolute bottom-0 left-0 right-0 z-30 pointer-events-none safe-area-bottom transition-all duration-300 ease-in-out ${
+            isMobileLandscape && handCollapsed ? 'translate-y-[calc(100%-28px)]' : 'translate-y-0'
+          }`}
           data-testid="hand-area"
           data-ui-element="true"
-          style={{ paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}
+          style={{
+            paddingLeft: isMobileLandscape ? 'calc(52px + env(safe-area-inset-left, 0px))' : 'env(safe-area-inset-left, 0px)',
+            paddingRight: 'env(safe-area-inset-right, 0px)',
+          }}
         >
+          {/* Collapse/expand toggle for landscape mode */}
+          {isMobileLandscape && (
+            <div className="flex justify-center pointer-events-auto">
+              <button
+                onClick={() => setHandCollapsed(prev => !prev)}
+                data-testid="hand-collapse-toggle"
+                className="bg-black/60 backdrop-blur-sm text-white/70 hover:text-white px-4 py-0.5 rounded-t-lg text-[10px] uppercase tracking-wider font-semibold transition-colors border border-b-0 border-white/10"
+              >
+                Hand ({handCards.length}) {handCollapsed ? '▲' : '▼'}
+              </button>
+            </div>
+          )}
           <div className="flex justify-center items-end pb-2 pointer-events-auto">
             <div
-              className="relative flex items-end justify-center bg-black/40 backdrop-blur-sm rounded-t-xl border border-b-0 border-white/10 sm:px-4 px-2 pt-2 pb-1 sm:min-h-[120px] min-h-[100px]"
+              className={`relative flex items-end justify-center bg-black/40 backdrop-blur-sm rounded-t-xl border border-b-0 border-white/10 sm:px-4 px-2 pt-2 pb-1 ${
+                isMobileLandscape ? 'min-h-[70px]' : 'sm:min-h-[120px] min-h-[100px]'
+              }`}
               data-testid="hand-container"
-              style={{ minWidth: Math.min(handCards.length * 90 + 40, 800) }}
+              style={{ minWidth: Math.min(handCards.length * (isMobileLandscape ? 60 : 90) + 40, isMobileLandscape ? 600 : 800) }}
             >
-              <div className="absolute top-1 left-3 text-white/40 sm:text-[10px] text-xs uppercase tracking-wider font-semibold">
-                Hand ({handCards.length})
-              </div>
+              {!isMobileLandscape && (
+                <div className="absolute top-1 left-3 text-white/40 sm:text-[10px] text-xs uppercase tracking-wider font-semibold">
+                  Hand ({handCards.length})
+                </div>
+              )}
               <div className="flex items-end justify-center" style={{ gap: '2px' }}>
                 {handCards.map((card, index) => {
                   const isMobile = window.innerWidth < 640;
-                  const cardWidth = isMobile ? 60 : 80;
-                  const cardHeight = isMobile ? 84 : 112;
+                  const cardWidth = isMobileLandscape ? 45 : (isMobile ? 60 : 80);
+                  const cardHeight = isMobileLandscape ? 63 : (isMobile ? 84 : 112);
                   const totalCards = handCards.length;
-                  const spreadAngle = isMobile ? Math.min(3, 20 / totalCards) : Math.min(5, 30 / totalCards);
+                  const spreadAngle = isMobileLandscape ? Math.min(2, 15 / totalCards) : (isMobile ? Math.min(3, 20 / totalCards) : Math.min(5, 30 / totalCards));
                   const centerIndex = (totalCards - 1) / 2;
                   const rotation = (index - centerIndex) * spreadAngle;
-                  const yOffset = Math.abs(index - centerIndex) * 4;
+                  const yOffset = Math.abs(index - centerIndex) * (isMobileLandscape ? 2 : 4);
                   const isHovered = hoveredHandCard === card.handId;
                   const isDragging = draggingHandCard === index;
                   const isDragOver = handDragOverIndex === index;
@@ -4660,7 +4696,7 @@ export default function GameTable() {
                         height: cardHeight,
                         transform: `rotate(${rotation}deg) translateY(${isHovered ? -30 - yOffset : -yOffset}px) scale(${isHovered ? 1.15 : 1})`,
                         zIndex: isHovered ? 100 : index,
-                        marginLeft: index === 0 ? 0 : (isMobile ? -8 : -10),
+                        marginLeft: index === 0 ? 0 : (isMobileLandscape ? -6 : (isMobile ? -8 : -10)),
                         transition: 'transform 0.2s ease, opacity 0.15s ease',
                       }}
                     >
@@ -4672,11 +4708,13 @@ export default function GameTable() {
                           <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" draggable={false} />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 14 : 20} height={isMobileLandscape ? 14 : 20} viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
                             <span className="sm:text-[7px] text-[9px] text-gray-500 text-center leading-tight truncate w-full px-1">{card.name}</span>
                           </div>
                         )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white sm:text-[7px] text-[9px] text-center py-0.5 truncate px-1">{card.name}</div>
+                        {!isMobileLandscape && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white sm:text-[7px] text-[9px] text-center py-0.5 truncate px-1">{card.name}</div>
+                        )}
                       </div>
                       {isHovered && (
                         <button
