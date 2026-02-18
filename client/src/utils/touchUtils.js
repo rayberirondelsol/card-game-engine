@@ -253,11 +253,17 @@ export function removeListener(element, event, handler) {
 export function isMobileDevice() {
   const isTouch = isTouchDevice();
   const width = window.innerWidth;
-  const result = isTouch && width < 768;
+  const height = window.innerHeight;
+  // Use the shorter dimension to classify device size correctly in both orientations.
+  // E.g., Pixel 8 Pro landscape is 862x412 — shortDim 412 < 768 = mobile.
+  const shortDim = Math.min(width, height);
+  const result = isTouch && shortDim < 768;
 
   console.log('[TouchDetection] isMobileDevice() called:', {
     isTouch,
     windowWidth: width,
+    windowHeight: height,
+    shortDim,
     threshold: 768,
     result
   });
@@ -272,11 +278,16 @@ export function isMobileDevice() {
 export function isTabletDevice() {
   const isTouch = isTouchDevice();
   const width = window.innerWidth;
-  const result = isTouch && width >= 768 && width < 1024;
+  const height = window.innerHeight;
+  // Use the shorter dimension to classify device size correctly in both orientations.
+  const shortDim = Math.min(width, height);
+  const result = isTouch && shortDim >= 768 && shortDim < 1024;
 
   console.log('[TouchDetection] isTabletDevice() called:', {
     isTouch,
     windowWidth: width,
+    windowHeight: height,
+    shortDim,
     minThreshold: 768,
     maxThreshold: 1024,
     result
@@ -293,12 +304,15 @@ export function isSmartphone() {
   const isTouch = isTouchDevice();
   const width = window.innerWidth;
   const height = window.innerHeight;
-  const result = isTouch && width < 768;
+  // Use the shorter dimension to classify device size correctly in both orientations.
+  const shortDim = Math.min(width, height);
+  const result = isTouch && shortDim < 768;
 
   console.log('[TouchDetection] isSmartphone() called:', {
     isTouch,
     windowWidth: width,
     windowHeight: height,
+    shortDim,
     threshold: 768,
     result
   });
@@ -321,6 +335,7 @@ export function getDeviceInfo() {
     // Screen dimensions
     windowWidth: window.innerWidth,
     windowHeight: window.innerHeight,
+    shortDim: Math.min(window.innerWidth, window.innerHeight),
     screenWidth: window.screen.width,
     screenHeight: window.screen.height,
     devicePixelRatio: window.devicePixelRatio,
