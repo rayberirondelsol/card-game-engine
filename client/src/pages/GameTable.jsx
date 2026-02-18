@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
+import SwipeModal from '../components/SwipeModal';
+import MobileActionBar from '../components/MobileActionBar';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
+import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -360,6 +363,8 @@ export default function GameTable() {
   const pressHoldTimerRef = useRef(null);
   const [pressHoldActive, setPressHoldActive] = useState(false);
   const PRESS_HOLD_DELAY = 250; // milliseconds to distinguish quick-click from press-hold
+  // Track the pending stack interaction (which card was pressed, which stack it's in)
+  const pendingStackRef = useRef(null); // { tableId, stackId, event }
 
   // Double-tap detection for mobile gestures
   const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0 });
@@ -370,6 +375,17 @@ export default function GameTable() {
   const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
   const handToTableDragOffsetRef = useRef({ x: 0, y: 0 });
   const [handDragPosition, setHandDragPosition] = useState({ x: 0, y: 0 }); // cursor position during hand-to-table drag
+
+  // Swipe gesture state for drawer
+  const drawerSwipeRef = useRef(null); // { startX, startY, startTime }
+  const [drawerSwipeOffset, setDrawerSwipeOffset] = useState(0); // pixel offset during swipe (for visual feedback)
+  const [isSwipingDrawer, setIsSwipingDrawer] = useState(false);
+  const drawerSwipeLockRef = useRef(null); // 'horizontal' | 'vertical' | null
+
+  // Detect touch capability
+  const isTouchCapableRef = useRef(
+    typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+  );
 
   // Device detection and debugging on mount
   useEffect(() => {
@@ -853,10 +869,8 @@ export default function GameTable() {
         return c;
       }));
 
-      // Haptic feedback if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      // Haptic feedback for card flip
+      triggerHaptic('flip');
 
       // Reset tap tracking
       lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
@@ -905,17 +919,26 @@ export default function GameTable() {
 
       // Only apply press-and-hold if stack has 2+ cards
       if (stackCards.length >= 2) {
-        // Start timer for press-and-hold
+        // Find the top card (highest zIndex) - this is the one we'll detach on short press + move
+        const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max);
+
+        // Store pending stack info so handleCardDragMove knows what to do
+        pendingStackRef.current = { tableId: topCard.tableId, stackId, event: e };
+
+        // Start timer for press-and-hold (long press = drag entire stack)
         pressHoldTimerRef.current = setTimeout(() => {
-          // After delay, allow dragging the stack
+          // Haptic feedback on long-press recognition (medium vibration)
+          triggerHaptic('longPress');
+          // After delay, allow dragging the entire stack
           setPressHoldActive(true);
-          startDraggingCard(e, tableId, card, stackId);
+          pendingStackRef.current = null;
+          startDraggingCard(e, topCard.tableId, topCard, stackId);
         }, PRESS_HOLD_DELAY);
 
-        // Store initial pointer position to detect if pointer moves (which should cancel quick-click)
+        // Store initial pointer position to detect if pointer moves
         cardDragOffsetRef.current = {
-          x: pointer.clientX - card.x,
-          y: pointer.clientY - card.y,
+          x: pointer.clientX - topCard.x,
+          y: pointer.clientY - topCard.y,
           initialX: pointer.clientX,
           initialY: pointer.clientY,
         };
@@ -929,6 +952,9 @@ export default function GameTable() {
 
   // Helper function to actually start dragging a card
   function startDraggingCard(e, tableId, card, stackId) {
+    // Haptic feedback on drag start (short vibration)
+    triggerHaptic('dragStart');
+
     const newZ = maxZIndex + 1;
 
     // Get unified pointer position
@@ -984,18 +1010,45 @@ export default function GameTable() {
     // Get unified pointer position
     const pointer = getPointerPosition(e);
 
-    // If timer is active and pointer moves significantly, cancel timer and start dragging
+    // If timer is active and pointer moves significantly, cancel timer and detach top card from stack
     if (pressHoldTimerRef.current && cardDragOffsetRef.current.initialX !== undefined) {
       const dx = Math.abs(pointer.clientX - cardDragOffsetRef.current.initialX);
       const dy = Math.abs(pointer.clientY - cardDragOffsetRef.current.initialY);
       if (dx > 5 || dy > 5) {
-        // Pointer moved - cancel quick-click, start dragging
+        // Pointer moved before long-press timer - cancel timer
         clearTimeout(pressHoldTimerRef.current);
         pressHoldTimerRef.current = null;
         setPressHoldActive(true);
 
-        // Find the card and start dragging
-        if (!draggingCard) {
+        // Short press + move: detach only the top card from the stack
+        if (!draggingCard && pendingStackRef.current) {
+          const { tableId: topCardId, stackId } = pendingStackRef.current;
+          pendingStackRef.current = null;
+
+          // Detach the top card from its stack
+          const topCard = tableCards.find(c => c.tableId === topCardId);
+          if (topCard) {
+            // Remove the top card from the stack (set inStack to null)
+            setTableCards(prev => {
+              const updated = prev.map(c => {
+                if (c.tableId === topCardId) {
+                  return { ...c, inStack: null };
+                }
+                return c;
+              });
+              // If only one card left in the stack, unstack it too
+              const remainingInStack = updated.filter(c => c.inStack === stackId);
+              if (remainingInStack.length === 1) {
+                return updated.map(c => c.inStack === stackId ? { ...c, inStack: null } : c);
+              }
+              return updated;
+            });
+
+            // Start dragging the detached single card (NOT as part of a stack)
+            startDraggingCard(e, topCardId, topCard, null);
+          }
+        } else if (!draggingCard) {
+          // Fallback for non-stack cards (shouldn't normally happen)
           const card = tableCards.find(c =>
             Math.abs(c.x - (cardDragOffsetRef.current.initialX - cardDragOffsetRef.current.x)) < 10 &&
             Math.abs(c.y - (cardDragOffsetRef.current.initialY - cardDragOffsetRef.current.y)) < 10
@@ -1089,47 +1142,21 @@ export default function GameTable() {
       pressHoldTimerRef.current = null;
     }
 
-    // If we have a dragging card but press-hold wasn't activated, it's a quick-click
+    // If we have a pending stack interaction that wasn't activated (no movement, no long press)
+    // This is a short click with no movement on a stack - just select the stack, don't draw to hand
     const card = draggingCard ? tableCards.find(c => c.tableId === draggingCard) : null;
 
-    if (card && card.inStack && !pressHoldActive) {
-      // Quick-click on stack - draw one card to hand
-      const stackCards = tableCards.filter(c => c.inStack === card.inStack);
-      if (stackCards.length >= 2) {
-        // Find the top card (highest zIndex)
-        const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max);
-
-        // Add to hand
-        const newHandCard = {
-          handId: crypto.randomUUID(),
-          cardId: topCard.cardId,
-          name: topCard.name,
-          image_path: topCard.image_path,
-          faceDown: false,
-        };
-        setHandCards(prev => [...prev, newHandCard]);
-
-        // Remove from table
-        setTableCards(prev => {
-          const remaining = prev.filter(c => c.tableId !== topCard.tableId);
-          // If only one card left in stack, unstack it
-          const remainingInStack = remaining.filter(c => c.inStack === card.inStack);
-          if (remainingInStack.length === 1) {
-            return remaining.map(c => c.inStack === card.inStack ? { ...c, inStack: null } : c);
-          }
-          return remaining;
-        });
-
-        // Show toast
-        setDrawToast('Drew 1 card to hand');
-        setTimeout(() => setDrawToast(null), 2000);
-
-        // Clear state
-        setDraggingCard(null);
-        setPressHoldActive(false);
-        return;
-      }
+    if (pendingStackRef.current && !pressHoldActive) {
+      // Short click on stack without movement - just select the stack
+      const { tableId: topCardId, stackId } = pendingStackRef.current;
+      pendingStackRef.current = null;
+      const stackCardIds = tableCards.filter(c => c.inStack === stackId).map(c => c.tableId);
+      setSelectedCards(new Set(stackCardIds));
+      setDraggingCard(null);
+      setPressHoldActive(false);
+      return;
     }
+    pendingStackRef.current = null;
 
     setPressHoldActive(false);
 
@@ -1235,6 +1262,9 @@ export default function GameTable() {
         return { ...c, x: finalX, y: finalY };
       }));
     }
+
+    // Haptic feedback on card drop (short vibration)
+    triggerHaptic('drop');
 
     setDraggingCard(null);
     setGridHighlight(null);
@@ -1637,6 +1667,58 @@ export default function GameTable() {
     }
 
     handleGlobalEnd(e);
+  }
+
+  // Touch cancel handler - cleans up all drag/pinch/press-hold state
+  // when touch events are interrupted by system events (incoming call,
+  // notification overlay, system gesture, etc.)
+  function handleGlobalTouchCancel(e) {
+    console.log('[GameTable] Touch cancel event detected - cleaning up state');
+
+    // Cancel haptic feedback
+    cancelHaptic();
+
+    // 1. Clear press-hold timer
+    if (pressHoldTimerRef.current) {
+      clearTimeout(pressHoldTimerRef.current);
+      pressHoldTimerRef.current = null;
+    }
+    setPressHoldActive(false);
+    pendingStackRef.current = null;
+
+    // 2. Reset pinch zoom state
+    isPinchingRef.current = false;
+    pinchStartDistanceRef.current = 0;
+    pinchStartZoomRef.current = 1;
+
+    // 3. Cancel active card drag - place card at last valid position
+    if (draggingCard) {
+      // Card stays at its current (last valid) position - just stop dragging
+      setDraggingCard(null);
+      setGridHighlight(null);
+      setStackDropTarget(null);
+    }
+
+    // 4. Cancel object drag
+    if (draggingObj) {
+      setDraggingObj(null);
+    }
+
+    // 5. Cancel hand-to-table drag
+    if (draggingFromHand) {
+      setDraggingFromHand(null);
+      setHandDragPosition({ x: 0, y: 0 });
+    }
+
+    // 6. Reset panning state
+    isPanningRef.current = false;
+    if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+
+    // 7. Reset hand card drag
+    if (draggingHandCard) {
+      setDraggingHandCard(null);
+      setHandDragOverIndex(null);
+    }
   }
 
   // Remove card from table
@@ -2540,6 +2622,148 @@ export default function GameTable() {
     }
   }
 
+  // ===== SWIPE GESTURE HANDLERS FOR DRAWER =====
+  const DRAWER_SWIPE_MIN_DISTANCE = 50; // minimum distance in px
+  const DRAWER_SWIPE_MAX_TIME = 500; // max time in ms
+  const DRAWER_EDGE_ZONE = 30; // px from left edge to detect edge swipe
+
+  function handleDrawerSwipeTouchStart(e) {
+    if (!isTouchCapableRef.current || e.touches.length !== 1) return;
+
+    // Don't interfere with card drags or other interactive elements
+    const target = e.target;
+    if (target.closest('[data-table-card], [data-drag-handle]')) return;
+
+    const touch = e.touches[0];
+    const isEdge = touch.clientX <= DRAWER_EDGE_ZONE;
+
+    // For opening: only from left edge when drawer is closed
+    // For closing: from anywhere on the drawer when it's open
+    if (!showCardDrawer && !isEdge) return;
+    if (showCardDrawer && !target.closest('[data-testid="card-drawer"]')) return;
+
+    drawerSwipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      startTime: Date.now(),
+      isEdge,
+    };
+    drawerSwipeLockRef.current = null;
+    setIsSwipingDrawer(false);
+    setDrawerSwipeOffset(0);
+  }
+
+  function handleDrawerSwipeTouchMove(e) {
+    if (!drawerSwipeRef.current || e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - drawerSwipeRef.current.startX;
+    const dy = touch.clientY - drawerSwipeRef.current.startY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Lock direction after 10px of movement
+    if (!drawerSwipeLockRef.current && (absDx > 10 || absDy > 10)) {
+      drawerSwipeLockRef.current = absDx > absDy ? 'horizontal' : 'vertical';
+    }
+
+    // Only handle horizontal swipes
+    if (drawerSwipeLockRef.current !== 'horizontal') return;
+
+    // Visual feedback: update offset
+    if (!showCardDrawer && dx > 0) {
+      // Opening: swipe right from edge
+      setDrawerSwipeOffset(Math.min(dx, 280));
+      setIsSwipingDrawer(true);
+      if (e.cancelable) e.preventDefault();
+    } else if (showCardDrawer && dx < 0) {
+      // Closing: swipe left on drawer
+      setDrawerSwipeOffset(Math.max(dx, -280));
+      setIsSwipingDrawer(true);
+      if (e.cancelable) e.preventDefault();
+    }
+  }
+
+  function handleDrawerSwipeTouchEnd(e) {
+    if (!drawerSwipeRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - drawerSwipeRef.current.startX;
+    const elapsed = Date.now() - drawerSwipeRef.current.startTime;
+    const absDx = Math.abs(dx);
+
+    // Check if swipe meets threshold
+    if (absDx >= DRAWER_SWIPE_MIN_DISTANCE && elapsed <= DRAWER_SWIPE_MAX_TIME) {
+      if (!showCardDrawer && dx > 0 && drawerSwipeRef.current.isEdge) {
+        // Open drawer
+        setShowCardDrawer(true);
+      } else if (showCardDrawer && dx < 0) {
+        // Close drawer
+        setShowCardDrawer(false);
+      }
+    }
+
+    // Reset swipe state
+    drawerSwipeRef.current = null;
+    drawerSwipeLockRef.current = null;
+    setDrawerSwipeOffset(0);
+    setIsSwipingDrawer(false);
+  }
+
+  // ===== MODAL DISMISS HELPERS =====
+  function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); }
+  function dismissDiceModal() { setShowDiceModal(false); }
+  function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
+  function dismissTokenModal() { setShowTokenModal(false); }
+  function dismissSaveModal() { setShowSaveModal(false); setSaveName(''); }
+  function dismissSetupSaveModal() { setShowSetupSaveModal(false); }
+  function dismissSplitModal() { setShowSplitModal(false); setSplitStackId(null); setSplitCount(''); }
+
+  // ===== MOBILE ACTION BAR HANDLERS =====
+  function handleMobileFlip() {
+    if (selectedCards.size > 0) {
+      setTableCards(prev => prev.map(c => {
+        if (selectedCards.has(c.tableId)) {
+          return { ...c, faceDown: !c.faceDown };
+        }
+        return c;
+      }));
+    }
+  }
+
+  function handleMobileRotateCW() {
+    if (selectedCards.size > 0) {
+      setTableCards(prev => prev.map(c => {
+        if (selectedCards.has(c.tableId)) {
+          return { ...c, rotation: (c.rotation || 0) + 90 };
+        }
+        return c;
+      }));
+    }
+  }
+
+  function handleMobileRotateCCW() {
+    if (selectedCards.size > 0) {
+      setTableCards(prev => prev.map(c => {
+        if (selectedCards.has(c.tableId)) {
+          return { ...c, rotation: (c.rotation || 0) - 90 };
+        }
+        return c;
+      }));
+    }
+  }
+
+  function handleMobileDraw(count) {
+    // Find stack from selected cards
+    for (const tid of selectedCards) {
+      const card = tableCards.find(c => c.tableId === tid);
+      if (card && card.inStack) {
+        drawCardsFromStack(card.inStack, count);
+        return;
+      }
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -2547,9 +2771,10 @@ export default function GameTable() {
       onMouseDown={handleGlobalMouseDown}
       onMouseMove={handleGlobalMouseMove}
       onMouseUp={handleGlobalMouseUp}
-      onTouchStart={handleGlobalTouchStart}
-      onTouchMove={handleGlobalTouchMove}
-      onTouchEnd={handleGlobalTouchEnd}
+      onTouchStart={(e) => { handleDrawerSwipeTouchStart(e); handleGlobalTouchStart(e); }}
+      onTouchMove={(e) => { handleDrawerSwipeTouchMove(e); handleGlobalTouchMove(e); }}
+      onTouchEnd={(e) => { handleDrawerSwipeTouchEnd(e); handleGlobalTouchEnd(e); }}
+      onTouchCancel={handleGlobalTouchCancel}
       onWheel={handleGlobalWheel}
       onClick={handleTableClick}
       onContextMenu={(e) => {
@@ -3055,8 +3280,8 @@ export default function GameTable() {
       ))}
 
       {/* Top bar with game name and back button */}
-      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none" data-ui-element="true">
-        <div className="flex items-center justify-between p-3">
+      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top" data-ui-element="true">
+        <div className="flex items-center justify-between p-3" style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
           <div className="flex items-center gap-3 pointer-events-auto">
             <button
               onClick={() => navigate(`/games/${id}`)}
@@ -3120,7 +3345,8 @@ export default function GameTable() {
       {/* Token Legend */}
       {showLegend && tokens.length > 0 && (
         <div
-          className="absolute top-16 right-4 z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 max-w-xs"
+          className="absolute z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 max-w-xs"
+          style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', right: 'max(1rem, env(safe-area-inset-right, 0px))' }}
           data-testid="token-legend"
           data-ui-element="true"
         >
@@ -3159,7 +3385,8 @@ export default function GameTable() {
       {!showLegend && tokens.length > 0 && (
         <button
           onClick={() => setShowLegend(true)}
-          className="absolute top-16 right-4 z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-2 text-white/80 hover:text-white/90 transition-colors"
+          className="absolute z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-2 text-white/80 hover:text-white/90 transition-colors"
+          style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', right: 'max(1rem, env(safe-area-inset-right, 0px))' }}
           data-testid="show-legend-btn"
           data-ui-element="true"
           title="Show Token Legend"
@@ -3175,10 +3402,53 @@ export default function GameTable() {
         </button>
       )}
 
+      {/* Swipe edge indicator for mobile - visible when drawer is closed on touch devices */}
+      {!showCardDrawer && isTouchCapableRef.current && (
+        <div
+          className="absolute left-0 z-30 pointer-events-none"
+          style={{
+            top: 'calc(50% - 40px)',
+            width: '4px',
+            height: '80px',
+          }}
+          data-testid="swipe-edge-indicator"
+        >
+          <div className="w-full h-full bg-white/20 rounded-r-full" />
+        </div>
+      )}
+
+      {/* Swipe-preview drawer (shown during opening swipe when drawer is closed) */}
+      {!showCardDrawer && isSwipingDrawer && drawerSwipeOffset > 0 && (
+        <div
+          className="absolute left-0 sm:w-64 w-full z-30 pointer-events-none safe-area-left"
+          style={{
+            top: 'calc(3rem + env(safe-area-inset-top, 0px))',
+            bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+            transform: `translateX(${-280 + drawerSwipeOffset}px)`,
+            transition: 'none',
+            opacity: Math.min(1, drawerSwipeOffset / 100),
+          }}
+          data-testid="drawer-swipe-preview"
+        >
+          <div className="h-full bg-black/80 backdrop-blur-md border-r border-white/10 flex flex-col">
+            <div className="p-3 border-b border-white/10">
+              <h3 className="text-white/90 text-sm font-semibold">Card Library</h3>
+              <p className="text-white/50 text-xs mt-1">Swipe to open</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Card Drawer Panel */}
       {showCardDrawer && (
         <div
-          className="absolute top-12 right-0 bottom-16 sm:w-64 w-full z-30 pointer-events-auto"
+          className="absolute right-0 sm:w-64 w-full z-30 pointer-events-auto safe-area-right"
+          style={{
+            top: 'calc(3rem + env(safe-area-inset-top, 0px))',
+            bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+            transform: isSwipingDrawer && drawerSwipeOffset < 0 ? `translateX(${-drawerSwipeOffset}px)` : 'translateX(0)',
+            transition: isSwipingDrawer ? 'none' : 'transform 0.3s ease-out',
+          }}
           data-testid="card-drawer"
           data-ui-element="true"
         >
@@ -3381,7 +3651,8 @@ export default function GameTable() {
       {/* Floating Toolbar */}
       {showToolbar && (
         <div
-          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30"
+          className="absolute left-1/2 transform -translate-x-1/2 z-30"
+          style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
           data-testid="floating-toolbar"
           data-ui-element="true"
         >
@@ -3523,7 +3794,8 @@ export default function GameTable() {
       {/* Background Picker Dropdown */}
       {showBgPicker && (
         <div
-          className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-40"
+          className="absolute left-1/2 transform -translate-x-1/2 z-40"
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
           data-testid="bg-picker"
           data-ui-element="true"
         >
@@ -3548,307 +3820,295 @@ export default function GameTable() {
       )}
 
       {/* Counter Creation Modal */}
-      {showCounterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="counter-modal">
-            <h3 className="text-white font-semibold mb-3">Create Counter</h3>
-            <input
-              type="text"
-              value={newCounterName}
-              onChange={(e) => setNewCounterName(e.target.value)}
-              placeholder="Counter name (e.g., Health)"
-              data-testid="counter-name-input"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newCounterName.trim()) {
-                  createCounter(newCounterName.trim());
-                }
-              }}
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowCounterModal(false); setNewCounterName(''); }}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createCounter(newCounterName.trim())}
-                disabled={!newCounterName.trim()}
-                data-testid="counter-create-btn"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Create
-              </button>
-            </div>
+      <SwipeModal isOpen={showCounterModal} onDismiss={dismissCounterModal} testId="counter-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="counter-modal">
+          <h3 className="text-white font-semibold mb-3">Create Counter</h3>
+          <input
+            type="text"
+            value={newCounterName}
+            onChange={(e) => setNewCounterName(e.target.value)}
+            placeholder="Counter name (e.g., Health)"
+            data-testid="counter-name-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newCounterName.trim()) {
+                createCounter(newCounterName.trim());
+              }
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissCounterModal}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => createCounter(newCounterName.trim())}
+              disabled={!newCounterName.trim()}
+              data-testid="counter-create-btn"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Create
+            </button>
           </div>
         </div>
-      )}
+      </SwipeModal>
 
       {/* Dice Creation Modal */}
-      {showDiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="dice-modal">
-            <h3 className="text-white font-semibold mb-3">Add Dice</h3>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {['d6', 'd8', 'd10', 'd12', 'd20'].map(type => (
+      <SwipeModal isOpen={showDiceModal} onDismiss={dismissDiceModal} testId="dice-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="dice-modal">
+          <h3 className="text-white font-semibold mb-3">Add Dice</h3>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {['d6', 'd8', 'd10', 'd12', 'd20'].map(type => (
+              <button
+                key={type}
+                onClick={() => setNewDiceType(type)}
+                data-testid={`dice-type-${type}`}
+                className={`px-3 py-2 rounded-lg text-sm font-bold uppercase transition-colors ${
+                  newDiceType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissDiceModal}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => createDie(newDiceType)}
+              data-testid="dice-create-btn"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+            >
+              Place Dice
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* Note Creation Modal */}
+      <SwipeModal isOpen={showNoteModal} onDismiss={dismissNoteModal} testId="note-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="note-modal">
+          <h3 className="text-white font-semibold mb-3">Add Note</h3>
+          <textarea
+            value={newNoteText}
+            onChange={(e) => setNewNoteText(e.target.value)}
+            placeholder="Type your note..."
+            data-testid="note-text-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 resize-none"
+            rows={3}
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissNoteModal}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (!newNoteText.trim()) return;
+                const canvas = canvasRef.current;
+                setNotes(prev => [...prev, {
+                  id: crypto.randomUUID(),
+                  text: newNoteText.trim(),
+                  x: (canvas?.width || 800) / 2,
+                  y: (canvas?.height || 600) / 2,
+                }]);
+                setShowNoteModal(false);
+                setNewNoteText('');
+              }}
+              disabled={!newNoteText.trim()}
+              data-testid="note-create-btn"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add Note
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* Token Modal */}
+      <SwipeModal isOpen={showTokenModal} onDismiss={dismissTokenModal} testId="token-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="token-modal">
+          <h3 className="text-white font-semibold mb-4">Add Token</h3>
+
+          {/* Shape Selection */}
+          <div className="mb-4">
+            <label className="block text-slate-300 text-sm mb-2">Shape</label>
+            <div className="grid grid-cols-3 gap-2">
+              {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
                 <button
-                  key={type}
-                  onClick={() => setNewDiceType(type)}
-                  data-testid={`dice-type-${type}`}
-                  className={`px-3 py-2 rounded-lg text-sm font-bold uppercase transition-colors ${
-                    newDiceType === type
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  key={shape}
+                  onClick={() => setNewTokenShape(shape)}
+                  data-testid={`token-shape-${shape}`}
+                  className={`p-3 rounded-lg border-2 transition-all flex items-center justify-center ${
+                    newTokenShape === shape
+                      ? 'border-blue-500 bg-blue-500/20'
+                      : 'border-slate-600 hover:border-slate-500 bg-slate-700'
                   }`}
                 >
-                  {type}
+                  <TokenShape shape={shape} color={newTokenColor} size={24} />
                 </button>
               ))}
             </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowDiceModal(false)}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createDie(newDiceType)}
-                data-testid="dice-create-btn"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
-              >
-                Place Dice
-              </button>
-            </div>
           </div>
-        </div>
-      )}
 
-      {/* Note Creation Modal */}
-      {showNoteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="note-modal">
-            <h3 className="text-white font-semibold mb-3">Add Note</h3>
-            <textarea
-              value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-              placeholder="Type your note..."
-              data-testid="note-text-input"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 resize-none"
-              rows={3}
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowNoteModal(false); setNewNoteText(''); }}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!newNoteText.trim()) return;
-                  const canvas = canvasRef.current;
-                  setNotes(prev => [...prev, {
-                    id: crypto.randomUUID(),
-                    text: newNoteText.trim(),
-                    x: (canvas?.width || 800) / 2,
-                    y: (canvas?.height || 600) / 2,
-                  }]);
-                  setShowNoteModal(false);
-                  setNewNoteText('');
-                }}
-                disabled={!newNoteText.trim()}
-                data-testid="note-create-btn"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add Note
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Token Modal */}
-      {showTokenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="token-modal">
-            <h3 className="text-white font-semibold mb-4">Add Token</h3>
-
-            {/* Shape Selection */}
-            <div className="mb-4">
-              <label className="block text-slate-300 text-sm mb-2">Shape</label>
-              <div className="grid grid-cols-3 gap-2">
-                {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
-                  <button
-                    key={shape}
-                    onClick={() => setNewTokenShape(shape)}
-                    data-testid={`token-shape-${shape}`}
-                    className={`p-3 rounded-lg border-2 transition-all flex items-center justify-center ${
-                      newTokenShape === shape
-                        ? 'border-blue-500 bg-blue-500/20'
-                        : 'border-slate-600 hover:border-slate-500 bg-slate-700'
-                    }`}
-                  >
-                    <TokenShape shape={shape} color={newTokenColor} size={24} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Color Picker */}
-            <div className="mb-4">
-              <label className="block text-slate-300 text-sm mb-2">Color</label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="color"
-                  value={newTokenColor}
-                  onChange={(e) => setNewTokenColor(e.target.value)}
-                  data-testid="token-color-input"
-                  className="w-12 h-10 rounded cursor-pointer bg-slate-700 border border-slate-600"
-                />
-                <input
-                  type="text"
-                  value={newTokenColor}
-                  onChange={(e) => setNewTokenColor(e.target.value)}
-                  placeholder="#3b82f6"
-                  className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Label Input */}
-            <div className="mb-4">
-              <label className="block text-slate-300 text-sm mb-2">Label (optional)</label>
+          {/* Color Picker */}
+          <div className="mb-4">
+            <label className="block text-slate-300 text-sm mb-2">Color</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={newTokenColor}
+                onChange={(e) => setNewTokenColor(e.target.value)}
+                data-testid="token-color-input"
+                className="w-12 h-10 rounded cursor-pointer bg-slate-700 border border-slate-600"
+              />
               <input
                 type="text"
-                value={newTokenLabel}
-                onChange={(e) => setNewTokenLabel(e.target.value)}
-                placeholder="e.g., A, 1, HP"
-                maxLength={3}
-                data-testid="token-label-input"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newTokenColor}
+                onChange={(e) => setNewTokenColor(e.target.value)}
+                placeholder="#3b82f6"
+                className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
               />
-              <p className="text-slate-400 text-xs mt-1">Max 3 characters displayed</p>
-            </div>
-
-            {/* Preview */}
-            <div className="mb-4 p-3 bg-slate-700 rounded-lg">
-              <p className="text-slate-300 text-sm mb-2">Preview:</p>
-              <div className="flex items-center justify-center p-4">
-                <TokenShape shape={newTokenShape} color={newTokenColor} size={40} label={newTokenLabel} />
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setShowTokenModal(false);
-                  setNewTokenShape('circle');
-                  setNewTokenColor('#3b82f6');
-                  setNewTokenLabel('');
-                }}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => createToken(newTokenShape, newTokenColor, newTokenLabel)}
-                data-testid="token-create-btn"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
-              >
-                Add Token
-              </button>
             </div>
           </div>
+
+          {/* Label Input */}
+          <div className="mb-4">
+            <label className="block text-slate-300 text-sm mb-2">Label (optional)</label>
+            <input
+              type="text"
+              value={newTokenLabel}
+              onChange={(e) => setNewTokenLabel(e.target.value)}
+              placeholder="e.g., A, 1, HP"
+              maxLength={3}
+              data-testid="token-label-input"
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-slate-400 text-xs mt-1">Max 3 characters displayed</p>
+          </div>
+
+          {/* Preview */}
+          <div className="mb-4 p-3 bg-slate-700 rounded-lg">
+            <p className="text-slate-300 text-sm mb-2">Preview:</p>
+            <div className="flex items-center justify-center p-4">
+              <TokenShape shape={newTokenShape} color={newTokenColor} size={40} label={newTokenLabel} />
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => {
+                dismissTokenModal();
+                setNewTokenShape('circle');
+                setNewTokenColor('#3b82f6');
+                setNewTokenLabel('');
+              }}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => createToken(newTokenShape, newTokenColor, newTokenLabel)}
+              data-testid="token-create-btn"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+            >
+              Add Token
+            </button>
+          </div>
         </div>
-      )}
+      </SwipeModal>
 
       {/* Save Game Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="save-modal">
-            <h3 className="text-white font-semibold mb-3">Save Game</h3>
-            <input
-              type="text"
-              value={saveName}
-              onChange={(e) => setSaveName(e.target.value)}
-              placeholder="Enter save name..."
-              data-testid="save-name-input"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && saveName.trim() && !saving) {
-                  saveGameState(saveName.trim());
-                }
-              }}
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowSaveModal(false); setSaveName(''); }}
-                data-testid="save-cancel-btn"
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => saveGameState(saveName.trim())}
-                disabled={!saveName.trim() || saving}
-                data-testid="save-confirm-btn"
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
+      <SwipeModal isOpen={showSaveModal} onDismiss={dismissSaveModal} testId="save-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="save-modal">
+          <h3 className="text-white font-semibold mb-3">Save Game</h3>
+          <input
+            type="text"
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            placeholder="Enter save name..."
+            data-testid="save-name-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && saveName.trim() && !saving) {
+                saveGameState(saveName.trim());
+              }
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissSaveModal}
+              data-testid="save-cancel-btn"
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveGameState(saveName.trim())}
+              disabled={!saveName.trim() || saving}
+              data-testid="save-confirm-btn"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
-      )}
+      </SwipeModal>
 
       {/* Save Setup Modal */}
-      {showSetupSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 sm:p-4 p-2" data-ui-element="true">
-          <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="setup-save-modal">
-            <h3 className="text-white font-semibold mb-3">{editingSetupId ? 'Update Setup' : 'Save Setup'}</h3>
-            <p className="text-slate-400 text-sm mb-3">
-              {editingSetupId ? 'Update the setup with the current table state.' : 'Save the current table arrangement as a reusable game setup.'}
-            </p>
-            <input
-              type="text"
-              value={setupName}
-              onChange={(e) => setSetupName(e.target.value)}
-              placeholder="Enter setup name..."
-              data-testid="setup-name-input"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && setupName.trim() && !savingSetup) {
-                  saveSetup(setupName.trim());
-                }
-              }}
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowSetupSaveModal(false); }}
-                data-testid="setup-save-cancel-btn"
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => saveSetup(setupName.trim())}
-                disabled={!setupName.trim() || savingSetup}
-                data-testid="setup-save-confirm-btn"
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingSetup ? 'Saving...' : (editingSetupId ? 'Update Setup' : 'Save Setup')}
-              </button>
-            </div>
+      <SwipeModal isOpen={showSetupSaveModal} onDismiss={dismissSetupSaveModal} testId="setup-save-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="setup-save-modal">
+          <h3 className="text-white font-semibold mb-3">{editingSetupId ? 'Update Setup' : 'Save Setup'}</h3>
+          <p className="text-slate-400 text-sm mb-3">
+            {editingSetupId ? 'Update the setup with the current table state.' : 'Save the current table arrangement as a reusable game setup.'}
+          </p>
+          <input
+            type="text"
+            value={setupName}
+            onChange={(e) => setSetupName(e.target.value)}
+            placeholder="Enter setup name..."
+            data-testid="setup-name-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && setupName.trim() && !savingSetup) {
+                saveSetup(setupName.trim());
+              }
+            }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissSetupSaveModal}
+              data-testid="setup-save-cancel-btn"
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveSetup(setupName.trim())}
+              disabled={!setupName.trim() || savingSetup}
+              data-testid="setup-save-confirm-btn"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {savingSetup ? 'Saving...' : (editingSetupId ? 'Update Setup' : 'Save Setup')}
+            </button>
           </div>
         </div>
-      )}
+      </SwipeModal>
 
       {/* Setup Mode Banner */}
       {setupMode && (
@@ -3885,7 +4145,7 @@ export default function GameTable() {
         const stackCards = tableCards.filter(c => c.inStack === splitStackId);
         const maxSplit = stackCards.length - 1;
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-ui-element="true">
+          <SwipeModal isOpen={true} onDismiss={dismissSplitModal} testId="split-modal-swipe">
             <div className="bg-slate-800 rounded-xl p-5 w-80 shadow-2xl border border-slate-600" data-testid="split-modal">
               <h3 className="text-white font-semibold mb-3">Split Stack</h3>
               <p className="text-slate-400 text-sm mb-3">
@@ -3906,16 +4166,14 @@ export default function GameTable() {
                     const n = parseInt(splitCount);
                     if (n >= 1 && n <= maxSplit) {
                       performSplit(splitStackId, n);
-                      setShowSplitModal(false);
-                      setSplitStackId(null);
-                      setSplitCount('');
+                      dismissSplitModal();
                     }
                   }
                 }}
               />
               <div className="flex gap-2 justify-end">
                 <button
-                  onClick={() => { setShowSplitModal(false); setSplitStackId(null); setSplitCount(''); }}
+                  onClick={dismissSplitModal}
                   data-testid="split-cancel-btn"
                   className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
                 >
@@ -3926,9 +4184,7 @@ export default function GameTable() {
                     const n = parseInt(splitCount);
                     if (n >= 1 && n <= maxSplit) {
                       performSplit(splitStackId, n);
-                      setShowSplitModal(false);
-                      setSplitStackId(null);
-                      setSplitCount('');
+                      dismissSplitModal();
                     }
                   }}
                   disabled={!splitCount || parseInt(splitCount) < 1 || parseInt(splitCount) > maxSplit}
@@ -3939,7 +4195,7 @@ export default function GameTable() {
                 </button>
               </div>
             </div>
-          </div>
+          </SwipeModal>
         );
       })()}
 
@@ -4105,7 +4361,14 @@ export default function GameTable() {
       {contextMenu && (
         <div
           className="fixed z-50"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+            marginLeft: 'env(safe-area-inset-left, 0px)',
+            marginTop: 'env(safe-area-inset-top, 0px)',
+            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+            overflow: 'auto',
+          }}
           data-testid="context-menu"
           data-ui-element="true"
         >
@@ -4333,9 +4596,10 @@ export default function GameTable() {
       {/* Player Hand Area - bottom of screen, auto-hides when empty */}
       {handCards.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none"
+          className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none safe-area-bottom"
           data-testid="hand-area"
           data-ui-element="true"
+          style={{ paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }}
         >
           <div className="flex justify-center items-end pb-2 pointer-events-auto">
             <div
@@ -4483,6 +4747,17 @@ export default function GameTable() {
           </div>
         );
       })()}
+
+      {/* Mobile Action Bar - floating action buttons for touch devices */}
+      <MobileActionBar
+        selectedCards={selectedCards}
+        tableCards={tableCards}
+        onFlip={handleMobileFlip}
+        onRotateCW={handleMobileRotateCW}
+        onRotateCCW={handleMobileRotateCCW}
+        onGroup={groupSelectedCards}
+        onDraw={handleMobileDraw}
+      />
 
       {/* Hover-to-enlarge preview - shows enlarged card on hover (without ALT key requirement) */}
       {hoveredTableCard && !draggingCard && (() => {
