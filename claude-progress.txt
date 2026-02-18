@@ -1,5 +1,96 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-18 (Agent handling feature #61) ---
+
+COMPLETED:
+- Feature #61: Display uploaded card back images on face-down table cards - PASSING
+  - All 6 feature steps verified via Playwright browser automation
+
+WHAT WAS IMPLEMENTED/IMPROVED:
+1. HoverCard.jsx updated with new cardBackImageUrl prop:
+   - When faceDown && cardBackImageUrl: renders card back image instead of blue gradient
+   - When faceDown && !cardBackImageUrl: renders blue gradient fallback (preserved)
+
+2. GameTable.jsx HoverCard invocation updated:
+   - Passes cardBackImageUrl={card.card_back_id ? cardBackMap[card.card_back_id] : null}
+
+3. Long-press card preview (touch devices) updated:
+   - Shows card back image for cards with card_back_id when face-down
+   - Falls back to blue gradient when no card back assigned
+
+4. ALT key card preview (desktop) updated:
+   - Shows card back image for cards with card_back_id when face-down
+   - Falls back to blue gradient when no card back assigned
+
+5. Stack browse overlay updated:
+   - Shows card back image for face-down cards with card_back_id
+   - Falls back to blue gradient when no card back assigned
+
+6. Table card rendering (lines 3125-3145) already had card back image support:
+   - cardBackMap populated from /api/games/:id/card-backs on mount
+   - card_back_id propagated through all card placement paths
+
+VERIFICATION:
+- Created test game F61_CardBack_Test with 2 cards
+- Card "test-card-front" assigned red card back image → flipped face-down → red image shows ✓
+- Card "no-back-card" has no card back → flipped face-down → blue gradient fallback shows ✓
+- HoverCard preview shows card back image when hovering face-down card with card back ✓
+- HoverCard preview shows blue gradient when hovering face-down card without card back ✓
+- Zero console errors (0 errors, 0 warnings out of 197 messages)
+- Zero mock data patterns in codebase
+- Screenshots: f61-card-flipped-with-back.png, f61-both-cards-flipped.png, f61-hovercard-with-cardback.png, f61-card-flipped-back-to-front.png
+
+CHANGES MADE:
+- client/src/components/HoverCard.jsx: Added cardBackImageUrl prop, conditional rendering for card back image with blue gradient fallback
+- client/src/pages/GameTable.jsx: Updated HoverCard invocation to pass cardBackImageUrl; updated long-press preview, ALT preview, and stack browse overlay to show card back images
+
+CURRENT STATUS: 60/64 features passing (93.8%)
+
+--- Session: 2026-02-18 (Agent handling features #58, #59) ---
+
+COMPLETED:
+- Feature #58: Card zoom preview on ALT key only on desktop, long-press preview on mobile - PASSING
+  - Already fully implemented by previous agent session
+  - Desktop: ALT+hover shows enlarged preview (gated by !isTouchCapableRef.current)
+  - Desktop: HoverCard component follows cursor on mouseover (non-touch only)
+  - Mobile: Long-press (500ms) shows full-screen preview overlay
+  - Long-press cancelled if finger moves >8px (prevents false triggers during drag)
+  - Long-press timer cleared on touchend/touchcancel
+  - All 7 feature steps verified via code review and browser testing
+  - Zero console errors
+
+- Feature #59: Verify and fix mobile mode detection on Pixel 8 Pro Chrome - PASSING
+  - BUG FOUND: isMobileDevice(), isTabletDevice(), isSmartphone() in touchUtils.js used raw `width`
+    which misclassified Pixel 8 Pro landscape (862x412) as non-mobile (862 > 768)
+  - FIX: Changed all three functions to use `shortDim = Math.min(width, height)`
+    matching the pattern already used in useOrientationLayout.js
+  - Added shortDim to getDeviceInfo() debug output and all console.log calls
+  - Verified at Pixel 8 Pro landscape (862x412): shortDim=412 < 768 = correctly classified as mobile
+  - Verified at Pixel 8 Pro portrait (412x862): shortDim=412 < 768 = correctly classified as mobile
+  - Landscape layout: compact vertical toolbar on left (icons only), maximized table area
+  - Portrait layout: horizontal bottom toolbar with icons + labels
+  - Zero console errors in both orientations
+  - useOrientationLayout.js was already correct (no changes needed)
+  - MobileActionBar.jsx uses isTouchDevice() (not isMobileDevice()), so was already correct
+
+CHANGES MADE:
+- client/src/utils/touchUtils.js:
+  - isMobileDevice(): uses shortDim = Math.min(width, height) instead of width
+  - isTabletDevice(): uses shortDim = Math.min(width, height) instead of width
+  - isSmartphone(): uses shortDim = Math.min(width, height) instead of width
+  - getDeviceInfo(): added shortDim field to output
+
+VERIFICATION:
+- Pixel 8 Pro landscape (862x412) with ?forceMobile=true: mobile layout active, vertical toolbar
+- Pixel 8 Pro portrait (412x862) with ?forceMobile=true: mobile layout active, horizontal toolbar
+- Zero console errors (0 errors, 0 warnings)
+- Screenshots: pixel8pro-landscape-862x412.png, pixel8pro-portrait-412x862.png
+
+CURRENT STATUS: 59/64 features passing (check feature_get_stats for exact count)
+
+NOTE: GameTable.jsx has uncommitted changes from previous sessions (card back rendering in previews,
+background drawing improvements). These are NOT part of features #58/#59.
+
 --- Session: 2026-02-18 (Agent handling feature #57) ---
 
 COMPLETED:
