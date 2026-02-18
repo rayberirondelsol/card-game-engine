@@ -1,5 +1,50 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-18 (Agent handling features #52, #53, #54) ---
+
+COMPLETED:
+- Feature #52: On-screen action buttons for mobile devices - PASSING
+  - Created MobileActionBar.jsx floating component for touch devices
+  - Shows when isTouchDevice() is true AND selectedCards.size > 0
+  - 5 action buttons: Flip, Rotate CCW, Rotate CW, Group (disabled <2 cards), Draw (disabled if no stack)
+  - Draw button opens number picker (1-10 or stack size)
+  - All buttons have min 44x44px touch targets per mobile UX guidelines
+  - Positioned at fixed bottom-20, auto-hides when no card selected
+  - Tested via Playwright: action bar appears on card selection, flip/rotate work, hides on deselection
+
+- Feature #53: Implement touchcancel event handler - PASSING
+  - handleGlobalTouchCancel() cleans up all drag/pinch/press-hold state on touch interruption
+  - Cancels haptic vibration, clears press-hold timer, resets pinch state
+  - Resets dragging card/object/hand-card state, panning, cursor
+  - Bound via onTouchCancel on container div
+  - Handles real-world interruptions: incoming calls, notifications, palm rejection, gesture conflicts
+
+- Feature #54: Expanded haptic feedback for all touch interactions - PASSING
+  - Created hapticUtils.js utility module with triggerHaptic() and cancelHaptic()
+  - Haptic patterns: dragStart=25ms, drop=15ms, longPress=50ms, action=25ms, flip=25ms, error=[25,50,25]
+  - Integrated at all touch interaction points in GameTable.jsx:
+    - Double-tap flip, long-press stack recognition, drag start, card drop
+  - MobileActionBar buttons trigger haptic on press
+  - Guards with isTouchDevice() and navigator.vibrate availability checks
+
+CHANGES MADE:
+- client/src/components/MobileActionBar.jsx: NEW - Floating action bar for touch devices
+- client/src/utils/hapticUtils.js: NEW - Haptic feedback utility with vibration patterns
+- client/src/hooks/useOrientationLayout.js: NEW - Orientation detection hook for landscape/portrait
+- client/src/index.css: Added safe area CSS utilities for notched/rounded-corner devices
+- client/src/pages/GameTable.jsx: Added orientation imports, touchcancel handler, haptic calls, mobile action handlers
+
+ISSUES DISCOVERED/FIXED:
+- Port 3001 was occupied by apl-customers-expresso uvicorn; used port 3002 as workaround during testing
+- SwipeModal.js had JSX but .js extension - was already renamed to .jsx in previous session
+- Some bash commands (cd, dir, pkill for non-node) are blocked in this environment
+
+CURRENT STATUS: 56/57 features passing (98.2%)
+
+WHAT SHOULD BE WORKED ON NEXT:
+- 1 remaining feature (check feature_get_ready for next available)
+- Some landscape layout optimizations in GameTable.jsx are uncommitted (card drawer panel adjustments)
+
 --- Session: 2026-02-18 (Agent handling feature #6) ---
 
 COMPLETED:
