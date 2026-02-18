@@ -2775,6 +2775,9 @@ export default function GameTable() {
     <div
       ref={containerRef}
       className="w-screen h-screen relative overflow-hidden select-none"
+      data-testid="game-table-container"
+      data-layout-mode={layoutMode}
+      data-orientation={isLandscape ? 'landscape' : 'portrait'}
       onMouseDown={handleGlobalMouseDown}
       onMouseMove={handleGlobalMouseMove}
       onMouseUp={handleGlobalMouseUp}
@@ -3286,45 +3289,53 @@ export default function GameTable() {
         </div>
       ))}
 
-      {/* Top bar with game name and back button */}
-      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top" data-ui-element="true">
-        <div className="flex items-center justify-between p-3" style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
-          <div className="flex items-center gap-3 pointer-events-auto">
+      {/* Top bar with game name and back button - compact in landscape */}
+      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
+        <div className={`flex items-center justify-between transition-all duration-300 ease-in-out ${isMobileLandscape ? 'p-1.5' : 'p-3'}`} style={{ paddingLeft: isMobileLandscape ? 'max(0.5rem, env(safe-area-inset-left, 0px))' : 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
+          <div className={`flex items-center ${isMobileLandscape ? 'gap-1.5' : 'gap-3'} pointer-events-auto`}>
             <button
               onClick={() => navigate(`/games/${id}`)}
               data-testid="back-to-game-btn"
-              className="px-4 py-3 bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors text-sm flex items-center gap-2 min-h-[44px]"
+              className={`bg-black/50 backdrop-blur-sm text-white rounded-lg hover:bg-black/70 transition-colors flex items-center gap-2 ${isMobileLandscape ? 'px-2 py-1.5 text-xs min-h-[36px]' : 'px-4 py-3 text-sm min-h-[44px]'}`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 14 : 16} height={isMobileLandscape ? 14 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
-              Back
+              {!isMobileLandscape && 'Back'}
             </button>
-            <span className="text-white/80 text-sm font-medium bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-lg" data-testid="game-table-title">
-              {game?.name || 'Game Table'}
-            </span>
+            {!isMobileLandscape && (
+              <span className="text-white/80 text-sm font-medium bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-lg" data-testid="game-table-title">
+                {game?.name || 'Game Table'}
+              </span>
+            )}
           </div>
-          <div className="pointer-events-auto flex items-center gap-2">
+          <div className={`pointer-events-auto flex items-center ${isMobileLandscape ? 'gap-1' : 'gap-2'}`}>
             {/* Card drawer toggle */}
             <button
               onClick={() => setShowCardDrawer(prev => !prev)}
               data-testid="toggle-card-drawer"
-              className={`px-4 py-3 backdrop-blur-sm text-white rounded-lg transition-colors text-sm flex items-center gap-2 min-h-[44px] ${
+              className={`backdrop-blur-sm text-white rounded-lg transition-colors flex items-center gap-2 ${
+                isMobileLandscape ? 'px-2 py-1.5 text-xs min-h-[36px]' : 'px-4 py-3 text-sm min-h-[44px]'
+              } ${
                 showCardDrawer ? 'bg-blue-600/70 hover:bg-blue-600' : 'bg-black/50 hover:bg-black/70'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 14 : 16} height={isMobileLandscape ? 14 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <path d="M3 9h18M9 3v18" />
               </svg>
-              Cards ({availableCards.length})
+              {isMobileLandscape ? availableCards.length : `Cards (${availableCards.length})`}
             </button>
-            <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="zoom-display">
-              Zoom: {zoomDisplay}%
-            </span>
-            <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="pan-display">
-              Pan: {panPosition.x},{panPosition.y}
-            </span>
+            {!isMobileLandscape && (
+              <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="zoom-display">
+                Zoom: {zoomDisplay}%
+              </span>
+            )}
+            {!isMobileLandscape && (
+              <span className="text-white/50 text-xs bg-black/30 backdrop-blur-sm px-2 py-1 rounded" data-testid="pan-display">
+                Pan: {panPosition.x},{panPosition.y}
+              </span>
+            )}
             <span
               className={`text-xs backdrop-blur-sm px-2 py-1 rounded cursor-pointer ${
                 autoSaveStatus === 'saving' ? 'text-yellow-300 bg-yellow-900/30' :
@@ -3446,13 +3457,15 @@ export default function GameTable() {
         </div>
       )}
 
-      {/* Card Drawer Panel */}
+      {/* Card Drawer Panel - landscape: narrower side panel */}
       {showCardDrawer && (
         <div
-          className="absolute right-0 sm:w-64 w-full z-30 pointer-events-auto safe-area-right"
+          className={`absolute right-0 z-30 pointer-events-auto safe-area-right transition-all duration-300 ease-in-out ${
+            isMobileLandscape ? 'w-48' : 'sm:w-64 w-full'
+          }`}
           style={{
-            top: 'calc(3rem + env(safe-area-inset-top, 0px))',
-            bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+            top: isMobileLandscape ? 'calc(2.5rem + env(safe-area-inset-top, 0px))' : 'calc(3rem + env(safe-area-inset-top, 0px))',
+            bottom: isMobileLandscape ? 'env(safe-area-inset-bottom, 0px)' : 'calc(4rem + env(safe-area-inset-bottom, 0px))',
             transform: isSwipingDrawer && drawerSwipeOffset < 0 ? `translateX(${-drawerSwipeOffset}px)` : 'translateX(0)',
             transition: isSwipingDrawer ? 'none' : 'transform 0.3s ease-out',
           }}
@@ -3460,13 +3473,15 @@ export default function GameTable() {
           data-ui-element="true"
         >
           <div className="h-full bg-black/80 backdrop-blur-md border-l border-white/10 flex flex-col">
-            <div className="p-3 border-b border-white/10">
+            <div className={isMobileLandscape ? 'p-2 border-b border-white/10' : 'p-3 border-b border-white/10'}>
               <h3 className="text-white/90 text-sm font-semibold">Card Library</h3>
-              <p className="text-white/50 text-xs mt-1">
-                {availableCards.length === 0
-                  ? 'No cards imported yet. Go to game details to upload cards.'
-                  : `${availableCards.length} card(s) available. Click to place on table.`}
-              </p>
+              {!isMobileLandscape && (
+                <p className="text-white/50 text-xs mt-1">
+                  {availableCards.length === 0
+                    ? 'No cards imported yet. Go to game details to upload cards.'
+                    : `${availableCards.length} card(s) available. Click to place on table.`}
+                </p>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {availableCards.length === 0 ? (
@@ -4795,6 +4810,7 @@ export default function GameTable() {
         onRotateCCW={handleMobileRotateCCW}
         onGroup={groupSelectedCards}
         onDraw={handleMobileDraw}
+        isLandscape={isMobileLandscape}
       />
 
       {/* Hover-to-enlarge preview - shows enlarged card on hover (without ALT key requirement) */}

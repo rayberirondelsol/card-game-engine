@@ -1,5 +1,75 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-18 (Agent handling feature #57) ---
+
+COMPLETED:
+- Feature #57: Landscape mode layout optimization for mobile devices - PASSING
+  - All 8 feature steps verified via Playwright browser automation
+
+WHAT WAS IMPLEMENTED/IMPROVED:
+1. Orientation detection triggers layout adjustment:
+   - useOrientationLayout hook listens to resize, orientationchange, screen.orientation, matchMedia
+   - Added ?forceMobile=true URL parameter for desktop testing of mobile layouts
+   - Touch detection re-evaluated on each check (not cached at init time)
+
+2. Hand area reduced/collapsible in landscape:
+   - min-h-[70px] in landscape vs min-h-[120px] in portrait
+   - Collapse/expand toggle button with ▲/▼ indicator
+   - Smaller cards (45x63 vs 80x112), tighter fan spread
+
+3. Toolbar compact in landscape (icons only, no labels):
+   - All button labels hidden: {!isMobileLandscape && <span>Label</span>}
+   - Smaller icons (18px vs 20px), tighter padding (px-2 py-1.5 vs px-4 py-3)
+   - Vertical layout on left side (flex-col) instead of horizontal at bottom
+
+4. Maximum table area visible in landscape:
+   - Toolbar moved to left side as vertical bar
+   - Game name, zoom/pan displays hidden
+   - Top bar compact (p-1.5 vs p-3)
+
+5. Smooth transition animations:
+   - Added transition-all duration-300 ease-in-out to top bar
+   - Toolbar, hand area, card drawer all already had smooth transitions
+   - MobileActionBar also transitions smoothly between positions
+
+6. Game state preserved during orientation change:
+   - Verified: counter created in landscape, survived portrait→landscape→portrait round-trip
+   - React state (tableCards, handCards, counters, dice, markers, notes) not affected by re-render
+
+7. Card drawer adapts to landscape:
+   - Narrower side panel (w-48 vs w-64)
+   - Description text hidden in landscape
+   - Spans from top bar to bottom as side panel
+
+8. Tested on Pixel 8 Pro landscape (932x430):
+   - All toolbar buttons accessible
+   - Back button, card toggle, auto-save status all visible
+   - Counter widget fully usable (create, increment, delete)
+
+CHANGES MADE:
+- client/src/hooks/useOrientationLayout.js:
+  - Added ?forceMobile=true URL param support for testing mobile layouts in desktop browsers
+  - Moved touch detection into function (re-evaluated on each call, not cached at init)
+  - Removed isTouchDevice from useCallback dependency (was stale)
+- client/src/pages/GameTable.jsx:
+  - Added transition-all duration-300 ease-in-out to top bar for smooth orientation transitions
+  - Added data-testid="game-table-container", data-layout-mode, data-orientation attributes
+  - Pass isLandscape={isMobileLandscape} prop to MobileActionBar
+- client/src/components/MobileActionBar.jsx:
+  - Added isLandscape prop for landscape-aware positioning
+  - Landscape: positioned at bottom-4 (not bottom-20) to avoid toolbar overlap
+  - Landscape: slightly more compact buttons (46x42 vs 52x48), smaller icons (18px vs 22px)
+  - Added transition-all duration-300 ease-in-out for smooth position transitions
+
+VERIFICATION:
+- Zero console errors (0 errors, 0 warnings)
+- Zero mock data patterns in codebase
+- Game state preserved across orientation changes (counter survived landscape↔portrait)
+- All UI elements accessible at Pixel 8 Pro landscape dimensions (932x430)
+- Screenshots: f57-landscape-mode-active.png, f57-landscape-card-drawer.png, f57-landscape-state-preserved.png, f57-portrait-mode-state-preserved.png
+
+CURRENT STATUS: 57/57 features passing (100.0%) 🎉
+
 --- Session: 2026-02-18 (Agent handling features #52, #53, #54) ---
 
 COMPLETED:

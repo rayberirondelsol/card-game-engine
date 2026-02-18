@@ -18,15 +18,31 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * - Mobile landscape: compact toolbar (icons only), reduced hand area, maximized table
  * - Tablet portrait: standard layout
  * - Tablet landscape: slightly compact, more table area
+ *
+ * Supports ?forceMobile=true URL parameter for testing landscape layout in desktop browsers.
  */
 
 const MOBILE_BREAKPOINT = 768;
 const TABLET_BREAKPOINT = 1024;
 
-export function useOrientationLayout() {
-  const isTouchDevice = typeof window !== 'undefined' &&
-    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+// Check if ?forceMobile=true is in the URL (for testing)
+function isForceMobileEnabled() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('forceMobile') === 'true';
+  } catch {
+    return false;
+  }
+}
 
+// Detect touch capability (re-checked on each call to handle dynamic changes)
+function detectTouchDevice() {
+  if (typeof window === 'undefined') return false;
+  return ('ontouchstart' in window || navigator.maxTouchPoints > 0 || isForceMobileEnabled());
+}
+
+export function useOrientationLayout() {
   const getOrientationState = useCallback(() => {
     if (typeof window === 'undefined') {
       return {
@@ -39,6 +55,7 @@ export function useOrientationLayout() {
       };
     }
 
+    const isTouchDevice = detectTouchDevice();
     const width = window.innerWidth;
     const height = window.innerHeight;
     const isLandscape = width > height;
@@ -69,7 +86,7 @@ export function useOrientationLayout() {
       screenSize: { width, height },
       layoutMode,
     };
-  }, [isTouchDevice]);
+  }, []);
 
   const [state, setState] = useState(getOrientationState);
   const prevStateRef = useRef(state);
