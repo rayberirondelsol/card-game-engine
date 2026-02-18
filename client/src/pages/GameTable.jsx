@@ -544,8 +544,10 @@ export default function GameTable() {
     const height = canvas.height;
     const camera = cameraRef.current;
 
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+    // Clear and fill with background base color so no gaps show at any zoom
+    const bg = TABLE_BACKGROUNDS[background];
+    ctx.fillStyle = bg.color;
+    ctx.fillRect(0, 0, width, height);
 
     // Save context state
     ctx.save();
@@ -555,25 +557,15 @@ export default function GameTable() {
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-width / 2 + camera.x, -height / 2 + camera.y);
 
-    // Draw background - size must account for zoom so it always fills the viewport
-    // At any zoom level, we need the background to cover what's visible
-    const bgScale = Math.max(3, 3 / camera.zoom);
-    const bg = TABLE_BACKGROUNDS[background];
-    const bgW = width * bgScale;
-    const bgH = height * bgScale;
-    // Offset background drawing to center it around the camera view
-    const bgOffsetX = -(bgW - width) / 2 - camera.x;
-    const bgOffsetY = -(bgH - height) / 2 - camera.y;
-    ctx.save();
-    ctx.translate(bgOffsetX, bgOffsetY);
+    // Draw textured background at a fixed reasonable size (3x viewport)
+    // The base color fill above ensures no gaps at any zoom level
     if (bg.pattern === 'felt') {
-      drawFeltPattern(ctx, bgW, bgH, bg.color);
+      drawFeltPattern(ctx, width * 3, height * 3, bg.color);
     } else if (bg.pattern === 'wood') {
-      drawWoodPattern(ctx, bgW, bgH, bg.color);
+      drawWoodPattern(ctx, width * 3, height * 3, bg.color);
     } else {
-      drawSolidBackground(ctx, bgW, bgH, bg.color);
+      drawSolidBackground(ctx, width * 3, height * 3, bg.color);
     }
-    ctx.restore();
 
     ctx.restore();
 
@@ -4450,14 +4442,18 @@ export default function GameTable() {
                       <div className="relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors"
                         style={{ width: 100, height: 140, backgroundColor: '#fff' }}>
                         {card.faceDown ? (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-                            <div className="w-12 h-16 rounded border border-blue-400/30 flex items-center justify-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <path d="M12 8v8M8 12h8" />
-                              </svg>
+                          card.card_back_id && cardBackMap[card.card_back_id] ? (
+                            <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                              <div className="w-12 h-16 rounded border border-blue-400/30 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                                  <path d="M12 8v8M8 12h8" />
+                                </svg>
+                              </div>
                             </div>
-                          </div>
+                          )
                         ) : card.image_path ? (
                           <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
                         ) : (
@@ -5005,6 +5001,7 @@ export default function GameTable() {
             imagePath={card.image_path}
             cardName={card.name}
             faceDown={card.faceDown}
+            cardBackImageUrl={card.card_back_id ? cardBackMap[card.card_back_id] : null}
             mouseX={mousePosition.x}
             mouseY={mousePosition.y}
             scale={2.5}
@@ -5038,14 +5035,18 @@ export default function GameTable() {
                 style={{ width: 280, height: 392, backgroundColor: '#fff' }}
               >
                 {previewCard.faceDown ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-                    <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M12 8v8M8 12h8" />
-                      </svg>
+                  previewCard.card_back_id && cardBackMap[previewCard.card_back_id] ? (
+                    <img src={cardBackMap[previewCard.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                      <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M12 8v8M8 12h8" />
+                        </svg>
+                      </div>
                     </div>
-                  </div>
+                  )
                 ) : previewCard.image_path ? (
                   <img src={previewCard.image_path} alt={previewCard.name} className="w-full h-full object-cover" />
                 ) : (
@@ -5088,14 +5089,18 @@ export default function GameTable() {
               style={{ width: 250, height: 350, backgroundColor: '#fff' }}
             >
               {card.faceDown ? (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
-                  <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M12 8v8M8 12h8" />
-                    </svg>
+                card.card_back_id && cardBackMap[card.card_back_id] ? (
+                  <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+                    <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(147,197,253,0.5)" strokeWidth="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M12 8v8M8 12h8" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
+                )
               ) : card.image_path ? (
                 <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
               ) : (
