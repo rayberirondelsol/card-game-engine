@@ -9,3 +9,15 @@ data/
 nul
 .playwright-mcp/
 server/uploads/
+
+# Test artifacts and screenshots
+*.png
+screenshots/
+test-*.mjs
+test-*.js
+create-test-*.js
+apply-*.js
+kill-all.js
+test-tts-save.json
+test-sharp-*.mjs
+create-tts-test.js
