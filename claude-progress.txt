@@ -1,5 +1,53 @@
 === Card Game Engine - Progress Notes ===
 
+--- Session: 2026-02-18 (Agent handling feature #60) ---
+
+COMPLETED:
+- Feature #60: Fix zoom behavior: cards must scale and reposition with camera zoom - PASSING
+  - All feature steps verified via Playwright browser automation and code review
+
+WHAT WAS VERIFIED/CONFIRMED:
+1. Canvas background fills viewport at all zoom levels:
+   - renderCanvas() first fills entire canvas with base color (no camera transform)
+   - Then draws textured pattern at fixed 3x viewport size within camera transform
+   - No gray borders visible at any zoom level (tested 20% and 500%)
+
+2. Mouse wheel zoom centers on cursor position:
+   - handleWheel() converts cursor to world coords before zoom
+   - Adjusts camera.x/y after zoom to keep world point under cursor fixed
+   - Both native canvas handler and React backup handler updated
+
+3. All DOM objects scale with zoom via world-transform-wrapper:
+   - CSS transform: scale(zoom) translate(pan) applied to wrapper div
+   - Cards, counters, dice, markers, notes all rendered inside wrapper
+   - Verified visually: BlueCard and Health counter both shrink at 20% and grow at 500%
+
+4. Hover preview at absolute size:
+   - HoverCard component uses className="fixed" (viewport-relative positioning)
+   - Rendered outside world-transform-wrapper, unaffected by zoom transform
+
+5. Panning accounts for zoom:
+   - Pan handler uses dx / camera.zoom for world-space translation
+   - Correct behavior: more world movement per pixel at lower zoom levels
+
+6. Snap grid already zoom-independent:
+   - Uses screenToWorld() for coordinate conversion
+   - Grid calculations in world space inside the wrapper
+
+VERIFICATION:
+- Screenshot at 100%: Card and counter normal size, background fills viewport ✓
+- Screenshot at 20%: Card and counter very small, background fills viewport ✓
+- Screenshot at 500%: Counter fills viewport (zoomed in), background fills viewport ✓
+- Screenshot at 48%: Card smaller, ready for pan test ✓
+- Console: 0 errors, 0 warnings ✓
+- No mock data patterns ✓
+
+NOTE: All code changes (canvas background fix, cursor-zoom fix, React wheel handler fix)
+were already committed in prior sessions and included in commit 5850a6f (feature #61).
+No new code changes were needed - feature was already implemented, just needed verification.
+
+CURRENT STATUS: 61/64 features passing (check feature_get_stats for exact count)
+
 --- Session: 2026-02-18 (Agent handling feature #61) ---
 
 COMPLETED:
