@@ -414,10 +414,11 @@ export default function GameTable() {
   const pendingStackRef = useRef(null); // { tableId, stackId, event }
 
   // Double-tap detection for mobile gestures
-  const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0, tapCount: 0 });
+  const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0 });
   const DOUBLE_TAP_DELAY = 400; // milliseconds
   const DOUBLE_TAP_DISTANCE = 30; // pixels
-  const tripleTapTimerRef = useRef(null); // timer to distinguish double from triple tap
+  const pendingTouchRef = useRef(null); // { tableId, event, timer } - delays drag start to detect taps
+  const TOUCH_TAP_THRESHOLD = 150; // ms - finger must stay down longer than this to start drag
 
   // Long-press card preview for touch devices (Feature #58)
   const [longPressPreviewCard, setLongPressPreviewCard] = useState(null); // tableId of card being previewed via long-press
@@ -929,106 +930,82 @@ export default function GameTable() {
     }
   }
 
-  // Start dragging a card on the table
-  // Multi-tap detection for mobile: double-tap = preview, triple-tap = context menu
-  function handleCardMultiTap(e, tableId) {
+  // Handle a completed tap (finger down + quick release) on mobile
+  // Single tap = show card preview, double tap = context menu
+  function handleCardTap(tableId, clientX, clientY) {
     const now = Date.now();
-    const pointer = getPointerPosition(e);
     const lastTap = lastTapRef.current;
 
-    // Check if this tap is a continuation of a previous tap sequence
     const timeSinceLastTap = now - lastTap.time;
     const distance = Math.sqrt(
-      Math.pow(pointer.clientX - lastTap.x, 2) +
-      Math.pow(pointer.clientY - lastTap.y, 2)
+      Math.pow(clientX - lastTap.x, 2) +
+      Math.pow(clientY - lastTap.y, 2)
     );
 
-    const isContinuation = timeSinceLastTap < DOUBLE_TAP_DELAY &&
+    const isDoubleTap = timeSinceLastTap < DOUBLE_TAP_DELAY &&
       distance < DOUBLE_TAP_DISTANCE &&
       lastTap.cardId === tableId;
 
-    if (isContinuation) {
-      const newTapCount = lastTap.tapCount + 1;
-
-      if (newTapCount >= 3) {
-        // Triple-tap detected → open context menu
-        if (tripleTapTimerRef.current) {
-          clearTimeout(tripleTapTimerRef.current);
-          tripleTapTimerRef.current = null;
-        }
-        // Close any preview that might have opened on double-tap
-        setLongPressPreviewCard(null);
-
-        triggerHaptic('action');
-
-        const card = tableCards.find(c => c.tableId === tableId);
-        setContextMenu({
-          x: pointer.clientX,
-          y: pointer.clientY,
-          cardTableId: tableId,
-          stackId: card?.inStack || null,
-        });
-
-        lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0, tapCount: 0 };
-        return true;
-      }
-
-      // Second tap - schedule double-tap action after a short delay
-      // (to allow triple-tap to cancel it)
-      lastTapRef.current = { ...lastTap, time: now, tapCount: newTapCount };
-
-      if (tripleTapTimerRef.current) {
-        clearTimeout(tripleTapTimerRef.current);
-      }
-      tripleTapTimerRef.current = setTimeout(() => {
-        tripleTapTimerRef.current = null;
-        // Double-tap confirmed (no triple-tap followed) → show card preview
-        triggerHaptic('action');
-        setLongPressPreviewCard(tableId);
-        lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0, tapCount: 0 };
-      }, 200);
-
-      return true;
+    if (isDoubleTap) {
+      // Double tap → open context menu
+      triggerHaptic('action');
+      const card = tableCards.find(c => c.tableId === tableId);
+      setContextMenu({
+        x: clientX,
+        y: clientY,
+        cardTableId: tableId,
+        stackId: card?.inStack || null,
+      });
+      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
+    } else {
+      // Single tap → show card preview
+      triggerHaptic('action');
+      setLongPressPreviewCard(tableId);
+      lastTapRef.current = { time: now, cardId: tableId, x: clientX, y: clientY };
     }
-
-    // First tap - just store it
-    if (tripleTapTimerRef.current) {
-      clearTimeout(tripleTapTimerRef.current);
-      tripleTapTimerRef.current = null;
-    }
-    lastTapRef.current = {
-      time: now,
-      cardId: tableId,
-      x: pointer.clientX,
-      y: pointer.clientY,
-      tapCount: 1,
-    };
-
-    return false; // Not a multi-tap
   }
 
   function handleCardDragStart(e, tableId) {
     // Only start drag on left mouse button (button 0) - ignore right-click (button 2)
     if (!isTouchEvent(e) && e.button !== 0) return;
 
-    // Check for multi-tap on touch devices (double-tap = preview, triple-tap = context menu)
-    if (isTouchEvent(e)) {
-      const isMultiTap = handleCardMultiTap(e, tableId);
-      if (isMultiTap) {
-        e.preventDefault();
-        return; // Don't start dragging if multi-tap was detected
-      }
-    }
-
-    // Prevent default for touch events to avoid scrolling
+    // For touch events: delay drag start to detect taps vs holds
     if (isTouchEvent(e)) {
       handleTouchPrevention(e);
-    } else {
-      e.preventDefault();
-      e.stopPropagation();
+      const pointer = getPointerPosition(e);
+
+      // Cancel any existing pending touch
+      if (pendingTouchRef.current?.timer) {
+        clearTimeout(pendingTouchRef.current.timer);
+      }
+
+      // Store pending touch - if finger lifts before threshold, it's a tap
+      const savedPointer = { clientX: pointer.clientX, clientY: pointer.clientY };
+      pendingTouchRef.current = {
+        tableId,
+        clientX: pointer.clientX,
+        clientY: pointer.clientY,
+        timer: setTimeout(() => {
+          // Finger held down long enough → start actual drag
+          if (pendingTouchRef.current && pendingTouchRef.current.tableId === tableId) {
+            pendingTouchRef.current = null;
+            // Create a minimal event-like object with saved coordinates (original event is stale)
+            const fakeEvent = { clientX: savedPointer.clientX, clientY: savedPointer.clientY, preventDefault: () => {}, stopPropagation: () => {}, touches: [savedPointer], button: 0, ctrlKey: false, metaKey: false, shiftKey: false, type: 'touchstart' };
+            actualCardDragStart(fakeEvent, tableId);
+          }
+        }, TOUCH_TAP_THRESHOLD),
+      };
+      return;
     }
 
-    // Long press on mobile now only lifts stacks (preview is via double-tap instead)
+    // Mouse events start drag immediately
+    e.preventDefault();
+    e.stopPropagation();
+    actualCardDragStart(e, tableId);
+  }
+
+  // Actually start dragging a card (called after tap detection for touch, immediately for mouse)
+  function actualCardDragStart(e, tableId) {
 
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
@@ -1891,6 +1868,19 @@ export default function GameTable() {
 
       }
     } else {
+      // If finger moves during tap detection threshold, cancel tap and start drag
+      if (pendingTouchRef.current) {
+        const pointer = getPointerPosition(e);
+        const dx = Math.abs(pointer.clientX - pendingTouchRef.current.clientX);
+        const dy = Math.abs(pointer.clientY - pendingTouchRef.current.clientY);
+        if (dx > 8 || dy > 8) {
+          const { tableId, timer } = pendingTouchRef.current;
+          clearTimeout(timer);
+          pendingTouchRef.current = null;
+          // Start drag immediately since finger is moving
+          actualCardDragStart(e, tableId);
+        }
+      }
       // Normal touch move (panning or dragging)
       handleGlobalMove(e);
     }
@@ -1918,7 +1908,7 @@ export default function GameTable() {
     handleGlobalEnd(e);
   }
 
-  // Touch end handler with pinch cleanup
+  // Touch end handler with pinch cleanup and tap detection
   function handleGlobalTouchEnd(e) {
     const remainingTouches = e.touches ? e.touches.length : 0;
 
@@ -1929,6 +1919,16 @@ export default function GameTable() {
       pinchStartZoomRef.current = 1;
     }
 
+    // Check if this is a quick tap (finger lifted before drag threshold)
+    if (pendingTouchRef.current) {
+      const { tableId, clientX, clientY, timer } = pendingTouchRef.current;
+      clearTimeout(timer);
+      pendingTouchRef.current = null;
+      // Quick release → it's a tap, not a drag
+      handleCardTap(tableId, clientX, clientY);
+      return; // Don't call handleGlobalEnd since no drag was started
+    }
+
     handleGlobalEnd(e);
   }
 
@@ -1936,6 +1936,12 @@ export default function GameTable() {
   // when touch events are interrupted by system events (incoming call,
   // notification overlay, system gesture, etc.)
   function handleGlobalTouchCancel(e) {
+
+    // Cancel pending touch tap detection
+    if (pendingTouchRef.current?.timer) {
+      clearTimeout(pendingTouchRef.current.timer);
+      pendingTouchRef.current = null;
+    }
 
     // Cancel haptic feedback
     cancelHaptic();
