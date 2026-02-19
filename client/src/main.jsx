@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import './index.css';
 import StartScreen from './pages/StartScreen';
 import GameDetail from './pages/GameDetail';
 import GameTable from './pages/GameTable';
-import LoginPage from './pages/LoginPage';
+import AuthPage from './pages/AuthPage';
+import ConfirmPage from './pages/ConfirmPage';
+
+// Shown at /auth/confirm?token=...
+function ConfirmRoute({ onLogin }) {
+  return <ConfirmPage onLogin={onLogin} />;
+}
 
 function App() {
   const [authState, setAuthState] = useState('loading'); // 'loading' | 'authenticated' | 'unauthenticated'
-  const [token, setToken] = useState(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('auth_token');
@@ -17,13 +22,11 @@ function App() {
       setAuthState('unauthenticated');
       return;
     }
-    // Validate token with server
     fetch('/api/auth/check', {
       headers: { Authorization: `Bearer ${stored}` },
     })
       .then(res => {
         if (res.ok) {
-          setToken(stored);
           setAuthState('authenticated');
         } else {
           localStorage.removeItem('auth_token');
@@ -31,15 +34,25 @@ function App() {
         }
       })
       .catch(() => {
-        // If server unreachable, still allow if token exists
-        setToken(stored);
+        // Server unreachable → trust stored token
         setAuthState('authenticated');
       });
   }, []);
 
-  function handleLogin(newToken) {
-    setToken(newToken);
+  function handleLogin(token) {
+    localStorage.setItem('auth_token', token);
     setAuthState('authenticated');
+  }
+
+  // Email confirmation link – always accessible, even when not logged in
+  if (window.location.pathname === '/auth/confirm') {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth/confirm" element={<ConfirmRoute onLogin={handleLogin} />} />
+        </Routes>
+      </BrowserRouter>
+    );
   }
 
   if (authState === 'loading') {
@@ -54,7 +67,7 @@ function App() {
   }
 
   if (authState === 'unauthenticated') {
-    return <LoginPage onLogin={handleLogin} />;
+    return <AuthPage onLogin={handleLogin} />;
   }
 
   return (
@@ -63,6 +76,7 @@ function App() {
         <Route path="/" element={<StartScreen />} />
         <Route path="/games/:id" element={<GameDetail />} />
         <Route path="/games/:id/play" element={<GameTable />} />
+        <Route path="/auth/confirm" element={<ConfirmRoute onLogin={handleLogin} />} />
       </Routes>
     </BrowserRouter>
   );
