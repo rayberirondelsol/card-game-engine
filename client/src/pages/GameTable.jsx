@@ -2969,7 +2969,7 @@ export default function GameTable() {
           triggerHaptic('action');
           setTableCards(prev => prev.map(c => {
             if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
-              return { ...c, rotation: ((c.rotation || 0) - 90 + 360) % 360 };
+              return { ...c, rotation: (c.rotation || 0) - 90 };
             }
             return c;
           }));
@@ -2978,7 +2978,7 @@ export default function GameTable() {
           triggerHaptic('action');
           setTableCards(prev => prev.map(c => {
             if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
-              return { ...c, rotation: ((c.rotation || 0) + 90) % 360 };
+              return { ...c, rotation: (c.rotation || 0) + 90 };
             }
             return c;
           }));
