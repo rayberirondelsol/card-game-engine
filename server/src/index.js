@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -14,6 +15,7 @@ import { cardsRoutes } from './routes/cards.js';
 import { categoriesRoutes } from './routes/categories.js';
 import { cardBacksRoutes } from './routes/card-backs.js';
 import { ttsImportRoutes } from './routes/tts-import.js';
+import { authRoutes } from './routes/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +57,7 @@ async function start() {
   });
 
   // Register routes
+  await fastify.register(authRoutes);
   await fastify.register(gamesRoutes);
   await fastify.register(healthRoutes);
   await fastify.register(savesRoutes);
