@@ -332,11 +332,12 @@ export default function GameTable() {
     };
   }
 
-  // Game objects state (counters, dice, notes, tokens)
+  // Game objects state (counters, dice, notes, tokens, textFields)
   const [counters, setCounters] = useState([]);
   const [dice, setDice] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tokens, setTokens] = useState([]);
+  const [textFields, setTextFields] = useState([]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -372,6 +373,14 @@ export default function GameTable() {
   const [newTokenShape, setNewTokenShape] = useState('circle');
   const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
   const [newTokenLabel, setNewTokenLabel] = useState('');
+  const [showTextFieldModal, setShowTextFieldModal] = useState(false);
+  const [newTextFieldText, setNewTextFieldText] = useState('');
+  const [newTextFieldFontSize, setNewTextFieldFontSize] = useState(16);
+  const [newTextFieldColor, setNewTextFieldColor] = useState('#ffffff');
+  const [editingTextFieldId, setEditingTextFieldId] = useState(null);
+  const [editingTextFieldText, setEditingTextFieldText] = useState('');
+  const [editingTextFieldFontSize, setEditingTextFieldFontSize] = useState(16);
+  const [editingTextFieldColor, setEditingTextFieldColor] = useState('#ffffff');
 
   // Legend state
   const [showLegend, setShowLegend] = useState(true);
@@ -1006,6 +1015,9 @@ export default function GameTable() {
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
+    // Don't drag locked cards/stacks
+    if (card.locked) return;
+
     // Get unified pointer position (works for both mouse and touch)
     const pointer = getPointerPosition(e);
     const stackId = card.inStack;
@@ -1080,9 +1092,9 @@ export default function GameTable() {
     };
     setDraggingCard(tableId);
 
-    // Select the card if not already selected (and not ctrl-clicking)
-    // Note: Touch events don't have ctrlKey, so they'll always follow the default path
-    if (!e.ctrlKey && !e.metaKey) {
+    // Select the card if not already selected (and not ctrl/shift-clicking)
+    // Note: Touch events don't have ctrlKey/shiftKey, so they'll always follow the default path
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
       // For stacks, select all cards in the stack
       if (stackId) {
         const stackCardIds = tableCards.filter(c => c.inStack === stackId).map(c => c.tableId);
@@ -1091,13 +1103,23 @@ export default function GameTable() {
         setSelectedCards(new Set([tableId]));
       }
     } else {
-      // Toggle selection with ctrl
+      // Toggle selection with ctrl or shift (shift adds to selection)
       setSelectedCards(prev => {
         const next = new Set(prev);
-        if (next.has(tableId)) {
-          next.delete(tableId);
+        if (e.shiftKey && !e.ctrlKey) {
+          // Shift: always add to selection
+          if (stackId) {
+            tableCards.filter(c => c.inStack === stackId).forEach(c => next.add(c.tableId));
+          } else {
+            next.add(tableId);
+          }
         } else {
-          next.add(tableId);
+          // Ctrl: toggle selection
+          if (next.has(tableId)) {
+            next.delete(tableId);
+          } else {
+            next.add(tableId);
+          }
         }
         return next;
       });
@@ -1210,15 +1232,19 @@ export default function GameTable() {
           }
         }
       } else {
-        // Dragging a single card - check all stacks
+        // Dragging a single card - check all stacks and single cards
         for (const otherCard of tableCards) {
           if (otherCard.tableId === draggingCard) continue;
-          if (!otherCard.inStack) continue;
 
           const dist = Math.sqrt((newX - otherCard.x) ** 2 + (newY - otherCard.y) ** 2);
           if (dist < STACK_DROP_THRESHOLD) {
-            targetStack = otherCard.inStack;
-            break;
+            if (otherCard.inStack) {
+              targetStack = otherCard.inStack;
+              break;
+            } else {
+              // Hovering over a single card - show as drop target
+              targetStack = '__single_card_target__';
+            }
           }
         }
       }
@@ -1226,13 +1252,36 @@ export default function GameTable() {
 
     setStackDropTarget(targetStack);
 
-    // Move the card (and all cards in the same stack)
+    // Move the card (and all cards in the same stack or multi-selection)
+    const dx = newX - card.x;
+    const dy = newY - card.y;
+    const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
+
     if (card && card.inStack) {
-      // Move entire stack together
-      const dx = newX - card.x;
-      const dy = newY - card.y;
+      // Move entire stack together (plus any other selected cards/stacks)
       setTableCards(prev => prev.map(c => {
         if (c.inStack === card.inStack) {
+          return { ...c, x: c.x + dx, y: c.y + dy };
+        }
+        // Also move other selected cards that aren't in this stack
+        if (isMultiSelected && selectedCards.has(c.tableId) && c.inStack !== card.inStack) {
+          return { ...c, x: c.x + dx, y: c.y + dy };
+        }
+        return c;
+      }));
+    } else if (isMultiSelected) {
+      // Move all selected cards together
+      setTableCards(prev => prev.map(c => {
+        if (selectedCards.has(c.tableId)) {
+          // If this card is in a stack, move all cards in that stack
+          if (c.inStack) {
+            const stackSelected = prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
+            if (stackSelected) return { ...c, x: c.x + dx, y: c.y + dy };
+          }
+          return { ...c, x: c.x + dx, y: c.y + dy };
+        }
+        // Move stack siblings of selected cards
+        if (c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId))) {
           return { ...c, x: c.x + dx, y: c.y + dy };
         }
         return c;
@@ -1306,16 +1355,41 @@ export default function GameTable() {
         }
       }
     } else {
-      // Single card being dropped - check all stacks
+      // Single card being dropped - check all stacks AND other single cards
+      let targetSingleCard = null;
       for (const otherCard of tableCards) {
         if (otherCard.tableId === draggingCard) continue;
-        if (!otherCard.inStack) continue;
 
         const dist = Math.sqrt((card.x - otherCard.x) ** 2 + (card.y - otherCard.y) ** 2);
         if (dist < STACK_DROP_THRESHOLD) {
-          targetStack = otherCard.inStack;
-          break;
+          if (otherCard.inStack) {
+            targetStack = otherCard.inStack;
+            break;
+          } else {
+            // Dropping on another single card - will create a new stack
+            targetSingleCard = otherCard;
+          }
         }
+      }
+
+      // Create new stack from two single cards
+      if (!targetStack && targetSingleCard) {
+        const newStackId = crypto.randomUUID();
+        const newZ = maxZIndex + 1;
+        setTableCards(prev => prev.map(c => {
+          if (c.tableId === targetSingleCard.tableId) {
+            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ };
+          }
+          if (c.tableId === draggingCard) {
+            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ + 1 };
+          }
+          return c;
+        }));
+        setMaxZIndex(newZ + 1);
+        setDraggingCard(null);
+        setGridHighlight(null);
+        setStackDropTarget(null);
+        return;
       }
     }
 
@@ -1358,22 +1432,34 @@ export default function GameTable() {
     }
 
     // No stack merge - always snap to grid on release
-    if (card.inStack) {
+    const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
+    const finalX = snapToGrid(card.x);
+    const finalY = snapToGrid(card.y);
+    const snapDx = finalX - card.x;
+    const snapDy = finalY - card.y;
+
+    if (isMultiSelected) {
+      // Snap all selected cards/stacks by the same offset as the dragged card
+      setTableCards(prev => prev.map(c => {
+        const isSelected = selectedCards.has(c.tableId);
+        const isInSelectedStack = c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
+        if (isSelected || isInSelectedStack) {
+          return { ...c, x: c.x + snapDx, y: c.y + snapDy };
+        }
+        return c;
+      }));
+    } else if (card.inStack) {
       // Snap the whole stack
-      const finalX = snapToGrid(card.x);
-      const finalY = snapToGrid(card.y);
-      const dx = finalX - card.x;
-      const dy = finalY - card.y;
       setTableCards(prev => prev.map(c => {
         if (c.inStack === card.inStack) {
-          return { ...c, x: c.x + dx, y: c.y + dy };
+          return { ...c, x: c.x + snapDx, y: c.y + snapDy };
         }
         return c;
       }));
     } else {
       setTableCards(prev => prev.map(c => {
         if (c.tableId !== draggingCard) return c;
-        return { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y) };
+        return { ...c, x: finalX, y: finalY };
       }));
     }
 
@@ -1498,8 +1584,11 @@ export default function GameTable() {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
-  // Drag handlers for floating objects (counters, dice, notes, tokens)
+  // Drag handlers for floating objects (counters, dice, notes, tokens, textFields)
   function handleObjDragStart(e, objType, objId) {
+    // Only start drag on left mouse button
+    if (!isTouchEvent(e) && e.button !== 0) return;
+
     // Prevent default for touch events
     if (isTouchEvent(e)) {
       handleTouchPrevention(e);
@@ -1512,7 +1601,11 @@ export default function GameTable() {
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
+    else if (objType === 'textField') obj = textFields.find(tf => tf.id === objId);
     if (!obj) return;
+
+    // Don't drag locked objects
+    if (obj.locked) return;
 
     // Get unified pointer position (convert to world coords for offset)
     const pointer = getPointerPosition(e);
@@ -1577,6 +1670,10 @@ export default function GameTable() {
       setTokens(prev => prev.map(t =>
         t.id === draggingObj.id ? { ...t, x: newX, y: newY, attachedTo: null } : t
       ));
+    } else if (draggingObj.type === 'textField') {
+      setTextFields(prev => prev.map(tf =>
+        tf.id === draggingObj.id ? { ...tf, x: newX, y: newY } : tf
+      ));
     }
   }
 
@@ -1622,6 +1719,61 @@ export default function GameTable() {
     }
     setEditingNoteId(null);
     setEditingNoteText('');
+  }
+
+  // Text field functions
+  function createTextField(text, fontSize, color) {
+    const canvas = canvasRef.current;
+    const newField = {
+      id: crypto.randomUUID(),
+      text: text || 'Text',
+      fontSize: fontSize || 16,
+      color: color || '#ffffff',
+      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+    };
+    setTextFields(prev => [...prev, newField]);
+    setShowTextFieldModal(false);
+    setNewTextFieldText('');
+    setNewTextFieldFontSize(16);
+    setNewTextFieldColor('#ffffff');
+  }
+
+  function deleteTextField(id) {
+    setTextFields(prev => prev.filter(tf => tf.id !== id));
+  }
+
+  function updateTextField(id, updates) {
+    setTextFields(prev => prev.map(tf =>
+      tf.id === id ? { ...tf, ...updates } : tf
+    ));
+  }
+
+  // Lock/unlock any element
+  function toggleLockCard(tableId) {
+    setTableCards(prev => prev.map(c =>
+      c.tableId === tableId ? { ...c, locked: !c.locked } : c
+    ));
+  }
+
+  function toggleLockStack(stackId) {
+    setTableCards(prev => prev.map(c =>
+      c.inStack === stackId ? { ...c, locked: !c.locked } : c
+    ));
+  }
+
+  function toggleLockObj(type, id) {
+    const setter = type === 'counter' ? setCounters
+      : type === 'die' ? setDice
+      : type === 'note' ? setNotes
+      : type === 'token' ? setTokens
+      : type === 'textField' ? setTextFields
+      : null;
+    if (setter) {
+      setter(prev => prev.map(obj =>
+        obj.id === id ? { ...obj, locked: !obj.locked } : obj
+      ));
+    }
   }
 
   // Token functions
@@ -2186,6 +2338,7 @@ export default function GameTable() {
         value: c.value,
         x: c.x,
         y: c.y,
+        locked: c.locked || false,
       })),
       dice: dice.map(d => ({
         id: d.id,
@@ -2194,12 +2347,14 @@ export default function GameTable() {
         maxValue: d.maxValue,
         x: d.x,
         y: d.y,
+        locked: d.locked || false,
       })),
       notes: notes.map(n => ({
         id: n.id,
         text: n.text,
         x: n.x,
         y: n.y,
+        locked: n.locked || false,
       })),
       tokens: tokens.map(t => ({
         id: t.id,
@@ -2210,6 +2365,16 @@ export default function GameTable() {
         y: t.y,
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
+        locked: t.locked || false,
+      })),
+      textFields: textFields.map(tf => ({
+        id: tf.id,
+        text: tf.text,
+        fontSize: tf.fontSize,
+        color: tf.color,
+        x: tf.x,
+        y: tf.y,
+        locked: tf.locked || false,
       })),
       maxZIndex: maxZIndex,
     };
@@ -2476,6 +2641,7 @@ export default function GameTable() {
         value: c.value,
         x: c.x,
         y: c.y,
+        locked: c.locked || false,
       })));
     } else {
       setCounters([]);
@@ -2491,6 +2657,7 @@ export default function GameTable() {
         x: d.x,
         y: d.y,
         rolling: false,
+        locked: d.locked || false,
       })));
     } else {
       setDice([]);
@@ -2503,6 +2670,7 @@ export default function GameTable() {
         text: n.text,
         x: n.x,
         y: n.y,
+        locked: n.locked || false,
       })));
     } else {
       setNotes([]);
@@ -2519,12 +2687,28 @@ export default function GameTable() {
         y: t.y,
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
+        locked: t.locked || false,
       }));
       // Merge migrated markers with existing tokens
       setTokens([...restoredTokens, ...migratedTokens]);
     } else {
       // Only migrated markers
       setTokens(migratedTokens);
+    }
+
+    // Restore text fields
+    if (state.textFields && Array.isArray(state.textFields)) {
+      setTextFields(state.textFields.map(tf => ({
+        id: tf.id || crypto.randomUUID(),
+        text: tf.text || 'Text',
+        fontSize: tf.fontSize || 16,
+        color: tf.color || '#ffffff',
+        x: tf.x,
+        y: tf.y,
+        locked: tf.locked || false,
+      })));
+    } else {
+      setTextFields([]);
     }
 
     // Trigger canvas re-render
@@ -2832,6 +3016,7 @@ export default function GameTable() {
   function dismissDiceModal() { setShowDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
   function dismissTokenModal() { setShowTokenModal(false); }
+  function dismissTextFieldModal() { setShowTextFieldModal(false); setNewTextFieldText(''); setNewTextFieldFontSize(16); setNewTextFieldColor('#ffffff'); }
   function dismissSaveModal() { setShowSaveModal(false); setSaveName(''); }
   function dismissSetupSaveModal() { setShowSetupSaveModal(false); }
   function dismissSplitModal() { setShowSplitModal(false); setSplitStackId(null); setSplitCount(''); }
@@ -3189,6 +3374,7 @@ export default function GameTable() {
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'counter', counter.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'counter', counter.id)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'counter', objId: counter.id, cardTableId: null, stackId: null }); }}
         >
           <div className="bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-3 shadow-xl min-w-[140px]">
             <div className="text-xs text-slate-400 text-center mb-1 font-medium truncate" data-testid={`counter-name-${counter.id}`}>
@@ -3242,6 +3428,7 @@ export default function GameTable() {
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'die', die.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'die', die.id)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'die', objId: die.id, cardTableId: null, stackId: null }); }}
         >
           <div
             className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`}
@@ -3300,6 +3487,7 @@ export default function GameTable() {
             if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON') return;
             handleObjDragStart(e, 'note', note.id);
           }}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'note', objId: note.id, cardTableId: null, stackId: null }); }}
           onDoubleClick={(e) => {
             e.stopPropagation();
             if (editingNoteId !== note.id) {
@@ -3397,6 +3585,7 @@ export default function GameTable() {
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
           <TokenShape shape={token.shape} color={token.color} size={30} label={token.label} />
           {/* Delete button on hover */}
@@ -3413,6 +3602,115 @@ export default function GameTable() {
           )}
         </div>
       ))}
+      {/* Text Field Widgets */}
+      {textFields.map(tf => {
+        return (
+          <div
+            key={tf.id}
+            data-testid={`textfield-${tf.id}`}
+            className={`absolute select-none group pointer-events-auto ${tf.locked ? 'ring-1 ring-yellow-500/40 rounded' : ''}`}
+            style={{
+              left: tf.x,
+              top: tf.y,
+              transform: 'translate(-50%, -50%)',
+              cursor: tf.locked ? 'default' : 'grab',
+              zIndex: 15,
+            }}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              if (editingTextFieldId === tf.id) return;
+              handleObjDragStart(e, 'textField', tf.id);
+            }}
+            onTouchStart={(e) => {
+              if (editingTextFieldId === tf.id) return;
+              handleObjDragStart(e, 'textField', tf.id);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                objType: 'textField',
+                objId: tf.id,
+                cardTableId: null,
+                stackId: null,
+              });
+            }}
+            onDoubleClick={() => {
+              setEditingTextFieldId(tf.id);
+              setEditingTextFieldText(tf.text);
+              setEditingTextFieldFontSize(tf.fontSize);
+              setEditingTextFieldColor(tf.color);
+            }}
+          >
+            {editingTextFieldId === tf.id ? (
+              <div className="bg-slate-800/90 backdrop-blur-sm rounded-lg p-2 border border-blue-400 shadow-xl" style={{ minWidth: 150 }}>
+                <textarea
+                  autoFocus
+                  value={editingTextFieldText}
+                  onChange={(e) => setEditingTextFieldText(e.target.value)}
+                  className="w-full bg-transparent text-white border-none outline-none resize-none"
+                  style={{ fontSize: editingTextFieldFontSize, color: editingTextFieldColor, minHeight: 30 }}
+                  rows={2}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
+                <div className="flex items-center gap-2 mt-1 border-t border-slate-700 pt-1">
+                  <label className="text-xs text-slate-400">Size:</label>
+                  <input
+                    type="number"
+                    min="8"
+                    max="72"
+                    value={editingTextFieldFontSize}
+                    onChange={(e) => setEditingTextFieldFontSize(parseInt(e.target.value) || 16)}
+                    className="w-12 bg-slate-700 text-white text-xs px-1 py-0.5 rounded"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <label className="text-xs text-slate-400">Color:</label>
+                  <input
+                    type="color"
+                    value={editingTextFieldColor}
+                    onChange={(e) => setEditingTextFieldColor(e.target.value)}
+                    className="w-6 h-6 rounded cursor-pointer"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    onClick={() => {
+                      updateTextField(tf.id, {
+                        text: editingTextFieldText,
+                        fontSize: editingTextFieldFontSize,
+                        color: editingTextFieldColor,
+                      });
+                      setEditingTextFieldId(null);
+                    }}
+                    className="ml-auto text-xs bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-500"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="whitespace-pre-wrap"
+                style={{
+                  fontSize: tf.fontSize,
+                  color: tf.color,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)',
+                  lineHeight: 1.2,
+                  pointerEvents: 'auto',
+                }}
+              >
+                {tf.text}
+                {tf.locked && (
+                  <span className="ml-1 text-yellow-500/60 text-xs align-top">{'\u{1F512}'}</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
       </div>{/* End world-space transform wrapper */}
 
       {/* Top bar with game name and back button - compact in landscape */}
@@ -3859,6 +4157,21 @@ export default function GameTable() {
               {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Note</span>}
             </button>
 
+            {/* Text Field button */}
+            <button
+              onClick={() => setShowTextFieldModal(true)}
+              data-testid="toolbar-text-btn"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
+              title="Add Text Field"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 7 4 4 20 4 20 7" />
+                <line x1="9" y1="20" x2="15" y2="20" />
+                <line x1="12" y1="4" x2="12" y2="20" />
+              </svg>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Text</span>}
+            </button>
+
             {/* Token button */}
             <button
               onClick={() => setShowTokenModal(true)}
@@ -4181,6 +4494,79 @@ export default function GameTable() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
             >
               Add Token
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* Text Field Modal */}
+      <SwipeModal isOpen={showTextFieldModal} onDismiss={dismissTextFieldModal} testId="textfield-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="textfield-modal">
+          <h3 className="text-white font-semibold mb-3">Add Text Field</h3>
+          <div className="mb-3">
+            <label className="block text-slate-300 text-sm mb-1">Text</label>
+            <textarea
+              value={newTextFieldText}
+              onChange={(e) => setNewTextFieldText(e.target.value)}
+              placeholder="Enter text..."
+              rows={2}
+              data-testid="textfield-text-input"
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              autoFocus
+            />
+          </div>
+          <div className="mb-3 flex gap-3">
+            <div className="flex-1">
+              <label className="block text-slate-300 text-sm mb-1">Font Size</label>
+              <input
+                type="number"
+                min="8"
+                max="72"
+                value={newTextFieldFontSize}
+                onChange={(e) => setNewTextFieldFontSize(parseInt(e.target.value) || 16)}
+                data-testid="textfield-fontsize-input"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-slate-300 text-sm mb-1">Color</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="color"
+                  value={newTextFieldColor}
+                  onChange={(e) => setNewTextFieldColor(e.target.value)}
+                  data-testid="textfield-color-input"
+                  className="w-10 h-10 rounded cursor-pointer bg-slate-700 border border-slate-600"
+                />
+                <input
+                  type="text"
+                  value={newTextFieldColor}
+                  onChange={(e) => setNewTextFieldColor(e.target.value)}
+                  className="flex-1 px-2 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+          {/* Preview */}
+          <div className="mb-3 p-3 bg-slate-900 rounded-lg">
+            <p className="text-slate-400 text-xs mb-1">Preview:</p>
+            <div style={{ fontSize: newTextFieldFontSize, color: newTextFieldColor, lineHeight: 1.2 }}>
+              {newTextFieldText || 'Text'}
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={dismissTextFieldModal}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => createTextField(newTextFieldText || 'Text', newTextFieldFontSize, newTextFieldColor)}
+              data-testid="textfield-create-btn"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+            >
+              Add Text
             </button>
           </div>
         </div>
@@ -4688,6 +5074,27 @@ export default function GameTable() {
                 )}
 
                 <div className="border-t border-slate-700 my-1" />
+                {/* Lock/Unlock */}
+                {(() => {
+                  const ctxCard = tableCards.find(c => c.tableId === contextMenu.cardTableId);
+                  const stackId = ctxCard?.inStack;
+                  const isLocked = ctxCard?.locked;
+                  return (
+                    <button
+                      onClick={() => {
+                        if (stackId) {
+                          toggleLockStack(stackId);
+                        } else {
+                          toggleLockCard(contextMenu.cardTableId);
+                        }
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                    >
+                      {isLocked ? '\u{1F513} Unlock' : '\u{1F512} Lock'}
+                    </button>
+                  );
+                })()}
                 <button
                   onClick={() => {
                     selectedCards.forEach(tid => removeCardFromTable(tid));
@@ -4729,6 +5136,65 @@ export default function GameTable() {
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   Add Token
+                </button>
+                <button
+                  onClick={() => { setShowTextFieldModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Text Field
+                </button>
+              </>
+            )}
+
+            {/* Object actions (counter, die, note, token, textField) */}
+            {contextMenu.objType && (
+              <>
+                <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                  {contextMenu.objType === 'textField' ? 'Text Field' : contextMenu.objType.charAt(0).toUpperCase() + contextMenu.objType.slice(1)}
+                </div>
+                <button
+                  onClick={() => {
+                    toggleLockObj(contextMenu.objType, contextMenu.objId);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  {(() => {
+                    const lists = { counter: counters, die: dice, note: notes, token: tokens, textField: textFields };
+                    const obj = (lists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
+                    return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
+                  })()}
+                </button>
+                {contextMenu.objType === 'textField' && (
+                  <button
+                    onClick={() => {
+                      const tf = textFields.find(t => t.id === contextMenu.objId);
+                      if (tf) {
+                        setEditingTextFieldId(tf.id);
+                        setEditingTextFieldText(tf.text);
+                        setEditingTextFieldFontSize(tf.fontSize);
+                        setEditingTextFieldColor(tf.color);
+                      }
+                      setContextMenu(null);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    Edit Text
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const { objType, objId } = contextMenu;
+                    if (objType === 'counter') setCounters(prev => prev.filter(c => c.id !== objId));
+                    else if (objType === 'die') setDice(prev => prev.filter(d => d.id !== objId));
+                    else if (objType === 'note') deleteNote(objId);
+                    else if (objType === 'token') setTokens(prev => prev.filter(t => t.id !== objId));
+                    else if (objType === 'textField') deleteTextField(objId);
+                    setContextMenu(null);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
+                >
+                  Delete
                 </button>
               </>
             )}
