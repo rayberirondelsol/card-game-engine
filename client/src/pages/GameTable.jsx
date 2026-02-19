@@ -414,8 +414,8 @@ export default function GameTable() {
   const pendingStackRef = useRef(null); // { tableId, stackId, event }
 
   // Double-tap detection for mobile gestures
-  const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0 });
-  const DOUBLE_TAP_DELAY = 400; // milliseconds
+  const lastTapRef = useRef({ time: 0, cardId: null, x: 0, y: 0, count: 0 });
+  const DOUBLE_TAP_DELAY = 350; // milliseconds
   const DOUBLE_TAP_DISTANCE = 30; // pixels
   const pendingTouchRef = useRef(null); // { tableId, event, timer } - delays drag start to detect taps
   const singleTapTimerRef = useRef(null); // timer to delay single-tap action (allows double-tap to cancel)
@@ -932,7 +932,7 @@ export default function GameTable() {
   }
 
   // Handle a completed tap (finger down + quick release) on mobile
-  // Single tap = show card preview, double tap = context menu
+  // Tap handling: 1x = select (action bar), 2x = preview, 3x = context menu
   function handleCardTap(tableId, clientX, clientY) {
     const now = Date.now();
     const lastTap = lastTapRef.current;
@@ -943,35 +943,37 @@ export default function GameTable() {
       Math.pow(clientY - lastTap.y, 2)
     );
 
-    const isDoubleTap = timeSinceLastTap < DOUBLE_TAP_DELAY &&
+    const isContinuation = timeSinceLastTap < DOUBLE_TAP_DELAY &&
       distance < DOUBLE_TAP_DISTANCE &&
       lastTap.cardId === tableId;
 
-    if (isDoubleTap) {
-      // Double tap → show card preview (enlarged)
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current);
-        singleTapTimerRef.current = null;
-      }
+    const tapCount = isContinuation ? lastTap.count + 1 : 1;
+
+    // Cancel any pending single-tap timer
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+    }
+
+    if (tapCount >= 2) {
+      // Double tap → show enlarged card preview
       triggerHaptic('action');
       setLongPressPreviewCard(tableId);
-      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
+      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0, count: 0 };
     } else {
-      // Single tap → open context menu (delayed to allow double-tap)
-      lastTapRef.current = { time: now, cardId: tableId, x: clientX, y: clientY };
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current);
-      }
+      // Single tap → select card (shows action bar), delayed to allow double-tap
+      lastTapRef.current = { time: now, cardId: tableId, x: clientX, y: clientY, count: 1 };
       singleTapTimerRef.current = setTimeout(() => {
         singleTapTimerRef.current = null;
         triggerHaptic('action');
+        // Select the tapped card (shows MobileActionBar)
         const card = tableCards.find(c => c.tableId === tableId);
-        setContextMenu({
-          x: clientX,
-          y: clientY,
-          cardTableId: tableId,
-          stackId: card?.inStack || null,
-        });
+        if (card?.inStack) {
+          const stackCardIds = tableCards.filter(c => c.inStack === card.inStack).map(c => c.tableId);
+          setSelectedCards(new Set(stackCardIds));
+        } else {
+          setSelectedCards(new Set([tableId]));
+        }
       }, DOUBLE_TAP_DELAY);
     }
   }
@@ -5486,6 +5488,69 @@ export default function GameTable() {
         onRotateCCW={handleMobileRotateCCW}
         onGroup={groupSelectedCards}
         onDraw={handleMobileDraw}
+        onPickUpToHand={() => {
+          selectedCards.forEach(tid => pickUpToHand(tid));
+        }}
+        onLockToggle={() => {
+          for (const tid of selectedCards) {
+            const card = tableCards.find(c => c.tableId === tid);
+            if (card?.inStack) { toggleLockStack(card.inStack); break; }
+            else { toggleLockCard(tid); break; }
+          }
+        }}
+        onShuffle={() => {
+          let stackId = null;
+          for (const tid of selectedCards) {
+            const card = tableCards.find(c => c.tableId === tid);
+            if (card?.inStack) { stackId = card.inStack; break; }
+          }
+          if (!stackId) return;
+          setTableCards(prev => {
+            const stackCards = prev.filter(c => c.inStack === stackId);
+            const otherCards = prev.filter(c => c.inStack !== stackId);
+            for (let i = stackCards.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              const tempZ = stackCards[i].zIndex;
+              stackCards[i] = { ...stackCards[i], zIndex: stackCards[j].zIndex };
+              stackCards[j] = { ...stackCards[j], zIndex: tempZ };
+            }
+            return [...otherCards, ...stackCards];
+          });
+        }}
+        onSplitStack={() => {
+          let stackId = null;
+          for (const tid of selectedCards) {
+            const card = tableCards.find(c => c.tableId === tid);
+            if (card?.inStack) { stackId = card.inStack; break; }
+          }
+          if (!stackId) return;
+          const stackCards = tableCards.filter(c => c.inStack === stackId);
+          if (stackCards.length < 2) return;
+          setSplitStackId(stackId);
+          setSplitCount(Math.floor(stackCards.length / 2).toString());
+          setShowSplitModal(true);
+        }}
+        onBrowse={() => {
+          let stackId = null;
+          for (const tid of selectedCards) {
+            const card = tableCards.find(c => c.tableId === tid);
+            if (card?.inStack) { stackId = card.inStack; break; }
+          }
+          if (stackId) setBrowseStackId(stackId);
+        }}
+        onFlipStack={() => {
+          let stackId = null;
+          for (const tid of selectedCards) {
+            const card = tableCards.find(c => c.tableId === tid);
+            if (card?.inStack) { stackId = card.inStack; break; }
+          }
+          if (!stackId) return;
+          setTableCards(prev => prev.map(c => c.inStack === stackId ? { ...c, faceDown: !c.faceDown } : c));
+        }}
+        onRemove={() => {
+          selectedCards.forEach(tid => removeCardFromTable(tid));
+          setSelectedCards(new Set());
+        }}
         isLandscape={isMobileLandscape}
       />
 
