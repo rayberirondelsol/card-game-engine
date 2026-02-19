@@ -418,6 +418,7 @@ export default function GameTable() {
   const DOUBLE_TAP_DELAY = 400; // milliseconds
   const DOUBLE_TAP_DISTANCE = 30; // pixels
   const pendingTouchRef = useRef(null); // { tableId, event, timer } - delays drag start to detect taps
+  const singleTapTimerRef = useRef(null); // timer to delay single-tap action (allows double-tap to cancel)
   const TOUCH_TAP_THRESHOLD = 150; // ms - finger must stay down longer than this to start drag
 
   // Long-press card preview for touch devices (Feature #58)
@@ -947,21 +948,31 @@ export default function GameTable() {
       lastTap.cardId === tableId;
 
     if (isDoubleTap) {
-      // Double tap → open context menu
-      triggerHaptic('action');
-      const card = tableCards.find(c => c.tableId === tableId);
-      setContextMenu({
-        x: clientX,
-        y: clientY,
-        cardTableId: tableId,
-        stackId: card?.inStack || null,
-      });
-      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
-    } else {
-      // Single tap → show card preview
+      // Double tap → show card preview (enlarged)
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
       triggerHaptic('action');
       setLongPressPreviewCard(tableId);
+      lastTapRef.current = { time: 0, cardId: null, x: 0, y: 0 };
+    } else {
+      // Single tap → open context menu (delayed to allow double-tap)
       lastTapRef.current = { time: now, cardId: tableId, x: clientX, y: clientY };
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+      }
+      singleTapTimerRef.current = setTimeout(() => {
+        singleTapTimerRef.current = null;
+        triggerHaptic('action');
+        const card = tableCards.find(c => c.tableId === tableId);
+        setContextMenu({
+          x: clientX,
+          y: clientY,
+          cardTableId: tableId,
+          stackId: card?.inStack || null,
+        });
+      }, DOUBLE_TAP_DELAY);
     }
   }
 
@@ -2938,11 +2949,46 @@ export default function GameTable() {
   function handleGlobalTouchStart(e) {
     const touchCount = e.touches ? e.touches.length : 0;
 
-    // Detect two-finger pinch for zoom
+    // Detect two-finger interaction
     if (touchCount === 2) {
-      e.preventDefault(); // Prevent default pinch-zoom behavior
+      e.preventDefault();
+
+      // If currently dragging a card, second finger = rotate
+      if (draggingCard) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        // Determine which touch is the new one (second finger)
+        // The second finger is the one that just appeared
+        const newTouch = touch2; // touches[1] is usually the newer one
+        const holdTouch = touch1;
+
+        // If second finger is LEFT of the holding finger → rotate CCW
+        // If second finger is RIGHT → rotate CW
+        if (newTouch.clientX < holdTouch.clientX) {
+          // Rotate 90° counter-clockwise
+          triggerHaptic('action');
+          setTableCards(prev => prev.map(c => {
+            if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
+              return { ...c, rotation: ((c.rotation || 0) - 90 + 360) % 360 };
+            }
+            return c;
+          }));
+        } else {
+          // Rotate 90° clockwise
+          triggerHaptic('action');
+          setTableCards(prev => prev.map(c => {
+            if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
+              return { ...c, rotation: ((c.rotation || 0) + 90) % 360 };
+            }
+            return c;
+          }));
+        }
+        return; // Don't start pinch zoom
+      }
+
+      // No card being dragged → normal pinch zoom
       isPinchingRef.current = true;
-      isPanningRef.current = false; // Stop panning when pinching starts
+      isPanningRef.current = false;
 
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
@@ -3230,7 +3276,9 @@ export default function GameTable() {
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Select this card so context menu operations apply to it
+                // On touch devices, context menu is handled via single tap - suppress native long-press menu
+                if (isTouchCapableRef.current) return;
+                // Desktop: open context menu via right-click
                 if (!selectedCards.has(card.tableId)) {
                   setSelectedCards(new Set([card.tableId]));
                 }
