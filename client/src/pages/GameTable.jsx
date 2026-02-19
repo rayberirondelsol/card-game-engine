@@ -58,70 +58,86 @@ function shouldSnap(value) {
   return Math.abs(value - nearest) < SNAP_THRESHOLD;
 }
 
-// Draw felt texture pattern
-function drawFeltPattern(ctx, width, height, baseColor) {
-  ctx.fillStyle = baseColor;
-  ctx.fillRect(0, 0, width, height);
+// Texture cache - generate once, reuse on every frame
+const textureCache = {};
 
-  // Add noise-like texture for felt effect
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 15;
-    data[i] = Math.max(0, Math.min(255, data[i] + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
-  }
-  ctx.putImageData(imageData, 0, 0);
-}
+function getOrCreateTexture(type, width, height, baseColor) {
+  const key = `${type}-${width}-${height}-${baseColor}`;
+  if (textureCache[key]) return textureCache[key];
 
-// Draw wood texture pattern
-function drawWoodPattern(ctx, width, height, baseColor) {
-  // Base color
-  ctx.fillStyle = baseColor;
-  ctx.fillRect(0, 0, width, height);
+  const offscreen = document.createElement('canvas');
+  offscreen.width = width;
+  offscreen.height = height;
+  const ctx = offscreen.getContext('2d');
 
-  // Wood grain lines
-  ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-  ctx.lineWidth = 1;
-  for (let y = 0; y < height; y += 3 + Math.random() * 5) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    let x = 0;
-    while (x < width) {
-      x += 10 + Math.random() * 20;
-      const yOff = y + (Math.random() - 0.5) * 3;
-      ctx.lineTo(x, yOff);
+  if (type === 'felt') {
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 15;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
     }
-    ctx.stroke();
+    ctx.putImageData(imageData, 0, 0);
+  } else if (type === 'wood') {
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, width, height);
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < height; y += 3 + Math.random() * 5) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      let x = 0;
+      while (x < width) {
+        x += 10 + Math.random() * 20;
+        const yOff = y + (Math.random() - 0.5) * 3;
+        ctx.lineTo(x, yOff);
+      }
+      ctx.stroke();
+    }
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 8;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    }
+    ctx.putImageData(imageData, 0, 0);
+  } else {
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, width, height);
+    const gradient = ctx.createRadialGradient(
+      width / 2, height / 2, Math.min(width, height) * 0.2,
+      width / 2, height / 2, Math.max(width, height) * 0.7
+    );
+    gradient.addColorStop(0, 'rgba(255,255,255,0.02)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.15)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
   }
 
-  // Add subtle noise
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 8;
-    data[i] = Math.max(0, Math.min(255, data[i] + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
-  }
-  ctx.putImageData(imageData, 0, 0);
+  textureCache[key] = offscreen;
+  return offscreen;
 }
 
-// Draw solid color background
-function drawSolidBackground(ctx, width, height, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, width, height);
+// Draw cached texture pattern onto context
+function drawFeltPattern(ctx, width, height, baseColor) {
+  const tex = getOrCreateTexture('felt', width, height, baseColor);
+  ctx.drawImage(tex, 0, 0);
+}
 
-  // Subtle vignette effect
-  const gradient = ctx.createRadialGradient(
-    width / 2, height / 2, Math.min(width, height) * 0.2,
-    width / 2, height / 2, Math.max(width, height) * 0.7
-  );
-  gradient.addColorStop(0, 'rgba(255,255,255,0.02)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.15)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+function drawWoodPattern(ctx, width, height, baseColor) {
+  const tex = getOrCreateTexture('wood', width, height, baseColor);
+  ctx.drawImage(tex, 0, 0);
+}
+
+function drawSolidBackground(ctx, width, height, color) {
+  const tex = getOrCreateTexture('solid', width, height, color);
+  ctx.drawImage(tex, 0, 0);
 }
 
 // Token shape components
@@ -422,35 +438,13 @@ export default function GameTable() {
 
   // Device detection and debugging on mount
   useEffect(() => {
-    console.log('='.repeat(80));
-    console.log('[GameTable] Component mounted - running device detection');
-    console.log('='.repeat(80));
+    // Device detection on mount
 
     // Log comprehensive device information
     const deviceInfo = getDeviceInfo();
 
-    // Log individual device type checks
-    console.log('[GameTable] Device Type Checks:', {
-      isTouchDevice: isTouchDevice(),
-      isMobileDevice: isMobileDevice(),
-      isTabletDevice: isTabletDevice(),
-      isSmartphone: isSmartphone()
-    });
-
-    // Log window resize events
-    const handleResize = () => {
-      console.log('[GameTable] Window resized:', {
-        width: window.innerWidth,
-        height: window.innerHeight,
-        isMobile: isMobileDevice(),
-        isTablet: isTabletDevice(),
-        isSmartphone: isSmartphone()
-      });
-    };
-
+    const handleResize = () => {};
     window.addEventListener('resize', handleResize);
-
-    console.log('='.repeat(80));
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -938,7 +932,7 @@ export default function GameTable() {
       lastTap.cardId === tableId
     ) {
       // Double-tap detected - flip the card
-      console.log('[GameTable] Double-tap detected, flipping card:', tableId);
+      // Double-tap detected, flip card
       setTableCards(prev => prev.map(c => {
         if (c.tableId === tableId) {
           return { ...c, faceDown: !c.faceDown };
@@ -966,6 +960,9 @@ export default function GameTable() {
   }
 
   function handleCardDragStart(e, tableId) {
+    // Only start drag on left mouse button (button 0) - ignore right-click (button 2)
+    if (!isTouchEvent(e) && e.button !== 0) return;
+
     // Check for double-tap on touch devices (for flipping cards)
     if (isTouchEvent(e)) {
       const isDoubleTap = handleCardDoubleTap(e, tableId);
@@ -1360,11 +1357,11 @@ export default function GameTable() {
       return;
     }
 
-    // No stack merge - just snap to grid on release
+    // No stack merge - always snap to grid on release
     if (card.inStack) {
       // Snap the whole stack
-      const finalX = shouldSnap(card.x) ? snapToGrid(card.x) : card.x;
-      const finalY = shouldSnap(card.y) ? snapToGrid(card.y) : card.y;
+      const finalX = snapToGrid(card.x);
+      const finalY = snapToGrid(card.y);
       const dx = finalX - card.x;
       const dy = finalY - card.y;
       setTableCards(prev => prev.map(c => {
@@ -1376,9 +1373,7 @@ export default function GameTable() {
     } else {
       setTableCards(prev => prev.map(c => {
         if (c.tableId !== draggingCard) return c;
-        const finalX = shouldSnap(c.x) ? snapToGrid(c.x) : c.x;
-        const finalY = shouldSnap(c.y) ? snapToGrid(c.y) : c.y;
-        return { ...c, x: finalX, y: finalY };
+        return { ...c, x: snapToGrid(c.x), y: snapToGrid(c.y) };
       }));
     }
 
@@ -1687,14 +1682,6 @@ export default function GameTable() {
   // Touch move handler with pinch-to-zoom support
   function handleGlobalTouchMove(e) {
     const touchCount = e.touches ? e.touches.length : 0;
-    console.log('[GameTable] Touch move event detected:', {
-      type: e.type,
-      touchCount,
-      isPanning: isPanningRef.current,
-      isPinching: isPinchingRef.current,
-      draggingCard: !!draggingCard,
-      draggingObj: !!draggingObj
-    });
 
     // Handle two-finger pinch zoom
     if (isPinchingRef.current && touchCount === 2) {
@@ -1732,11 +1719,6 @@ export default function GameTable() {
         setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
         renderCanvas();
 
-        console.log('[GameTable] Pinch zoom:', {
-          distance: currentDistance,
-          ratio: distanceRatio.toFixed(2),
-          zoom: camera.zoom.toFixed(2)
-        });
       }
     } else {
       // Normal touch move (panning or dragging)
@@ -1769,22 +1751,12 @@ export default function GameTable() {
   // Touch end handler with pinch cleanup
   function handleGlobalTouchEnd(e) {
     const remainingTouches = e.touches ? e.touches.length : 0;
-    console.log('[GameTable] Touch end event detected:', {
-      type: e.type,
-      changedTouchCount: e.changedTouches ? e.changedTouches.length : 0,
-      remainingTouches,
-      isPanning: isPanningRef.current,
-      isPinching: isPinchingRef.current,
-      draggingCard: !!draggingCard,
-      draggingObj: !!draggingObj
-    });
 
     // Clean up pinch state when fingers are lifted
     if (isPinchingRef.current && remainingTouches < 2) {
       isPinchingRef.current = false;
       pinchStartDistanceRef.current = 0;
       pinchStartZoomRef.current = 1;
-      console.log('[GameTable] Pinch ended');
     }
 
     handleGlobalEnd(e);
@@ -1794,7 +1766,6 @@ export default function GameTable() {
   // when touch events are interrupted by system events (incoming call,
   // notification overlay, system gesture, etc.)
   function handleGlobalTouchCancel(e) {
-    console.log('[GameTable] Touch cancel event detected - cleaning up state');
 
     // Cancel haptic feedback
     cancelHaptic();
@@ -2097,11 +2068,6 @@ export default function GameTable() {
 
   // Touch start handler for hand cards
   function handleHandCardTouchStart(e, handId) {
-    console.log('[GameTable] Hand card touch start:', {
-      type: e.type,
-      handId,
-      touchCount: e.touches ? e.touches.length : 0
-    });
     if (isTouchEvent(e)) {
       handleTouchPrevention(e);
     }
@@ -2306,7 +2272,7 @@ export default function GameTable() {
         setSaveToast('Auto-saved');
         setTimeout(() => setSaveToast(null), 2000);
         setTimeout(() => setAutoSaveStatus('idle'), 3000);
-        console.log('[Auto-save] Game auto-saved at', lastAutoSaveRef.current);
+        // Auto-saved
       }
     } catch (err) {
       console.error('[Auto-save] Failed:', err);
@@ -2755,12 +2721,6 @@ export default function GameTable() {
   // Touch start handler for panning and pinch-to-zoom
   function handleGlobalTouchStart(e) {
     const touchCount = e.touches ? e.touches.length : 0;
-    console.log('[GameTable] Touch start event detected:', {
-      type: e.type,
-      touchCount,
-      target: e.target.tagName,
-      targetClass: e.target.className
-    });
 
     // Detect two-finger pinch for zoom
     if (touchCount === 2) {
@@ -2773,10 +2733,6 @@ export default function GameTable() {
       pinchStartDistanceRef.current = getTouchDistance(touch1, touch2);
       pinchStartZoomRef.current = cameraRef.current.zoom;
 
-      console.log('[GameTable] Pinch started:', {
-        distance: pinchStartDistanceRef.current,
-        currentZoom: pinchStartZoomRef.current
-      });
     } else {
       // Single touch - normal panning behavior
       handleGlobalStart(e);
@@ -3048,12 +3004,8 @@ export default function GameTable() {
               }}
               onMouseDown={(e) => handleCardDragStart(e, card.tableId)}
               onTouchStart={(e) => handleCardDragStart(e, card.tableId)}
-              onMouseEnter={(e) => {
+              onMouseEnter={() => {
                 setHoveredTableCard(card.tableId);
-                setMousePosition({ x: e.clientX, y: e.clientY });
-              }}
-              onMouseMove={(e) => {
-                setMousePosition({ x: e.clientX, y: e.clientY });
               }}
               onMouseLeave={() => {
                 setHoveredTableCard(null);
