@@ -352,6 +352,7 @@ export default function GameTable() {
   const [maxZIndex, setMaxZIndex] = useState(1);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
   const [stackDropTarget, setStackDropTarget] = useState(null); // stackId of stack being targeted for drop
+  const [stackNames, setStackNames] = useState({}); // stackId → name for named stacks
   const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // mouse position for hover preview
   const [altKeyHeld, setAltKeyHeld] = useState(false); // whether ALT key is currently held
@@ -919,6 +920,12 @@ export default function GameTable() {
 
     // Add all cards to the table at once
     setTableCards(prev => [...prev, ...newTableCards]);
+
+    // Name the stack after the category
+    const category = categories.find(c => c.id === categoryId);
+    if (category) {
+      setStackNames(prev => ({ ...prev, [stackId]: category.name }));
+    }
   }
 
   // Start dragging a card on the table
@@ -2376,6 +2383,7 @@ export default function GameTable() {
         y: tf.y,
         locked: tf.locked || false,
       })),
+      stackNames: stackNames,
       maxZIndex: maxZIndex,
     };
   }
@@ -2709,6 +2717,13 @@ export default function GameTable() {
       })));
     } else {
       setTextFields([]);
+    }
+
+    // Restore stack names
+    if (state.stackNames && typeof state.stackNames === 'object') {
+      setStackNames(state.stackNames);
+    } else {
+      setStackNames({});
     }
 
     // Trigger canvas re-render
@@ -3209,7 +3224,7 @@ export default function GameTable() {
                   stackId: stackId,
                 });
               }}
-              title={isStack ? `Stack: ${stackSize} cards` : card.name}
+              title={isStack ? (stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`) : card.name}
             >
               {/* Stack offset visual - ghost cards behind */}
               {isStack && (
@@ -3338,7 +3353,7 @@ export default function GameTable() {
                   data-testid={`stack-tooltip-${stackId}`}
                   className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white sm:text-[10px] text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20"
                 >
-                  Stack: {stackSize} cards
+                  {stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`}
                 </div>
               )}
             </div>
