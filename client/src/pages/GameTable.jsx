@@ -1071,7 +1071,7 @@ export default function GameTable() {
     const pointer = getPointerPosition(e);
 
     if (stackId) {
-      const stackCards = tableCards.filter(c => c.inStack === stackId);
+      const stackCards = tableCards.filter(c => c.inStack === stackId).sort((a, b) => a.zIndex - b.zIndex);
       setMaxZIndex(newZ + stackCards.length);
       setTableCards(prev => prev.map(c => {
         if (c.inStack !== stackId) return c;
