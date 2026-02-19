@@ -383,7 +383,7 @@ export default function GameTable() {
   // Press-and-hold state for stack interaction
   const pressHoldTimerRef = useRef(null);
   const [pressHoldActive, setPressHoldActive] = useState(false);
-  const PRESS_HOLD_DELAY = 250; // milliseconds to distinguish quick-click from press-hold
+  const PRESS_HOLD_DELAY = 500; // milliseconds to distinguish quick-click from press-hold
   // Track the pending stack interaction (which card was pressed, which stack it's in)
   const pendingStackRef = useRef(null); // { tableId, stackId, event }
 
@@ -1670,7 +1670,7 @@ export default function GameTable() {
       camera.y = panStartRef.current.camY + dy / camera.zoom;
       setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
       renderCanvas();
-    } else if (draggingCard) {
+    } else if (draggingCard || pendingStackRef.current) {
       handleCardDragMove(e);
     } else if (draggingObj) {
       handleObjDragMove(e);
@@ -4991,23 +4991,7 @@ export default function GameTable() {
         isLandscape={isMobileLandscape}
       />
 
-      {/* Hover-to-enlarge preview - shows enlarged card on hover (desktop only, Feature #58) */}
-      {hoveredTableCard && !draggingCard && !isTouchCapableRef.current && (() => {
-        const card = tableCards.find(c => c.tableId === hoveredTableCard);
-        if (!card) return null;
-        return (
-          <HoverCard
-            card={card}
-            imagePath={card.image_path}
-            cardName={card.name}
-            faceDown={card.faceDown}
-            cardBackImageUrl={card.card_back_id ? cardBackMap[card.card_back_id] : null}
-            mouseX={mousePosition.x}
-            mouseY={mousePosition.y}
-            scale={2.5}
-          />
-        );
-      })()}
+      {/* Hover-to-enlarge preview removed - use ALT key for card zoom instead */}
 
       {/* Long-press card preview popup for touch devices (Feature #58) */}
       {longPressPreviewCard && (() => {
