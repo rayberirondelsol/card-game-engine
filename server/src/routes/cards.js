@@ -189,6 +189,68 @@ export async function cardsRoutes(fastify) {
     return { success: true, message: 'Card deleted' };
   });
 
+  // POST /api/games/:id/cards/:cardId/rotate - Rotate a card image 90° CW or CCW
+  fastify.post('/api/games/:id/cards/:cardId/rotate', async (request, reply) => {
+    const db = getDb();
+    const { id, cardId } = request.params;
+    const body = request.body || {};
+
+    const card = db.prepare('SELECT * FROM cards WHERE id = ? AND game_id = ?').get(cardId, id);
+    if (!card) {
+      return reply.status(404).send({ error: 'Card not found' });
+    }
+
+    const { degrees } = body;
+    if (degrees !== 90 && degrees !== -90 && degrees !== 180) {
+      return reply.status(400).send({ error: 'degrees must be 90, -90, or 180' });
+    }
+
+    try {
+      // Resolve image path to filesystem path
+      const imagePath = card.image_path.startsWith('/uploads/')
+        ? path.join(UPLOADS_DIR, '..', card.image_path)
+        : path.join(UPLOADS_DIR, id, path.basename(card.image_path));
+
+      if (!existsSync(imagePath)) {
+        return reply.status(404).send({ error: 'Card image file not found' });
+      }
+
+      // Rotate image and overwrite
+      const rotatedBuffer = await sharp(imagePath)
+        .rotate(degrees)
+        .png()
+        .toBuffer();
+
+      writeFileSync(imagePath, rotatedBuffer);
+
+      // Update width/height in DB (swapped for ±90°, same for 180°)
+      let newWidth = card.width;
+      let newHeight = card.height;
+      if (degrees === 90 || degrees === -90) {
+        newWidth = card.height;
+        newHeight = card.width;
+      }
+      // For 180° width/height stay the same
+
+      // If width/height were 0, read from the new image
+      if (newWidth === 0 || newHeight === 0) {
+        const meta = await sharp(rotatedBuffer).metadata();
+        newWidth = meta.width || 0;
+        newHeight = meta.height || 0;
+      }
+
+      db.prepare(
+        "UPDATE cards SET width = ?, height = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run(newWidth, newHeight, cardId);
+
+      const updated = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
+      return updated;
+    } catch (err) {
+      console.error('[Cards] Rotate error:', err);
+      return reply.status(500).send({ error: 'Failed to rotate card image: ' + err.message });
+    }
+  });
+
   // POST /api/games/:id/cards/analyze-split - Analyze an image to detect grid layout
   fastify.post('/api/games/:id/cards/analyze-split', async (request, reply) => {
     const db = getDb();
