@@ -3315,21 +3315,25 @@ export default function GameTable() {
         }}
       >
       {/* Grid highlight overlay when dragging cards */}
-      {gridHighlight && draggingCard && (
-        <div
-          data-testid="grid-highlight"
-          className="absolute pointer-events-none z-10"
-          style={{
-            left: gridHighlight.x - CARD_WIDTH / 2 - 4,
-            top: gridHighlight.y - CARD_HEIGHT / 2 - 4,
-            width: CARD_WIDTH + 8,
-            height: CARD_HEIGHT + 8,
-            border: '2px dashed rgba(59, 130, 246, 0.6)',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          }}
-        />
-      )}
+      {gridHighlight && draggingCard && (() => {
+        const draggingCardData = tableCards.find(c => c.tableId === draggingCard);
+        const { w: ghW, h: ghH } = getCardDims(draggingCardData);
+        return (
+          <div
+            data-testid="grid-highlight"
+            className="absolute pointer-events-none z-10"
+            style={{
+              left: gridHighlight.x - ghW / 2 - 4,
+              top: gridHighlight.y - ghH / 2 - 4,
+              width: ghW + 8,
+              height: ghH + 8,
+              border: '2px dashed rgba(59, 130, 246, 0.6)',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            }}
+          />
+        );
+      })()}
 
       {/* Table Cards - render stacks and individual cards */}
       {(() => {
@@ -5121,7 +5125,7 @@ export default function GameTable() {
                       className="flex flex-col items-center"
                     >
                       <div className="relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors"
-                        style={{ width: 100, height: 140, backgroundColor: '#fff' }}>
+                        style={{ width: getCardDims(card).w, height: getCardDims(card).h, backgroundColor: '#fff' }}>
                         {card.faceDown ? (
                           card.card_back_id && cardBackMap[card.card_back_id] ? (
                             <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-contain" />
@@ -5610,8 +5614,11 @@ export default function GameTable() {
               <div className="flex items-end justify-center" style={{ gap: '2px' }}>
                 {handCards.map((card, index) => {
                   const isMobile = window.innerWidth < 640;
-                  const cardWidth = isMobileLandscape ? 45 : (isMobile ? 60 : 80);
-                  const cardHeight = isMobileLandscape ? 63 : (isMobile ? 84 : 112);
+                  const isLandscapeCard = card.width > 0 && card.height > 0 && card.width > card.height;
+                  const baseW = isMobileLandscape ? 45 : (isMobile ? 60 : 80);
+                  const baseH = isMobileLandscape ? 63 : (isMobile ? 84 : 112);
+                  const cardWidth = isLandscapeCard ? baseH : baseW;
+                  const cardHeight = isLandscapeCard ? baseW : baseH;
                   const totalCards = handCards.length;
                   const spreadAngle = isMobileLandscape ? Math.min(2, 15 / totalCards) : (isMobile ? Math.min(3, 20 / totalCards) : Math.min(5, 30 / totalCards));
                   const centerIndex = (totalCards - 1) / 2;
@@ -5699,9 +5706,12 @@ export default function GameTable() {
       {hoveredHandCard && !draggingFromHand && (() => {
         const card = handCards.find(c => c.handId === hoveredHandCard);
         if (!card) return null;
+        const isLandscapePreview = card.width > 0 && card.height > 0 && card.width > card.height;
+        const previewW = isLandscapePreview ? 280 : 200;
+        const previewH = isLandscapePreview ? 200 : 280;
         return (
           <div className="fixed z-50 pointer-events-none" data-testid="hand-card-preview" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -70%)' }}>
-            <div className="rounded-xl overflow-hidden border-2 border-yellow-400 shadow-2xl shadow-black/50" style={{ width: 200, height: 280, backgroundColor: '#fff' }}>
+            <div className="rounded-xl overflow-hidden border-2 border-yellow-400 shadow-2xl shadow-black/50" style={{ width: previewW, height: previewH, backgroundColor: '#fff' }}>
               {card.image_path ? (
                 <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
               ) : (
@@ -5720,18 +5730,19 @@ export default function GameTable() {
       {draggingFromHand && (() => {
         const card = handCards.find(c => c.handId === draggingFromHand);
         if (!card) return null;
+        const { w: ghostW, h: ghostH } = getCardDims(card);
         return (
           <div
             className="fixed z-[70] pointer-events-none"
             data-testid="hand-drag-ghost"
             style={{
-              left: handDragPosition.x - CARD_WIDTH / 2,
-              top: handDragPosition.y - CARD_HEIGHT / 2,
+              left: handDragPosition.x - ghostW / 2,
+              top: handDragPosition.y - ghostH / 2,
             }}
           >
             <div
               className="rounded-lg overflow-hidden border-2 border-blue-400 shadow-2xl shadow-blue-400/50 opacity-70"
-              style={{ width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: '#fff' }}
+              style={{ width: ghostW, height: ghostH, backgroundColor: '#fff' }}
             >
               {card.image_path ? (
                 <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
@@ -5828,6 +5839,9 @@ export default function GameTable() {
       {longPressPreviewCard && (() => {
         const previewCard = tableCards.find(c => c.tableId === longPressPreviewCard);
         if (!previewCard) return null;
+        const isLandscapeLP = previewCard.width > 0 && previewCard.height > 0 && previewCard.width > previewCard.height;
+        const lpW = isLandscapeLP ? 392 : 280;
+        const lpH = isLandscapeLP ? 280 : 392;
         return (
           <div
             className="fixed inset-0 z-[70] flex items-center justify-center"
@@ -5847,7 +5861,7 @@ export default function GameTable() {
             >
               <div
                 className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
-                style={{ width: 280, height: 392, backgroundColor: '#fff' }}
+                style={{ width: lpW, height: lpH, backgroundColor: '#fff' }}
               >
                 {previewCard.faceDown ? (
                   previewCard.card_back_id && cardBackMap[previewCard.card_back_id] ? (
@@ -5892,6 +5906,9 @@ export default function GameTable() {
       {altKeyHeld && hoveredTableCard && !isTouchCapableRef.current && (() => {
         const card = tableCards.find(c => c.tableId === hoveredTableCard);
         if (!card) return null;
+        const isLandscapeAlt = card.width > 0 && card.height > 0 && card.width > card.height;
+        const altW = isLandscapeAlt ? 350 : 250;
+        const altH = isLandscapeAlt ? 250 : 350;
         // Show the front face image regardless of faceDown state for preview
         return (
           <div
@@ -5901,7 +5918,7 @@ export default function GameTable() {
           >
             <div
               className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
-              style={{ width: 250, height: 350, backgroundColor: '#fff' }}
+              style={{ width: altW, height: altH, backgroundColor: '#fff' }}
             >
               {card.faceDown ? (
                 card.card_back_id && cardBackMap[card.card_back_id] ? (
