@@ -72,7 +72,8 @@ function downloadImage(url) {
 }
 
 /**
- * Parse a TTS JSON save file and extract all custom deck definitions
+ * Parse a TTS JSON save file and extract all custom deck definitions.
+ * Also detects deck rotation to hint at landscape card orientation.
  */
 function extractDecksFromTTS(ttsData) {
   const decks = [];
@@ -83,23 +84,36 @@ function extractDecksFromTTS(ttsData) {
     // Check if this object is a DeckCustom or has CustomDeck
     if (obj.Name === 'DeckCustom' || obj.Name === 'Deck') {
       if (obj.CustomDeck) {
+        // Detect if the deck is rotated in TTS (landscape placement).
+        // TTS rotZ of ~90 or ~270 means the deck was placed sideways on the table,
+        // which often indicates the card face images need rotation during import.
+        const rotZ = obj.Transform ? (obj.Transform.rotZ || 0) : 0;
+        const normalizedRotZ = ((rotZ % 360) + 360) % 360;
+        const isRotated90 = Math.abs(normalizedRotZ - 90) < 15 || Math.abs(normalizedRotZ - 270) < 15;
+
         const deckInfo = {
           nickname: obj.Nickname || obj.Description || 'Unnamed Deck',
           customDeck: obj.CustomDeck,
           deckIDs: obj.DeckIDs || [],
           containedObjects: obj.ContainedObjects || [],
+          suggestedRotation: isRotated90 ? 90 : 0,
         };
         decks.push(deckInfo);
       }
     } else if (obj.Name === 'Card' || obj.Name === 'CardCustom') {
       // Individual card that's not part of a deck on the table
       if (obj.CustomDeck) {
+        const rotZ = obj.Transform ? (obj.Transform.rotZ || 0) : 0;
+        const normalizedRotZ = ((rotZ % 360) + 360) % 360;
+        const isRotated90 = Math.abs(normalizedRotZ - 90) < 15 || Math.abs(normalizedRotZ - 270) < 15;
+
         const deckInfo = {
           nickname: obj.Nickname || 'Single Card',
           customDeck: obj.CustomDeck,
           deckIDs: [obj.CardID],
           containedObjects: [obj],
           isSingleCard: true,
+          suggestedRotation: isRotated90 ? 90 : 0,
         };
         decks.push(deckInfo);
       }
@@ -229,9 +243,20 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
 }
 
 /**
- * Slice a sprite sheet image into individual card images
+ * Slice a sprite sheet image into individual card images.
+ * @param {Buffer} imageBuffer - Raw sprite sheet image buffer
+ * @param {number} numWidth - Number of card columns in the sheet
+ * @param {number} numHeight - Number of card rows in the sheet
+ * @param {string} deckKey - Deck identifier key
+ * @param {number[]} deckIDs - Array of card IDs to extract
+ * @param {Object} cardNames - Map of card ID to card name
+ * @param {string} gameUploadsDir - Directory to save extracted cards
+ * @param {string|null} ocrNamePosition - OCR name position (top/bottom/center) or null
+ * @param {Object|null} ocrWorker - Tesseract OCR worker or null
+ * @param {number} cardRotation - Degrees to rotate each card after extraction (0, 90, 180, 270).
+ *   Use 90 or 270 when TTS stores landscape cards rotated in portrait cells.
  */
-async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker) {
+async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker, cardRotation = 0) {
   // Normalize EXIF orientation so that width/height reflect the visual (display) dimensions.
   // Without this, landscape sheets stored with an EXIF rotation tag report swapped dimensions,
   // causing each card cell to be sliced at the wrong size and orientation.
@@ -244,6 +269,9 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
 
   const totalCards = numWidth * numHeight;
   const cards = [];
+
+  // Normalize rotation to one of the supported values
+  const rotation = [90, 180, 270].includes(cardRotation) ? cardRotation : 0;
 
   // Determine which card indices we actually need from the DeckIDs
   const neededIndices = new Set();
@@ -272,15 +300,24 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
     const top = row * cardHeight;
 
     try {
-      const cardImageBuffer = await sharp(normalizedBuffer)
+      let cardPipeline = sharp(normalizedBuffer)
         .extract({
           left,
           top,
           width: cardWidth,
           height: cardHeight,
-        })
-        .png()
-        .toBuffer();
+        });
+
+      // Apply user-requested rotation to correct landscape cards stored portrait in TTS
+      if (rotation !== 0) {
+        cardPipeline = cardPipeline.rotate(rotation);
+      }
+
+      const cardImageBuffer = await cardPipeline.png().toBuffer();
+
+      // Determine actual stored dimensions (swapped if rotated 90° or 270°)
+      const storedWidth = (rotation === 90 || rotation === 270) ? cardHeight : cardWidth;
+      const storedHeight = (rotation === 90 || rotation === 270) ? cardWidth : cardHeight;
 
       // Generate filename
       const fileId = uuidv4();
@@ -308,8 +345,8 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
         cardName,
         cardIndex,
         fullCardID,
-        width: cardWidth,
-        height: cardHeight,
+        width: storedWidth,
+        height: storedHeight,
       });
     } catch (err) {
       console.error(`[TTS Import] Failed to extract card index ${cardIndex}:`, err.message);
@@ -396,6 +433,7 @@ export async function ttsImportRoutes(fastify) {
           totalCards,
           sheets,
           isSingleCard: deck.isSingleCard || false,
+          suggestedRotation: deck.suggestedRotation || 0,
         };
       });
 
@@ -432,10 +470,17 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
-    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition } = body;
+    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition, cardRotationDegrees } = body;
 
     if (!tempId) {
       return reply.status(400).send({ error: 'Missing tempId from analyze step' });
+    }
+
+    // Validate and parse card rotation (0, 90, 180, 270 degrees)
+    const validRotations = [0, 90, 180, 270];
+    const cardRotation = validRotations.includes(parseInt(cardRotationDegrees)) ? parseInt(cardRotationDegrees) : 0;
+    if (cardRotation !== 0) {
+      console.log(`[TTS Import] Card rotation requested: ${cardRotation}°`);
     }
 
     // Validate OCR position if provided
@@ -564,8 +609,13 @@ export async function ttsImportRoutes(fastify) {
                   const backFilename = `${backFileId}.png`;
                   const backFilePath = path.join(gameUploadsDir, backFilename);
 
-                  // Convert back image to PNG, normalizing EXIF orientation
-                  await sharp(backBuffer).rotate().png().toFile(backFilePath);
+                  // Convert back image to PNG, normalizing EXIF orientation.
+                  // Also apply the same card rotation so the back matches the front orientation.
+                  let backPipeline = sharp(backBuffer).rotate();
+                  if (cardRotation !== 0) {
+                    backPipeline = backPipeline.rotate(cardRotation);
+                  }
+                  await backPipeline.png().toFile(backFilePath);
 
                   // Create card back entry
                   const cardBackId = uuidv4();
@@ -591,7 +641,8 @@ export async function ttsImportRoutes(fastify) {
               cardNames,
               gameUploadsDir,
               useOcr ? ocrNamePosition : null,
-              ocrWorker
+              ocrWorker,
+              cardRotation
             );
 
             // Filter out cards that already exist

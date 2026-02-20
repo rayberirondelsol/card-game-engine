@@ -64,6 +64,7 @@ export default function GameDetail() {
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
   const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
+  const [ttsCardRotation, setTtsCardRotation] = useState(0);
   const [ocrRenamePosition, setOcrRenamePosition] = useState('top');
   const [ocrRenaming, setOcrRenaming] = useState(false);
   const [ttsError, setTtsError] = useState('');
@@ -494,6 +495,11 @@ export default function GameDetail() {
       // Select all decks by default
       const allIndices = new Set(data.decks.map(d => d.index));
       setTtsSelectedDecks(allIndices);
+      // Auto-suggest rotation if any deck was placed sideways in TTS
+      const anyRotated = data.decks.some(d => d.suggestedRotation && d.suggestedRotation !== 0);
+      if (anyRotated) {
+        setTtsCardRotation(90);
+      }
     } catch (err) {
       setTtsError('Failed to upload file: ' + err.message);
     } finally {
@@ -543,6 +549,7 @@ export default function GameDetail() {
           selectedDeckIndices: Array.from(ttsSelectedDecks),
           createCategories: ttsCreateCategories,
           ocrNamePosition: ttsOcrNamePosition !== 'none' ? ttsOcrNamePosition : undefined,
+          cardRotationDegrees: ttsCardRotation !== 0 ? ttsCardRotation : undefined,
         }),
       });
 
@@ -1512,7 +1519,7 @@ export default function GameDetail() {
                         <img
                           src={cb.image_path}
                           alt={cb.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       </div>
                       <span className="text-xs text-[var(--color-text)] truncate flex-1" data-testid={`card-back-name-${cb.id}`} title={cb.name}>
@@ -2303,6 +2310,11 @@ export default function GameDetail() {
                             {deck.isSingleCard && (
                               <span className="ml-1 text-xs text-[var(--color-text-secondary)]">(single card)</span>
                             )}
+                            {deck.suggestedRotation > 0 && (
+                              <span className="ml-1 text-xs text-amber-600" title="This deck appears to have landscape cards stored sideways in TTS">
+                                ↻ landscape
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-[var(--color-text-secondary)]">
                             {deck.totalCards} card{deck.totalCards !== 1 ? 's' : ''}
@@ -2349,6 +2361,28 @@ export default function GameDetail() {
                       {ttsOcrNamePosition !== 'none' && (
                         <span className="text-xs text-amber-600">
                           (slower import)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-[var(--color-text)]">
+                        Rotate cards:
+                      </span>
+                      <select
+                        value={ttsCardRotation}
+                        onChange={(e) => setTtsCardRotation(parseInt(e.target.value))}
+                        className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-[var(--color-text)] focus:ring-purple-500 focus:border-purple-500"
+                        data-testid="tts-card-rotation-select"
+                      >
+                        <option value={0}>No rotation (default)</option>
+                        <option value={90}>90° clockwise (landscape → portrait)</option>
+                        <option value={270}>90° counter-clockwise (landscape → portrait)</option>
+                        <option value={180}>180° (upside down)</option>
+                      </select>
+                      {ttsCardRotation !== 0 && (
+                        <span className="text-xs text-amber-600">
+                          Use when cards appear sideways after import
                         </span>
                       )}
                     </div>
