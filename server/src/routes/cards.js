@@ -93,13 +93,24 @@ export async function cardsRoutes(fastify) {
       // Store relative path for serving
       const relativePath = `/uploads/${id}/${savedFilename}`;
 
+      // Read image dimensions for proper orientation display
+      let imgWidth = 0;
+      let imgHeight = 0;
+      try {
+        const meta = await sharp(filePath).metadata();
+        imgWidth = meta.width || 0;
+        imgHeight = meta.height || 0;
+      } catch (_) {
+        // non-critical – default to 0
+      }
+
       // Insert card into database
       const cardId = uuidv4();
       const stmt = db.prepare(
-        'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+        'INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)'
       );
-      stmt.run(cardId, id, cardName, relativePath);
-      console.log('[SQL] INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)', cardId, id, cardName);
+      stmt.run(cardId, id, cardName, relativePath, imgWidth, imgHeight);
+      console.log('[SQL] INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)', cardId, id, cardName, imgWidth, imgHeight);
 
       const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
       return reply.status(201).send(card);
@@ -325,7 +336,7 @@ export async function cardsRoutes(fastify) {
 
       // Use transaction for atomic batch insert
       const insertCard = db.prepare(
-        'INSERT INTO cards (id, game_id, name, image_path, category_id) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO cards (id, game_id, name, image_path, category_id, width, height) VALUES (?, ?, ?, ?, ?, ?, ?)'
       );
 
       const transaction = db.transaction((cardsData) => {
@@ -335,7 +346,9 @@ export async function cardsRoutes(fastify) {
             cardData.game_id,
             cardData.name,
             cardData.image_path,
-            cardData.category_id
+            cardData.category_id,
+            cardData.width || 0,
+            cardData.height || 0
           );
         }
       });
@@ -379,6 +392,8 @@ export async function cardsRoutes(fastify) {
             name: cardName,
             image_path: relativePath,
             category_id: (categoryId && categoryId !== 'none') ? categoryId : null,
+            width: cardWidth,
+            height: cardHeight,
           });
         } catch (err) {
           console.error(`[Cards] Failed to extract card index ${cardIndex}:`, err.message);
@@ -472,7 +487,7 @@ export async function cardsRoutes(fastify) {
         const prefix = path.basename(data.filename, path.extname(data.filename));
 
         const insertCard = db.prepare(
-          'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+          'INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)'
         );
 
         const transaction = db.transaction((cardsData) => {
@@ -481,7 +496,9 @@ export async function cardsRoutes(fastify) {
               cardData.id,
               cardData.game_id,
               cardData.name,
-              cardData.image_path
+              cardData.image_path,
+              cardData.width || 0,
+              cardData.height || 0
             );
           }
         });
@@ -524,6 +541,8 @@ export async function cardsRoutes(fastify) {
               game_id: id,
               name: cardName,
               image_path: relativePath,
+              width: cardWidth,
+              height: cardHeight,
             });
           } catch (err) {
             console.error(`[Cards] Failed to extract card index ${cardIndex}:`, err.message);
@@ -566,9 +585,9 @@ export async function cardsRoutes(fastify) {
         // Insert card into database
         const cardId = uuidv4();
         const stmt = db.prepare(
-          'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+          'INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        stmt.run(cardId, id, cardName, relativePath);
+        stmt.run(cardId, id, cardName, relativePath, metadata.width || 0, metadata.height || 0);
 
         console.log(`[Cards] Auto-imported single card: ${cardName}`);
 

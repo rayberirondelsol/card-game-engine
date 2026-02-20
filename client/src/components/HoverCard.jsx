@@ -25,9 +25,12 @@ export default function HoverCard({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
 
-  // Base card dimensions (matching GameTable.jsx)
-  const CARD_WIDTH = 100;
-  const CARD_HEIGHT = 140;
+  // Base card dimensions – use actual image aspect ratio when available
+  const BASE_W = 100;
+  const BASE_H = 140;
+  const isLandscape = card && card.width > 0 && card.height > 0 && card.width > card.height;
+  const CARD_WIDTH = isLandscape ? BASE_H : BASE_W;
+  const CARD_HEIGHT = isLandscape ? BASE_W : BASE_H;
 
   // Scaled dimensions
   const scaledWidth = CARD_WIDTH * scale;
@@ -110,7 +113,7 @@ export default function HoverCard({
               <img
                 src={imagePath}
                 alt={cardName}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 draggable={false}
               />
             ) : (
@@ -156,7 +159,7 @@ export default function HoverCard({
               <img
                 src={cardBackImageUrl}
                 alt="Card back"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 draggable={false}
               />
             ) : (

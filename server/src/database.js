@@ -69,6 +69,8 @@ export async function setupDatabase() {
       card_back_id TEXT,
       name TEXT NOT NULL,
       image_path TEXT NOT NULL,
+      width INTEGER DEFAULT 0,
+      height INTEGER DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
@@ -115,6 +117,17 @@ export async function setupDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  // Migrations: add new columns to existing tables if they don't exist yet
+  const cardColumns = db.prepare("PRAGMA table_info(cards)").all().map(c => c.name);
+  if (!cardColumns.includes('width')) {
+    db.exec('ALTER TABLE cards ADD COLUMN width INTEGER DEFAULT 0');
+    console.log('[DB] Migration: added width column to cards');
+  }
+  if (!cardColumns.includes('height')) {
+    db.exec('ALTER TABLE cards ADD COLUMN height INTEGER DEFAULT 0');
+    console.log('[DB] Migration: added height column to cards');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states');

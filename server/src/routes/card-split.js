@@ -291,14 +291,16 @@ export async function cardSplitRoutes(fastify) {
             const relativePath = `/uploads/${id}/${savedFilename}`;
 
             const insertStmt = db.prepare(
-              'INSERT INTO cards (id, game_id, category_id, name, image_path) VALUES (?, ?, ?, ?, ?)'
+              'INSERT INTO cards (id, game_id, category_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
-            insertStmt.run(cardId, id, categoryId || null, cardName, relativePath);
+            insertStmt.run(cardId, id, categoryId || null, cardName, relativePath, extractWidth, extractHeight);
 
             createdCards.push({
               id: cardId,
               name: cardName,
               image_path: relativePath,
+              width: extractWidth,
+              height: extractHeight,
               row,
               col,
             });
@@ -472,13 +474,15 @@ export async function cardSplitRoutes(fastify) {
               const relativePath = `/uploads/${id}/${savedFilename}`;
 
               db.prepare(
-                'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
-              ).run(cardId, id, cardName, relativePath);
+                'INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)'
+              ).run(cardId, id, cardName, relativePath, extractWidth, extractHeight);
 
               createdCards.push({
                 id: cardId,
                 name: cardName,
                 image_path: relativePath,
+                width: extractWidth,
+                height: extractHeight,
                 row,
                 col,
               });
@@ -518,13 +522,15 @@ export async function cardSplitRoutes(fastify) {
         const relativePath = `/uploads/${id}/${savedFilename}`;
 
         db.prepare(
-          'INSERT INTO cards (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
-        ).run(cardId, id, baseName, relativePath);
+          'INSERT INTO cards (id, game_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(cardId, id, baseName, relativePath, width, height);
 
         createdCards.push({
           id: cardId,
           name: baseName,
           image_path: relativePath,
+          width,
+          height,
         });
 
         console.log(`[Auto Import] Single card imported: ${baseName}`);

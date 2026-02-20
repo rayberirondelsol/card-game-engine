@@ -1359,11 +1359,14 @@ export default function GameDetail() {
                         data-testid={`card-${card.id}`}
                         className="group relative bg-[var(--color-background)] rounded-lg border border-[var(--color-border)] overflow-hidden hover:border-[var(--color-primary)] transition-colors"
                       >
-                        <div className="aspect-[2.5/3.5] overflow-hidden">
+                        <div
+                          className="overflow-hidden"
+                          style={{ aspectRatio: (card.width > 0 && card.height > 0) ? `${card.width}/${card.height}` : '2.5/3.5' }}
+                        >
                           <img
                             src={card.image_path}
                             alt={card.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             loading="lazy"
                           />
                         </div>
