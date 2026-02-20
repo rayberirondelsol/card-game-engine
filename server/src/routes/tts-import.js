@@ -232,8 +232,12 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
  * Slice a sprite sheet image into individual card images
  */
 async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker) {
-  const image = sharp(imageBuffer);
-  const metadata = await image.metadata();
+  // Normalize EXIF orientation so that width/height reflect the visual (display) dimensions.
+  // Without this, landscape sheets stored with an EXIF rotation tag report swapped dimensions,
+  // causing each card cell to be sliced at the wrong size and orientation.
+  const normalizedBuffer = await sharp(imageBuffer).rotate().toBuffer();
+
+  const metadata = await sharp(normalizedBuffer).metadata();
 
   const cardWidth = Math.floor(metadata.width / numWidth);
   const cardHeight = Math.floor(metadata.height / numHeight);
@@ -268,7 +272,7 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
     const top = row * cardHeight;
 
     try {
-      const cardImageBuffer = await sharp(imageBuffer)
+      const cardImageBuffer = await sharp(normalizedBuffer)
         .extract({
           left,
           top,
@@ -558,8 +562,8 @@ export async function ttsImportRoutes(fastify) {
                   const backFilename = `${backFileId}.png`;
                   const backFilePath = path.join(gameUploadsDir, backFilename);
 
-                  // Convert back image to PNG
-                  await sharp(backBuffer).png().toFile(backFilePath);
+                  // Convert back image to PNG, normalizing EXIF orientation
+                  await sharp(backBuffer).rotate().png().toFile(backFilePath);
 
                   // Create card back entry
                   const cardBackId = uuidv4();
