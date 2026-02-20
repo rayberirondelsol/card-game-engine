@@ -231,7 +231,7 @@ async function ocrCardName(cardImageBuffer, namePosition, worker) {
 /**
  * Slice a sprite sheet image into individual card images
  */
-async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker) {
+async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckIDs, cardNames, gameUploadsDir, ocrNamePosition, ocrWorker, rotateCardsDegrees) {
   // Normalize EXIF orientation so that width/height reflect the visual (display) dimensions.
   // Without this, landscape sheets stored with an EXIF rotation tag report swapped dimensions,
   // causing each card cell to be sliced at the wrong size and orientation.
@@ -272,7 +272,7 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
     const top = row * cardHeight;
 
     try {
-      const cardImageBuffer = await sharp(normalizedBuffer)
+      let extractedBuffer = await sharp(normalizedBuffer)
         .extract({
           left,
           top,
@@ -282,13 +282,42 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
         .png()
         .toBuffer();
 
+      // Apply explicit rotation if requested
+      let finalWidth = cardWidth;
+      let finalHeight = cardHeight;
+      if (rotateCardsDegrees === 90 || rotateCardsDegrees === -90 || rotateCardsDegrees === 180) {
+        extractedBuffer = await sharp(extractedBuffer)
+          .rotate(rotateCardsDegrees)
+          .png()
+          .toBuffer();
+        if (rotateCardsDegrees === 90 || rotateCardsDegrees === -90) {
+          finalWidth = cardHeight;
+          finalHeight = cardWidth;
+        }
+      } else if (rotateCardsDegrees === 'auto') {
+        // Auto-detect: if the cell is portrait but wider than tall after standard ratio check,
+        // rotate 90° CW. Standard portrait ratio is ~1:1.4 (w:h). If the cell is significantly
+        // more portrait (h > w * 1.5), it may be a landscape card stored rotated in TTS.
+        // We rotate only when it looks like a rotated landscape card.
+        const ratio = cardHeight / cardWidth;
+        if (ratio > 1.45) {
+          // Likely a landscape card stored rotated – rotate 90° CW to restore landscape orientation
+          extractedBuffer = await sharp(extractedBuffer)
+            .rotate(90)
+            .png()
+            .toBuffer();
+          finalWidth = cardHeight;
+          finalHeight = cardWidth;
+        }
+      }
+
       // Generate filename
       const fileId = uuidv4();
       const savedFilename = `${fileId}.png`;
       const filePath = path.join(gameUploadsDir, savedFilename);
 
       // Write card image to disk
-      writeFileSync(filePath, cardImageBuffer);
+      writeFileSync(filePath, extractedBuffer);
 
       // Determine card name: OCR > TTS nickname > fallback
       const fullCardID = parseInt(deckKey) * 100 + cardIndex;
@@ -296,7 +325,7 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
       let cardName = nickname || `Card ${cardIndex + 1}`;
 
       if (ocrNamePosition && ocrWorker) {
-        const ocrText = await ocrCardName(cardImageBuffer, ocrNamePosition, ocrWorker);
+        const ocrText = await ocrCardName(extractedBuffer, ocrNamePosition, ocrWorker);
         if (ocrText) {
           cardName = ocrText;
         }
@@ -308,8 +337,8 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
         cardName,
         cardIndex,
         fullCardID,
-        width: cardWidth,
-        height: cardHeight,
+        width: finalWidth,
+        height: finalHeight,
       });
     } catch (err) {
       console.error(`[TTS Import] Failed to extract card index ${cardIndex}:`, err.message);
@@ -432,7 +461,7 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
-    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition } = body;
+    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition, rotateCards } = body;
 
     if (!tempId) {
       return reply.status(400).send({ error: 'Missing tempId from analyze step' });
@@ -441,6 +470,10 @@ export async function ttsImportRoutes(fastify) {
     // Validate OCR position if provided
     const validOcrPositions = ['top', 'bottom', 'center'];
     const useOcr = ocrNamePosition && validOcrPositions.includes(ocrNamePosition);
+
+    // Validate rotateCards option: 90, -90, 180, 'auto', or undefined/null for no rotation
+    const validRotateOptions = [90, -90, 180, 'auto'];
+    const rotateCardsDegrees = validRotateOptions.includes(rotateCards) ? rotateCards : null;
 
     // Read temp TTS file
     const tempPath = path.join(UPLOADS_DIR, '_tts_temp', `${tempId}.json`);
@@ -591,7 +624,8 @@ export async function ttsImportRoutes(fastify) {
               cardNames,
               gameUploadsDir,
               useOcr ? ocrNamePosition : null,
-              ocrWorker
+              ocrWorker,
+              rotateCardsDegrees
             );
 
             // Filter out cards that already exist

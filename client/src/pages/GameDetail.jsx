@@ -56,6 +56,9 @@ export default function GameDetail() {
   const [savingCardName, setSavingCardName] = useState(false);
   const editCardNameRef = useRef(null);
 
+  // Card rotation state
+  const [rotatingCardId, setRotatingCardId] = useState(null);
+
   // TTS Import state
   const [showTtsImportModal, setShowTtsImportModal] = useState(false);
   const [ttsAnalyzing, setTtsAnalyzing] = useState(false);
@@ -64,6 +67,7 @@ export default function GameDetail() {
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
   const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
+  const [ttsRotateCards, setTtsRotateCards] = useState('none');
   const [ocrRenamePosition, setOcrRenamePosition] = useState('top');
   const [ocrRenaming, setOcrRenaming] = useState(false);
   const [ttsError, setTtsError] = useState('');
@@ -426,6 +430,29 @@ export default function GameDetail() {
     }
   }
 
+  // --- Card Rotation ---
+  async function handleRotateCard(cardId, degrees) {
+    if (rotatingCardId) return;
+    setRotatingCardId(cardId);
+    try {
+      const res = await fetch(`/api/games/${id}/cards/${cardId}/rotate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ degrees }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Rotation failed');
+      } else {
+        fetchCards();
+      }
+    } catch (err) {
+      alert('Rotation failed: ' + err.message);
+    } finally {
+      setRotatingCardId(null);
+    }
+  }
+
   // --- TTS Import ---
   async function handleOcrRename() {
     if (ocrRenaming) return;
@@ -462,6 +489,7 @@ export default function GameDetail() {
     setTtsSelectedDecks(new Set());
     setTtsCreateCategories(true);
     setTtsOcrNamePosition('none');
+    setTtsRotateCards('none');
   }
 
   async function handleTtsFileSelect(e) {
@@ -543,6 +571,7 @@ export default function GameDetail() {
           selectedDeckIndices: Array.from(ttsSelectedDecks),
           createCategories: ttsCreateCategories,
           ocrNamePosition: ttsOcrNamePosition !== 'none' ? ttsOcrNamePosition : undefined,
+          rotateCards: ttsRotateCards !== 'none' ? (ttsRotateCards === 'auto' ? 'auto' : parseInt(ttsRotateCards)) : undefined,
         }),
       });
 
@@ -1441,6 +1470,39 @@ export default function GameDetail() {
                               ))}
                             </select>
                           )}
+                        </div>
+                        {/* Rotate buttons (shown on hover) */}
+                        <div className="absolute top-1 left-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRotateCard(card.id, -90);
+                            }}
+                            disabled={rotatingCardId === card.id}
+                            data-testid={`rotate-ccw-card-${card.id}`}
+                            className="p-1 bg-blue-600 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center disabled:opacity-50"
+                            title="Rotate 90° counter-clockwise"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                              <path d="M3 3v5h5"/>
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRotateCard(card.id, 90);
+                            }}
+                            disabled={rotatingCardId === card.id}
+                            data-testid={`rotate-cw-card-${card.id}`}
+                            className="p-1 bg-blue-600 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center disabled:opacity-50"
+                            title="Rotate 90° clockwise"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                              <path d="M21 3v5h-5"/>
+                            </svg>
+                          </button>
                         </div>
                         {/* Delete button (shown on hover) */}
                         <button
@@ -2351,6 +2413,24 @@ export default function GameDetail() {
                           (slower import)
                         </span>
                       )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-[var(--color-text)]">
+                        Rotate imported cards:
+                      </span>
+                      <select
+                        value={ttsRotateCards}
+                        onChange={(e) => setTtsRotateCards(e.target.value)}
+                        className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-[var(--color-text)] focus:ring-purple-500 focus:border-purple-500"
+                        data-testid="tts-rotate-cards-select"
+                      >
+                        <option value="none">No rotation</option>
+                        <option value="auto">Auto-detect (landscape→portrait)</option>
+                        <option value="90">90° clockwise</option>
+                        <option value="-90">90° counter-clockwise</option>
+                        <option value="180">180°</option>
+                      </select>
                     </div>
                   </div>
 
