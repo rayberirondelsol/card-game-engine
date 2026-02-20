@@ -332,9 +332,10 @@ export default function GameTable() {
     };
   }
 
-  // Game objects state (counters, dice, notes, tokens, textFields)
+  // Game objects state (counters, dice, hitDice, notes, tokens, textFields)
   const [counters, setCounters] = useState([]);
   const [dice, setDice] = useState([]);
+  const [hitDice, setHitDice] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tokens, setTokens] = useState([]);
   const [textFields, setTextFields] = useState([]);
@@ -366,6 +367,7 @@ export default function GameTable() {
   // Toolbar modals
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
+  const [showHitDiceModal, setShowHitDiceModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
@@ -1592,7 +1594,63 @@ export default function GameTable() {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
-  // Drag handlers for floating objects (counters, dice, notes, tokens, textFields)
+  // Hit Dice (colored hit/crit/miss dice inspired by 20 Strong)
+  const HIT_DIE_FACES = {
+    yellow: ['miss', 'miss', 'miss', 'miss', 'hit', 'crit'],
+    green:  ['miss', 'miss', 'miss', 'hit', 'hit', 'crit'],
+    blue:   ['miss', 'miss', 'hit', 'hit', 'hit', 'crit'],
+    purple: ['miss', 'hit', 'hit', 'hit', 'hit', 'crit'],
+    red:    ['hit', 'hit', 'hit', 'hit', 'hit', 'crit'],
+  };
+
+  function rollHitFace(hitType) {
+    const faces = HIT_DIE_FACES[hitType] || HIT_DIE_FACES.yellow;
+    return faces[Math.floor(Math.random() * faces.length)];
+  }
+
+  function createHitDie(hitType) {
+    const canvas = canvasRef.current;
+    const newDie = {
+      id: crypto.randomUUID(),
+      type: 'hit',
+      hitType: hitType,
+      value: rollHitFace(hitType),
+      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      rolling: false,
+      locked: false,
+    };
+    setHitDice(prev => [...prev, newDie]);
+    setShowHitDiceModal(false);
+  }
+
+  function rollHitDie(dieId) {
+    const die = hitDice.find(d => d.id === dieId);
+    if (!die) return;
+    setHitDice(prev => prev.map(d =>
+      d.id === dieId ? { ...d, rolling: true } : d
+    ));
+    let count = 0;
+    const interval = setInterval(() => {
+      setHitDice(prev => prev.map(d => {
+        if (d.id !== dieId) return d;
+        return { ...d, value: rollHitFace(d.hitType) };
+      }));
+      count++;
+      if (count >= 10) {
+        clearInterval(interval);
+        setHitDice(prev => prev.map(d =>
+          d.id === dieId ? { ...d, rolling: false, value: rollHitFace(d.hitType) } : d
+        ));
+      }
+    }, 80);
+  }
+
+  function deleteHitDie(dieId) {
+    setHitDice(prev => prev.filter(d => d.id !== dieId));
+  }
+
+  // Drag handlers for floating objects (counters, dice, hitDice, notes, tokens, textFields)
   function handleObjDragStart(e, objType, objId) {
     // Only start drag on left mouse button
     if (!isTouchEvent(e) && e.button !== 0) return;
@@ -1607,6 +1665,7 @@ export default function GameTable() {
     let obj;
     if (objType === 'counter') obj = counters.find(c => c.id === objId);
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
+    else if (objType === 'hitDie') obj = hitDice.find(d => d.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
     else if (objType === 'textField') obj = textFields.find(tf => tf.id === objId);
@@ -1668,6 +1727,10 @@ export default function GameTable() {
       ));
     } else if (draggingObj.type === 'die') {
       setDice(prev => prev.map(d =>
+        d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
+      ));
+    } else if (draggingObj.type === 'hitDie') {
+      setHitDice(prev => prev.map(d =>
         d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
       ));
     } else if (draggingObj.type === 'note') {
@@ -1773,6 +1836,7 @@ export default function GameTable() {
   function toggleLockObj(type, id) {
     const setter = type === 'counter' ? setCounters
       : type === 'die' ? setDice
+      : type === 'hitDie' ? setHitDice
       : type === 'note' ? setNotes
       : type === 'token' ? setTokens
       : type === 'textField' ? setTextFields
@@ -2386,6 +2450,15 @@ export default function GameTable() {
         y: d.y,
         locked: d.locked || false,
       })),
+      hitDice: hitDice.map(d => ({
+        id: d.id,
+        type: d.type,
+        hitType: d.hitType,
+        value: d.value,
+        x: d.x,
+        y: d.y,
+        locked: d.locked || false,
+      })),
       notes: notes.map(n => ({
         id: n.id,
         text: n.text,
@@ -2699,6 +2772,22 @@ export default function GameTable() {
       })));
     } else {
       setDice([]);
+    }
+
+    // Restore hit dice
+    if (state.hitDice && Array.isArray(state.hitDice)) {
+      setHitDice(state.hitDice.map(d => ({
+        id: d.id || crypto.randomUUID(),
+        type: 'hit',
+        hitType: d.hitType || 'yellow',
+        value: d.value || 'miss',
+        x: d.x,
+        y: d.y,
+        rolling: false,
+        locked: d.locked || false,
+      })));
+    } else {
+      setHitDice([]);
     }
 
     // Restore notes
@@ -3094,6 +3183,7 @@ export default function GameTable() {
   // ===== MODAL DISMISS HELPERS =====
   function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); }
   function dismissDiceModal() { setShowDiceModal(false); }
+  function dismissHitDiceModal() { setShowHitDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
   function dismissTokenModal() { setShowTokenModal(false); }
   function dismissTextFieldModal() { setShowTextFieldModal(false); setNewTextFieldText(''); setNewTextFieldFontSize(16); setNewTextFieldColor('#ffffff'); }
@@ -3545,6 +3635,91 @@ export default function GameTable() {
           </div>
         </div>
       ))}
+
+      {/* Floating Hit Dice Widgets */}
+      {hitDice.map(die => {
+        const hitDieColors = {
+          yellow: { bg: 'rgba(202,138,4,0.92)', border: '#fbbf24', text: '#fff', label: 'Yellow' },
+          green:  { bg: 'rgba(22,101,52,0.92)',  border: '#4ade80', text: '#fff', label: 'Green' },
+          blue:   { bg: 'rgba(29,78,216,0.92)',   border: '#60a5fa', text: '#fff', label: 'Blue' },
+          purple: { bg: 'rgba(88,28,135,0.92)',   border: '#c084fc', text: '#fff', label: 'Purple' },
+          red:    { bg: 'rgba(153,27,27,0.92)',   border: '#f87171', text: '#fff', label: 'Red' },
+        };
+        const colors = hitDieColors[die.hitType] || hitDieColors.yellow;
+        const faceSymbol = die.value === 'hit' ? '⊕' : die.value === 'crit' ? '✦' : '○';
+        const faceLabel = die.value === 'hit' ? 'Hit' : die.value === 'crit' ? 'Crit' : 'Miss';
+        return (
+          <div
+            key={die.id}
+            data-testid={`hit-die-${die.id}`}
+            data-die-type={`hit-${die.hitType}`}
+            data-ui-element="true"
+            className="absolute z-20 select-none pointer-events-auto"
+            style={{
+              left: die.x - 38,
+              top: die.y - 42,
+              cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
+            }}
+            onMouseDown={(e) => handleObjDragStart(e, 'hitDie', die.id)}
+            onTouchStart={(e) => handleObjDragStart(e, 'hitDie', die.id)}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'hitDie', objId: die.id, cardTableId: null, stackId: null }); }}
+          >
+            <div
+              className={`rounded-xl border-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`}
+              style={{
+                minWidth: '76px',
+                background: colors.bg,
+                borderColor: colors.border,
+                padding: '8px',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Subtle glitter overlay */}
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: '10px', pointerEvents: 'none',
+                background: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.04) 4px, rgba(255,255,255,0.04) 5px)',
+              }} />
+              <div className="text-[10px] uppercase font-bold mb-0.5" style={{ color: colors.border, letterSpacing: '0.05em' }}>
+                {colors.label}
+              </div>
+              <div
+                className={`text-3xl font-bold leading-none ${die.rolling ? 'opacity-50' : ''}`}
+                style={{ color: colors.text }}
+                data-testid={`hit-die-symbol-${die.id}`}
+              >
+                {die.rolling ? '?' : faceSymbol}
+              </div>
+              <div className="text-xs font-semibold mt-0.5" style={{ color: colors.border }}>
+                {die.rolling ? '...' : faceLabel}
+              </div>
+              <div className="flex gap-1 mt-1.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); rollHitDie(die.id); }}
+                  disabled={die.rolling}
+                  data-testid={`hit-die-roll-${die.id}`}
+                  className="flex-1 h-10 rounded text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                  style={{ background: 'rgba(0,0,0,0.35)' }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.55)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.35)'; }}
+                >
+                  {die.rolling ? '...' : 'Roll'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteHitDie(die.id); }}
+                  data-testid={`hit-die-delete-${die.id}`}
+                  className="w-10 h-10 rounded text-white text-base flex items-center justify-center transition-colors"
+                  style={{ background: 'rgba(0,0,0,0.35)' }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.7)'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.35)'; }}
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
 
       {/* Floating Note Widgets (sticky notes on table) */}
       {notes.map(note => (
@@ -4225,6 +4400,22 @@ export default function GameTable() {
               {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Dice</span>}
             </button>
 
+            {/* Hit Dice button */}
+            <button
+              onClick={() => setShowHitDiceModal(true)}
+              data-testid="toolbar-hit-dice-btn"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
+              title="Add Hit Die"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="12" cy="12" r="4" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Hit Die</span>}
+            </button>
+
             {/* Note button */}
             <button
               onClick={() => setShowNoteModal(true)}
@@ -4439,6 +4630,45 @@ export default function GameTable() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
             >
               Place Dice
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* Hit Dice Creation Modal */}
+      <SwipeModal isOpen={showHitDiceModal} onDismiss={dismissHitDiceModal} testId="hit-dice-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="hit-dice-modal">
+          <h3 className="text-white font-semibold mb-1">Add Hit Die</h3>
+          <p className="text-slate-400 text-xs mb-4">Select a die by strength. More hits = stronger die.</p>
+          <div className="flex flex-col gap-2 mb-4">
+            {[
+              { type: 'yellow', label: 'Yellow — 1 Hit', hits: 1, bg: '#ca8a04', border: '#fbbf24', desc: '4× Miss, 1× Hit, 1× Crit' },
+              { type: 'green',  label: 'Green — 2 Hits', hits: 2, bg: '#166534', border: '#4ade80', desc: '3× Miss, 2× Hit, 1× Crit' },
+              { type: 'blue',   label: 'Blue — 3 Hits',  hits: 3, bg: '#1d4ed8', border: '#60a5fa', desc: '2× Miss, 3× Hit, 1× Crit' },
+              { type: 'purple', label: 'Purple — 4 Hits', hits: 4, bg: '#581c87', border: '#c084fc', desc: '1× Miss, 4× Hit, 1× Crit' },
+              { type: 'red',    label: 'Red — 5 Hits',   hits: 5, bg: '#991b1b', border: '#f87171', desc: '5× Hit, 1× Crit (no miss)' },
+            ].map(opt => (
+              <button
+                key={opt.type}
+                onClick={() => createHitDie(opt.type)}
+                data-testid={`hit-die-${opt.type}`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg border-2 text-left transition-all hover:scale-[1.02]"
+                style={{ background: opt.bg + 'cc', borderColor: opt.border }}
+              >
+                <span className="text-2xl font-bold text-white">⊕</span>
+                <div>
+                  <div className="text-white text-sm font-semibold">{opt.label}</div>
+                  <div className="text-xs" style={{ color: opt.border }}>{opt.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={dismissHitDiceModal}
+              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
             </button>
           </div>
         </div>
@@ -5208,6 +5438,12 @@ export default function GameTable() {
                   Add Dice
                 </button>
                 <button
+                  onClick={() => { setShowHitDiceModal(true); setContextMenu(null); }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Add Hit Die
+                </button>
+                <button
                   onClick={() => { setShowNoteModal(true); setContextMenu(null); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
@@ -5232,7 +5468,7 @@ export default function GameTable() {
             {contextMenu.objType && (
               <>
                 <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                  {contextMenu.objType === 'textField' ? 'Text Field' : contextMenu.objType.charAt(0).toUpperCase() + contextMenu.objType.slice(1)}
+                  {contextMenu.objType === 'textField' ? 'Text Field' : contextMenu.objType === 'hitDie' ? 'Hit Die' : contextMenu.objType.charAt(0).toUpperCase() + contextMenu.objType.slice(1)}
                 </div>
                 <button
                   onClick={() => {
@@ -5242,7 +5478,7 @@ export default function GameTable() {
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   {(() => {
-                    const lists = { counter: counters, die: dice, note: notes, token: tokens, textField: textFields };
+                    const lists = { counter: counters, die: dice, hitDie: hitDice, note: notes, token: tokens, textField: textFields };
                     const obj = (lists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
                     return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
                   })()}
@@ -5269,6 +5505,7 @@ export default function GameTable() {
                     const { objType, objId } = contextMenu;
                     if (objType === 'counter') setCounters(prev => prev.filter(c => c.id !== objId));
                     else if (objType === 'die') setDice(prev => prev.filter(d => d.id !== objId));
+                    else if (objType === 'hitDie') setHitDice(prev => prev.filter(d => d.id !== objId));
                     else if (objType === 'note') deleteNote(objId);
                     else if (objType === 'token') setTokens(prev => prev.filter(t => t.id !== objId));
                     else if (objType === 'textField') deleteTextField(objId);
