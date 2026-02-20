@@ -45,6 +45,19 @@ const TABLE_BACKGROUNDS = {
 const GRID_SIZE = 80; // pixels per grid cell
 const CARD_WIDTH = 100;
 const CARD_HEIGHT = 140;
+
+/**
+ * Returns the display dimensions for a card based on its actual image aspect ratio.
+ * Landscape cards (width > height) swap the default portrait dimensions so the
+ * card fills its container correctly without being cropped.
+ */
+function getCardDims(card) {
+  if (card && card.width > 0 && card.height > 0 && card.width > card.height) {
+    // Landscape card – swap so it renders in landscape orientation
+    return { w: CARD_HEIGHT, h: CARD_WIDTH };
+  }
+  return { w: CARD_WIDTH, h: CARD_HEIGHT };
+}
 const SNAP_THRESHOLD = 20; // pixels within which snap activates
 
 // Snap a value to the nearest grid line
@@ -874,6 +887,8 @@ export default function GameTable() {
       name: card.name,
       image_path: card.image_path,
       card_back_id: card.card_back_id || null,
+      width: card.width || 0,
+      height: card.height || 0,
       x: 250 + col * 150 + (Math.random() - 0.5) * 30,
       y: 300 + row * 180 + (Math.random() - 0.5) * 30,
       zIndex: newZIndex,
@@ -911,6 +926,8 @@ export default function GameTable() {
         name: card.name,
         image_path: card.image_path,
         card_back_id: card.card_back_id || null,
+        width: card.width || 0,
+        height: card.height || 0,
         x: stackX,
         y: stackY,
         zIndex: newZIndex,
@@ -1696,11 +1713,12 @@ export default function GameTable() {
       return c.zIndex === maxZ;
     });
     allCards.forEach(card => {
+      const { w: cw, h: ch } = getCardDims(card);
       const corners = [
-        { name: 'top-left', x: card.x - CARD_WIDTH / 2 + 8, y: card.y - CARD_HEIGHT / 2 + 8 },
-        { name: 'top-right', x: card.x + CARD_WIDTH / 2 - 8, y: card.y - CARD_HEIGHT / 2 + 8 },
-        { name: 'bottom-left', x: card.x - CARD_WIDTH / 2 + 8, y: card.y + CARD_HEIGHT / 2 - 8 },
-        { name: 'bottom-right', x: card.x + CARD_WIDTH / 2 - 8, y: card.y + CARD_HEIGHT / 2 - 8 },
+        { name: 'top-left', x: card.x - cw / 2 + 8, y: card.y - ch / 2 + 8 },
+        { name: 'top-right', x: card.x + cw / 2 - 8, y: card.y - ch / 2 + 8 },
+        { name: 'bottom-left', x: card.x - cw / 2 + 8, y: card.y + ch / 2 - 8 },
+        { name: 'bottom-right', x: card.x + cw / 2 - 8, y: card.y + ch / 2 - 8 },
       ];
       corners.forEach(corner => {
         const dist = Math.sqrt((px - corner.x) ** 2 + (py - corner.y) ** 2);
@@ -2127,6 +2145,8 @@ export default function GameTable() {
       name: card.name,
       image_path: card.image_path,
       card_back_id: card.card_back_id || null,
+      width: card.width || 0,
+      height: card.height || 0,
       originalTableId: card.tableId,
     };
     setHandCards(prev => [...prev, handCard]);
@@ -2156,6 +2176,8 @@ export default function GameTable() {
       name: card.name,
       image_path: card.image_path,
       card_back_id: card.card_back_id || null,
+      width: card.width || 0,
+      height: card.height || 0,
       originalTableId: card.tableId,
     }));
     setHandCards(prev => [...prev, ...newHandCards]);
@@ -2204,6 +2226,8 @@ export default function GameTable() {
           name: card.name,
           image_path: card.image_path,
           card_back_id: card.card_back_id || null,
+          width: card.width || 0,
+          height: card.height || 0,
           x: stackPosition.x,
           y: stackPosition.y,
           zIndex: maxStackZ + 1,
@@ -2242,6 +2266,8 @@ export default function GameTable() {
         name: card.name,
         image_path: card.image_path,
         card_back_id: card.card_back_id || null,
+        width: card.width || 0,
+        height: card.height || 0,
         x: posX,
         y: posY,
         zIndex: newZIndex,
@@ -2674,6 +2700,8 @@ export default function GameTable() {
           name: c.name,
           image_path: c.image_path,
           card_back_id: c.card_back_id || null,
+          width: c.width || 0,
+          height: c.height || 0,
           x: c.x,
           y: c.y,
           zIndex: c.zIndex || 1,
@@ -2697,6 +2725,8 @@ export default function GameTable() {
               name: c.name,
               image_path: c.image_path,
               card_back_id: c.card_back_id || null,
+              width: c.width || 0,
+              height: c.height || 0,
               x: stack.x,
               y: stack.y,
               zIndex: c.zIndex || 1,
@@ -3327,6 +3357,7 @@ export default function GameTable() {
           const isSelected = selectedCards.has(card.tableId);
           const isStack = stackSize > 1;
           const isDropTarget = stackDropTarget === stackId; // Highlight if this stack is a drop target
+          const { w: cardW, h: cardH } = getCardDims(card);
 
           return (
             <div
@@ -3341,10 +3372,10 @@ export default function GameTable() {
               data-ui-element="true"
               className="absolute select-none group pointer-events-auto"
               style={{
-                left: card.x - CARD_WIDTH / 2,
-                top: card.y - CARD_HEIGHT / 2,
-                width: CARD_WIDTH,
-                height: CARD_HEIGHT + (isStack ? 6 : 0),
+                left: card.x - cardW / 2,
+                top: card.y - cardH / 2,
+                width: cardW,
+                height: cardH + (isStack ? 6 : 0),
                 zIndex: isDragging ? 9999 : card.zIndex,
                 transform: `scale(${isDragging ? 1.1 : isDropTarget ? 1.05 : 1}) rotate(${card.rotation || 0}deg)`,
                 transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
@@ -3392,8 +3423,8 @@ export default function GameTable() {
                     style={{
                       left: 4,
                       top: 8,
-                      width: CARD_WIDTH - 4,
-                      height: CARD_HEIGHT - 4,
+                      width: cardW - 4,
+                      height: cardH - 4,
                     }}
                   />
                   {/* Middle ghost card (for 3+ stacks) */}
@@ -3403,8 +3434,8 @@ export default function GameTable() {
                       style={{
                         left: 2,
                         top: 4,
-                        width: CARD_WIDTH - 2,
-                        height: CARD_HEIGHT - 2,
+                        width: cardW - 2,
+                        height: cardH - 2,
                       }}
                     />
                   )}
@@ -3425,8 +3456,8 @@ export default function GameTable() {
                 data-testid={`card-face-container-${card.tableId}`}
                 data-face-down={card.faceDown ? 'true' : 'false'}
                 style={{
-                  width: CARD_WIDTH,
-                  height: CARD_HEIGHT,
+                  width: cardW,
+                  height: cardH,
                   perspective: '600px',
                 }}
               >
@@ -3449,7 +3480,7 @@ export default function GameTable() {
                       <img
                         src={card.image_path}
                         alt={card.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         draggable={false}
                       />
                     ) : (
@@ -3479,7 +3510,7 @@ export default function GameTable() {
                       <img
                         src={cardBackMap[card.card_back_id]}
                         alt="Card back"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         draggable={false}
                       />
                     ) : (
@@ -4228,14 +4259,14 @@ export default function GameTable() {
                                 onClick={() => placeCardOnTable(card)}
                                 data-testid={`drawer-card-${card.id}`}
                                 className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
-                                style={{ aspectRatio: '5/7' }}
+                                style={{ aspectRatio: (card.width > 0 && card.height > 0) ? `${card.width}/${card.height}` : '5/7' }}
                                 title={`Place "${card.name}" on table`}
                               >
                                 {card.image_path ? (
                                   <img
                                     src={card.image_path}
                                     alt={card.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                     draggable={false}
                                   />
                                 ) : (
@@ -4302,14 +4333,14 @@ export default function GameTable() {
                                 onClick={() => placeCardOnTable(card)}
                                 data-testid={`drawer-card-${card.id}`}
                                 className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all hover:scale-105 bg-slate-700/50"
-                                style={{ aspectRatio: '5/7' }}
+                                style={{ aspectRatio: (card.width > 0 && card.height > 0) ? `${card.width}/${card.height}` : '5/7' }}
                                 title={`Place "${card.name}" on table`}
                               >
                                 {card.image_path ? (
                                   <img
                                     src={card.image_path}
                                     alt={card.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                     draggable={false}
                                   />
                                 ) : (
@@ -5093,7 +5124,7 @@ export default function GameTable() {
                         style={{ width: 100, height: 140, backgroundColor: '#fff' }}>
                         {card.faceDown ? (
                           card.card_back_id && cardBackMap[card.card_back_id] ? (
-                            <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                            <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-contain" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
                               <div className="w-12 h-16 rounded border border-blue-400/30 flex items-center justify-center">
@@ -5105,7 +5136,7 @@ export default function GameTable() {
                             </div>
                           )
                         ) : card.image_path ? (
-                          <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+                          <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
@@ -5635,7 +5666,7 @@ export default function GameTable() {
                         style={{ backgroundColor: '#fff' }}
                       >
                         {card.image_path ? (
-                          <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" draggable={false} />
+                          <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" draggable={false} />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
                             <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 14 : 20} height={isMobileLandscape ? 14 : 20} viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
@@ -5672,7 +5703,7 @@ export default function GameTable() {
           <div className="fixed z-50 pointer-events-none" data-testid="hand-card-preview" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -70%)' }}>
             <div className="rounded-xl overflow-hidden border-2 border-yellow-400 shadow-2xl shadow-black/50" style={{ width: 200, height: 280, backgroundColor: '#fff' }}>
               {card.image_path ? (
-                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                   <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
@@ -5703,7 +5734,7 @@ export default function GameTable() {
               style={{ width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: '#fff' }}
             >
               {card.image_path ? (
-                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 p-1">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
@@ -5820,7 +5851,7 @@ export default function GameTable() {
               >
                 {previewCard.faceDown ? (
                   previewCard.card_back_id && cardBackMap[previewCard.card_back_id] ? (
-                    <img src={cardBackMap[previewCard.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                    <img src={cardBackMap[previewCard.card_back_id]} alt="Card back" className="w-full h-full object-contain" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
                       <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
@@ -5832,7 +5863,7 @@ export default function GameTable() {
                     </div>
                   )
                 ) : previewCard.image_path ? (
-                  <img src={previewCard.image_path} alt={previewCard.name} className="w-full h-full object-cover" />
+                  <img src={previewCard.image_path} alt={previewCard.name} className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">
@@ -5874,7 +5905,7 @@ export default function GameTable() {
             >
               {card.faceDown ? (
                 card.card_back_id && cardBackMap[card.card_back_id] ? (
-                  <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-cover" />
+                  <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
                     <div className="w-24 h-32 rounded border-2 border-blue-400/30 flex items-center justify-center">
@@ -5886,7 +5917,7 @@ export default function GameTable() {
                   </div>
                 )
               ) : card.image_path ? (
-                <img src={card.image_path} alt={card.name} className="w-full h-full object-cover" />
+                <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                   <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">

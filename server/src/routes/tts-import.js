@@ -308,6 +308,8 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
         cardName,
         cardIndex,
         fullCardID,
+        width: cardWidth,
+        height: cardHeight,
       });
     } catch (err) {
       console.error(`[TTS Import] Failed to extract card index ${cardIndex}:`, err.message);
@@ -604,14 +606,14 @@ export async function ttsImportRoutes(fastify) {
             // Insert only new cards into database
             if (newCards.length > 0) {
               const insertStmt = db.prepare(
-                'INSERT INTO cards (id, game_id, category_id, card_back_id, name, image_path) VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO cards (id, game_id, category_id, card_back_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
               );
 
               const insertMany = db.transaction((cardsToInsert) => {
                 for (const card of cardsToInsert) {
                   const cardId = uuidv4();
                   const relativePath = `/uploads/${id}/${card.savedFilename}`;
-                  insertStmt.run(cardId, id, categoryId, backImagePath, card.cardName, relativePath);
+                  insertStmt.run(cardId, id, categoryId, backImagePath, card.cardName, relativePath, card.width || 0, card.height || 0);
                 }
               });
 
@@ -730,13 +732,13 @@ export async function ttsImportRoutes(fastify) {
             );
 
             const insertStmt = db.prepare(
-              'INSERT INTO cards (id, game_id, category_id, name, image_path) VALUES (?, ?, ?, ?, ?)'
+              'INSERT INTO cards (id, game_id, category_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?, ?)'
             );
             const insertMany = db.transaction((cards) => {
               for (const card of cards) {
                 const cardId = uuidv4();
                 const relativePath = `/uploads/${id}/${card.savedFilename}`;
-                insertStmt.run(cardId, id, catId, card.cardName, relativePath);
+                insertStmt.run(cardId, id, catId, card.cardName, relativePath, card.width || 0, card.height || 0);
               }
             });
             insertMany(extractedCards);
