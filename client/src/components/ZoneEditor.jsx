@@ -10,6 +10,12 @@ const PLAYER_COLORS = [
 ];
 
 const PRESET_LAYOUTS = {
+  '1p-solo': {
+    label: '1 Player – Solo',
+    zones: [
+      { color: 'blue', label: 'Player 1', x: 100, y: 300, width: 1000, height: 500 },
+    ],
+  },
   '2p-vertical': {
     label: '2 Players – Top/Bottom',
     zones: [
