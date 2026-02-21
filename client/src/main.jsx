@@ -5,6 +5,8 @@ import './index.css';
 import StartScreen from './pages/StartScreen';
 import GameDetail from './pages/GameDetail';
 import GameTable from './pages/GameTable';
+import RoomLobby from './pages/RoomLobby';
+import MultiplayerGame from './pages/MultiplayerGame';
 import AuthPage from './pages/AuthPage';
 import ConfirmPage from './pages/ConfirmPage';
 
@@ -76,6 +78,8 @@ function App() {
         <Route path="/" element={<StartScreen />} />
         <Route path="/games/:id" element={<GameDetail />} />
         <Route path="/games/:id/play" element={<GameTable />} />
+        <Route path="/rooms/:code/lobby" element={<RoomLobby />} />
+        <Route path="/rooms/:code/play" element={<MultiplayerGame />} />
         <Route path="/auth/confirm" element={<ConfirmRoute onLogin={handleLogin} />} />
       </Routes>
     </BrowserRouter>

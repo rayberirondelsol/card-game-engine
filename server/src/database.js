@@ -118,6 +118,37 @@ export async function setupDatabase() {
     );
   `);
 
+  // Multiplayer tables
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_rooms (
+      id TEXT PRIMARY KEY,
+      game_id TEXT NOT NULL,
+      room_code TEXT UNIQUE NOT NULL,
+      host_player_id TEXT,
+      status TEXT NOT NULL DEFAULT 'waiting',
+      live_state_data TEXT DEFAULT '{}',
+      setup_id TEXT,
+      created_at INTEGER DEFAULT (unixepoch()),
+      updated_at INTEGER DEFAULT (unixepoch()),
+      FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS room_players (
+      id TEXT PRIMARY KEY,
+      room_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      seat INTEGER NOT NULL,
+      is_host INTEGER DEFAULT 0,
+      is_connected INTEGER DEFAULT 0,
+      hand_card_count INTEGER DEFAULT 0,
+      joined_at INTEGER DEFAULT (unixepoch()),
+      FOREIGN KEY (room_id) REFERENCES game_rooms(id) ON DELETE CASCADE,
+      UNIQUE (room_id, color),
+      UNIQUE (room_id, seat)
+    );
+  `);
+
   // Migrations: add new columns to existing tables if they don't exist yet
   const cardColumns = db.prepare("PRAGMA table_info(cards)").all().map(c => c.name);
   if (!cardColumns.includes('width')) {
@@ -129,8 +160,15 @@ export async function setupDatabase() {
     console.log('[DB] Migration: added height column to cards');
   }
 
+  // Migration: add zone_data to setups
+  const setupColumns = db.prepare("PRAGMA table_info(setups)").all().map(c => c.name);
+  if (!setupColumns.includes('zone_data')) {
+    db.exec("ALTER TABLE setups ADD COLUMN zone_data TEXT DEFAULT '[]'");
+    console.log('[DB] Migration: added zone_data column to setups');
+  }
+
   console.log('[DB] Database initialized at:', DB_PATH);
-  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states');
+  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players');
 
   return db;
 }

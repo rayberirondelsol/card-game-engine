@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import CreateRoomModal from '../components/CreateRoomModal';
+import JoinRoomModal from '../components/JoinRoomModal';
 
 export default function GameDetail() {
   const { id } = useParams();
@@ -90,6 +92,11 @@ export default function GameDetail() {
 
   // Expanded categories in tree
   const [expandedCategories, setExpandedCategories] = useState(new Set());
+
+  // Multiplayer modal state
+  const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false);
+  const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
 
   useEffect(() => {
     fetchGame();
@@ -1080,6 +1087,7 @@ export default function GameDetail() {
   const rootCategories = buildCategoryTree(categories, null);
 
   return (
+    <>
     <div className="min-h-screen bg-[var(--color-background)] p-8">
       <div className="max-w-7xl mx-auto">
         {/* Top Bar */}
@@ -1117,6 +1125,30 @@ export default function GameDetail() {
             >
               Play Game
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowMultiplayerMenu(v => !v)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors font-medium"
+              >
+                Multiplayer
+              </button>
+              {showMultiplayerMenu && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => { setShowMultiplayerMenu(false); setShowCreateRoomModal(true); }}
+                    className="w-full px-4 py-2.5 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 transition-colors"
+                  >
+                    Create Room
+                  </button>
+                  <button
+                    onClick={() => { setShowMultiplayerMenu(false); setShowJoinRoomModal(true); }}
+                    className="w-full px-4 py-2.5 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 transition-colors"
+                  >
+                    Join Room
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2495,5 +2527,32 @@ export default function GameDetail() {
         )}
       </div>
     </div>
+
+    {/* Multiplayer Modals */}
+    {showCreateRoomModal && (
+      <CreateRoomModal
+        gameId={id}
+        setups={setups}
+        onClose={() => setShowCreateRoomModal(false)}
+        onCreated={(data) => {
+          setShowCreateRoomModal(false);
+          sessionStorage.setItem(`room_${data.room_code}_player_id`, data.player_id);
+          sessionStorage.setItem(`room_${data.room_code}_is_host`, 'true');
+          navigate(`/rooms/${data.room_code}/lobby`);
+        }}
+      />
+    )}
+    {showJoinRoomModal && (
+      <JoinRoomModal
+        onClose={() => setShowJoinRoomModal(false)}
+        onJoined={(data) => {
+          setShowJoinRoomModal(false);
+          sessionStorage.setItem(`room_${data.room_code}_player_id`, data.player_id);
+          sessionStorage.setItem(`room_${data.room_code}_is_host`, 'false');
+          navigate(`/rooms/${data.room_code}/lobby`);
+        }}
+      />
+    )}
+    </>
   );
 }

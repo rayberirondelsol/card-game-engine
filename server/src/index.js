@@ -16,6 +16,8 @@ import { categoriesRoutes } from './routes/categories.js';
 import { cardBacksRoutes } from './routes/card-backs.js';
 import { ttsImportRoutes } from './routes/tts-import.js';
 import { authRoutes } from './routes/auth.js';
+import { roomsRoutes } from './routes/rooms.js';
+import { setupWebSocketServer } from './websocket/roomWs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,6 +68,7 @@ async function start() {
   await fastify.register(categoriesRoutes);
   await fastify.register(cardBacksRoutes);
   await fastify.register(ttsImportRoutes);
+  await fastify.register(roomsRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -82,6 +85,10 @@ async function start() {
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`[Server] Card Game Engine API running on http://localhost:${PORT}`);
     console.log(`[Server] Health check: http://localhost:${PORT}/api/health`);
+
+    // Attach WebSocket server to the underlying HTTP server
+    setupWebSocketServer(fastify.server);
+    console.log(`[Server] WebSocket server ready at ws://localhost:${PORT}/ws/rooms/:code`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

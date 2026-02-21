@@ -23,7 +23,7 @@ export async function setupsRoutes(fastify) {
   fastify.post('/api/games/:id/setups', async (request, reply) => {
     const db = getDb();
     const { id } = request.params;
-    const { name, state_data } = request.body || {};
+    const { name, state_data, zone_data } = request.body || {};
 
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
     if (!game) {
@@ -36,10 +36,13 @@ export async function setupsRoutes(fastify) {
 
     const setupId = uuidv4();
     const stateJson = typeof state_data === 'string' ? state_data : JSON.stringify(state_data || {});
+    const zoneJson = zone_data !== undefined
+      ? (typeof zone_data === 'string' ? zone_data : JSON.stringify(zone_data))
+      : '[]';
 
     db.prepare(
-      'INSERT INTO setups (id, game_id, name, state_data) VALUES (?, ?, ?, ?)'
-    ).run(setupId, id, name.trim(), stateJson);
+      'INSERT INTO setups (id, game_id, name, state_data, zone_data) VALUES (?, ?, ?, ?, ?)'
+    ).run(setupId, id, name.trim(), stateJson, zoneJson);
     console.log('[SQL] INSERT INTO setups', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);
@@ -66,7 +69,7 @@ export async function setupsRoutes(fastify) {
   fastify.put('/api/games/:id/setups/:setupId', async (request, reply) => {
     const db = getDb();
     const { id, setupId } = request.params;
-    const { name, state_data } = request.body || {};
+    const { name, state_data, zone_data } = request.body || {};
 
     const existing = db.prepare(
       'SELECT * FROM setups WHERE id = ? AND game_id = ?'
@@ -78,14 +81,18 @@ export async function setupsRoutes(fastify) {
     const stateJson = state_data !== undefined
       ? (typeof state_data === 'string' ? state_data : JSON.stringify(state_data))
       : null;
+    const zoneJson = zone_data !== undefined
+      ? (typeof zone_data === 'string' ? zone_data : JSON.stringify(zone_data))
+      : null;
 
     db.prepare(
       `UPDATE setups SET
         name = COALESCE(?, name),
         state_data = COALESCE(?, state_data),
+        zone_data = COALESCE(?, zone_data),
         updated_at = datetime('now')
       WHERE id = ?`
-    ).run(name || null, stateJson, setupId);
+    ).run(name || null, stateJson, zoneJson, setupId);
     console.log('[SQL] UPDATE setups WHERE id = ?', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);

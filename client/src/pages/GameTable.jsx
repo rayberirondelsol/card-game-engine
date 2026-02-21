@@ -4,6 +4,10 @@ import HoverCard from '../components/HoverCard';
 import SwipeModal from '../components/SwipeModal';
 import MobileActionBar from '../components/MobileActionBar';
 import { useOrientationLayout } from '../hooks/useOrientationLayout';
+import PlayerHUD from '../components/PlayerHUD';
+import PlayerCursors from '../components/PlayerCursor';
+import ZoneOverlay from '../components/ZoneOverlay';
+import ZoneEditor from '../components/ZoneEditor';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 
@@ -285,8 +289,10 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
   }
 }
 
-export default function GameTable() {
-  const { id } = useParams();
+export default function GameTable({ room = null }) {
+  const { id: routeId } = useParams();
+  // In multiplayer mode, room.gameId takes precedence over the URL param
+  const id = room?.gameId || routeId;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const canvasRef = useRef(null);
@@ -315,6 +321,19 @@ export default function GameTable() {
   const [savingSetup, setSavingSetup] = useState(false);
   const [editingSetupId, setEditingSetupId] = useState(null);
   const setupLoadedRef = useRef(false);
+
+  // Multiplayer state
+  const [zones, setZones] = useState([]);
+  const applyingRemoteRef = useRef(false);
+  const roomRef = useRef(null);
+
+  // Register remote action handler on mount (used by MultiplayerGame wrapper)
+  useEffect(() => {
+    if (room?.registerActionHandler) {
+      room.registerActionHandler(applyRemoteAction);
+      roomRef.current = { onAction: applyRemoteAction };
+    }
+  }, [room]);
 
   // Camera state
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
@@ -757,6 +776,7 @@ export default function GameTable() {
         if (selectedCards.size > 0) {
           setTableCards(prev => prev.map(c => {
             if (selectedCards.has(c.tableId)) {
+              if (room) room.sendAction({ type: 'card_flip', table_id: c.tableId, face_down: !c.faceDown });
               return { ...c, faceDown: !c.faceDown };
             }
             return c;
@@ -769,6 +789,7 @@ export default function GameTable() {
         if (selectedCards.size > 0) {
           setTableCards(prev => prev.map(c => {
             if (selectedCards.has(c.tableId)) {
+              if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation: (c.rotation || 0) + 90 });
               return { ...c, rotation: (c.rotation || 0) + 90 };
             }
             return c;
@@ -781,6 +802,7 @@ export default function GameTable() {
         if (selectedCards.size > 0) {
           setTableCards(prev => prev.map(c => {
             if (selectedCards.has(c.tableId)) {
+              if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation: (c.rotation || 0) - 90 });
               return { ...c, rotation: (c.rotation || 0) - 90 };
             }
             return c;
@@ -1488,6 +1510,7 @@ export default function GameTable() {
         if (c.tableId !== draggingCard) return c;
         return { ...c, x: finalX, y: finalY };
       }));
+      if (room) room.sendAction({ type: 'card_move', table_id: draggingCard, x: finalX, y: finalY });
     }
 
     // Haptic feedback on card drop (short vibration)
@@ -1919,6 +1942,11 @@ export default function GameTable() {
   // Mouse move handler (React events on container)
   function handleGlobalMouseMove(e) {
     handleGlobalMove(e);
+    // Send cursor position to multiplayer room (throttled in hook)
+    if (room?.sendCursor) {
+      const worldPos = screenToWorld(e.clientX, e.clientY);
+      room.sendCursor(worldPos.x, worldPos.y);
+    }
   }
 
   // Touch move handler with pinch-to-zoom support
@@ -2158,6 +2186,11 @@ export default function GameTable() {
 
   // Draw N cards from a stack to hand (TTS-style number key draw)
   function drawCardsFromStack(stackId, count) {
+    // In multiplayer mode, send request to server - the server will respond privately
+    if (room) {
+      room.sendAction({ type: 'card_draw_to_hand', stack_id: stackId, count });
+      return;
+    }
     const stackCards = tableCards.filter(c => c.inStack === stackId);
     if (stackCards.length === 0) return;
 
@@ -2517,6 +2550,133 @@ export default function GameTable() {
     };
   }
 
+  // ─── Multiplayer: Apply remote actions from the server ────────────────────
+  function applyRemoteAction(msg) {
+    if (!msg || !msg.type) return;
+    applyingRemoteRef.current = true;
+    try {
+      switch (msg.type) {
+        case 'card_move':
+          setTableCards(prev => prev.map(c =>
+            c.tableId === msg.table_id ? { ...c, x: msg.x, y: msg.y } : c
+          ));
+          break;
+        case 'card_flip':
+          setTableCards(prev => prev.map(c =>
+            c.tableId === msg.table_id ? { ...c, faceDown: msg.face_down } : c
+          ));
+          break;
+        case 'card_rotate':
+          setTableCards(prev => prev.map(c =>
+            c.tableId === msg.table_id ? { ...c, rotation: msg.rotation } : c
+          ));
+          break;
+        case 'stack_move':
+          setTableCards(prev => prev.map(c =>
+            c.inStack === msg.stack_id ? { ...c, x: msg.x, y: msg.y } : c
+          ));
+          break;
+        case 'stack_take_top':
+          if (msg.card) {
+            setTableCards(prev => {
+              const withoutOld = prev.filter(c => c.tableId !== msg.card.tableId);
+              return [...withoutOld, { ...msg.card, tableId: msg.card.tableId, inStack: null }];
+            });
+          }
+          break;
+        case 'stack_removed':
+          setTableCards(prev => prev.filter(c => c.inStack !== msg.stack_id));
+          break;
+        case 'stack_size_update':
+          // Server already handled removal - just update the visual stack count by removing extras
+          // (the server's boardState is authoritative; we rely on full sync for accuracy)
+          break;
+        case 'card_play_from_hand':
+          if (msg.card) {
+            setTableCards(prev => {
+              const exists = prev.find(c => c.tableId === msg.card.tableId);
+              if (exists) return prev;
+              return [...prev, {
+                ...msg.card,
+                tableId: msg.card.tableId,
+                inStack: null,
+                faceDown: false,
+                rotation: 0,
+                zIndex: maxZIndex + 1,
+              }];
+            });
+            setMaxZIndex(z => z + 1);
+          }
+          break;
+        case 'draw_response':
+          // Private cards drawn to our hand
+          if (msg.cards && msg.cards.length > 0) {
+            const newHandCards = msg.cards.map(card => ({
+              handId: crypto.randomUUID(),
+              cardId: card.id || card.cardId,
+              name: card.name,
+              image_path: card.image_path,
+              card_back_id: card.card_back_id || null,
+              width: card.width || 0,
+              height: card.height || 0,
+            }));
+            setHandCards(prev => [...prev, ...newHandCards]);
+          }
+          break;
+        case 'dice_roll':
+          setDice(prev => prev.map(d => d.id === msg.dice_id ? { ...d, value: msg.value } : d));
+          break;
+        case 'counter_update':
+          setCounters(prev => prev.map(c => c.id === msg.counter_id ? { ...c, value: msg.value } : c));
+          break;
+        case 'note_edit':
+          setNotes(prev => prev.map(n => n.id === msg.note_id ? { ...n, text: msg.text } : n));
+          break;
+        case 'token_move':
+          setTokens(prev => prev.map(t => t.id === msg.token_id ? { ...t, x: msg.x, y: msg.y } : t));
+          break;
+        case 'board_sync':
+          if (msg.board_state) {
+            if (msg.board_state.cards) setTableCards(msg.board_state.cards);
+            if (msg.board_state.counters) setCounters(msg.board_state.counters);
+            if (msg.board_state.dice) setDice(msg.board_state.dice);
+            if (msg.board_state.notes) setNotes(msg.board_state.notes);
+            if (msg.board_state.tokens) setTokens(msg.board_state.tokens);
+          }
+          break;
+        case 'room_started':
+          if (msg.board_state) {
+            if (msg.board_state.cards) setTableCards(msg.board_state.cards);
+            if (msg.board_state.counters) setCounters(msg.board_state.counters);
+            if (msg.board_state.dice) setDice(msg.board_state.dice);
+            if (msg.board_state.notes) setNotes(msg.board_state.notes);
+            if (msg.board_state.tokens) setTokens(msg.board_state.tokens);
+          }
+          if (msg.zones) setZones(msg.zones);
+          break;
+        default:
+          // Unknown or cursor/player messages handled by useGameRoom hook
+          break;
+      }
+    } finally {
+      applyingRemoteRef.current = false;
+    }
+  }
+
+  // Sync hand card count to server in multiplayer mode
+  useEffect(() => {
+    if (room) {
+      room.sendHandCountUpdate(handCards.length);
+    }
+  }, [handCards.length, room]);
+
+  // Load zones from room welcome message
+  useEffect(() => {
+    if (room?.zones && room.zones.length > 0) {
+      setZones(room.zones);
+    }
+  }, [room?.zones]);
+
   // Save the game state to the backend
   async function saveGameState(name) {
     setSaving(true);
@@ -2555,6 +2715,8 @@ export default function GameTable() {
   // Auto-save function (uses refs to avoid stale closures)
   const performAutoSaveRef = useRef(null);
   performAutoSaveRef.current = async function performAutoSave() {
+    // Disable auto-save in multiplayer mode
+    if (room) return;
     // Only auto-save if there's something on the table
     if (tableCards.length === 0 && handCards.length === 0 && tokens.length === 0 && counters.length === 0 && dice.length === 0 && notes.length === 0) {
       return;
@@ -2629,14 +2791,14 @@ export default function GameTable() {
         res = await fetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones }),
         });
       } else {
         // Create new setup
         res = await fetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones }),
         });
       }
       if (!res.ok) {
@@ -2932,6 +3094,9 @@ export default function GameTable() {
           }
           const setup = await res.json();
           loadGameState(setup.state_data);
+          if (setup.zone_data) {
+            try { setZones(JSON.parse(setup.zone_data)); } catch {}
+          }
           setSaveToast(`Loaded setup: "${setup.name}"`);
           setTimeout(() => setSaveToast(null), 4000);
         } catch (err) {
@@ -2956,6 +3121,9 @@ export default function GameTable() {
           const setup = await res.json();
           setSetupName(setup.name);
           loadGameState(setup.state_data);
+          if (setup.zone_data) {
+            try { setZones(JSON.parse(setup.zone_data)); } catch {}
+          }
           setSaveToast(`Editing setup: "${setup.name}"`);
           setTimeout(() => setSaveToast(null), 4000);
         } catch (err) {
@@ -5901,6 +6069,57 @@ export default function GameTable() {
           </div>
         );
       })()}
+
+      {/* ─── Multiplayer Overlays ─── */}
+      {room && (
+        <>
+          <PlayerHUD
+            players={room.players || []}
+            myPlayerId={room.myPlayerId}
+          />
+          <PlayerCursors
+            cursors={(() => {
+              // Convert world coords to screen coords for rendering
+              const container = containerRef.current;
+              if (!container) return {};
+              const rect = container.getBoundingClientRect();
+              const cam = cameraRef.current;
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              const result = {};
+              for (const [pid, pos] of Object.entries(room.remoteCursors || {})) {
+                result[pid] = {
+                  screenX: (pos.x - centerX + cam.x) * cam.zoom + centerX,
+                  screenY: (pos.y - centerY + cam.y) * cam.zoom + centerY,
+                };
+              }
+              return result;
+            })()}
+            players={room.players || []}
+          />
+          {zones.length > 0 && (
+            <div
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              style={{
+                transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px) scale(${cameraRef.current.zoom})`,
+                transformOrigin: '50% 50%',
+              }}
+            >
+              <ZoneOverlay zones={zones} myColor={room.myColor} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Zone editor overlays in setup mode */}
+      {setupMode && (
+        <ZoneEditor
+          zones={zones}
+          onZonesChange={setZones}
+          camera={cameraRef.current}
+          containerRef={containerRef}
+        />
+      )}
 
       {/* ALT key card zoom preview - desktop only (Feature #58) */}
       {altKeyHeld && hoveredTableCard && !isTouchCapableRef.current && (() => {
