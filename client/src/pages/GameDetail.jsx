@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
 import JoinRoomModal from '../components/JoinRoomModal';
+import CameraCardScanner from '../components/CameraCardScanner';
+import { isTouchDevice } from '../utils/touchUtils';
 
 export default function GameDetail() {
   const { id } = useParams();
@@ -97,6 +99,10 @@ export default function GameDetail() {
   const [showMultiplayerMenu, setShowMultiplayerMenu] = useState(false);
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
+
+  // Camera card scanner state
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const isTouchDev = typeof window !== 'undefined' && isTouchDevice();
 
   useEffect(() => {
     fetchGame();
@@ -1327,6 +1333,8 @@ export default function GameDetail() {
                           openTtsImportModal();
                         } else if (value === 'ocr') {
                           handleOcrRename();
+                        } else if (value === 'camera') {
+                          setShowCameraScanner(true);
                         }
                         // Reset selection after action
                         e.target.value = '';
@@ -1348,6 +1356,11 @@ export default function GameDetail() {
                       <option value="ocr" title="Rename existing cards using OCR text recognition">
                         🔤 OCR Rename Cards
                       </option>
+                      {isTouchDev && (
+                        <option value="camera" title="Karten mit der Smartphone-Kamera scannen (automatische Erkennung)">
+                          📷 Kamera-Scan (Android)
+                        </option>
+                      )}
                     </select>
 
                     {/* Tooltip on hover */}
@@ -1366,6 +1379,11 @@ export default function GameDetail() {
                         <div>
                           <strong>🔤 OCR Rename:</strong> Use optical character recognition to automatically rename existing cards based on text found in the images.
                         </div>
+                        {isTouchDev && (
+                          <div>
+                            <strong>📷 Kamera-Scan:</strong> Karten direkt mit der Smartphone-Kamera scannen – automatische Erkennung, Vorder- und Rückseiten-Modi.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2550,6 +2568,25 @@ export default function GameDetail() {
           sessionStorage.setItem(`room_${data.room_code}_player_id`, data.player_id);
           sessionStorage.setItem(`room_${data.room_code}_is_host`, 'false');
           navigate(`/rooms/${data.room_code}/lobby`);
+        }}
+      />
+    )}
+
+    {showCameraScanner && (
+      <CameraCardScanner
+        gameId={id}
+        categoryId={selectedCategoryId !== 'uncategorized' ? selectedCategoryId : null}
+        onClose={() => setShowCameraScanner(false)}
+        onCardsImported={(count) => {
+          if (count > 0) {
+            fetchCards();
+            fetchCardBacks();
+            setUploadMessage({
+              type: 'success',
+              text: `${count} Karte${count !== 1 ? 'n' : ''} per Kamera-Scan importiert`,
+            });
+            setTimeout(() => setUploadMessage(null), 5000);
+          }
         }}
       />
     )}
