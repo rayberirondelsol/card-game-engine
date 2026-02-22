@@ -6101,7 +6101,7 @@ export default function GameTable({ room = null }) {
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
               style={{
-                transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px) scale(${cameraRef.current.zoom})`,
+                transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
                 transformOrigin: '50% 50%',
               }}
             >
