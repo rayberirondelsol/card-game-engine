@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { mkdirSync, existsSync, unlinkSync, writeFileSync } from 'fs';
+import { mkdirSync, existsSync, unlinkSync, writeFileSync, renameSync } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
 import sharp from 'sharp';
@@ -89,6 +89,23 @@ export async function cardsRoutes(fastify) {
 
       // Derive card name from original filename (without extension)
       const cardName = path.basename(data.filename, path.extname(data.filename));
+
+      // Camera scan: auto-trim background so only the card itself is kept.
+      // Uses the corner pixel colour as background reference and removes uniform borders.
+      if (request.query.is_camera_scan === 'true') {
+        try {
+          const trimmedPath = filePath + '.trimmed.jpg';
+          await sharp(filePath)
+            .trim({ threshold: 20 })
+            .jpeg({ quality: 92 })
+            .toFile(trimmedPath);
+          // Replace original with trimmed version
+          renameSync(trimmedPath, filePath);
+        } catch (trimErr) {
+          // Non-fatal — keep original if trim fails
+          console.warn('[Cards] Camera scan trim failed, keeping original:', trimErr.message);
+        }
+      }
 
       // Store relative path for serving
       const relativePath = `/uploads/${id}/${savedFilename}`;

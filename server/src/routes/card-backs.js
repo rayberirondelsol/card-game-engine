@@ -2,9 +2,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { mkdirSync, existsSync, unlinkSync } from 'fs';
+import { mkdirSync, existsSync, unlinkSync, renameSync } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +73,20 @@ export async function cardBacksRoutes(fastify) {
 
       // Save file to disk
       await pipeline(data.file, createWriteStream(filePath));
+
+      // Camera scan: auto-trim background so only the card back itself is kept.
+      if (request.query.is_camera_scan === 'true') {
+        try {
+          const trimmedPath = filePath + '.trimmed.jpg';
+          await sharp(filePath)
+            .trim({ threshold: 20 })
+            .jpeg({ quality: 92 })
+            .toFile(trimmedPath);
+          renameSync(trimmedPath, filePath);
+        } catch (trimErr) {
+          console.warn('[CardBacks] Camera scan trim failed, keeping original:', trimErr.message);
+        }
+      }
 
       // Derive card back name from original filename (without extension)
       const cardBackName = path.basename(data.filename, path.extname(data.filename));

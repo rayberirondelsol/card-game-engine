@@ -62,9 +62,12 @@ function getRegionVariance(imageData, x, y, w, h) {
 }
 
 /**
- * Detect if a card is placed within the guide rectangle.
- * Strategy: check that edges of guide box show high contrast (card boundary)
- * and interior variance is low (uniform card face).
+ * Detect if a card is placed within the guide rectangle AND fills it.
+ * Strategy:
+ * 1. Check contrast between guide interior and outer background.
+ * 2. Check that each edge strip of the guide frame is covered by card
+ *    (edge strip brightness differs from outer background → card reaches the frame border).
+ * 3. Check interior variance is in a card-like range.
  */
 function detectCard(ctx, videoW, videoH) {
   // Guide rectangle: portrait-oriented, centered
@@ -74,35 +77,53 @@ function detectCard(ctx, videoW, videoH) {
   const guideY = Math.floor((videoH - guideH) / 2);
 
   const borderThickness = Math.max(6, Math.floor(videoW * 0.025));
+  // Thin strip just inside each guide edge to check card covers the whole frame
+  const edgeStrip = Math.max(5, Math.floor(videoW * 0.012));
 
   try {
     const full = ctx.getImageData(0, 0, videoW, videoH);
 
-    // Interior brightness (inside card guide)
-    const innerX = guideX + guideW * 0.1;
-    const innerY = guideY + guideH * 0.1;
-    const innerW = guideW * 0.8;
-    const innerH = guideH * 0.8;
+    // Interior brightness and variance (central 60% of guide to avoid edge effects)
+    const innerX = guideX + guideW * 0.2;
+    const innerY = guideY + guideH * 0.2;
+    const innerW = guideW * 0.6;
+    const innerH = guideH * 0.6;
     const innerBrightness = getRegionBrightness(full, innerX, innerY, innerW, innerH);
     const innerVariance = getRegionVariance(full, innerX, innerY, innerW, innerH);
 
-    // Border zones (just outside the guide box on all four sides)
-    const topOuterBrightness = getRegionBrightness(full, guideX, guideY - borderThickness, guideW, borderThickness);
+    // Outer border zones (just outside the guide box on all four sides)
+    const topOuterBrightness    = getRegionBrightness(full, guideX, guideY - borderThickness, guideW, borderThickness);
     const bottomOuterBrightness = getRegionBrightness(full, guideX, guideY + guideH, guideW, borderThickness);
-    const leftOuterBrightness = getRegionBrightness(full, guideX - borderThickness, guideY, borderThickness, guideH);
-    const rightOuterBrightness = getRegionBrightness(full, guideX + guideW, guideY, borderThickness, guideH);
+    const leftOuterBrightness   = getRegionBrightness(full, guideX - borderThickness, guideY, borderThickness, guideH);
+    const rightOuterBrightness  = getRegionBrightness(full, guideX + guideW, guideY, borderThickness, guideH);
 
     const avgOuterBrightness = (topOuterBrightness + bottomOuterBrightness + leftOuterBrightness + rightOuterBrightness) / 4;
     const edgeContrast = Math.abs(innerBrightness - avgOuterBrightness);
 
-    // Card detected if:
-    // 1. High contrast between interior and exterior (card sitting on table)
-    // 2. Interior variance is reasonable (not totally uniform = empty frame,
-    //    but not too chaotic either — a card face has some pattern but is structured)
-    const hasContrast = edgeContrast > 18;
-    const hasContent = innerVariance > 100 && innerVariance < 12000;
+    // Edge strips *inside* the guide at each border — detect whether card fills the frame.
+    // If the card doesn't reach the guide edge, these strips will look like the background.
+    const margin = guideW * 0.08; // skip corners to avoid guide-border artifacts
+    const topEdgeBrightness    = getRegionBrightness(full, guideX + margin, guideY,                           guideW - 2 * margin, edgeStrip);
+    const bottomEdgeBrightness = getRegionBrightness(full, guideX + margin, guideY + guideH - edgeStrip,     guideW - 2 * margin, edgeStrip);
+    const leftEdgeBrightness   = getRegionBrightness(full, guideX,                          guideY + margin, edgeStrip,           guideH - 2 * margin);
+    const rightEdgeBrightness  = getRegionBrightness(full, guideX + guideW - edgeStrip,     guideY + margin, edgeStrip,           guideH - 2 * margin);
 
-    return hasContrast && hasContent;
+    // Each guide-edge strip should differ from the outer background (card covers the edge)
+    const FILL_THRESHOLD = 14;
+    const topFills    = Math.abs(topEdgeBrightness    - topOuterBrightness)    > FILL_THRESHOLD;
+    const bottomFills = Math.abs(bottomEdgeBrightness - bottomOuterBrightness) > FILL_THRESHOLD;
+    const leftFills   = Math.abs(leftEdgeBrightness   - leftOuterBrightness)   > FILL_THRESHOLD;
+    const rightFills  = Math.abs(rightEdgeBrightness  - rightOuterBrightness)  > FILL_THRESHOLD;
+    const cardFillsFrame = topFills && bottomFills && leftFills && rightFills;
+
+    // Card detected if:
+    // 1. Sufficient contrast between guide interior and outer background
+    // 2. Interior variance indicates card content (not blank, not chaotic)
+    // 3. Card fills all four edges of the guide frame
+    const hasContrast = edgeContrast > 25;
+    const hasContent  = innerVariance > 100 && innerVariance < 12000;
+
+    return hasContrast && hasContent && cardFillsFrame;
   } catch {
     return false;
   }
@@ -152,7 +173,7 @@ async function uploadCardImage(gameId, imageDataUrl, name, categoryId, cardBackI
   if (categoryId) formData.append('category_id', categoryId);
   if (cardBackId) formData.append('card_back_id', cardBackId);
 
-  const res = await fetch(`/api/games/${gameId}/cards/upload`, {
+  const res = await fetch(`/api/games/${gameId}/cards/upload?is_camera_scan=true`, {
     method: 'POST',
     body: formData,
   });
@@ -168,7 +189,7 @@ async function uploadCardBackImage(gameId, imageDataUrl) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`/api/games/${gameId}/card-backs/upload`, {
+  const res = await fetch(`/api/games/${gameId}/card-backs/upload?is_camera_scan=true`, {
     method: 'POST',
     body: formData,
   });
@@ -638,7 +659,7 @@ export default function CameraCardScanner({ gameId, categoryId, onClose, onCards
               )}
               {!cardDetected && (
                 <p className="text-white/50 text-center text-xs mt-1">
-                  Karte vollständig in den Rahmen legen
+                  Karte vollständig in den Rahmen legen – Karte muss den Rahmen ganz ausfüllen
                 </p>
               )}
               {importError && (
