@@ -1554,14 +1554,14 @@ export default function GameDetail() {
                             </svg>
                           </button>
                         </div>
-                        {/* Delete button (shown on hover) */}
+                        {/* Delete button (always visible on touch, hover on desktop) */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteCard(card.id, card.name);
                           }}
                           data-testid={`delete-card-${card.id}`}
-                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-xs w-5 h-5 flex items-center justify-center"
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-60 hover:opacity-100 transition-opacity text-xs w-5 h-5 flex items-center justify-center"
                           title="Delete card"
                         >
                           &times;
@@ -1633,7 +1633,7 @@ export default function GameDetail() {
                       <button
                         onClick={() => handleDeleteCardBack(cb.id, cb.name)}
                         data-testid={`delete-card-back-${cb.id}`}
-                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400 opacity-60 hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
                         title="Delete card back"
                       >
                         &times;
