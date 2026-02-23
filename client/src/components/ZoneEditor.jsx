@@ -59,6 +59,7 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStart = useRef(null);
   const [drawRect, setDrawRect] = useState(null);
+  const [showPresetModal, setShowPresetModal] = useState(() => zones.length === 0);
 
   const selectedZone = zones.find(z => z.id === selectedZoneId) || null;
 
@@ -149,6 +150,7 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
       cameraY: z.y,
     }));
     onZonesChange(newZones);
+    setShowPresetModal(false);
   }
 
   return (
@@ -246,19 +248,45 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
         </div>
       )}
 
-      {/* Layout presets toolbar */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex gap-2 z-40">
-        {Object.entries(PRESET_LAYOUTS).map(([key, preset]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => applyPreset(key)}
-            className="px-3 py-1.5 text-xs bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-white rounded-lg"
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+      {/* Layout preset picker modal – shown on first entry or via "Change Layout" */}
+      {showPresetModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 w-80 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold text-sm">Choose Player Layout</h3>
+              {zones.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPresetModal(false)}
+                  className="text-slate-400 hover:text-white text-lg leading-none"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+            <p className="text-slate-400 text-xs">Select a preset to place player zones on the table. You can adjust them afterwards.</p>
+            <div className="flex flex-col gap-2">
+              {Object.entries(PRESET_LAYOUTS).map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyPreset(key)}
+                  className="w-full px-4 py-2.5 text-sm bg-slate-800 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 text-white rounded-lg text-left transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowPresetModal(false)}
+                className="w-full px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors"
+              >
+                Skip – I'll draw zones manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zone overlays for editing */}
       {zones.map(zone => {
@@ -290,9 +318,16 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
         );
       })}
 
-      {/* Instructions hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/50 bg-black/40 px-3 py-1 rounded-full pointer-events-none">
-        Alt + drag to draw a zone · Click zone to edit · Use presets above
+      {/* Instructions hint + change layout */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/40 px-3 py-1.5 rounded-full">
+        <span className="text-xs text-white/50 pointer-events-none">Alt + drag to draw a zone · Click zone to edit</span>
+        <button
+          type="button"
+          onClick={() => setShowPresetModal(true)}
+          className="text-xs text-slate-300 hover:text-white underline underline-offset-2 transition-colors"
+        >
+          Change Layout
+        </button>
       </div>
     </div>
   );
