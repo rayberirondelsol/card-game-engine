@@ -8,6 +8,8 @@ import PlayerHUD from '../components/PlayerHUD';
 import PlayerCursors from '../components/PlayerCursor';
 import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
+import SetupSequenceEditor from '../components/SetupSequenceEditor';
+import { executeSequence } from '../utils/sequenceExecutor.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 
@@ -320,6 +322,8 @@ export default function GameTable({ room = null }) {
   const [setupName, setSetupName] = useState('');
   const [savingSetup, setSavingSetup] = useState(false);
   const [editingSetupId, setEditingSetupId] = useState(null);
+  const [sequenceSteps, setSequenceSteps] = useState([]);
+  const [showSequenceEditor, setShowSequenceEditor] = useState(false);
   const setupLoadedRef = useRef(false);
 
   // Multiplayer state
@@ -2446,6 +2450,7 @@ export default function GameTable({ room = null }) {
       const sorted = [...cards].sort((a, b) => a.zIndex - b.zIndex);
       return {
         stackId,
+        label: stackNames[stackId] || null,
         card_ids: sorted.map(c => c.cardId),
         table_ids: sorted.map(c => c.tableId),
         x: sorted[0].x,
@@ -2791,14 +2796,14 @@ export default function GameTable({ room = null }) {
         res = await fetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
         });
       } else {
         // Create new setup
         res = await fetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
         });
       }
       if (!res.ok) {
@@ -2876,9 +2881,11 @@ export default function GameTable({ room = null }) {
     }
 
     // Restore stacks
+    const newStackNames = {};
     if (state.stacks && Array.isArray(state.stacks)) {
       state.stacks.forEach(stack => {
         const stackId = stack.stackId || crypto.randomUUID();
+        if (stack.label) newStackNames[stackId] = stack.label;
         if (stack.cards && Array.isArray(stack.cards)) {
           stack.cards.forEach(c => {
             restoredCards.push({
@@ -3030,11 +3037,11 @@ export default function GameTable({ room = null }) {
       setTextFields([]);
     }
 
-    // Restore stack names
+    // Restore stack names (merge embedded labels from stack objects + legacy stackNames map)
     if (state.stackNames && typeof state.stackNames === 'object') {
-      setStackNames(state.stackNames);
+      setStackNames({ ...newStackNames, ...state.stackNames });
     } else {
-      setStackNames({});
+      setStackNames(newStackNames);
     }
 
     // Trigger canvas re-render
@@ -3093,10 +3100,26 @@ export default function GameTable({ room = null }) {
             return;
           }
           const setup = await res.json();
-          loadGameState(setup.state_data);
+          let parsedZones = [];
           if (setup.zone_data) {
-            try { setZones(JSON.parse(setup.zone_data)); } catch {}
+            try { parsedZones = JSON.parse(setup.zone_data); } catch {}
           }
+          setZones(parsedZones);
+
+          // Execute setup sequence for new games (not savegame loads)
+          let parsedSeq = [];
+          try { parsedSeq = JSON.parse(setup.sequence_data || '[]'); } catch {}
+
+          let stateToLoad = setup.state_data;
+          if (parsedSeq.length > 0) {
+            try {
+              const parsed = typeof stateToLoad === 'string' ? JSON.parse(stateToLoad) : stateToLoad;
+              stateToLoad = executeSequence(parsed, parsedSeq, parsedZones);
+            } catch (err) {
+              console.error('Sequence execution failed:', err);
+            }
+          }
+          loadGameState(stateToLoad);
           setSaveToast(`Loaded setup: "${setup.name}"`);
           setTimeout(() => setSaveToast(null), 4000);
         } catch (err) {
@@ -3123,6 +3146,9 @@ export default function GameTable({ room = null }) {
           loadGameState(setup.state_data);
           if (setup.zone_data) {
             try { setZones(JSON.parse(setup.zone_data)); } catch {}
+          }
+          if (setup.sequence_data) {
+            try { setSequenceSteps(JSON.parse(setup.sequence_data)); } catch { setSequenceSteps([]); }
           }
           setSaveToast(`Editing setup: "${setup.name}"`);
           setTimeout(() => setSaveToast(null), 4000);
@@ -5176,6 +5202,13 @@ export default function GameTable({ room = null }) {
             {editingSetupId ? `Editing Setup: ${setupName}` : 'Setup Editor Mode'}
           </span>
           <button
+            onClick={() => setShowSequenceEditor(prev => !prev)}
+            data-testid="setup-banner-sequence-btn"
+            className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+          >
+            Sequence{sequenceSteps.length > 0 ? ` (${sequenceSteps.length})` : ''}
+          </button>
+          <button
             onClick={() => setShowSetupSaveModal(true)}
             data-testid="setup-banner-save-btn"
             className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
@@ -6118,6 +6151,21 @@ export default function GameTable({ room = null }) {
           onZonesChange={setZones}
           camera={cameraRef.current}
           containerRef={containerRef}
+        />
+      )}
+
+      {/* Setup sequence editor */}
+      {setupMode && (
+        <SetupSequenceEditor
+          steps={sequenceSteps}
+          onStepsChange={setSequenceSteps}
+          availableStackLabels={
+            [...new Set(tableCards.filter(c => c.inStack).map(c => c.inStack))]
+              .map(id => stackNames[id]).filter(Boolean)
+          }
+          availableZoneLabels={zones.map(z => z.label).filter(Boolean)}
+          isOpen={showSequenceEditor}
+          onToggle={() => setShowSequenceEditor(prev => !prev)}
         />
       )}
 

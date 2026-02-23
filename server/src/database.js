@@ -166,6 +166,10 @@ export async function setupDatabase() {
     db.exec("ALTER TABLE setups ADD COLUMN zone_data TEXT DEFAULT '[]'");
     console.log('[DB] Migration: added zone_data column to setups');
   }
+  if (!setupColumns.includes('sequence_data')) {
+    db.exec("ALTER TABLE setups ADD COLUMN sequence_data TEXT DEFAULT '[]'");
+    console.log('[DB] Migration: added sequence_data column to setups');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players');
