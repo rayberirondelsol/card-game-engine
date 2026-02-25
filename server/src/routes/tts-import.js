@@ -489,6 +489,15 @@ export async function ttsImportRoutes(fastify) {
       }
       writeFileSync(path.join(tempDir, `${tempId}.json`), jsonContent);
 
+      const tokenSummaries = nonCardAssets.tokens.map((t, i) => ({
+        index: i,
+        nickname: t.nickname || `Token ${i + 1}`,
+      }));
+      const boardSummaries = nonCardAssets.boards.map((b, i) => ({
+        index: i,
+        nickname: b.nickname || `Board ${i + 1}`,
+      }));
+
       return reply.status(200).send({
         tempId,
         saveName: ttsData.SaveName || ttsData.GameMode || 'TTS Import',
@@ -496,6 +505,8 @@ export async function ttsImportRoutes(fastify) {
         decks: deckSummaries,
         tokenCount: nonCardAssets.tokens.length,
         boardCount: nonCardAssets.boards.length,
+        tokens: tokenSummaries,
+        boards: boardSummaries,
       });
     } catch (err) {
       console.error('[TTS Import] Analyze error:', err);
@@ -515,7 +526,7 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
-    const { tempId, selectedDeckIndices, createCategories, ocrNamePosition, rotateCards } = body;
+    const { tempId, selectedDeckIndices, selectedTokenIndices, selectedBoardIndices, createCategories, ocrNamePosition, rotateCards } = body;
 
     if (!tempId) {
       return reply.status(400).send({ error: 'Missing tempId from analyze step' });
@@ -743,7 +754,11 @@ export async function ttsImportRoutes(fastify) {
         'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       );
 
-      for (const asset of nonCardAssets.tokens) {
+      const tokensToImport = selectedTokenIndices != null && Array.isArray(selectedTokenIndices)
+        ? nonCardAssets.tokens.filter((_, i) => selectedTokenIndices.includes(i))
+        : nonCardAssets.tokens;
+
+      for (const asset of tokensToImport) {
         try {
           // Dedup: reuse existing entry for same URL
           const existing = db.prepare(
@@ -798,7 +813,11 @@ export async function ttsImportRoutes(fastify) {
         }
       }
 
-      for (const asset of nonCardAssets.boards) {
+      const boardsToImport = selectedBoardIndices != null && Array.isArray(selectedBoardIndices)
+        ? nonCardAssets.boards.filter((_, i) => selectedBoardIndices.includes(i))
+        : nonCardAssets.boards;
+
+      for (const asset of boardsToImport) {
         try {
           // Dedup: reuse existing entry for same URL
           const existing = db.prepare(

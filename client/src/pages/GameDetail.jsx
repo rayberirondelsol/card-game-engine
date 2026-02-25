@@ -69,6 +69,8 @@ export default function GameDetail() {
   const [ttsAnalysis, setTtsAnalysis] = useState(null);
   const [ttsImporting, setTtsImporting] = useState(false);
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
+  const [ttsSelectedTokens, setTtsSelectedTokens] = useState(new Set());
+  const [ttsSelectedBoards, setTtsSelectedBoards] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
   const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
   const [ttsRotateCards, setTtsRotateCards] = useState('none');
@@ -527,6 +529,8 @@ export default function GameDetail() {
     setTtsImporting(false);
     setTtsImportProgress('');
     setTtsSelectedDecks(new Set());
+    setTtsSelectedTokens(new Set());
+    setTtsSelectedBoards(new Set());
     setTtsCreateCategories(true);
     setTtsOcrNamePosition('none');
     setTtsRotateCards('none');
@@ -550,7 +554,14 @@ export default function GameDetail() {
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        setTtsError('Server returned an unexpected response. Please ensure the server is running.');
+        setTtsAnalyzing(false);
+        return;
+      }
 
       if (!res.ok) {
         setTtsError(data.error || 'Failed to analyze TTS file');
@@ -559,9 +570,11 @@ export default function GameDetail() {
       }
 
       setTtsAnalysis(data);
-      // Select all decks by default
+      // Select all decks, tokens, and boards by default
       const allIndices = new Set(data.decks.map(d => d.index));
       setTtsSelectedDecks(allIndices);
+      setTtsSelectedTokens(new Set((data.tokens || []).map(t => t.index)));
+      setTtsSelectedBoards(new Set((data.boards || []).map(b => b.index)));
     } catch (err) {
       setTtsError('Failed to upload file: ' + err.message);
     } finally {
@@ -595,8 +608,32 @@ export default function GameDetail() {
     setTtsSelectedDecks(new Set());
   }
 
+  function toggleTtsTokenSelection(tokenIndex) {
+    setTtsSelectedTokens(prev => {
+      const next = new Set(prev);
+      if (next.has(tokenIndex)) {
+        next.delete(tokenIndex);
+      } else {
+        next.add(tokenIndex);
+      }
+      return next;
+    });
+  }
+
+  function toggleTtsBoardSelection(boardIndex) {
+    setTtsSelectedBoards(prev => {
+      const next = new Set(prev);
+      if (next.has(boardIndex)) {
+        next.delete(boardIndex);
+      } else {
+        next.add(boardIndex);
+      }
+      return next;
+    });
+  }
+
   async function handleTtsImport() {
-    const hasNonCardAssets = ttsAnalysis && ((ttsAnalysis.tokenCount || 0) > 0 || (ttsAnalysis.boardCount || 0) > 0);
+    const hasNonCardAssets = ttsAnalysis && (ttsSelectedTokens.size > 0 || ttsSelectedBoards.size > 0);
     if (!ttsAnalysis || (ttsSelectedDecks.size === 0 && !hasNonCardAssets)) return;
 
     setTtsImporting(true);
@@ -610,13 +647,21 @@ export default function GameDetail() {
         body: JSON.stringify({
           tempId: ttsAnalysis.tempId,
           selectedDeckIndices: Array.from(ttsSelectedDecks),
+          selectedTokenIndices: Array.from(ttsSelectedTokens),
+          selectedBoardIndices: Array.from(ttsSelectedBoards),
           createCategories: ttsCreateCategories,
           ocrNamePosition: ttsOcrNamePosition !== 'none' ? ttsOcrNamePosition : undefined,
           rotateCards: ttsRotateCards !== 'none' ? (ttsRotateCards === 'auto' ? 'auto' : parseInt(ttsRotateCards)) : undefined,
         }),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        setTtsError('Import failed: Server returned an unexpected response.');
+        return;
+      }
 
       if (!res.ok) {
         setTtsError(data.error || 'Import failed');
@@ -2553,10 +2598,71 @@ export default function GameDetail() {
                     ))}
                   </div>
 
-                  {/* Non-card assets note */}
-                  {((ttsAnalysis?.tokenCount || 0) > 0 || (ttsAnalysis?.boardCount || 0) > 0) && (
+                  {/* Tokens selection */}
+                  {(ttsAnalysis?.tokens || []).length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide mb-1">
+                        Tokens
+                      </p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {ttsAnalysis.tokens.map((token) => (
+                          <label
+                            key={token.index}
+                            className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
+                              ttsSelectedTokens.has(token.index)
+                                ? 'border-purple-400 bg-purple-50'
+                                : 'border-[var(--color-border)] hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={ttsSelectedTokens.has(token.index)}
+                              onChange={() => toggleTtsTokenSelection(token.index)}
+                              className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-[var(--color-text)] truncate">
+                              {token.nickname}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Boards selection */}
+                  {(ttsAnalysis?.boards || []).length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide mb-1">
+                        Boards
+                      </p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {ttsAnalysis.boards.map((board) => (
+                          <label
+                            key={board.index}
+                            className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
+                              ttsSelectedBoards.has(board.index)
+                                ? 'border-purple-400 bg-purple-50'
+                                : 'border-[var(--color-border)] hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={ttsSelectedBoards.has(board.index)}
+                              onChange={() => toggleTtsBoardSelection(board.index)}
+                              className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-[var(--color-text)] truncate">
+                              {board.nickname}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(ttsSelectedTokens.size > 0 || ttsSelectedBoards.size > 0) && (
                     <div className="mb-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
-                      Tokens and boards will be imported automatically and a save state will be created so you can load them on the game table.
+                      Selected tokens and boards will be imported and a save state will be created so you can load them on the game table.
                     </div>
                   )}
 
