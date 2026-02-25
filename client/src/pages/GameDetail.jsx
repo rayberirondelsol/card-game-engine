@@ -1757,9 +1757,27 @@ export default function GameDetail() {
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <span className="text-xs text-[var(--color-text)] truncate flex-1" data-testid={`card-back-name-${cb.id}`} title={cb.name}>
-                        {cb.name}
-                      </span>
+                      <input
+                        type="text"
+                        defaultValue={cb.name}
+                        onBlur={async (e) => {
+                          const newName = e.target.value.trim();
+                          if (!newName || newName === cb.name) return;
+                          const res = await fetch(`/api/games/${id}/card-backs/${cb.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: newName }),
+                          });
+                          if (res.ok) {
+                            const updated = await res.json();
+                            setCardBacks(prev => prev.map(c => c.id === cb.id ? updated : c));
+                          }
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = cb.name; e.target.blur(); } }}
+                        data-testid={`card-back-name-${cb.id}`}
+                        className="text-xs text-[var(--color-text)] flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-primary)] focus:outline-none px-0.5 py-0.5 truncate"
+                        title="Klicken zum Umbenennen"
+                      />
                       <button
                         onClick={() => handleDeleteCardBack(cb.id, cb.name)}
                         data-testid={`delete-card-back-${cb.id}`}
