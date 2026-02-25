@@ -569,7 +569,8 @@ export default function GameDetail() {
   }
 
   async function handleTtsImport() {
-    if (!ttsAnalysis || ttsSelectedDecks.size === 0) return;
+    const hasNonCardAssets = ttsAnalysis && ((ttsAnalysis.tokenCount || 0) > 0 || (ttsAnalysis.boardCount || 0) > 0);
+    if (!ttsAnalysis || (ttsSelectedDecks.size === 0 && !hasNonCardAssets)) return;
 
     setTtsImporting(true);
     setTtsImportProgress('Downloading and processing card images...');
@@ -599,6 +600,25 @@ export default function GameDetail() {
 
       // Success
       setShowTtsImportModal(false);
+
+      // If tokens or boards were imported, auto-create a save so they appear on the table
+      if ((data.tokens && data.tokens.length > 0) || (data.boards && data.boards.length > 0)) {
+        try {
+          const saveName = `TTS Assets (${new Date().toLocaleDateString()})`;
+          const stateData = {
+            tokens: data.tokens || [],
+            boards: data.boards || [],
+          };
+          await fetch(`/api/games/${id}/saves`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: saveName, state_data: stateData }),
+          });
+        } catch (_) {
+          // Not critical if save creation fails
+        }
+      }
+
       setUploadMessage({
         type: 'success',
         text: data.message || `Imported ${data.totalImported} cards`,
@@ -2365,6 +2385,8 @@ export default function GameDetail() {
                     <div>
                       <h3 className="font-medium text-[var(--color-text)]">
                         Found {ttsAnalysis.deckCount} deck{ttsAnalysis.deckCount !== 1 ? 's' : ''}
+                        {ttsAnalysis.tokenCount > 0 && `, ${ttsAnalysis.tokenCount} token${ttsAnalysis.tokenCount !== 1 ? 's' : ''}`}
+                        {ttsAnalysis.boardCount > 0 && `, ${ttsAnalysis.boardCount} board${ttsAnalysis.boardCount !== 1 ? 's' : ''}`}
                       </h3>
                       {ttsAnalysis.saveName && (
                         <p className="text-xs text-[var(--color-text-secondary)]">
@@ -2427,6 +2449,13 @@ export default function GameDetail() {
                       </label>
                     ))}
                   </div>
+
+                  {/* Non-card assets note */}
+                  {((ttsAnalysis?.tokenCount || 0) > 0 || (ttsAnalysis?.boardCount || 0) > 0) && (
+                    <div className="mb-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+                      Tokens and boards will be imported automatically and a save state will be created so you can load them on the game table.
+                    </div>
+                  )}
 
                   {/* Options */}
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-3">
@@ -2514,11 +2543,11 @@ export default function GameDetail() {
                       </button>
                       <button
                         onClick={handleTtsImport}
-                        disabled={ttsImporting || ttsSelectedDecks.size === 0}
+                        disabled={ttsImporting || (ttsSelectedDecks.size === 0 && !((ttsAnalysis?.tokenCount || 0) > 0 || (ttsAnalysis?.boardCount || 0) > 0))}
                         data-testid="tts-import-execute-btn"
                         className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       >
-                        {ttsImporting ? 'Importing...' : `Import ${ttsSelectedDecks.size} Deck${ttsSelectedDecks.size !== 1 ? 's' : ''}`}
+                        {ttsImporting ? 'Importing...' : ttsSelectedDecks.size > 0 ? `Import ${ttsSelectedDecks.size} Deck${ttsSelectedDecks.size !== 1 ? 's' : ''}` : 'Import Assets'}
                       </button>
                     </div>
                   </div>

@@ -72,6 +72,57 @@ function downloadImage(url) {
 }
 
 /**
+ * Parse a TTS JSON save file and extract non-card image assets
+ * (Custom_Token, Custom_Tile, Figurine_Custom, Custom_Board)
+ */
+function extractNonCardAssetsFromTTS(ttsData) {
+  const tokens = [];
+  const boards = [];
+
+  function processObject(obj) {
+    if (!obj) return;
+
+    const name = obj.Name || '';
+    const imageUrl = obj.CustomImage?.ImageURL || obj.CustomToken?.ImageURL || null;
+    const ttsX = obj.Transform?.posX || 0;
+    const ttsZ = obj.Transform?.posZ || 0;
+    const scaleX = obj.Transform?.scaleX || 1;
+    const scaleZ = obj.Transform?.scaleZ || 1;
+    const nickname = obj.Nickname || obj.Description || '';
+
+    if (name === 'Custom_Token' || name === 'Custom_Tile') {
+      if (imageUrl) {
+        tokens.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'token' });
+      }
+    } else if (name === 'Figurine_Custom') {
+      if (imageUrl) {
+        tokens.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'figurine' });
+      }
+    } else if (name === 'Custom_Board') {
+      if (imageUrl) {
+        boards.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ });
+      }
+    }
+
+    // Recurse into containers (Bags, etc.) but not into decks (already handled separately)
+    if (obj.ContainedObjects && Array.isArray(obj.ContainedObjects)) {
+      if (name !== 'DeckCustom' && name !== 'Deck') {
+        obj.ContainedObjects.forEach(processObject);
+      }
+    }
+  }
+
+  if (ttsData.ObjectStates && Array.isArray(ttsData.ObjectStates)) {
+    ttsData.ObjectStates.forEach(processObject);
+  }
+  if (ttsData.Name) {
+    processObject(ttsData);
+  }
+
+  return { tokens, boards };
+}
+
+/**
  * Parse a TTS JSON save file and extract all custom deck definitions
  */
 function extractDecksFromTTS(ttsData) {
@@ -382,9 +433,10 @@ export async function ttsImportRoutes(fastify) {
 
       // Extract deck information
       const decks = extractDecksFromTTS(ttsData);
+      const nonCardAssets = extractNonCardAssetsFromTTS(ttsData);
 
-      if (decks.length === 0) {
-        return reply.status(400).send({ error: 'No card decks found in this TTS file. Make sure the file contains CustomDeck objects.' });
+      if (decks.length === 0 && nonCardAssets.tokens.length === 0 && nonCardAssets.boards.length === 0) {
+        return reply.status(400).send({ error: 'No card decks or custom assets found in this TTS file. Make sure the file contains CustomDeck, Custom_Token, or Custom_Board objects.' });
       }
 
       // Build summary for each deck
@@ -442,6 +494,8 @@ export async function ttsImportRoutes(fastify) {
         saveName: ttsData.SaveName || ttsData.GameMode || 'TTS Import',
         deckCount: decks.length,
         decks: deckSummaries,
+        tokenCount: nonCardAssets.tokens.length,
+        boardCount: nonCardAssets.boards.length,
       });
     } catch (err) {
       console.error('[TTS Import] Analyze error:', err);
@@ -674,6 +728,73 @@ export async function ttsImportRoutes(fastify) {
         console.log('[TTS Import] OCR worker terminated');
       }
 
+      // Process non-card assets (tokens and boards)
+      const nonCardAssets = extractNonCardAssetsFromTTS(ttsData);
+      const importedTokens = [];
+      const importedBoards = [];
+
+      // TTS table center is (0, 0) in TTS space; scale to our pixel world
+      // TTS table is ~40 units wide; our table renders at ~1600px wide
+      const TTS_SCALE = 50;
+      const WORLD_CENTER_X = 800;
+      const WORLD_CENTER_Y = 450;
+
+      for (const asset of nonCardAssets.tokens) {
+        try {
+          const buffer = await downloadImage(asset.imageUrl);
+          const fileId = uuidv4();
+          const filename = `${fileId}.png`;
+          const filePath = path.join(gameUploadsDir, filename);
+          await sharp(buffer).rotate().png().toFile(filePath);
+          const relPath = `/uploads/${id}/${filename}`;
+          const size = Math.round(Math.max(asset.scaleX, asset.scaleZ) * 60);
+          importedTokens.push({
+            id: uuidv4(),
+            shape: 'image',
+            imageUrl: relPath,
+            label: asset.nickname || '',
+            size: Math.max(size, 30),
+            x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
+            y: WORLD_CENTER_Y + asset.ttsZ * TTS_SCALE,
+            color: null,
+            attachedTo: null,
+            attachedCorner: null,
+            locked: false,
+          });
+          console.log(`[TTS Import] Imported token: ${asset.nickname || 'unnamed'}`);
+        } catch (err) {
+          console.warn(`[TTS Import] Failed to download token image: ${err.message}`);
+        }
+      }
+
+      for (const asset of nonCardAssets.boards) {
+        try {
+          const buffer = await downloadImage(asset.imageUrl);
+          const metadata = await sharp(buffer).rotate().metadata();
+          const fileId = uuidv4();
+          const filename = `${fileId}.png`;
+          const filePath = path.join(gameUploadsDir, filename);
+          await sharp(buffer).rotate().png().toFile(filePath);
+          const relPath = `/uploads/${id}/${filename}`;
+          // Use actual image dimensions scaled to a reasonable board size
+          const boardWidth = Math.round((metadata.width || 400) * Math.min(1, 600 / (metadata.width || 400)));
+          const boardHeight = Math.round((metadata.height || 300) * Math.min(1, 600 / (metadata.width || 400)));
+          importedBoards.push({
+            id: uuidv4(),
+            imageUrl: relPath,
+            name: asset.nickname || 'Board',
+            x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
+            y: WORLD_CENTER_Y + asset.ttsZ * TTS_SCALE,
+            width: boardWidth,
+            height: boardHeight,
+            locked: false,
+          });
+          console.log(`[TTS Import] Imported board: ${asset.nickname || 'unnamed'}`);
+        } catch (err) {
+          console.warn(`[TTS Import] Failed to download board image: ${err.message}`);
+        }
+      }
+
       // Clean up temp file
       try {
         const { unlinkSync } = await import('fs');
@@ -682,13 +803,19 @@ export async function ttsImportRoutes(fastify) {
         // Not critical
       }
 
+      const extraMsg = [];
+      if (importedTokens.length > 0) extraMsg.push(`${importedTokens.length} token(s)`);
+      if (importedBoards.length > 0) extraMsg.push(`${importedBoards.length} board(s)`);
+
       return reply.status(200).send({
         success: true,
         totalImported,
         totalSkipped,
         totalFailed,
         importedDecks,
-        message: `Successfully imported ${totalImported} new cards from ${importedDecks.length} deck(s)${totalSkipped > 0 ? ` (${totalSkipped} existing cards skipped)` : ''}${totalFailed > 0 ? ` (${totalFailed} sheets failed)` : ''}`
+        tokens: importedTokens,
+        boards: importedBoards,
+        message: `Successfully imported ${totalImported} new cards from ${importedDecks.length} deck(s)${extraMsg.length > 0 ? ` and ${extraMsg.join(', ')}` : ''}${totalSkipped > 0 ? ` (${totalSkipped} existing cards skipped)` : ''}${totalFailed > 0 ? ` (${totalFailed} sheets failed)` : ''}`
       });
     } catch (err) {
       console.error('[TTS Import] Execute error:', err);

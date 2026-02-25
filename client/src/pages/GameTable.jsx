@@ -160,7 +160,7 @@ function drawSolidBackground(ctx, width, height, color) {
 }
 
 // Token shape components
-function TokenShape({ shape, color, size = 30, label = '' }) {
+function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
   const commonClasses = "flex items-center justify-center shadow-lg border-2 border-white/60";
   const textClasses = "text-white sm:text-[10px] text-xs font-bold leading-none drop-shadow-sm";
 
@@ -279,6 +279,17 @@ function TokenShape({ shape, color, size = 30, label = '' }) {
         </div>
       );
 
+    case 'image':
+      return (
+        <div
+          className="relative shadow-lg rounded-sm overflow-hidden"
+          style={{ width: size, height: size }}
+          title={label || 'Image Token'}
+        >
+          <img src={imageUrl} alt={label || 'token'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
+        </div>
+      );
+
     default:
       return (
         <div
@@ -374,6 +385,7 @@ export default function GameTable({ room = null }) {
   const [hitDice, setHitDice] = useState([]);
   const [notes, setNotes] = useState([]);
   const [tokens, setTokens] = useState([]);
+  const [boards, setBoards] = useState([]);
   const [textFields, setTextFields] = useState([]);
 
   // Card state
@@ -1712,6 +1724,7 @@ export default function GameTable({ room = null }) {
     else if (objType === 'hitDie') obj = hitDice.find(d => d.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
+    else if (objType === 'board') obj = boards.find(b => b.id === objId);
     else if (objType === 'textField') obj = textFields.find(tf => tf.id === objId);
     if (!obj) return;
 
@@ -1785,6 +1798,10 @@ export default function GameTable({ room = null }) {
     } else if (draggingObj.type === 'token') {
       setTokens(prev => prev.map(t =>
         t.id === draggingObj.id ? { ...t, x: newX, y: newY, attachedTo: null } : t
+      ));
+    } else if (draggingObj.type === 'board') {
+      setBoards(prev => prev.map(b =>
+        b.id === draggingObj.id ? { ...b, x: newX, y: newY } : b
       ));
     } else if (draggingObj.type === 'textField') {
       setTextFields(prev => prev.map(tf =>
@@ -1914,6 +1931,10 @@ export default function GameTable({ room = null }) {
 
   function deleteToken(tokenId) {
     setTokens(prev => prev.filter(t => t.id !== tokenId));
+  }
+
+  function deleteBoard(boardId) {
+    setBoards(prev => prev.filter(b => b.id !== boardId));
   }
 
   // Combined move handler (works for both mouse and touch)
@@ -2535,11 +2556,23 @@ export default function GameTable({ room = null }) {
         shape: t.shape,
         color: t.color,
         label: t.label || '',
+        imageUrl: t.imageUrl || null,
+        size: t.size || null,
         x: t.x,
         y: t.y,
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+      })),
+      boards: boards.map(b => ({
+        id: b.id,
+        imageUrl: b.imageUrl,
+        name: b.name || '',
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+        locked: b.locked || false,
       })),
       textFields: textFields.map(tf => ({
         id: tf.id,
@@ -3009,6 +3042,8 @@ export default function GameTable({ room = null }) {
         shape: t.shape,
         color: t.color,
         label: t.label || '',
+        imageUrl: t.imageUrl || null,
+        size: t.size || null,
         x: t.x,
         y: t.y,
         attachedTo: t.attachedTo || null,
@@ -3020,6 +3055,22 @@ export default function GameTable({ room = null }) {
     } else {
       // Only migrated markers
       setTokens(migratedTokens);
+    }
+
+    // Restore boards
+    if (state.boards && Array.isArray(state.boards)) {
+      setBoards(state.boards.map(b => ({
+        id: b.id || crypto.randomUUID(),
+        imageUrl: b.imageUrl,
+        name: b.name || '',
+        x: b.x,
+        y: b.y,
+        width: b.width || 200,
+        height: b.height || 200,
+        locked: b.locked || false,
+      })));
+    } else {
+      setBoards([]);
     }
 
     // Restore text fields
@@ -3756,6 +3807,48 @@ export default function GameTable({ room = null }) {
         );
       })()}
 
+      {/* Board / Player Mat Widgets - rendered behind cards */}
+      {boards.map(board => (
+        <div
+          key={board.id}
+          data-testid={`board-${board.id}`}
+          data-ui-element="true"
+          className="absolute select-none group pointer-events-auto"
+          style={{
+            left: board.x - board.width / 2,
+            top: board.y - board.height / 2,
+            width: board.width,
+            height: board.height,
+            zIndex: 1,
+            cursor: board.locked ? 'default' : (draggingObj?.id === board.id ? 'grabbing' : 'grab'),
+          }}
+          onMouseDown={(e) => handleObjDragStart(e, 'board', board.id)}
+          onTouchStart={(e) => handleObjDragStart(e, 'board', board.id)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'board', objId: board.id, cardTableId: null, stackId: null }); }}
+        >
+          <img
+            src={board.imageUrl}
+            alt={board.name || 'Board'}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            draggable={false}
+          />
+          {/* Delete button on hover */}
+          <button
+            onClick={(e) => { e.stopPropagation(); deleteBoard(board.id); }}
+            data-testid={`board-delete-${board.id}`}
+            className="absolute -top-1 -right-1 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            &times;
+          </button>
+          {/* Board name label */}
+          {board.name && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center py-0.5 truncate px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {board.name}
+            </div>
+          )}
+        </div>
+      ))}
+
       {/* Floating Counter Widgets */}
       {counters.map(counter => (
         <div
@@ -4051,7 +4144,10 @@ export default function GameTable({ room = null }) {
       ))}
 
       {/* Floating Token Widgets */}
-      {tokens.map(token => (
+      {tokens.map(token => {
+        const tokenSize = token.size || 30;
+        const halfSize = Math.floor(tokenSize / 2);
+        return (
         <div
           key={token.id}
           data-testid={`token-${token.id}`}
@@ -4061,15 +4157,15 @@ export default function GameTable({ room = null }) {
           data-ui-element="true"
           className="absolute z-20 select-none group pointer-events-auto"
           style={{
-            left: token.x - 15,
-            top: token.y - 15,
+            left: token.x - halfSize,
+            top: token.y - halfSize,
             cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
-          <TokenShape shape={token.shape} color={token.color} size={30} label={token.label} />
+          <TokenShape shape={token.shape} color={token.color} size={tokenSize} label={token.label} imageUrl={token.imageUrl || null} />
           {/* Delete button on hover */}
           <button
             onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
@@ -4083,7 +4179,8 @@ export default function GameTable({ room = null }) {
             <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
           )}
         </div>
-      ))}
+        );
+      })}
       {/* Text Field Widgets */}
       {textFields.map(tf => {
         return (
@@ -5744,6 +5841,7 @@ export default function GameTable({ room = null }) {
                     else if (objType === 'hitDie') setHitDice(prev => prev.filter(d => d.id !== objId));
                     else if (objType === 'note') deleteNote(objId);
                     else if (objType === 'token') setTokens(prev => prev.filter(t => t.id !== objId));
+                    else if (objType === 'board') setBoards(prev => prev.filter(b => b.id !== objId));
                     else if (objType === 'textField') deleteTextField(objId);
                     setContextMenu(null);
                   }}
