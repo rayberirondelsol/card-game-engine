@@ -424,6 +424,7 @@ export default function GameTable({ room = null }) {
   const [newTokenShape, setNewTokenShape] = useState('circle');
   const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
   const [newTokenLabel, setNewTokenLabel] = useState('');
+  const [imageTokenLibrary, setImageTokenLibrary] = useState([]);
   const [showTextFieldModal, setShowTextFieldModal] = useState(false);
   const [newTextFieldText, setNewTextFieldText] = useState('');
   const [newTextFieldFontSize, setNewTextFieldFontSize] = useState(16);
@@ -1911,6 +1912,17 @@ export default function GameTable({ room = null }) {
   }
 
   // Token functions
+  function openTokenModal() {
+    setShowTokenModal(true);
+    // Load image token library
+    if (id) {
+      fetch(`/api/games/${id}/table-assets`)
+        .then(r => r.ok ? r.json() : [])
+        .then(assets => setImageTokenLibrary(assets.filter(a => a.type === 'token')))
+        .catch(() => {});
+    }
+  }
+
   function createToken(shape, color, label) {
     const canvas = canvasRef.current;
     const newToken = {
@@ -4769,7 +4781,7 @@ export default function GameTable({ room = null }) {
 
             {/* Token button */}
             <button
-              onClick={() => setShowTokenModal(true)}
+              onClick={() => openTokenModal()}
               data-testid="toolbar-token-btn"
               className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Token"
@@ -5044,9 +5056,57 @@ export default function GameTable({ room = null }) {
         <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="token-modal">
           <h3 className="text-white font-semibold mb-4">Add Token</h3>
 
+          {/* Bild-Tokens aus der Bibliothek */}
+          {imageTokenLibrary.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-slate-300 text-sm mb-2">Bild-Token</label>
+              <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
+                {imageTokenLibrary.map(token => (
+                  <button
+                    key={token.id}
+                    onClick={() => {
+                      const canvas = canvasRef.current;
+                      const size = token.width || 60;
+                      const newToken = {
+                        id: crypto.randomUUID(),
+                        shape: 'image',
+                        imageUrl: token.image_path,
+                        label: token.name || '',
+                        size,
+                        x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+                        y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+                        color: null,
+                        attachedTo: null,
+                        attachedCorner: null,
+                        locked: false,
+                      };
+                      setTokens(prev => [...prev, newToken]);
+                      setShowTokenModal(false);
+                    }}
+                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-blue-400 bg-slate-700 hover:bg-slate-600 transition-all"
+                    title={`${token.name || 'Token'}${token.quantity > 1 ? ` (×${token.quantity})` : ''}`}
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-600 flex items-center justify-center">
+                      <img src={token.image_path} alt={token.name} className="w-full h-full object-contain" loading="lazy" />
+                    </div>
+                    <span className="text-[10px] text-slate-300 truncate w-12 text-center leading-tight">
+                      {token.name || '—'}
+                    </span>
+                    {token.quantity > 1 && (
+                      <span className="text-[9px] text-blue-400">×{token.quantity}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 border-t border-slate-600 pt-2">
+                <label className="block text-slate-300 text-sm mb-2">Geometrische Form</label>
+              </div>
+            </div>
+          )}
+
           {/* Shape Selection */}
           <div className="mb-4">
-            <label className="block text-slate-300 text-sm mb-2">Shape</label>
+            {imageTokenLibrary.length === 0 && <label className="block text-slate-300 text-sm mb-2">Shape</label>}
             <div className="grid grid-cols-3 gap-2">
               {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
                 <button
@@ -5783,7 +5843,7 @@ export default function GameTable({ room = null }) {
                   Add Note
                 </button>
                 <button
-                  onClick={() => { setShowTokenModal(true); setContextMenu(null); }}
+                  onClick={() => { openTokenModal(); setContextMenu(null); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   Add Token

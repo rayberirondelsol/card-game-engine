@@ -216,6 +216,18 @@ export default function GameDetail() {
     }
   }
 
+  async function handleUpdateTableAsset(assetId, fields) {
+    const res = await fetch(`/api/games/${id}/table-assets/${assetId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setTableAssets(prev => prev.map(a => a.id === assetId ? updated : a));
+    }
+  }
+
   async function handleCardBackUpload(e) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1773,41 +1785,125 @@ export default function GameDetail() {
                   Noch keine Tokens oder Boards importiert.
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-2" data-testid="table-assets-list">
-                  {tableAssets.map((asset) => (
-                    <div
-                      key={asset.id}
-                      data-testid={`table-asset-${asset.id}`}
-                      className="group relative flex flex-col items-center gap-1 p-1.5 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors bg-[var(--color-background)]"
-                      style={{ width: '72px' }}
-                    >
-                      <div className="w-full h-16 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
-                        <img
-                          src={asset.image_path}
-                          alt={asset.name}
-                          className="w-full h-full object-contain"
-                          loading="lazy"
-                        />
-                      </div>
-                      <p className="text-[10px] text-[var(--color-text)] truncate w-full text-center" title={asset.name}>
-                        {asset.name || '—'}
-                      </p>
-                      <span className={`text-[9px] px-1 rounded font-medium ${asset.type === 'board' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {asset.type}
-                      </span>
-                      <p className="text-[9px] text-[var(--color-text-secondary)]">
-                        {new Date(asset.created_at).toLocaleDateString()}
-                      </p>
-                      <button
-                        onClick={() => handleDeleteTableAsset(asset.id, asset.name)}
-                        data-testid={`delete-table-asset-${asset.id}`}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
-                        title="Löschen"
+                <div className="space-y-3" data-testid="table-assets-list">
+                  {tableAssets.map((asset) => {
+                    const isToken = asset.type === 'token';
+                    const cardRef = 100; // CARD_WIDTH in GameTable
+                    const sizeVal = asset.width || 60;
+                    const sizeRatio = (sizeVal / cardRef).toFixed(1);
+                    return (
+                      <div
+                        key={asset.id}
+                        data-testid={`table-asset-${asset.id}`}
+                        className="rounded-lg border border-[var(--color-border)] p-2 space-y-2 bg-[var(--color-background)]"
                       >
-                        &times;
-                      </button>
-                    </div>
-                  ))}
+                        {/* Row 1: Thumbnail + Name + Delete */}
+                        <div className="flex items-center gap-2">
+                          <div className={`flex-shrink-0 rounded overflow-hidden bg-gray-100 border border-gray-200 ${isToken ? 'w-9 h-9' : 'w-14 h-9'}`}>
+                            <img src={asset.image_path} alt={asset.name} className="w-full h-full object-contain" loading="lazy" />
+                          </div>
+                          <input
+                            type="text"
+                            defaultValue={asset.name}
+                            onBlur={(e) => handleUpdateTableAsset(asset.id, { name: e.target.value })}
+                            className="flex-1 text-xs text-[var(--color-text)] bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-primary)] focus:outline-none px-0.5 py-0.5 min-w-0"
+                            placeholder="Name…"
+                          />
+                          <span className={`text-[9px] px-1 py-0.5 rounded font-medium flex-shrink-0 ${isToken ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {isToken ? 'token' : 'board'}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteTableAsset(asset.id, asset.name)}
+                            data-testid={`delete-table-asset-${asset.id}`}
+                            className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
+                            title="Löschen"
+                          >
+                            &times;
+                          </button>
+                        </div>
+
+                        {/* Row 2: Kategorie */}
+                        <select
+                          value={asset.category_id || ''}
+                          onChange={(e) => handleUpdateTableAsset(asset.id, { category_id: e.target.value || null })}
+                          className="w-full text-xs border border-[var(--color-border)] rounded px-1.5 py-1 bg-white text-[var(--color-text)]"
+                          data-testid={`asset-category-select-${asset.id}`}
+                        >
+                          <option value="">Keine Kategorie</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.parent_category_id
+                                ? `${categories.find(p => p.id === cat.parent_category_id)?.name || ''} / ${cat.name}`
+                                : cat.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Row 3: Anzahl + Größe */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-[var(--color-text-secondary)] flex-shrink-0">Anz.:</span>
+                          <button
+                            onClick={() => handleUpdateTableAsset(asset.id, { quantity: Math.max(1, (asset.quantity || 1) - 1) })}
+                            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-[var(--color-text)] text-xs font-bold flex-shrink-0"
+                          >−</button>
+                          <span className="text-xs font-medium text-[var(--color-text)] w-5 text-center flex-shrink-0">{asset.quantity || 1}</span>
+                          <button
+                            onClick={() => handleUpdateTableAsset(asset.id, { quantity: (asset.quantity || 1) + 1 })}
+                            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-[var(--color-text)] text-xs font-bold flex-shrink-0"
+                          >+</button>
+                          <span className="text-[10px] text-[var(--color-text-secondary)] ml-auto flex-shrink-0">
+                            {sizeVal}px ≈ {sizeRatio}× Karte
+                          </span>
+                        </div>
+
+                        {/* Row 4: Größen-Regler */}
+                        <div className="space-y-0.5">
+                          {isToken ? (
+                            <>
+                              <input
+                                type="range"
+                                min="20"
+                                max="200"
+                                value={sizeVal}
+                                onChange={(e) => {
+                                  const v = parseInt(e.target.value);
+                                  setTableAssets(prev => prev.map(a => a.id === asset.id ? { ...a, width: v, height: v } : a));
+                                }}
+                                onMouseUp={(e) => handleUpdateTableAsset(asset.id, { width: parseInt(e.target.value), height: parseInt(e.target.value) })}
+                                onTouchEnd={(e) => handleUpdateTableAsset(asset.id, { width: parseInt(e.target.value), height: parseInt(e.target.value) })}
+                                className="w-full h-1.5 accent-[var(--color-primary)]"
+                              />
+                              <div className="flex justify-between text-[9px] text-[var(--color-text-secondary)]">
+                                <span>20</span>
+                                <span className="text-[var(--color-primary)]">↑ 1× Karte = 100px</span>
+                                <span>200</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-[var(--color-text-secondary)]">B:</span>
+                              <input
+                                type="number"
+                                min="20" max="2000"
+                                defaultValue={asset.width || 400}
+                                onBlur={(e) => handleUpdateTableAsset(asset.id, { width: parseInt(e.target.value) || 400 })}
+                                className="w-16 text-xs border border-[var(--color-border)] rounded px-1 py-0.5 text-[var(--color-text)]"
+                              />
+                              <span className="text-[10px] text-[var(--color-text-secondary)]">H:</span>
+                              <input
+                                type="number"
+                                min="20" max="2000"
+                                defaultValue={asset.height || 300}
+                                onBlur={(e) => handleUpdateTableAsset(asset.id, { height: parseInt(e.target.value) || 300 })}
+                                className="w-16 text-xs border border-[var(--color-border)] rounded px-1 py-0.5 text-[var(--color-text)]"
+                              />
+                              <span className="text-[9px] text-[var(--color-text-secondary)]">px</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

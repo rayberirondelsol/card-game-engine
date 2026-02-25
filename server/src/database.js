@@ -162,6 +162,17 @@ export async function setupDatabase() {
     );
   `);
 
+  // Migration: add quantity and category_id to table_assets
+  const tableAssetCols = db.prepare("PRAGMA table_info(table_assets)").all().map(c => c.name);
+  if (!tableAssetCols.includes('quantity')) {
+    db.exec('ALTER TABLE table_assets ADD COLUMN quantity INTEGER DEFAULT 1');
+    console.log('[DB] Migration: added quantity column to table_assets');
+  }
+  if (!tableAssetCols.includes('category_id')) {
+    db.exec('ALTER TABLE table_assets ADD COLUMN category_id TEXT');
+    console.log('[DB] Migration: added category_id column to table_assets');
+  }
+
   // Migrations: add new columns to existing tables if they don't exist yet
   const cardColumns = db.prepare("PRAGMA table_info(cards)").all().map(c => c.name);
   if (!cardColumns.includes('width')) {

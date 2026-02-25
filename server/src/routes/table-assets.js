@@ -26,6 +26,40 @@ export async function tableAssetsRoutes(fastify) {
     return assets;
   });
 
+  // PATCH /api/games/:id/table-assets/:assetId - Update a table asset
+  fastify.patch('/api/games/:id/table-assets/:assetId', async (request, reply) => {
+    const db = getDb();
+    const { id, assetId } = request.params;
+    const body = request.body || {};
+
+    const asset = db.prepare(
+      'SELECT * FROM table_assets WHERE id = ? AND game_id = ?'
+    ).get(assetId, id);
+
+    if (!asset) {
+      return reply.status(404).send({ error: 'Asset not found' });
+    }
+
+    const updates = [];
+    const values = [];
+
+    if (body.name !== undefined) { updates.push('name = ?'); values.push(String(body.name)); }
+    if (body.quantity !== undefined) { updates.push('quantity = ?'); values.push(Math.max(1, parseInt(body.quantity) || 1)); }
+    if (body.category_id !== undefined) { updates.push('category_id = ?'); values.push(body.category_id || null); }
+    if (body.width !== undefined) { updates.push('width = ?'); values.push(Math.max(10, parseInt(body.width) || 60)); }
+    if (body.height !== undefined) { updates.push('height = ?'); values.push(Math.max(10, parseInt(body.height) || 60)); }
+
+    if (updates.length === 0) {
+      return reply.status(400).send({ error: 'No fields to update' });
+    }
+
+    values.push(assetId, id);
+    db.prepare(`UPDATE table_assets SET ${updates.join(', ')} WHERE id = ? AND game_id = ?`).run(...values);
+
+    const updated = db.prepare('SELECT * FROM table_assets WHERE id = ?').get(assetId);
+    return updated;
+  });
+
   // DELETE /api/games/:id/table-assets/:assetId - Delete a table asset
   fastify.delete('/api/games/:id/table-assets/:assetId', async (request, reply) => {
     const db = getDb();
