@@ -17,6 +17,7 @@ import { cardBacksRoutes } from './routes/card-backs.js';
 import { ttsImportRoutes } from './routes/tts-import.js';
 import { authRoutes } from './routes/auth.js';
 import { roomsRoutes } from './routes/rooms.js';
+import { tableAssetsRoutes } from './routes/table-assets.js';
 import { setupWebSocketServer } from './websocket/roomWs.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +70,7 @@ async function start() {
   await fastify.register(cardBacksRoutes);
   await fastify.register(ttsImportRoutes);
   await fastify.register(roomsRoutes);
+  await fastify.register(tableAssetsRoutes);
 
   // Graceful shutdown
   const shutdown = async () => {

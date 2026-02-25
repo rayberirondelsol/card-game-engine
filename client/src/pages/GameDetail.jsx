@@ -104,6 +104,12 @@ export default function GameDetail() {
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const isTouchDev = typeof window !== 'undefined' && isTouchDevice();
 
+  // Table assets (tokens & boards from TTS import)
+  const [tableAssets, setTableAssets] = useState([]);
+
+  // Card sort order
+  const [cardSortOrder, setCardSortOrder] = useState('name');
+
   useEffect(() => {
     fetchGame();
     fetchSaves();
@@ -111,6 +117,7 @@ export default function GameDetail() {
     fetchCards();
     fetchCategories();
     fetchCardBacks();
+    fetchTableAssets();
   }, [id]);
 
   async function fetchGame() {
@@ -184,6 +191,26 @@ export default function GameDetail() {
       }
     } catch (err) {
       // Card backs endpoint may not exist yet - that's OK
+    }
+  }
+
+  async function fetchTableAssets() {
+    try {
+      const res = await fetch(`/api/games/${id}/table-assets`);
+      if (res.ok) {
+        const data = await res.json();
+        setTableAssets(data);
+      }
+    } catch (err) {
+      // Table assets endpoint may not exist yet - that's OK
+    }
+  }
+
+  async function handleDeleteTableAsset(assetId, name) {
+    if (!confirm(`"${name || 'Asset'}" löschen?`)) return;
+    const res = await fetch(`/api/games/${id}/table-assets/${assetId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setTableAssets(prev => prev.filter(a => a.id !== assetId));
     }
   }
 
@@ -1422,6 +1449,19 @@ export default function GameDetail() {
                       <option value="bottom">OCR: Bottom</option>
                     </select>
                   )}
+
+                  {/* Sort Toggle */}
+                  <select
+                    value={cardSortOrder}
+                    onChange={(e) => setCardSortOrder(e.target.value)}
+                    className="text-sm border border-[var(--color-border)] rounded-lg px-2 py-2 bg-[var(--color-surface)] text-[var(--color-text)]"
+                    data-testid="card-sort-select"
+                    title="Sort cards"
+                  >
+                    <option value="name">Sort: Name</option>
+                    <option value="date-desc">Sort: Newest</option>
+                    <option value="date-asc">Sort: Oldest</option>
+                  </select>
                 </div>
               </div>
 
@@ -1438,9 +1478,17 @@ export default function GameDetail() {
 
               {/* Card Grid */}
               {(() => {
-                const displayCards = selectedCategoryId === 'uncategorized'
+                let displayCards = selectedCategoryId === 'uncategorized'
                   ? cards.filter(c => !c.category_id)
                   : filteredCards;
+
+                if (cardSortOrder === 'date-desc') {
+                  displayCards = [...displayCards].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                } else if (cardSortOrder === 'date-asc') {
+                  displayCards = [...displayCards].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                } else {
+                  displayCards = [...displayCards].sort((a, b) => a.name.localeCompare(b.name));
+                }
 
                 return displayCards.length === 0 ? (
                   <div className="text-[var(--color-text-secondary)] text-center py-8" data-testid="no-cards-message">
@@ -1507,6 +1555,11 @@ export default function GameDetail() {
                                 </svg>
                               </button>
                             </div>
+                          )}
+                          {card.created_at && (
+                            <p className="text-[10px] text-[var(--color-text-secondary)] truncate mt-0.5">
+                              {new Date(card.created_at).toLocaleDateString()}
+                            </p>
                           )}
                           {/* Category assignment dropdown */}
                           <select
@@ -1661,6 +1714,56 @@ export default function GameDetail() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </div>
+
+            {/* Tokens & Boards */}
+            <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="table-assets-section">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide">Tokens &amp; Boards</h2>
+              </div>
+
+              {tableAssets.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-secondary)]" data-testid="no-table-assets-message">
+                  Noch keine Tokens oder Boards importiert.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2" data-testid="table-assets-list">
+                  {tableAssets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      data-testid={`table-asset-${asset.id}`}
+                      className="group relative flex flex-col items-center gap-1 p-1.5 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors bg-[var(--color-background)]"
+                      style={{ width: '72px' }}
+                    >
+                      <div className="w-full h-16 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                        <img
+                          src={asset.image_path}
+                          alt={asset.name}
+                          className="w-full h-full object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+                      <p className="text-[10px] text-[var(--color-text)] truncate w-full text-center" title={asset.name}>
+                        {asset.name || '—'}
+                      </p>
+                      <span className={`text-[9px] px-1 rounded font-medium ${asset.type === 'board' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {asset.type}
+                      </span>
+                      <p className="text-[9px] text-[var(--color-text-secondary)]">
+                        {new Date(asset.created_at).toLocaleDateString()}
+                      </p>
+                      <button
+                        onClick={() => handleDeleteTableAsset(asset.id, asset.name)}
+                        data-testid={`delete-table-asset-${asset.id}`}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
+                        title="Löschen"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 

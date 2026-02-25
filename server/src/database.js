@@ -116,6 +116,19 @@ export async function setupDatabase() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch()),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS table_assets (
+      id TEXT PRIMARY KEY,
+      game_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      image_path TEXT NOT NULL,
+      source_url TEXT,
+      width INTEGER DEFAULT 60,
+      height INTEGER DEFAULT 60,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    );
   `);
 
   // Multiplayer tables
@@ -172,7 +185,7 @@ export async function setupDatabase() {
   }
 
   console.log('[DB] Database initialized at:', DB_PATH);
-  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players');
+  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets');
 
   return db;
 }

@@ -739,8 +739,36 @@ export async function ttsImportRoutes(fastify) {
       const WORLD_CENTER_X = 800;
       const WORLD_CENTER_Y = 450;
 
+      const insertAssetStmt = db.prepare(
+        'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      );
+
       for (const asset of nonCardAssets.tokens) {
         try {
+          // Dedup: reuse existing entry for same URL
+          const existing = db.prepare(
+            'SELECT * FROM table_assets WHERE game_id = ? AND source_url = ?'
+          ).get(id, asset.imageUrl);
+
+          if (existing) {
+            const size = Math.round(Math.max(asset.scaleX, asset.scaleZ) * 60);
+            importedTokens.push({
+              id: existing.id,
+              shape: 'image',
+              imageUrl: existing.image_path,
+              label: asset.nickname || '',
+              size: Math.max(size, 30),
+              x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
+              y: WORLD_CENTER_Y + asset.ttsZ * TTS_SCALE,
+              color: null,
+              attachedTo: null,
+              attachedCorner: null,
+              locked: false,
+            });
+            console.log(`[TTS Import] Reusing existing token: ${asset.nickname || 'unnamed'}`);
+            continue;
+          }
+
           const buffer = await downloadImage(asset.imageUrl);
           const fileId = uuidv4();
           const filename = `${fileId}.png`;
@@ -748,12 +776,15 @@ export async function ttsImportRoutes(fastify) {
           await sharp(buffer).rotate().png().toFile(filePath);
           const relPath = `/uploads/${id}/${filename}`;
           const size = Math.round(Math.max(asset.scaleX, asset.scaleZ) * 60);
+          const clampedSize = Math.max(size, 30);
+          const assetId = uuidv4();
+          insertAssetStmt.run(assetId, id, 'token', asset.nickname || '', relPath, asset.imageUrl, clampedSize, clampedSize);
           importedTokens.push({
-            id: uuidv4(),
+            id: assetId,
             shape: 'image',
             imageUrl: relPath,
             label: asset.nickname || '',
-            size: Math.max(size, 30),
+            size: clampedSize,
             x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
             y: WORLD_CENTER_Y + asset.ttsZ * TTS_SCALE,
             color: null,
@@ -769,6 +800,26 @@ export async function ttsImportRoutes(fastify) {
 
       for (const asset of nonCardAssets.boards) {
         try {
+          // Dedup: reuse existing entry for same URL
+          const existing = db.prepare(
+            'SELECT * FROM table_assets WHERE game_id = ? AND source_url = ?'
+          ).get(id, asset.imageUrl);
+
+          if (existing) {
+            importedBoards.push({
+              id: existing.id,
+              imageUrl: existing.image_path,
+              name: asset.nickname || 'Board',
+              x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
+              y: WORLD_CENTER_Y + asset.ttsZ * TTS_SCALE,
+              width: existing.width,
+              height: existing.height,
+              locked: false,
+            });
+            console.log(`[TTS Import] Reusing existing board: ${asset.nickname || 'unnamed'}`);
+            continue;
+          }
+
           const buffer = await downloadImage(asset.imageUrl);
           const metadata = await sharp(buffer).rotate().metadata();
           const fileId = uuidv4();
@@ -779,8 +830,10 @@ export async function ttsImportRoutes(fastify) {
           // Use actual image dimensions scaled to a reasonable board size
           const boardWidth = Math.round((metadata.width || 400) * Math.min(1, 600 / (metadata.width || 400)));
           const boardHeight = Math.round((metadata.height || 300) * Math.min(1, 600 / (metadata.width || 400)));
+          const assetId = uuidv4();
+          insertAssetStmt.run(assetId, id, 'board', asset.nickname || 'Board', relPath, asset.imageUrl, boardWidth, boardHeight);
           importedBoards.push({
-            id: uuidv4(),
+            id: assetId,
             imageUrl: relPath,
             name: asset.nickname || 'Board',
             x: WORLD_CENTER_X + asset.ttsX * TTS_SCALE,
