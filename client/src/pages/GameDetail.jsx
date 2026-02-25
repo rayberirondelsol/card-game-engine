@@ -2579,6 +2579,22 @@ export default function GameDetail() {
                           className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
                           data-testid={`tts-deck-checkbox-${deck.index}`}
                         />
+                        {/* Sprite-Sheet-Vorschau */}
+                        {deck.previewUrl ? (
+                          <div className="w-12 h-16 rounded overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                            <img
+                              src={deck.previewUrl}
+                              alt={deck.nickname}
+                              className="w-full h-full object-cover object-left-top"
+                              loading="lazy"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-16 rounded bg-gray-100 flex-shrink-0 flex items-center justify-center text-gray-400 text-xs border border-gray-200">
+                            ?
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[var(--color-text)] truncate">
                             {deck.nickname}
@@ -2620,6 +2636,19 @@ export default function GameDetail() {
                               onChange={() => toggleTtsTokenSelection(token.index)}
                               className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
                             />
+                            {ttsAnalysis.tokenPreviews?.[token.index]?.url ? (
+                              <div className="w-8 h-8 rounded-full overflow-hidden bg-purple-100 border border-purple-200 flex-shrink-0">
+                                <img
+                                  src={ttsAnalysis.tokenPreviews[token.index].url}
+                                  alt={token.nickname}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-purple-100 flex-shrink-0 flex items-center justify-center text-purple-400 text-xs border border-purple-200">?</div>
+                            )}
                             <span className="text-sm text-[var(--color-text)] truncate">
                               {token.nickname}
                             </span>
@@ -2651,6 +2680,19 @@ export default function GameDetail() {
                               onChange={() => toggleTtsBoardSelection(board.index)}
                               className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
                             />
+                            {ttsAnalysis.boardPreviews?.[board.index]?.url ? (
+                              <div className="w-12 h-8 rounded overflow-hidden bg-purple-100 border border-purple-200 flex-shrink-0">
+                                <img
+                                  src={ttsAnalysis.boardPreviews[board.index].url}
+                                  alt={board.nickname}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-8 rounded bg-purple-100 flex-shrink-0 flex items-center justify-center text-purple-400 text-xs border border-purple-200">?</div>
+                            )}
                             <span className="text-sm text-[var(--color-text)] truncate">
                               {board.nickname}
                             </span>

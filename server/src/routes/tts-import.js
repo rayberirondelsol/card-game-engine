@@ -477,6 +477,7 @@ export async function ttsImportRoutes(fastify) {
           totalCards,
           sheets,
           isSingleCard: deck.isSingleCard || false,
+          previewUrl: sheets[0]?.faceURL || null,
         };
       });
 
@@ -507,6 +508,8 @@ export async function ttsImportRoutes(fastify) {
         boardCount: nonCardAssets.boards.length,
         tokens: tokenSummaries,
         boards: boardSummaries,
+        tokenPreviews: nonCardAssets.tokens.map(t => ({ url: t.imageUrl, name: t.nickname || '' })),
+        boardPreviews: nonCardAssets.boards.map(b => ({ url: b.imageUrl, name: b.nickname || 'Board' })),
       });
     } catch (err) {
       console.error('[TTS Import] Analyze error:', err);
