@@ -14,16 +14,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Check whether the CENTER 50% region of a buffer has significant content
- * (i.e., is not just a uniform background color).
- * Returns true if the center region has non-trivial pixel variance.
+ * Check whether the CENTER 50% region of a cell (defined by srcLeft, srcTop, cellW, cellH
+ * within the source image buffer) has significant content.
+ * Operates directly on the source buffer to avoid an intermediate PNG encode/decode.
  */
-async function hasCenterContent(buffer, width, height, threshold = 15) {
-  const left   = Math.floor(width  * 0.25);
-  const top    = Math.floor(height * 0.25);
-  const cw     = Math.max(Math.floor(width  * 0.50), 1);
-  const ch     = Math.max(Math.floor(height * 0.50), 1);
-  const stats  = await sharp(buffer).extract({ left, top, width: cw, height: ch }).stats();
+async function hasCenterContent(srcBuffer, srcLeft, srcTop, cellW, cellH, threshold = 15) {
+  const left = srcLeft + Math.floor(cellW * 0.25);
+  const top  = srcTop  + Math.floor(cellH * 0.25);
+  const cw   = Math.max(Math.floor(cellW * 0.50), 1);
+  const ch   = Math.max(Math.floor(cellH * 0.50), 1);
+  const stats = await sharp(srcBuffer).extract({ left, top, width: cw, height: ch }).stats();
   return stats.channels.some(c => c.stdev > threshold);
 }
 
@@ -1046,28 +1046,34 @@ export async function ttsImportRoutes(fastify) {
                 const tryRows = baseRows + extraRows;
                 const faceW = Math.floor(metadata.width / baseCols);
                 const faceH = Math.floor(metadata.height / tryRows);
-                const contentCells = [];
+                const totalCells = baseCols * tryRows;
 
-                for (let cellIdx = 0; cellIdx < baseCols * tryRows; cellIdx++) {
-                  const col = cellIdx % baseCols;
-                  const row = Math.floor(cellIdx / baseCols);
-                  const cellBuf = await sharp(buffer)
-                    .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
-                    .png()
-                    .toBuffer();
-                  if (await hasCenterContent(cellBuf, faceW, faceH)) {
-                    contentCells.push(cellBuf);
-                  }
-                }
+                // Check all cells in parallel — no PNG encode/decode needed for detection
+                const cellHasContent = await Promise.all(
+                  Array.from({ length: totalCells }, (_, cellIdx) => {
+                    const col = cellIdx % baseCols;
+                    const row = Math.floor(cellIdx / baseCols);
+                    return hasCenterContent(buffer, col * faceW, row * faceH, faceW, faceH);
+                  })
+                );
 
-                if (contentCells.length === die.numFaces) {
-                  for (const cellBuf of contentCells) {
+                const contentIndices = cellHasContent.map((has, i) => has ? i : -1).filter(i => i >= 0);
+
+                if (contentIndices.length === die.numFaces) {
+                  // Extract and save only the content cells
+                  for (const cellIdx of contentIndices) {
+                    const col = cellIdx % baseCols;
+                    const row = Math.floor(cellIdx / baseCols);
+                    const cellBuf = await sharp(buffer)
+                      .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
+                      .png()
+                      .toBuffer();
                     const fileId = uuidv4();
                     const filename = `${fileId}.png`;
                     writeFileSync(path.join(gameUploadsDir, filename), cellBuf);
                     faceImagePaths.push(`/uploads/${id}/${filename}`);
                   }
-                  console.log(`[TTS Import] Die "${die.nickname}": used ${baseCols}×${tryRows} grid (+${extraRows} extra rows), found ${contentCells.length} faces`);
+                  console.log(`[TTS Import] Die "${die.nickname}": used ${baseCols}×${tryRows} grid (+${extraRows} extra rows), found ${contentIndices.length} faces`);
                   found = true;
                 }
               }
