@@ -13,6 +13,14 @@ import { createWorker } from 'tesseract.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/** Grid layout for TTS die texture sheets: [cols, rows] */
+function getDieSheetGrid(numFaces) {
+  const grids = { 4: [2, 2], 6: [3, 2], 8: [4, 2], 10: [5, 2], 12: [4, 3], 20: [5, 4] };
+  if (grids[numFaces]) return grids[numFaces];
+  const cols = Math.ceil(Math.sqrt(numFaces));
+  return [cols, Math.ceil(numFaces / cols)];
+}
+
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 // Ensure uploads directory exists
@@ -938,17 +946,47 @@ export async function ttsImportRoutes(fastify) {
 
           // Download all face images
           const faceImagePaths = [];
-          for (let faceIdx = 0; faceIdx < die.faceUrls.length; faceIdx++) {
+          const isSheetDie = die.faceUrls.length > 1 && die.faceUrls.every(u => u === die.faceUrls[0]);
+          if (isSheetDie) {
+            // Single texture sheet: slice into individual face regions
             try {
-              const faceUrl = die.faceUrls[faceIdx];
-              const buffer = await downloadImage(faceUrl);
-              const fileId = uuidv4();
-              const filename = `${fileId}.png`;
-              const filePath = path.join(gameUploadsDir, filename);
-              await sharp(buffer).rotate().png().toFile(filePath);
-              faceImagePaths.push(`/uploads/${id}/${filename}`);
-            } catch (faceErr) {
-              console.warn(`[TTS Import] Failed to download die face ${faceIdx}: ${faceErr.message}`);
+              const buffer = await downloadImage(die.faceUrls[0]);
+              const [cols, rows] = getDieSheetGrid(die.numFaces);
+              const metadata = await sharp(buffer).metadata();
+              const faceW = Math.floor(metadata.width / cols);
+              const faceH = Math.floor(metadata.height / rows);
+              for (let faceIdx = 0; faceIdx < die.numFaces; faceIdx++) {
+                try {
+                  const col = faceIdx % cols;
+                  const row = Math.floor(faceIdx / cols);
+                  const fileId = uuidv4();
+                  const filename = `${fileId}.png`;
+                  const filePath = path.join(gameUploadsDir, filename);
+                  await sharp(buffer)
+                    .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
+                    .png()
+                    .toFile(filePath);
+                  faceImagePaths.push(`/uploads/${id}/${filename}`);
+                } catch (sliceErr) {
+                  console.warn(`[TTS Import] Failed to slice die face ${faceIdx}: ${sliceErr.message}`);
+                }
+              }
+            } catch (sheetErr) {
+              console.warn(`[TTS Import] Failed to download die sheet: ${sheetErr.message}`);
+            }
+          } else {
+            for (let faceIdx = 0; faceIdx < die.faceUrls.length; faceIdx++) {
+              try {
+                const faceUrl = die.faceUrls[faceIdx];
+                const buffer = await downloadImage(faceUrl);
+                const fileId = uuidv4();
+                const filename = `${fileId}.png`;
+                const filePath = path.join(gameUploadsDir, filename);
+                await sharp(buffer).rotate().png().toFile(filePath);
+                faceImagePaths.push(`/uploads/${id}/${filename}`);
+              } catch (faceErr) {
+                console.warn(`[TTS Import] Failed to download die face ${faceIdx}: ${faceErr.message}`);
+              }
             }
           }
 

@@ -1987,12 +1987,17 @@ export default function GameTable({ room = null }) {
   // Token functions
   function openTokenModal() {
     setShowTokenModal(true);
-    // Load image token library + custom dice library
     if (id) {
       fetch(`/api/games/${id}/table-assets`)
         .then(r => r.ok ? r.json() : [])
         .then(assets => setImageTokenLibrary(assets.filter(a => a.type === 'token')))
         .catch(() => {});
+    }
+  }
+
+  function openDiceModal() {
+    setShowDiceModal(true);
+    if (id) {
       fetch(`/api/games/${id}/custom-dice`)
         .then(r => r.ok ? r.json() : [])
         .then(dice => setCustomDiceLibrary(dice))
@@ -4909,7 +4914,7 @@ export default function GameTable({ room = null }) {
 
             {/* Dice button */}
             <button
-              onClick={() => setShowDiceModal(true)}
+              onClick={() => openDiceModal()}
               data-testid="toolbar-dice-btn"
               className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
               title="Add Dice"
@@ -4922,22 +4927,6 @@ export default function GameTable({ room = null }) {
                 <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" />
               </svg>
               {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Dice</span>}
-            </button>
-
-            {/* Hit Dice button */}
-            <button
-              onClick={() => setShowHitDiceModal(true)}
-              data-testid="toolbar-hit-dice-btn"
-              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
-              title="Add Hit Die"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="12" cy="12" r="4" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="8" y1="12" x2="16" y2="12" />
-              </svg>
-              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Hit Die</span>}
             </button>
 
             {/* Note button */}
@@ -5121,78 +5110,94 @@ export default function GameTable({ room = null }) {
         </div>
       </SwipeModal>
 
-      {/* Dice Creation Modal */}
+      {/* Dice Modal — Standard, Hit Dice, Custom (unified) */}
       <SwipeModal isOpen={showDiceModal} onDismiss={dismissDiceModal} testId="dice-modal-swipe">
-        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="dice-modal">
-          <h3 className="text-white font-semibold mb-3">Add Dice</h3>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {['d6', 'd8', 'd10', 'd12', 'd20'].map(type => (
-              <button
-                key={type}
-                onClick={() => setNewDiceType(type)}
-                data-testid={`dice-type-${type}`}
-                className={`px-3 py-2 rounded-lg text-sm font-bold uppercase transition-colors ${
-                  newDiceType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={dismissDiceModal}
-              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="dice-modal">
+          <h3 className="text-white font-semibold mb-4">Add Dice</h3>
+
+          {/* Standard Dice */}
+          <div className="mb-4">
+            <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2">Standard</label>
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {['d6', 'd8', 'd10', 'd12', 'd20'].map(type => (
+                <button
+                  key={type}
+                  onClick={() => setNewDiceType(type)}
+                  data-testid={`dice-type-${type}`}
+                  className={`px-2 py-2 rounded-lg text-sm font-bold uppercase transition-colors ${
+                    newDiceType === type ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => createDie(newDiceType)}
               data-testid="dice-create-btn"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors text-sm"
             >
-              Place Dice
+              Place {newDiceType}
             </button>
           </div>
-        </div>
-      </SwipeModal>
 
-      {/* Hit Dice Creation Modal */}
-      <SwipeModal isOpen={showHitDiceModal} onDismiss={dismissHitDiceModal} testId="hit-dice-modal-swipe">
-        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="hit-dice-modal">
-          <h3 className="text-white font-semibold mb-1">Add Hit Die</h3>
-          <p className="text-slate-400 text-xs mb-4">Select a die by strength. More hits = stronger die.</p>
-          <div className="flex flex-col gap-2 mb-4">
-            {[
-              { type: 'yellow', label: 'Yellow — 1 Hit', hits: 1, bg: '#ca8a04', border: '#fbbf24', desc: '4× Miss, 1× Hit, 1× Crit' },
-              { type: 'green',  label: 'Green — 2 Hits', hits: 2, bg: '#166534', border: '#4ade80', desc: '3× Miss, 2× Hit, 1× Crit' },
-              { type: 'blue',   label: 'Blue — 3 Hits',  hits: 3, bg: '#1d4ed8', border: '#60a5fa', desc: '2× Miss, 3× Hit, 1× Crit' },
-              { type: 'purple', label: 'Purple — 4 Hits', hits: 4, bg: '#581c87', border: '#c084fc', desc: '1× Miss, 4× Hit, 1× Crit' },
-              { type: 'red',    label: 'Red — 5 Hits',   hits: 5, bg: '#991b1b', border: '#f87171', desc: '5× Hit, 1× Crit (no miss)' },
-            ].map(opt => (
-              <button
-                key={opt.type}
-                onClick={() => createHitDie(opt.type)}
-                data-testid={`hit-die-${opt.type}`}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg border-2 text-left transition-all hover:scale-[1.02]"
-                style={{ background: opt.bg + 'cc', borderColor: opt.border }}
-              >
-                <span className="text-2xl font-bold text-white">⊕</span>
-                <div>
-                  <div className="text-white text-sm font-semibold">{opt.label}</div>
-                  <div className="text-xs" style={{ color: opt.border }}>{opt.desc}</div>
-                </div>
-              </button>
-            ))}
+          <div className="border-t border-slate-600 pt-4 mb-4">
+            <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2">Hit Dice</label>
+            <p className="text-slate-500 text-xs mb-2">More hits = stronger die.</p>
+            <div className="flex flex-col gap-1.5">
+              {[
+                { type: 'yellow', label: 'Yellow — 1 Hit', bg: '#ca8a04', border: '#fbbf24', desc: '4× Miss, 1× Hit, 1× Crit' },
+                { type: 'green',  label: 'Green — 2 Hits',  bg: '#166534', border: '#4ade80', desc: '3× Miss, 2× Hit, 1× Crit' },
+                { type: 'blue',   label: 'Blue — 3 Hits',   bg: '#1d4ed8', border: '#60a5fa', desc: '2× Miss, 3× Hit, 1× Crit' },
+                { type: 'purple', label: 'Purple — 4 Hits', bg: '#581c87', border: '#c084fc', desc: '1× Miss, 4× Hit, 1× Crit' },
+                { type: 'red',    label: 'Red — 5 Hits',    bg: '#991b1b', border: '#f87171', desc: '5× Hit, 1× Crit (no miss)' },
+              ].map(opt => (
+                <button
+                  key={opt.type}
+                  onClick={() => createHitDie(opt.type)}
+                  data-testid={`hit-die-${opt.type}`}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg border-2 text-left transition-all hover:scale-[1.01]"
+                  style={{ background: opt.bg + 'cc', borderColor: opt.border }}
+                >
+                  <span className="text-xl font-bold text-white">⊕</span>
+                  <div>
+                    <div className="text-white text-xs font-semibold">{opt.label}</div>
+                    <div className="text-[10px]" style={{ color: opt.border }}>{opt.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {customDiceLibrary.length > 0 && (
+            <div className="border-t border-slate-600 pt-4 mb-4">
+              <label className="block text-slate-400 text-xs uppercase tracking-wider mb-2">Custom Dice</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
+                {customDiceLibrary.map(die => (
+                  <button
+                    key={die.id}
+                    onClick={() => { placeCustomDie(die); setShowDiceModal(false); }}
+                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-purple-400 bg-slate-700 hover:bg-slate-600 transition-all"
+                    title={`${die.name} (d${die.num_faces})`}
+                  >
+                    <div className="w-10 h-10 rounded overflow-hidden bg-slate-600 flex items-center justify-center">
+                      {die.face_images?.[0] ? (
+                        <img src={die.face_images[0]} alt={die.name} className="w-full h-full object-contain" loading="lazy" />
+                      ) : (
+                        <span className="text-lg">🎲</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-300 truncate w-12 text-center leading-tight">{die.name}</span>
+                    <span className="text-[9px] text-purple-400">d{die.num_faces}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end">
-            <button
-              onClick={dismissHitDiceModal}
-              className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
-            >
-              Cancel
+            <button onClick={dismissDiceModal} className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm">
+              Close
             </button>
           </div>
         </div>
@@ -5295,37 +5300,9 @@ export default function GameTable({ room = null }) {
             </div>
           )}
 
-          {/* Custom Würfel aus der Bibliothek */}
-          {customDiceLibrary.length > 0 && (
-            <div className="mb-4">
-              <label className="block text-slate-300 text-sm mb-2">Custom Würfel</label>
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
-                {customDiceLibrary.map(die => (
-                  <button
-                    key={die.id}
-                    onClick={() => placeCustomDie(die)}
-                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-purple-400 bg-slate-700 hover:bg-slate-600 transition-all"
-                    title={`${die.name} (d${die.num_faces})`}
-                  >
-                    <div className="w-10 h-10 rounded overflow-hidden bg-slate-600 flex items-center justify-center">
-                      {die.face_images?.[0] ? (
-                        <img src={die.face_images[0]} alt={die.name} className="w-full h-full object-contain" loading="lazy" />
-                      ) : (
-                        <span className="text-lg">🎲</span>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-slate-300 truncate w-12 text-center leading-tight">{die.name}</span>
-                    <span className="text-[9px] text-purple-400">d{die.num_faces}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-2 border-t border-slate-600 pt-2" />
-            </div>
-          )}
-
           {/* Shape Selection */}
           <div className="mb-4">
-            {imageTokenLibrary.length === 0 && customDiceLibrary.length === 0 && <label className="block text-slate-300 text-sm mb-2">Shape</label>}
+            {imageTokenLibrary.length === 0 && <label className="block text-slate-300 text-sm mb-2">Shape</label>}
             <div className="grid grid-cols-3 gap-2">
               {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
                 <button
@@ -6044,16 +6021,10 @@ export default function GameTable({ room = null }) {
                   Add Counter
                 </button>
                 <button
-                  onClick={() => { setShowDiceModal(true); setContextMenu(null); }}
+                  onClick={() => { openDiceModal(); setContextMenu(null); }}
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   Add Dice
-                </button>
-                <button
-                  onClick={() => { setShowHitDiceModal(true); setContextMenu(null); }}
-                  className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
-                >
-                  Add Hit Die
                 </button>
                 <button
                   onClick={() => { setShowNoteModal(true); setContextMenu(null); }}
