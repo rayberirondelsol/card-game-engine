@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import CreateRoomModal from '../components/CreateRoomModal';
+import JoinRoomModal from '../components/JoinRoomModal';
 
 export default function StartScreen() {
   const navigate = useNavigate();
@@ -14,6 +16,9 @@ export default function StartScreen() {
   const [nameError, setNameError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // game object to delete
   const [deleting, setDeleting] = useState(false);
+  const [createRoomTarget, setCreateRoomTarget] = useState(null);
+  const [showJoinRoom, setShowJoinRoom] = useState(false);
+  const [createRoomSetups, setCreateRoomSetups] = useState([]);
 
   useEffect(() => {
     fetchGames();
@@ -92,12 +97,39 @@ export default function StartScreen() {
     }
   }
 
+  async function openCreateRoom(e, game) {
+    e.stopPropagation();
+    const res = await fetch(`/api/games/${game.id}/setups`);
+    setCreateRoomSetups(res.ok ? await res.json() : []);
+    setCreateRoomTarget(game);
+  }
+
+  function handleRoomCreated(data) {
+    sessionStorage.setItem(`room_${data.room_code}_player_id`, data.player_id);
+    sessionStorage.setItem(`room_${data.room_code}_is_host`, 'true');
+    navigate(`/rooms/${data.room_code}/lobby`);
+  }
+
+  function handleRoomJoined(data) {
+    sessionStorage.setItem(`room_${data.room_code}_player_id`, data.player_id);
+    sessionStorage.setItem(`room_${data.room_code}_is_host`, 'false');
+    navigate(`/rooms/${data.room_code}/lobby`);
+  }
+
   return (
     <div className="min-h-screen bg-[var(--color-background)] p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-[var(--color-text)] mb-2">
-          Card Game Engine
-        </h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-4xl font-bold text-[var(--color-text)]">
+            Card Game Engine
+          </h1>
+          <button
+            onClick={() => setShowJoinRoom(true)}
+            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors text-sm font-medium"
+          >
+            Join Room
+          </button>
+        </div>
         <p className="text-[var(--color-text-secondary)] mb-8">
           Your virtual tabletop for any card game
         </p>
@@ -173,8 +205,16 @@ export default function StartScreen() {
                       {game.description}
                     </p>
                   )}
-                  <div className="text-xs text-[var(--color-text-secondary)] mt-auto">
-                    {game.card_count || 0} cards
+                  <div className="flex items-center justify-between mt-auto">
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      {game.card_count || 0} cards
+                    </span>
+                    <button
+                      onClick={(e) => openCreateRoom(e, game)}
+                      className="text-xs px-2 py-1 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-hover)] transition-colors"
+                    >
+                      Multiplayer
+                    </button>
                   </div>
                 </div>
               ))}
@@ -270,6 +310,20 @@ export default function StartScreen() {
             </div>
           </div>
         </div>
+      )}
+      {createRoomTarget && (
+        <CreateRoomModal
+          gameId={createRoomTarget.id}
+          setups={createRoomSetups}
+          onClose={() => setCreateRoomTarget(null)}
+          onCreated={handleRoomCreated}
+        />
+      )}
+      {showJoinRoom && (
+        <JoinRoomModal
+          onClose={() => setShowJoinRoom(false)}
+          onJoined={handleRoomJoined}
+        />
       )}
       </div>
     </div>

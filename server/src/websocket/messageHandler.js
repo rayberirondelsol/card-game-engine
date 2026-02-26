@@ -51,6 +51,24 @@ export function handleMessage(room, playerId, rawData) {
       return handleNoteEdit(room, playerId, payload, timestamp);
     case 'token_move':
       return handleTokenMove(room, playerId, payload, timestamp);
+    case 'token_create':
+      return handleTokenCreate(room, playerId, payload, timestamp);
+    case 'token_delete':
+      return handleTokenDelete(room, playerId, payload, timestamp);
+    case 'counter_move':
+      return handleCounterMove(room, playerId, payload, timestamp);
+    case 'die_move':
+      return handleDieMove(room, playerId, payload, timestamp);
+    case 'note_move':
+      return handleNoteMove(room, playerId, payload, timestamp);
+    case 'custom_die_place':
+      return handleCustomDiePlace(room, playerId, payload, timestamp);
+    case 'custom_die_move':
+      return handleCustomDieMove(room, playerId, payload, timestamp);
+    case 'custom_die_roll':
+      return handleCustomDieRoll(room, playerId, payload, timestamp);
+    case 'custom_die_delete':
+      return handleCustomDieDelete(room, playerId, payload, timestamp);
     case 'cursor_move':
       // Cursor is not persisted in boardState, just broadcast
       broadcast(room, { type: 'cursor', player_id: playerId, x: payload.x, y: payload.y }, playerId);
@@ -253,6 +271,62 @@ function handleHandCountUpdate(room, playerId, { count }) {
   const player = room.players.get(playerId);
   if (player) player.handCardCount = count;
   broadcast(room, { type: 'player_hand_count', player_id: playerId, count }, playerId);
+}
+
+// ─── Token create/delete ──────────────────────────────────────────────────────
+
+function handleTokenCreate(room, playerId, { token }, timestamp) {
+  if (token) room.boardState.tokens.push(token);
+  broadcast(room, { type: 'token_create', token, from_player_id: playerId, timestamp });
+}
+
+function handleTokenDelete(room, playerId, { token_id }, timestamp) {
+  room.boardState.tokens = room.boardState.tokens.filter(t => t.id !== token_id);
+  broadcast(room, { type: 'token_delete', token_id, from_player_id: playerId, timestamp }, playerId);
+}
+
+// ─── Object move actions ──────────────────────────────────────────────────────
+
+function handleCounterMove(room, playerId, { counter_id, x, y }, timestamp) {
+  const counter = room.boardState.counters.find(c => c.id === counter_id);
+  if (counter) { counter.x = x; counter.y = y; }
+  broadcast(room, { type: 'counter_move', counter_id, x, y, from_player_id: playerId, timestamp }, playerId);
+}
+
+function handleDieMove(room, playerId, { die_id, x, y }, timestamp) {
+  const die = room.boardState.dice.find(d => d.id === die_id);
+  if (die) { die.x = x; die.y = y; }
+  broadcast(room, { type: 'die_move', die_id, x, y, from_player_id: playerId, timestamp }, playerId);
+}
+
+function handleNoteMove(room, playerId, { note_id, x, y }, timestamp) {
+  const note = room.boardState.notes.find(n => n.id === note_id);
+  if (note) { note.x = x; note.y = y; }
+  broadcast(room, { type: 'note_move', note_id, x, y, from_player_id: playerId, timestamp }, playerId);
+}
+
+// ─── Custom dice ──────────────────────────────────────────────────────────────
+
+function handleCustomDiePlace(room, playerId, { die }, timestamp) {
+  if (die) room.boardState.customDice.push(die);
+  broadcast(room, { type: 'custom_die_place', die, from_player_id: playerId, timestamp });
+}
+
+function handleCustomDieMove(room, playerId, { die_id, x, y }, timestamp) {
+  const die = room.boardState.customDice.find(d => d.id === die_id);
+  if (die) { die.x = x; die.y = y; }
+  broadcast(room, { type: 'custom_die_move', die_id, x, y, from_player_id: playerId, timestamp }, playerId);
+}
+
+function handleCustomDieRoll(room, playerId, { die_id, currentFace }, timestamp) {
+  const die = room.boardState.customDice.find(d => d.id === die_id);
+  if (die) die.currentFace = currentFace;
+  broadcast(room, { type: 'custom_die_roll', die_id, currentFace, from_player_id: playerId, timestamp }, playerId);
+}
+
+function handleCustomDieDelete(room, playerId, { die_id }, timestamp) {
+  room.boardState.customDice = room.boardState.customDice.filter(d => d.id !== die_id);
+  broadcast(room, { type: 'custom_die_delete', die_id, from_player_id: playerId, timestamp }, playerId);
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────

@@ -1669,6 +1669,7 @@ export default function GameTable({ room = null }) {
       locked: false,
     };
     setCustomDiceOnTable(prev => [...prev, newDie]);
+    if (room) room.sendAction({ type: 'custom_die_place', die: newDie });
     setShowTokenModal(false);
   }
 
@@ -1683,15 +1684,19 @@ export default function GameTable({ room = null }) {
       count++;
       if (count >= 10) {
         clearInterval(interval);
-        setCustomDiceOnTable(prev => prev.map(d =>
-          d.id === dieId ? { ...d, rolling: false, currentFace: Math.floor(Math.random() * d.faceImages.length) } : d
-        ));
+        setCustomDiceOnTable(prev => prev.map(d => {
+          if (d.id !== dieId) return d;
+          const face = Math.floor(Math.random() * d.faceImages.length);
+          if (room) room.sendAction({ type: 'custom_die_roll', die_id: dieId, currentFace: face });
+          return { ...d, rolling: false, currentFace: face };
+        }));
       }
     }, 80);
   }
 
   function deleteCustomDieFromTable(dieId) {
     setCustomDiceOnTable(prev => prev.filter(d => d.id !== dieId));
+    if (room) room.sendAction({ type: 'custom_die_delete', die_id: dieId });
   }
 
   // Hit Dice (colored hit/crit/miss dice inspired by 20 Strong)
@@ -1871,6 +1876,25 @@ export default function GameTable({ room = null }) {
         }
       }
     }
+    if (room && draggingObj) {
+      const { id: objId, type: objType } = draggingObj;
+      if (objType === 'counter') {
+        const obj = counters.find(c => c.id === objId);
+        if (obj) room.sendAction({ type: 'counter_move', counter_id: objId, x: obj.x, y: obj.y });
+      } else if (objType === 'die') {
+        const obj = dice.find(d => d.id === objId);
+        if (obj) room.sendAction({ type: 'die_move', die_id: objId, x: obj.x, y: obj.y });
+      } else if (objType === 'customDie') {
+        const obj = customDiceOnTable.find(d => d.id === objId);
+        if (obj) room.sendAction({ type: 'custom_die_move', die_id: objId, x: obj.x, y: obj.y });
+      } else if (objType === 'note') {
+        const obj = notes.find(n => n.id === objId);
+        if (obj) room.sendAction({ type: 'note_move', note_id: objId, x: obj.x, y: obj.y });
+      } else if (objType === 'token') {
+        const obj = tokens.find(t => t.id === objId);
+        if (obj) room.sendAction({ type: 'token_move', token_id: objId, x: obj.x, y: obj.y });
+      }
+    }
     setDraggingObj(null);
   }
 
@@ -1988,6 +2012,7 @@ export default function GameTable({ room = null }) {
       attachedTo: null, // support card attachment
     };
     setTokens(prev => [...prev, newToken]);
+    if (room) room.sendAction({ type: 'token_create', token: newToken });
     setShowTokenModal(false);
     setNewTokenShape('circle');
     setNewTokenColor('#3b82f6');
@@ -1996,6 +2021,7 @@ export default function GameTable({ room = null }) {
 
   function deleteToken(tokenId) {
     setTokens(prev => prev.filter(t => t.id !== tokenId));
+    if (room) room.sendAction({ type: 'token_delete', token_id: tokenId });
   }
 
   function deleteBoard(boardId) {
@@ -2749,6 +2775,39 @@ export default function GameTable({ room = null }) {
         case 'token_move':
           setTokens(prev => prev.map(t => t.id === msg.token_id ? { ...t, x: msg.x, y: msg.y } : t));
           break;
+        case 'token_create':
+          setTokens(prev => {
+            if (prev.find(t => t.id === msg.token?.id)) return prev;
+            return [...prev, msg.token];
+          });
+          break;
+        case 'token_delete':
+          setTokens(prev => prev.filter(t => t.id !== msg.token_id));
+          break;
+        case 'counter_move':
+          setCounters(prev => prev.map(c => c.id === msg.counter_id ? { ...c, x: msg.x, y: msg.y } : c));
+          break;
+        case 'die_move':
+          setDice(prev => prev.map(d => d.id === msg.die_id ? { ...d, x: msg.x, y: msg.y } : d));
+          break;
+        case 'note_move':
+          setNotes(prev => prev.map(n => n.id === msg.note_id ? { ...n, x: msg.x, y: msg.y } : n));
+          break;
+        case 'custom_die_place':
+          setCustomDiceOnTable(prev => {
+            if (prev.find(d => d.id === msg.die?.id)) return prev;
+            return [...prev, { ...msg.die, rolling: false }];
+          });
+          break;
+        case 'custom_die_move':
+          setCustomDiceOnTable(prev => prev.map(d => d.id === msg.die_id ? { ...d, x: msg.x, y: msg.y } : d));
+          break;
+        case 'custom_die_roll':
+          setCustomDiceOnTable(prev => prev.map(d => d.id === msg.die_id ? { ...d, currentFace: msg.currentFace } : d));
+          break;
+        case 'custom_die_delete':
+          setCustomDiceOnTable(prev => prev.filter(d => d.id !== msg.die_id));
+          break;
         case 'board_sync':
           if (msg.board_state) {
             if (msg.board_state.cards) setTableCards(msg.board_state.cards);
@@ -2756,6 +2815,8 @@ export default function GameTable({ room = null }) {
             if (msg.board_state.dice) setDice(msg.board_state.dice);
             if (msg.board_state.notes) setNotes(msg.board_state.notes);
             if (msg.board_state.tokens) setTokens(msg.board_state.tokens);
+            if (msg.board_state.customDice)
+              setCustomDiceOnTable(msg.board_state.customDice.map(d => ({ ...d, rolling: false })));
           }
           break;
         case 'room_started':
@@ -2765,6 +2826,8 @@ export default function GameTable({ room = null }) {
             if (msg.board_state.dice) setDice(msg.board_state.dice);
             if (msg.board_state.notes) setNotes(msg.board_state.notes);
             if (msg.board_state.tokens) setTokens(msg.board_state.tokens);
+            if (msg.board_state.customDice)
+              setCustomDiceOnTable(msg.board_state.customDice.map(d => ({ ...d, rolling: false })));
           }
           if (msg.zones) setZones(msg.zones);
           break;
@@ -5208,6 +5271,7 @@ export default function GameTable({ room = null }) {
                         locked: false,
                       };
                       setTokens(prev => [...prev, newToken]);
+                      if (room) room.sendAction({ type: 'token_create', token: newToken });
                       setShowTokenModal(false);
                     }}
                     className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-blue-400 bg-slate-700 hover:bg-slate-600 transition-all"
@@ -6055,7 +6119,7 @@ export default function GameTable({ room = null }) {
                     else if (objType === 'die') setDice(prev => prev.filter(d => d.id !== objId));
                     else if (objType === 'hitDie') setHitDice(prev => prev.filter(d => d.id !== objId));
                     else if (objType === 'note') deleteNote(objId);
-                    else if (objType === 'token') setTokens(prev => prev.filter(t => t.id !== objId));
+                    else if (objType === 'token') { setTokens(prev => prev.filter(t => t.id !== objId)); if (room) room.sendAction({ type: 'token_delete', token_id: objId }); }
                     else if (objType === 'board') setBoards(prev => prev.filter(b => b.id !== objId));
                     else if (objType === 'textField') deleteTextField(objId);
                     setContextMenu(null);

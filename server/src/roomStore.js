@@ -24,6 +24,7 @@ export function createRoom({ roomCode, gameId, hostPlayerId, setupId = null }) {
       tokens: [],
       notes: [],
       stackNames: {},
+      customDice: [],
     },
     zones: [],
     lastSnapshot: new Date(),
