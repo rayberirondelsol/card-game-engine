@@ -13,10 +13,29 @@ import { createWorker } from 'tesseract.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Grid layout for TTS die texture sheets: [cols, rows] */
-function getDieSheetGrid(numFaces) {
-  const grids = { 4: [2, 2], 6: [3, 2], 8: [4, 2], 10: [5, 2], 12: [4, 3], 20: [5, 4] };
-  if (grids[numFaces]) return grids[numFaces];
+/**
+ * Determine the grid layout [cols, rows] for a TTS die texture sheet.
+ * Rather than guessing, we compute all layouts that evenly divide numFaces
+ * and pick the one whose cells are closest to square (best aspect ratio).
+ */
+function getDieSheetGrid(numFaces, imgWidth, imgHeight) {
+  const candidates = [];
+  for (let cols = 1; cols <= numFaces; cols++) {
+    if (numFaces % cols === 0) candidates.push([cols, numFaces / cols]);
+  }
+  if (candidates.length === 0) return [1, numFaces];
+  // If we have image dimensions, pick the layout giving most-square cells
+  if (imgWidth && imgHeight) {
+    let best = candidates[0];
+    let bestScore = Infinity;
+    for (const [cols, rows] of candidates) {
+      const cellAspect = (imgWidth / cols) / (imgHeight / rows);
+      const score = Math.abs(Math.log(cellAspect)); // 0 = perfect square
+      if (score < bestScore) { bestScore = score; best = [cols, rows]; }
+    }
+    return best;
+  }
+  // Fallback: prefer layouts close to square overall
   const cols = Math.ceil(Math.sqrt(numFaces));
   return [cols, Math.ceil(numFaces / cols)];
 }
@@ -951,8 +970,9 @@ export async function ttsImportRoutes(fastify) {
             // Single texture sheet: slice into individual face regions
             try {
               const buffer = await downloadImage(die.faceUrls[0]);
-              const [cols, rows] = getDieSheetGrid(die.numFaces);
               const metadata = await sharp(buffer).metadata();
+              const [cols, rows] = getDieSheetGrid(die.numFaces, metadata.width, metadata.height);
+              console.log(`[TTS Import] Die sheet ${die.nickname}: ${metadata.width}x${metadata.height} → grid ${cols}x${rows}`);
               const faceW = Math.floor(metadata.width / cols);
               const faceH = Math.floor(metadata.height / rows);
               for (let faceIdx = 0; faceIdx < die.numFaces; faceIdx++) {
