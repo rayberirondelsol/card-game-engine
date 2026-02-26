@@ -15,29 +15,49 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Determine the grid layout [cols, rows] for a TTS die texture sheet.
- * Rather than guessing, we compute all layouts that evenly divide numFaces
- * and pick the one whose cells are closest to square (best aspect ratio).
+ *
+ * TTS uses standard landscape layouts for polyhedral dice (3×2 for d6, etc.).
+ * We use those as the primary choice and only deviate when the image aspect
+ * ratio clearly doesn't match the standard layout (> 50% off in log-space).
  */
 function getDieSheetGrid(numFaces, imgWidth, imgHeight) {
+  // Standard TTS polyhedral die sheet layouts: [cols, rows]
+  const ttsDefaults = { 4: [2,2], 6: [3,2], 8: [4,2], 10: [5,2], 12: [4,3], 20: [5,4] };
+  const defaultGrid = ttsDefaults[numFaces];
+
+  if (!imgWidth || !imgHeight) {
+    return defaultGrid || [Math.ceil(Math.sqrt(numFaces)), Math.ceil(numFaces / Math.ceil(Math.sqrt(numFaces)))];
+  }
+
+  const aspectRatio = imgWidth / imgHeight;
+
+  // If the image aspect matches the TTS default (within ±50% in log-space), use it.
+  // This handles square images (TTS creators sometimes pad to square) and standard layouts.
+  if (defaultGrid) {
+    const [defCols, defRows] = defaultGrid;
+    const expectedAspect = defCols / defRows; // e.g. 3/2 = 1.5 for d6
+    if (Math.abs(Math.log(aspectRatio / expectedAspect)) < 0.5) {
+      console.log(`[TTS Import] Using TTS default grid ${defCols}x${defRows} for d${numFaces} (image ${imgWidth}x${imgHeight}, aspect ${aspectRatio.toFixed(2)} vs expected ${expectedAspect.toFixed(2)})`);
+      return defaultGrid;
+    }
+  }
+
+  // Image aspect ratio is far from TTS default — try all divisor pairs and pick most-square cells
   const candidates = [];
   for (let cols = 1; cols <= numFaces; cols++) {
     if (numFaces % cols === 0) candidates.push([cols, numFaces / cols]);
   }
   if (candidates.length === 0) return [1, numFaces];
-  // If we have image dimensions, pick the layout giving most-square cells
-  if (imgWidth && imgHeight) {
-    let best = candidates[0];
-    let bestScore = Infinity;
-    for (const [cols, rows] of candidates) {
-      const cellAspect = (imgWidth / cols) / (imgHeight / rows);
-      const score = Math.abs(Math.log(cellAspect)); // 0 = perfect square
-      if (score < bestScore) { bestScore = score; best = [cols, rows]; }
-    }
-    return best;
+
+  let best = defaultGrid || candidates[0];
+  let bestScore = Infinity;
+  for (const [cols, rows] of candidates) {
+    const cellAspect = (imgWidth / cols) / (imgHeight / rows);
+    const score = Math.abs(Math.log(cellAspect));
+    if (score < bestScore) { bestScore = score; best = [cols, rows]; }
   }
-  // Fallback: prefer layouts close to square overall
-  const cols = Math.ceil(Math.sqrt(numFaces));
-  return [cols, Math.ceil(numFaces / cols)];
+  console.log(`[TTS Import] Auto-detected grid ${best[0]}x${best[1]} for d${numFaces} (image ${imgWidth}x${imgHeight}, aspect ${aspectRatio.toFixed(2)})`);
+  return best;
 }
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
@@ -972,7 +992,6 @@ export async function ttsImportRoutes(fastify) {
               const buffer = await downloadImage(die.faceUrls[0]);
               const metadata = await sharp(buffer).metadata();
               const [cols, rows] = getDieSheetGrid(die.numFaces, metadata.width, metadata.height);
-              console.log(`[TTS Import] Die sheet ${die.nickname}: ${metadata.width}x${metadata.height} → grid ${cols}x${rows}`);
               const faceW = Math.floor(metadata.width / cols);
               const faceH = Math.floor(metadata.height / rows);
               for (let faceIdx = 0; faceIdx < die.numFaces; faceIdx++) {
