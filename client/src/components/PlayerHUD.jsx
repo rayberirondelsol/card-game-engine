@@ -13,7 +13,7 @@ export default function PlayerHUD({ players = [], myPlayerId }) {
   if (!players.length) return null;
 
   return (
-    <div className="absolute top-4 right-4 flex flex-col gap-2 z-40 pointer-events-none">
+    <div className="absolute top-16 right-4 flex flex-col gap-2 z-40 pointer-events-none">
       {players.map(player => {
         const isMe = player.id === myPlayerId;
         const hex = COLOR_HEX[player.color] || '#888';
