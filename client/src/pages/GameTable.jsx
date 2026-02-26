@@ -387,6 +387,7 @@ export default function GameTable({ room = null }) {
   const [tokens, setTokens] = useState([]);
   const [boards, setBoards] = useState([]);
   const [textFields, setTextFields] = useState([]);
+  const [customDiceOnTable, setCustomDiceOnTable] = useState([]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -425,6 +426,7 @@ export default function GameTable({ room = null }) {
   const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
   const [newTokenLabel, setNewTokenLabel] = useState('');
   const [imageTokenLibrary, setImageTokenLibrary] = useState([]);
+  const [customDiceLibrary, setCustomDiceLibrary] = useState([]);
   const [showTextFieldModal, setShowTextFieldModal] = useState(false);
   const [newTextFieldText, setNewTextFieldText] = useState('');
   const [newTextFieldFontSize, setNewTextFieldFontSize] = useState(16);
@@ -1651,6 +1653,47 @@ export default function GameTable({ room = null }) {
     setDice(prev => prev.filter(d => d.id !== dieId));
   }
 
+  // Custom Dice (image-based, imported from TTS)
+  function placeCustomDie(template) {
+    const canvas = canvasRef.current;
+    const newDie = {
+      id: crypto.randomUUID(),
+      templateId: template.id,
+      name: template.name,
+      faceImages: template.face_images || [],
+      numFaces: template.num_faces || template.faceImages?.length || 6,
+      currentFace: Math.floor(Math.random() * (template.face_images?.length || 1)),
+      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      rolling: false,
+      locked: false,
+    };
+    setCustomDiceOnTable(prev => [...prev, newDie]);
+    setShowTokenModal(false);
+  }
+
+  function rollCustomDie(dieId) {
+    setCustomDiceOnTable(prev => prev.map(d => d.id === dieId ? { ...d, rolling: true } : d));
+    let count = 0;
+    const interval = setInterval(() => {
+      setCustomDiceOnTable(prev => prev.map(d => {
+        if (d.id !== dieId) return d;
+        return { ...d, currentFace: Math.floor(Math.random() * d.faceImages.length) };
+      }));
+      count++;
+      if (count >= 10) {
+        clearInterval(interval);
+        setCustomDiceOnTable(prev => prev.map(d =>
+          d.id === dieId ? { ...d, rolling: false, currentFace: Math.floor(Math.random() * d.faceImages.length) } : d
+        ));
+      }
+    }, 80);
+  }
+
+  function deleteCustomDieFromTable(dieId) {
+    setCustomDiceOnTable(prev => prev.filter(d => d.id !== dieId));
+  }
+
   // Hit Dice (colored hit/crit/miss dice inspired by 20 Strong)
   const HIT_DIE_FACES = {
     yellow: ['miss', 'miss', 'miss', 'miss', 'hit', 'crit'],
@@ -1722,6 +1765,7 @@ export default function GameTable({ room = null }) {
     let obj;
     if (objType === 'counter') obj = counters.find(c => c.id === objId);
     else if (objType === 'die') obj = dice.find(d => d.id === objId);
+    else if (objType === 'customDie') obj = customDiceOnTable.find(d => d.id === objId);
     else if (objType === 'hitDie') obj = hitDice.find(d => d.id === objId);
     else if (objType === 'note') obj = notes.find(n => n.id === objId);
     else if (objType === 'token') obj = tokens.find(t => t.id === objId);
@@ -1786,6 +1830,10 @@ export default function GameTable({ room = null }) {
       ));
     } else if (draggingObj.type === 'die') {
       setDice(prev => prev.map(d =>
+        d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
+      ));
+    } else if (draggingObj.type === 'customDie') {
+      setCustomDiceOnTable(prev => prev.map(d =>
         d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
       ));
     } else if (draggingObj.type === 'hitDie') {
@@ -1899,6 +1947,7 @@ export default function GameTable({ room = null }) {
   function toggleLockObj(type, id) {
     const setter = type === 'counter' ? setCounters
       : type === 'die' ? setDice
+      : type === 'customDie' ? setCustomDiceOnTable
       : type === 'hitDie' ? setHitDice
       : type === 'note' ? setNotes
       : type === 'token' ? setTokens
@@ -1914,11 +1963,15 @@ export default function GameTable({ room = null }) {
   // Token functions
   function openTokenModal() {
     setShowTokenModal(true);
-    // Load image token library
+    // Load image token library + custom dice library
     if (id) {
       fetch(`/api/games/${id}/table-assets`)
         .then(r => r.ok ? r.json() : [])
         .then(assets => setImageTokenLibrary(assets.filter(a => a.type === 'token')))
+        .catch(() => {});
+      fetch(`/api/games/${id}/custom-dice`)
+        .then(r => r.ok ? r.json() : [])
+        .then(dice => setCustomDiceLibrary(dice))
         .catch(() => {});
     }
   }
@@ -2556,6 +2609,17 @@ export default function GameTable({ room = null }) {
         y: d.y,
         locked: d.locked || false,
       })),
+      customDice: customDiceOnTable.map(d => ({
+        id: d.id,
+        templateId: d.templateId,
+        name: d.name,
+        faceImages: d.faceImages,
+        numFaces: d.numFaces,
+        currentFace: d.currentFace,
+        x: d.x,
+        y: d.y,
+        locked: d.locked || false,
+      })),
       notes: notes.map(n => ({
         id: n.id,
         text: n.text,
@@ -3032,6 +3096,24 @@ export default function GameTable({ room = null }) {
       })));
     } else {
       setHitDice([]);
+    }
+
+    // Restore custom dice
+    if (state.customDice && Array.isArray(state.customDice)) {
+      setCustomDiceOnTable(state.customDice.map(d => ({
+        id: d.id || crypto.randomUUID(),
+        templateId: d.templateId,
+        name: d.name || 'Würfel',
+        faceImages: d.faceImages || [],
+        numFaces: d.numFaces || d.faceImages?.length || 6,
+        currentFace: d.currentFace || 0,
+        x: d.x,
+        y: d.y,
+        rolling: false,
+        locked: d.locked || false,
+      })));
+    } else {
+      setCustomDiceOnTable([]);
     }
 
     // Restore notes
@@ -3958,6 +4040,51 @@ export default function GameTable({ room = null }) {
                 onClick={(e) => { e.stopPropagation(); deleteDie(die.id); }}
                 data-testid={`die-delete-${die.id}`}
                 className="w-11 h-11 rounded bg-red-600 hover:bg-red-500 text-white text-base flex items-center justify-center transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Floating Custom Dice Widgets */}
+      {customDiceOnTable.map(die => (
+        <div
+          key={die.id}
+          data-testid={`custom-die-${die.id}`}
+          data-ui-element="true"
+          className="absolute z-20 select-none pointer-events-auto"
+          style={{ left: die.x - 40, top: die.y - 48, cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab' }}
+          onMouseDown={(e) => handleObjDragStart(e, 'customDie', die.id)}
+          onTouchStart={(e) => handleObjDragStart(e, 'customDie', die.id)}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'customDie', objId: die.id, cardTableId: null, stackId: null }); }}
+        >
+          <div className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`} style={{ width: '80px' }}>
+            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 truncate" title={die.name}>{die.name}</div>
+            {die.faceImages[die.currentFace] ? (
+              <div className="w-12 h-12 mx-auto rounded-lg overflow-hidden bg-slate-700 border border-slate-500 mb-1">
+                <img
+                  src={die.faceImages[die.currentFace]}
+                  alt={`Seite ${die.currentFace + 1}`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="text-2xl font-mono font-bold text-white mb-1">{die.currentFace + 1}</div>
+            )}
+            <div className="flex gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); rollCustomDie(die.id); }}
+                disabled={die.rolling}
+                data-testid={`custom-die-roll-${die.id}`}
+                className="flex-1 h-8 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                {die.rolling ? '...' : 'Roll'}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteCustomDieFromTable(die.id); }}
+                className="w-8 h-8 rounded bg-red-600 hover:bg-red-500 text-white text-sm flex items-center justify-center transition-colors"
               >
                 &times;
               </button>
@@ -5104,9 +5231,37 @@ export default function GameTable({ room = null }) {
             </div>
           )}
 
+          {/* Custom Würfel aus der Bibliothek */}
+          {customDiceLibrary.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-slate-300 text-sm mb-2">Custom Würfel</label>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
+                {customDiceLibrary.map(die => (
+                  <button
+                    key={die.id}
+                    onClick={() => placeCustomDie(die)}
+                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-purple-400 bg-slate-700 hover:bg-slate-600 transition-all"
+                    title={`${die.name} (d${die.num_faces})`}
+                  >
+                    <div className="w-10 h-10 rounded overflow-hidden bg-slate-600 flex items-center justify-center">
+                      {die.face_images?.[0] ? (
+                        <img src={die.face_images[0]} alt={die.name} className="w-full h-full object-contain" loading="lazy" />
+                      ) : (
+                        <span className="text-lg">🎲</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-300 truncate w-12 text-center leading-tight">{die.name}</span>
+                    <span className="text-[9px] text-purple-400">d{die.num_faces}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 border-t border-slate-600 pt-2" />
+            </div>
+          )}
+
           {/* Shape Selection */}
           <div className="mb-4">
-            {imageTokenLibrary.length === 0 && <label className="block text-slate-300 text-sm mb-2">Shape</label>}
+            {imageTokenLibrary.length === 0 && customDiceLibrary.length === 0 && <label className="block text-slate-300 text-sm mb-2">Shape</label>}
             <div className="grid grid-cols-3 gap-2">
               {['circle', 'square', 'triangle', 'star', 'hexagon', 'diamond'].map(shape => (
                 <button

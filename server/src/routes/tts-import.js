@@ -78,6 +78,7 @@ function downloadImage(url) {
 function extractNonCardAssetsFromTTS(ttsData) {
   const tokens = [];
   const boards = [];
+  const dice = [];
 
   function processObject(obj) {
     if (!obj) return;
@@ -102,6 +103,26 @@ function extractNonCardAssetsFromTTS(ttsData) {
       if (imageUrl) {
         boards.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ });
       }
+    } else if (name === 'Custom_Die') {
+      // Extract face images from States (one image per die face)
+      const faceUrls = [];
+      if (obj.States && typeof obj.States === 'object') {
+        // States keys are "1", "2", ... sorted numerically
+        const stateKeys = Object.keys(obj.States).sort((a, b) => parseInt(a) - parseInt(b));
+        for (const key of stateKeys) {
+          const stateObj = obj.States[key];
+          const faceUrl = stateObj?.CustomImage?.ImageURL || stateObj?.CustomMesh?.DiffuseURL || null;
+          if (faceUrl) faceUrls.push(faceUrl);
+        }
+      }
+      // Fallback: single image for all faces
+      if (faceUrls.length === 0 && imageUrl) {
+        const numFaces = obj.CustomImage?.NumFaces || 6;
+        for (let i = 0; i < numFaces; i++) faceUrls.push(imageUrl);
+      }
+      if (faceUrls.length > 0) {
+        dice.push({ faceUrls, nickname, numFaces: faceUrls.length, ttsX, ttsZ });
+      }
     }
 
     // Recurse into containers (Bags, etc.) but not into decks (already handled separately)
@@ -119,7 +140,7 @@ function extractNonCardAssetsFromTTS(ttsData) {
     processObject(ttsData);
   }
 
-  return { tokens, boards };
+  return { tokens, boards, dice };
 }
 
 /**
@@ -499,6 +520,14 @@ export async function ttsImportRoutes(fastify) {
         nickname: b.nickname || `Board ${i + 1}`,
       }));
 
+      const diceSummaries = nonCardAssets.dice.map((die, index) => ({
+        index,
+        nickname: die.nickname || `Würfel ${index + 1}`,
+        numFaces: die.numFaces,
+        previewUrl: die.faceUrls[0] || null,
+        faceUrls: die.faceUrls,
+      }));
+
       return reply.status(200).send({
         tempId,
         saveName: ttsData.SaveName || ttsData.GameMode || 'TTS Import',
@@ -506,8 +535,10 @@ export async function ttsImportRoutes(fastify) {
         decks: deckSummaries,
         tokenCount: nonCardAssets.tokens.length,
         boardCount: nonCardAssets.boards.length,
+        diceCount: nonCardAssets.dice.length,
         tokens: tokenSummaries,
         boards: boardSummaries,
+        dice: diceSummaries,
         tokenPreviews: nonCardAssets.tokens.map(t => ({ url: t.imageUrl, name: t.nickname || '' })),
         boardPreviews: nonCardAssets.boards.map(b => ({ url: b.imageUrl, name: b.nickname || 'Board' })),
       });
@@ -529,7 +560,7 @@ export async function ttsImportRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
-    const { tempId, selectedDeckIndices, selectedTokenIndices, selectedBoardIndices, createCategories, ocrNamePosition, rotateCards } = body;
+    const { tempId, selectedDeckIndices, selectedTokenIndices, selectedBoardIndices, selectedDiceIndices, createCategories, ocrNamePosition, rotateCards } = body;
 
     if (!tempId) {
       return reply.status(400).send({ error: 'Missing tempId from analyze step' });
@@ -870,6 +901,64 @@ export async function ttsImportRoutes(fastify) {
         }
       }
 
+      // Import custom dice
+      const importedCustomDice = [];
+      const diceToImport = selectedDiceIndices != null && Array.isArray(selectedDiceIndices)
+        ? nonCardAssets.dice.filter((_, i) => selectedDiceIndices.includes(i))
+        : nonCardAssets.dice;
+
+      const insertDieStmt = db.prepare(
+        'INSERT INTO custom_dice (id, game_id, name, num_faces, face_images, source_url) VALUES (?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const die of diceToImport) {
+        try {
+          // Dedup by first face URL
+          const firstUrl = die.faceUrls[0];
+          if (firstUrl) {
+            const existing = db.prepare(
+              'SELECT * FROM custom_dice WHERE game_id = ? AND source_url = ?'
+            ).get(id, firstUrl);
+            if (existing) {
+              importedCustomDice.push({
+                id: existing.id,
+                name: existing.name,
+                numFaces: existing.num_faces,
+                faceImages: JSON.parse(existing.face_images || '[]'),
+              });
+              console.log(`[TTS Import] Reusing existing die: ${die.nickname || 'unnamed'}`);
+              continue;
+            }
+          }
+
+          // Download all face images
+          const faceImagePaths = [];
+          for (let faceIdx = 0; faceIdx < die.faceUrls.length; faceIdx++) {
+            try {
+              const faceUrl = die.faceUrls[faceIdx];
+              const buffer = await downloadImage(faceUrl);
+              const fileId = uuidv4();
+              const filename = `${fileId}.png`;
+              const filePath = path.join(gameUploadsDir, filename);
+              await sharp(buffer).rotate().png().toFile(filePath);
+              faceImagePaths.push(`/uploads/${id}/${filename}`);
+            } catch (faceErr) {
+              console.warn(`[TTS Import] Failed to download die face ${faceIdx}: ${faceErr.message}`);
+            }
+          }
+
+          if (faceImagePaths.length === 0) continue;
+
+          const dieId = uuidv4();
+          const dieName = die.nickname || `Würfel ${importedCustomDice.length + 1}`;
+          insertDieStmt.run(dieId, id, dieName, faceImagePaths.length, JSON.stringify(faceImagePaths), firstUrl || null);
+          importedCustomDice.push({ id: dieId, name: dieName, numFaces: faceImagePaths.length, faceImages: faceImagePaths });
+          console.log(`[TTS Import] Imported die: ${dieName} (${faceImagePaths.length} faces)`);
+        } catch (err) {
+          console.warn(`[TTS Import] Failed to import die: ${err.message}`);
+        }
+      }
+
       // Clean up temp file
       try {
         const { unlinkSync } = await import('fs');
@@ -881,6 +970,7 @@ export async function ttsImportRoutes(fastify) {
       const extraMsg = [];
       if (importedTokens.length > 0) extraMsg.push(`${importedTokens.length} token(s)`);
       if (importedBoards.length > 0) extraMsg.push(`${importedBoards.length} board(s)`);
+      if (importedCustomDice.length > 0) extraMsg.push(`${importedCustomDice.length} die/dice`);
 
       return reply.status(200).send({
         success: true,
@@ -890,6 +980,7 @@ export async function ttsImportRoutes(fastify) {
         importedDecks,
         tokens: importedTokens,
         boards: importedBoards,
+        customDice: importedCustomDice,
         message: `Successfully imported ${totalImported} new cards from ${importedDecks.length} deck(s)${extraMsg.length > 0 ? ` and ${extraMsg.join(', ')}` : ''}${totalSkipped > 0 ? ` (${totalSkipped} existing cards skipped)` : ''}${totalFailed > 0 ? ` (${totalFailed} sheets failed)` : ''}`
       });
     } catch (err) {

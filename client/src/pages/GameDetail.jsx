@@ -71,6 +71,7 @@ export default function GameDetail() {
   const [ttsSelectedDecks, setTtsSelectedDecks] = useState(new Set());
   const [ttsSelectedTokens, setTtsSelectedTokens] = useState(new Set());
   const [ttsSelectedBoards, setTtsSelectedBoards] = useState(new Set());
+  const [ttsSelectedDice, setTtsSelectedDice] = useState(new Set());
   const [ttsCreateCategories, setTtsCreateCategories] = useState(true);
   const [ttsOcrNamePosition, setTtsOcrNamePosition] = useState('none');
   const [ttsRotateCards, setTtsRotateCards] = useState('none');
@@ -109,6 +110,9 @@ export default function GameDetail() {
   // Table assets (tokens & boards from TTS import)
   const [tableAssets, setTableAssets] = useState([]);
 
+  // Custom dice from TTS import
+  const [customDice, setCustomDice] = useState([]);
+
   // Card sort order
   const [cardSortOrder, setCardSortOrder] = useState('name');
 
@@ -120,6 +124,7 @@ export default function GameDetail() {
     fetchCategories();
     fetchCardBacks();
     fetchTableAssets();
+    fetchCustomDice();
   }, [id]);
 
   async function fetchGame() {
@@ -213,6 +218,32 @@ export default function GameDetail() {
     const res = await fetch(`/api/games/${id}/table-assets/${assetId}`, { method: 'DELETE' });
     if (res.ok) {
       setTableAssets(prev => prev.filter(a => a.id !== assetId));
+    }
+  }
+
+  async function fetchCustomDice() {
+    try {
+      const res = await fetch(`/api/games/${id}/custom-dice`);
+      if (res.ok) setCustomDice(await res.json());
+    } catch (err) {}
+  }
+
+  async function handleDeleteCustomDie(dieId, name) {
+    if (!confirm(`"${name || 'Würfel'}" löschen?`)) return;
+    const res = await fetch(`/api/games/${id}/custom-dice/${dieId}`, { method: 'DELETE' });
+    if (res.ok) setCustomDice(prev => prev.filter(d => d.id !== dieId));
+  }
+
+  async function handleRenameCustomDie(dieId, newName) {
+    if (!newName.trim()) return;
+    const res = await fetch(`/api/games/${id}/custom-dice/${dieId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setCustomDice(prev => prev.map(d => d.id === dieId ? updated : d));
     }
   }
 
@@ -661,6 +692,7 @@ export default function GameDetail() {
           selectedDeckIndices: Array.from(ttsSelectedDecks),
           selectedTokenIndices: Array.from(ttsSelectedTokens),
           selectedBoardIndices: Array.from(ttsSelectedBoards),
+          selectedDiceIndices: Array.from(ttsSelectedDice),
           createCategories: ttsCreateCategories,
           ocrNamePosition: ttsOcrNamePosition !== 'none' ? ttsOcrNamePosition : undefined,
           rotateCards: ttsRotateCards !== 'none' ? (ttsRotateCards === 'auto' ? 'auto' : parseInt(ttsRotateCards)) : undefined,
@@ -684,6 +716,11 @@ export default function GameDetail() {
 
       // Success
       setShowTtsImportModal(false);
+
+      // Refresh custom dice list if any were imported
+      if (data.customDice && data.customDice.length > 0) {
+        fetchCustomDice();
+      }
 
       // If tokens or boards were imported, auto-create a save so they appear on the table
       if ((data.tokens && data.tokens.length > 0) || (data.boards && data.boards.length > 0)) {
@@ -1926,6 +1963,52 @@ export default function GameDetail() {
               )}
             </div>
 
+            {/* Custom Dice */}
+            {customDice.length > 0 && (
+              <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="custom-dice-section">
+                <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-3">Custom Würfel</h2>
+                <div className="space-y-3">
+                  {customDice.map(die => (
+                    <div key={die.id} className="rounded-lg border border-[var(--color-border)] p-2 space-y-2 bg-[var(--color-background)]" data-testid={`custom-die-${die.id}`}>
+                      {/* Name + Delete */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          defaultValue={die.name}
+                          onBlur={(e) => handleRenameCustomDie(die.id, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = die.name; e.target.blur(); } }}
+                          className="flex-1 text-xs text-[var(--color-text)] bg-transparent border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-primary)] focus:outline-none px-0.5 py-0.5 min-w-0"
+                        />
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-100 text-purple-700 font-medium flex-shrink-0">
+                          d{die.num_faces}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteCustomDie(die.id, die.name)}
+                          className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400 hover:bg-red-100 hover:text-red-600 transition-all text-xs"
+                          title="Löschen"
+                        >&times;</button>
+                      </div>
+                      {/* Face Images */}
+                      <div className="flex flex-wrap gap-1">
+                        {(die.face_images || []).map((img, i) => (
+                          <div
+                            key={i}
+                            className="w-8 h-8 rounded border border-[var(--color-border)] overflow-hidden bg-gray-100 flex-shrink-0"
+                            title={`Seite ${i + 1}`}
+                          >
+                            <img src={img} alt={`Seite ${i + 1}`} className="w-full h-full object-contain" loading="lazy" />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[9px] text-[var(--color-text-secondary)]">
+                        {new Date(die.created_at).toLocaleDateString()} · {die.num_faces} Seiten
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Setups */}
             <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4" data-testid="setups-section">
               <div className="flex items-center justify-between mb-3">
@@ -2649,6 +2732,7 @@ export default function GameDetail() {
                         Found {ttsAnalysis.deckCount} deck{ttsAnalysis.deckCount !== 1 ? 's' : ''}
                         {ttsAnalysis.tokenCount > 0 && `, ${ttsAnalysis.tokenCount} token${ttsAnalysis.tokenCount !== 1 ? 's' : ''}`}
                         {ttsAnalysis.boardCount > 0 && `, ${ttsAnalysis.boardCount} board${ttsAnalysis.boardCount !== 1 ? 's' : ''}`}
+                        {ttsAnalysis.diceCount > 0 && `, ${ttsAnalysis.diceCount} custom ${ttsAnalysis.diceCount !== 1 ? 'dice' : 'die'}`}
                       </h3>
                       {ttsAnalysis.saveName && (
                         <p className="text-xs text-[var(--color-text-secondary)]">
@@ -2819,6 +2903,51 @@ export default function GameDetail() {
                   {(ttsSelectedTokens.size > 0 || ttsSelectedBoards.size > 0) && (
                     <div className="mb-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
                       Selected tokens and boards will be imported and a save state will be created so you can load them on the game table.
+                    </div>
+                  )}
+
+                  {/* Dice selection */}
+                  {(ttsAnalysis?.dice || []).length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide mb-1">
+                        Custom Würfel
+                      </p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {ttsAnalysis.dice.map((die) => (
+                          <label
+                            key={die.index}
+                            className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-colors ${
+                              ttsSelectedDice.has(die.index)
+                                ? 'border-purple-400 bg-purple-50'
+                                : 'border-[var(--color-border)] hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={ttsSelectedDice.has(die.index)}
+                              onChange={() => {
+                                setTtsSelectedDice(prev => {
+                                  const next = new Set(prev);
+                                  next.has(die.index) ? next.delete(die.index) : next.add(die.index);
+                                  return next;
+                                });
+                              }}
+                              className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                            />
+                            {die.previewUrl ? (
+                              <div className="w-8 h-8 rounded overflow-hidden bg-purple-100 border border-purple-200 flex-shrink-0">
+                                <img src={die.previewUrl} alt={die.nickname} className="w-full h-full object-contain" loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-purple-100 flex-shrink-0 flex items-center justify-center text-purple-400 text-xs border border-purple-200">🎲</div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm text-[var(--color-text)] truncate block">{die.nickname}</span>
+                              <span className="text-xs text-[var(--color-text-secondary)]">d{die.numFaces} · {die.numFaces} Seiten</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   )}
 

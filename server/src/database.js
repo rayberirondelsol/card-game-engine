@@ -129,6 +129,17 @@ export async function setupDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS custom_dice (
+      id TEXT PRIMARY KEY,
+      game_id TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      num_faces INTEGER NOT NULL DEFAULT 6,
+      face_images TEXT NOT NULL DEFAULT '[]',
+      source_url TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE
+    );
   `);
 
   // Multiplayer tables
@@ -196,7 +207,7 @@ export async function setupDatabase() {
   }
 
   console.log('[DB] Database initialized at:', DB_PATH);
-  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets');
+  console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');
 
   return db;
 }
