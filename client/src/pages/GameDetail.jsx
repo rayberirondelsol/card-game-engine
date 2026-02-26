@@ -613,11 +613,12 @@ export default function GameDetail() {
       }
 
       setTtsAnalysis(data);
-      // Select all decks, tokens, and boards by default
+      // Select all assets by default
       const allIndices = new Set(data.decks.map(d => d.index));
       setTtsSelectedDecks(allIndices);
       setTtsSelectedTokens(new Set((data.tokens || []).map(t => t.index)));
       setTtsSelectedBoards(new Set((data.boards || []).map(b => b.index)));
+      setTtsSelectedDice(new Set((data.dice || []).map(d => d.index)));
     } catch (err) {
       setTtsError('Failed to upload file: ' + err.message);
     } finally {
@@ -1484,49 +1485,15 @@ export default function GameDetail() {
                       className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium"
                       data-testid="import-dropdown"
                     >
-                      <option value="">Import Cards...</option>
-                      <option value="auto" title="Automatically detect and import single cards or multi-card sheets">
-                        🔄 Auto-Detect Import
-                      </option>
-                      <option value="split" title="Manually split a sprite sheet into individual cards with custom grid settings">
-                        ✂️ Manual Split Import
-                      </option>
-                      <option value="tts" title="Import cards from Tabletop Simulator JSON save files">
-                        🎲 TTS Import
-                      </option>
-                      <option value="ocr" title="Rename existing cards using OCR text recognition">
-                        🔤 OCR Rename Cards
-                      </option>
+                      <option value="">Karten importieren...</option>
+                      <option value="auto">🔄 Bilder hochladen (einzeln oder Spritesheet)</option>
+                      <option value="split">✂️ Spritesheet manuell aufteilen</option>
+                      <option value="tts">🎲 Tabletop Simulator (.json)</option>
+                      <option value="ocr">🔤 Kartenname per OCR erkennen</option>
                       {isTouchDev && (
-                        <option value="camera" title="Karten mit der Smartphone-Kamera scannen (automatische Erkennung)">
-                          📷 Kamera-Scan (Android)
-                        </option>
+                        <option value="camera">📷 Kamera-Scan (Android)</option>
                       )}
                     </select>
-
-                    {/* Tooltip on hover */}
-                    <div className="absolute left-0 top-full mt-2 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-xl">
-                      <div className="space-y-2">
-                        <div className="font-semibold border-b border-gray-700 pb-1">Import Options:</div>
-                        <div>
-                          <strong>🔄 Auto-Detect:</strong> Upload images and let the system automatically detect if they're sprite sheets (10x7 grid) or single cards.
-                        </div>
-                        <div>
-                          <strong>✂️ Manual Split:</strong> Upload a sprite sheet and manually specify the grid dimensions to split it into individual cards.
-                        </div>
-                        <div>
-                          <strong>🎲 TTS Import:</strong> Import cards directly from Tabletop Simulator JSON save files with automatic sprite sheet processing.
-                        </div>
-                        <div>
-                          <strong>🔤 OCR Rename:</strong> Use optical character recognition to automatically rename existing cards based on text found in the images.
-                        </div>
-                        {isTouchDev && (
-                          <div>
-                            <strong>📷 Kamera-Scan:</strong> Karten direkt mit der Smartphone-Kamera scannen – automatische Erkennung, Vorder- und Rückseiten-Modi.
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
 
                   {/* OCR Position Selector (shown when needed) */}
