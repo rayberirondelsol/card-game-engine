@@ -13,6 +13,8 @@ export default function MultiplayerGame() {
 
   const playerId = sessionStorage.getItem(`room_${code}_player_id`);
   const [gameId, setGameId] = useState(null);
+  // Must be declared before any early returns (Rules of Hooks)
+  const roomRef = React.useRef({});
 
   useEffect(() => {
     // Fetch room info to get the game ID
@@ -36,10 +38,6 @@ export default function MultiplayerGame() {
       </div>
     );
   }
-
-  // onMessage is set by GameTable via the room prop's onAction callback
-  const roomRef = React.useRef(null);
-  if (!roomRef.current) roomRef.current = {};
 
   return <MultiplayerGameInner code={code} playerId={playerId} gameId={gameId} roomRef={roomRef} />;
 }
