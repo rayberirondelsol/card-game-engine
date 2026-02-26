@@ -14,6 +14,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
+ * Check whether the CENTER 50% region of a buffer has significant content
+ * (i.e., is not just a uniform background color).
+ * Returns true if the center region has non-trivial pixel variance.
+ */
+async function hasCenterContent(buffer, width, height, threshold = 15) {
+  const left   = Math.floor(width  * 0.25);
+  const top    = Math.floor(height * 0.25);
+  const cw     = Math.max(Math.floor(width  * 0.50), 1);
+  const ch     = Math.max(Math.floor(height * 0.50), 1);
+  const stats  = await sharp(buffer).extract({ left, top, width: cw, height: ch }).stats();
+  return stats.channels.some(c => c.stdev > threshold);
+}
+
+/**
  * Determine the grid layout [cols, rows] for a TTS die texture sheet.
  *
  * TTS uses standard landscape layouts for polyhedral dice (3×2 for d6, etc.).
@@ -730,37 +744,55 @@ export async function ttsImportRoutes(fastify) {
             const faceBuffer = await downloadImage(faceURL);
             console.log(`[TTS Import] Downloaded ${faceBuffer.length} bytes`);
 
-            // Reuse existing card back or create new one
-            let backImagePath = null;
-            if (backURL && backURL !== 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/NewTux.svg/120px-NewTux.svg.png') {
-              const backName = `${deckNickname} Back`;
-              const existingBack = db.prepare(
-                'SELECT id FROM card_backs WHERE game_id = ? AND name = ?'
-              ).get(id, backName);
+            // Handle card backs
+            // UniqueBack=true: each card has its own back from a sprite sheet (same grid as face sheet)
+            // UniqueBack=false: one shared back image for all cards in the deck
+            let backImagePath = null;         // shared fallback back ID
+            let backSliceMap = {};            // { [cardIndex]: relPath } for UniqueBack
+            const isUniqueBack = !!deckDef.UniqueBack;
 
-              if (existingBack) {
-                backImagePath = existingBack.id;
-                console.log(`[TTS Import] Reusing existing card back "${backName}"`);
-              } else {
+            if (backURL && backURL !== 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/NewTux.svg/120px-NewTux.svg.png') {
+              if (isUniqueBack) {
+                // Slice the back sheet per-card (same grid as face sheet)
                 try {
                   const backBuffer = await downloadImage(backURL);
-                  const backFileId = uuidv4();
-                  const backFilename = `${backFileId}.png`;
-                  const backFilePath = path.join(gameUploadsDir, backFilename);
-
-                  // Convert back image to PNG, normalizing EXIF orientation
-                  await sharp(backBuffer).rotate().png().toFile(backFilePath);
-
-                  // Create card back entry
-                  const cardBackId = uuidv4();
-                  const backRelPath = `/uploads/${id}/${backFilename}`;
-                  db.prepare(
-                    'INSERT INTO card_backs (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
-                  ).run(cardBackId, id, `${deckNickname} Back`, backRelPath);
-                  backImagePath = cardBackId;
-                  console.log(`[TTS Import] Created card back for deck ${deckKey}`);
+                  const backSlices = await sliceSpriteSheet(
+                    backBuffer, numWidth, numHeight, deckKey,
+                    deck.deckIDs, {}, gameUploadsDir, null, null, null
+                  );
+                  for (const bs of backSlices) {
+                    backSliceMap[bs.cardIndex] = `/uploads/${id}/${bs.savedFilename}`;
+                  }
+                  console.log(`[TTS Import] Sliced UniqueBack sheet for deck ${deckKey}: ${backSlices.length} backs`);
                 } catch (backErr) {
-                  console.warn(`[TTS Import] Failed to download back image: ${backErr.message}`);
+                  console.warn(`[TTS Import] Failed to slice UniqueBack sheet: ${backErr.message}`);
+                }
+              } else {
+                const backName = `${deckNickname} Back`;
+                const existingBack = db.prepare(
+                  'SELECT id FROM card_backs WHERE game_id = ? AND name = ?'
+                ).get(id, backName);
+
+                if (existingBack) {
+                  backImagePath = existingBack.id;
+                  console.log(`[TTS Import] Reusing existing card back "${backName}"`);
+                } else {
+                  try {
+                    const backBuffer = await downloadImage(backURL);
+                    const backFileId = uuidv4();
+                    const backFilename = `${backFileId}.png`;
+                    const backFilePath = path.join(gameUploadsDir, backFilename);
+                    await sharp(backBuffer).rotate().png().toFile(backFilePath);
+                    const cardBackId = uuidv4();
+                    const backRelPath = `/uploads/${id}/${backFilename}`;
+                    db.prepare(
+                      'INSERT INTO card_backs (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+                    ).run(cardBackId, id, backName, backRelPath);
+                    backImagePath = cardBackId;
+                    console.log(`[TTS Import] Created card back for deck ${deckKey}`);
+                  } catch (backErr) {
+                    console.warn(`[TTS Import] Failed to download back image: ${backErr.message}`);
+                  }
                 }
               }
             }
@@ -793,12 +825,24 @@ export async function ttsImportRoutes(fastify) {
               const insertStmt = db.prepare(
                 'INSERT INTO cards (id, game_id, category_id, card_back_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
               );
+              const insertCardBackStmt = db.prepare(
+                'INSERT INTO card_backs (id, game_id, name, image_path) VALUES (?, ?, ?, ?)'
+              );
 
               const insertMany = db.transaction((cardsToInsert) => {
                 for (const card of cardsToInsert) {
                   const cardId = uuidv4();
                   const relativePath = `/uploads/${id}/${card.savedFilename}`;
-                  insertStmt.run(cardId, id, categoryId, backImagePath, card.cardName, relativePath, card.width || 0, card.height || 0);
+
+                  // Resolve per-card back (UniqueBack) or fall back to shared back
+                  let cardBackId = backImagePath;
+                  if (isUniqueBack && backSliceMap[card.cardIndex]) {
+                    const uniqueBackId = uuidv4();
+                    insertCardBackStmt.run(uniqueBackId, id, `${card.cardName} Back`, backSliceMap[card.cardIndex]);
+                    cardBackId = uniqueBackId;
+                  }
+
+                  insertStmt.run(cardId, id, categoryId, cardBackId, card.cardName, relativePath, card.width || 0, card.height || 0);
                 }
               });
 
@@ -987,28 +1031,55 @@ export async function ttsImportRoutes(fastify) {
           const faceImagePaths = [];
           const isSheetDie = die.faceUrls.length > 1 && die.faceUrls.every(u => u === die.faceUrls[0]);
           if (isSheetDie) {
-            // Single texture sheet: slice into individual face regions
+            // Single UV-texture sheet: try increasing row counts until we find
+            // exactly numFaces cells whose CENTER region has actual content.
+            // This handles sheets where icons are in a "padded" grid (e.g. 3×3
+            // with the top row blank, like many TTS Custom_Dice mods).
             try {
               const buffer = await downloadImage(die.faceUrls[0]);
               const metadata = await sharp(buffer).metadata();
-              const [cols, rows] = getDieSheetGrid(die.numFaces, metadata.width, metadata.height);
-              const faceW = Math.floor(metadata.width / cols);
-              const faceH = Math.floor(metadata.height / rows);
-              for (let faceIdx = 0; faceIdx < die.numFaces; faceIdx++) {
-                try {
-                  const col = faceIdx % cols;
-                  const row = Math.floor(faceIdx / cols);
-                  const fileId = uuidv4();
-                  const filename = `${fileId}.png`;
-                  const filePath = path.join(gameUploadsDir, filename);
-                  await sharp(buffer)
+              const baseCols = getDieSheetGrid(die.numFaces, metadata.width, metadata.height)[0];
+              const baseRows = Math.ceil(die.numFaces / baseCols);
+              let found = false;
+
+              for (let extraRows = 0; extraRows <= 4 && !found; extraRows++) {
+                const tryRows = baseRows + extraRows;
+                const faceW = Math.floor(metadata.width / baseCols);
+                const faceH = Math.floor(metadata.height / tryRows);
+                const contentCells = [];
+
+                for (let cellIdx = 0; cellIdx < baseCols * tryRows; cellIdx++) {
+                  const col = cellIdx % baseCols;
+                  const row = Math.floor(cellIdx / baseCols);
+                  const cellBuf = await sharp(buffer)
                     .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
                     .png()
-                    .toFile(filePath);
-                  faceImagePaths.push(`/uploads/${id}/${filename}`);
-                } catch (sliceErr) {
-                  console.warn(`[TTS Import] Failed to slice die face ${faceIdx}: ${sliceErr.message}`);
+                    .toBuffer();
+                  if (await hasCenterContent(cellBuf, faceW, faceH)) {
+                    contentCells.push(cellBuf);
+                  }
                 }
+
+                if (contentCells.length === die.numFaces) {
+                  for (const cellBuf of contentCells) {
+                    const fileId = uuidv4();
+                    const filename = `${fileId}.png`;
+                    writeFileSync(path.join(gameUploadsDir, filename), cellBuf);
+                    faceImagePaths.push(`/uploads/${id}/${filename}`);
+                  }
+                  console.log(`[TTS Import] Die "${die.nickname}": used ${baseCols}×${tryRows} grid (+${extraRows} extra rows), found ${contentCells.length} faces`);
+                  found = true;
+                }
+              }
+
+              if (!found) {
+                // Fallback: save the whole sheet as a single representative image for all faces
+                const fileId = uuidv4();
+                const filename = `${fileId}.png`;
+                writeFileSync(path.join(gameUploadsDir, filename), await sharp(buffer).png().toBuffer());
+                const relPath = `/uploads/${id}/${filename}`;
+                for (let i = 0; i < die.numFaces; i++) faceImagePaths.push(relPath);
+                console.log(`[TTS Import] Die "${die.nickname}": could not detect face grid, using whole sheet for all ${die.numFaces} faces`);
               }
             } catch (sheetErr) {
               console.warn(`[TTS Import] Failed to download die sheet: ${sheetErr.message}`);
