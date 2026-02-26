@@ -103,7 +103,7 @@ function extractNonCardAssetsFromTTS(ttsData) {
       if (imageUrl) {
         boards.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ });
       }
-    } else if (name === 'Custom_Die') {
+    } else if (name === 'Custom_Die' || name === 'Custom_Dice') {
       // Extract face images from States (one image per die face)
       const faceUrls = [];
       if (obj.States && typeof obj.States === 'object') {
@@ -115,13 +115,18 @@ function extractNonCardAssetsFromTTS(ttsData) {
           if (faceUrl) faceUrls.push(faceUrl);
         }
       }
-      // Fallback: single image for all faces
+      // Fallback: single texture-sheet image repeated for each face (e.g. Custom_Dice with RotationValues)
       if (faceUrls.length === 0 && imageUrl) {
-        const numFaces = obj.CustomImage?.NumFaces || 6;
+        const numFaces = obj.RotationValues?.length || obj.CustomImage?.NumFaces || 6;
         for (let i = 0; i < numFaces; i++) faceUrls.push(imageUrl);
       }
       if (faceUrls.length > 0) {
-        dice.push({ faceUrls, nickname, numFaces: faceUrls.length, ttsX, ttsZ });
+        // Deduplicate: skip if a die with the same image sheet is already recorded
+        const sheetUrl = faceUrls[0];
+        const isDuplicate = faceUrls.every(u => u === sheetUrl) && dice.some(d => d.faceUrls[0] === sheetUrl && d.faceUrls.every(u => u === sheetUrl));
+        if (!isDuplicate) {
+          dice.push({ faceUrls, nickname, numFaces: faceUrls.length, ttsX, ttsZ });
+        }
       }
     }
 
