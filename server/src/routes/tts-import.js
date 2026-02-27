@@ -14,17 +14,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Check whether the CENTER 50% region of a cell (defined by srcLeft, srcTop, cellW, cellH
- * within the source image buffer) has significant content.
- * Operates directly on the source buffer to avoid an intermediate PNG encode/decode.
+ * Return the max stdev across color channels for the CENTER 40% region of a cell.
+ * NOTE: Sharp's .extract().stats() ignores the extract and returns full-image stats.
+ * We must extract to a buffer first, then call stats() on the new buffer.
  */
-async function hasCenterContent(srcBuffer, srcLeft, srcTop, cellW, cellH, threshold = 15) {
-  const left = srcLeft + Math.floor(cellW * 0.25);
-  const top  = srcTop  + Math.floor(cellH * 0.25);
-  const cw   = Math.max(Math.floor(cellW * 0.50), 1);
-  const ch   = Math.max(Math.floor(cellH * 0.50), 1);
-  const stats = await sharp(srcBuffer).extract({ left, top, width: cw, height: ch }).stats();
-  return stats.channels.some(c => c.stdev > threshold);
+async function cellCenterStdev(srcBuffer, srcLeft, srcTop, cellW, cellH) {
+  const left = srcLeft + Math.floor(cellW * 0.30);
+  const top  = srcTop  + Math.floor(cellH * 0.30);
+  const cw   = Math.max(Math.floor(cellW * 0.40), 1);
+  const ch   = Math.max(Math.floor(cellH * 0.40), 1);
+  const cropBuf = await sharp(srcBuffer).extract({ left, top, width: cw, height: ch }).toBuffer();
+  const stats = await sharp(cropBuf).stats();
+  return Math.max(...stats.channels.map(c => c.stdev));
 }
 
 /**
@@ -521,7 +522,6 @@ export async function ttsImportRoutes(fastify) {
       // Extract deck information
       const decks = extractDecksFromTTS(ttsData);
       const nonCardAssets = extractNonCardAssetsFromTTS(ttsData);
-
       if (decks.length === 0 && nonCardAssets.tokens.length === 0 && nonCardAssets.boards.length === 0) {
         return reply.status(400).send({ error: 'No card decks or custom assets found in this TTS file. Make sure the file contains CustomDeck, Custom_Token, or Custom_Board objects.' });
       }
@@ -1042,40 +1042,57 @@ export async function ttsImportRoutes(fastify) {
               const baseRows = Math.ceil(die.numFaces / baseCols);
               let found = false;
 
+              // Helper to extract and save one cell
+              async function extractCell(cellIdx, faceW, faceH) {
+                const col = cellIdx % baseCols;
+                const row = Math.floor(cellIdx / baseCols);
+                const cellBuf = await sharp(buffer)
+                  .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
+                  .png().toBuffer();
+                const fileId = uuidv4();
+                const filename = `${fileId}.png`;
+                writeFileSync(path.join(gameUploadsDir, filename), cellBuf);
+                faceImagePaths.push(`/uploads/${id}/${filename}`);
+              }
+
               for (let extraRows = 0; extraRows <= 4 && !found; extraRows++) {
                 const tryRows = baseRows + extraRows;
                 const faceW = Math.floor(metadata.width / baseCols);
                 const faceH = Math.floor(metadata.height / tryRows);
                 const totalCells = baseCols * tryRows;
 
-                // Check all cells in parallel — no PNG encode/decode needed for detection
-                const cellHasContent = await Promise.all(
+                // Compute center stdev for all cells
+                const stdevs = await Promise.all(
                   Array.from({ length: totalCells }, (_, cellIdx) => {
                     const col = cellIdx % baseCols;
                     const row = Math.floor(cellIdx / baseCols);
-                    return hasCenterContent(buffer, col * faceW, row * faceH, faceW, faceH);
+                    return cellCenterStdev(buffer, col * faceW, row * faceH, faceW, faceH);
                   })
                 );
 
-                const contentIndices = cellHasContent.map((has, i) => has ? i : -1).filter(i => i >= 0);
+                // A cell is "blank" if its center region is near-uniform (solid color, stdev < 2).
+                // Any cell with actual artwork (even simple shapes) will have stdev >= 2.
+                const contentIndices = stdevs.map((s, i) => s >= 2 ? i : -1).filter(i => i >= 0);
 
                 if (contentIndices.length === die.numFaces) {
-                  // Extract and save only the content cells
                   for (const cellIdx of contentIndices) {
-                    const col = cellIdx % baseCols;
-                    const row = Math.floor(cellIdx / baseCols);
-                    const cellBuf = await sharp(buffer)
-                      .extract({ left: col * faceW, top: row * faceH, width: faceW, height: faceH })
-                      .png()
-                      .toBuffer();
-                    const fileId = uuidv4();
-                    const filename = `${fileId}.png`;
-                    writeFileSync(path.join(gameUploadsDir, filename), cellBuf);
-                    faceImagePaths.push(`/uploads/${id}/${filename}`);
+                    await extractCell(cellIdx, faceW, faceH);
                   }
-                  console.log(`[TTS Import] Die "${die.nickname}": used ${baseCols}×${tryRows} grid (+${extraRows} extra rows), found ${contentIndices.length} faces`);
+                  console.log(`[TTS Import] Die "${die.nickname}": used ${baseCols}×${tryRows} grid, extracted ${contentIndices.length} faces (${extraRows} extra rows)`);
                   found = true;
                 }
+              }
+
+              // Fallback: if no grid matched (e.g. some faces are intentionally blank/solid),
+              // extract all cells of the base grid including blank ones.
+              if (!found) {
+                const faceW = Math.floor(metadata.width / baseCols);
+                const faceH = Math.floor(metadata.height / baseRows);
+                for (let cellIdx = 0; cellIdx < baseCols * baseRows; cellIdx++) {
+                  await extractCell(cellIdx, faceW, faceH);
+                }
+                console.log(`[TTS Import] Die "${die.nickname}": fallback to ${baseCols}×${baseRows} grid (all cells)`);
+                found = true;
               }
 
               if (!found) {
