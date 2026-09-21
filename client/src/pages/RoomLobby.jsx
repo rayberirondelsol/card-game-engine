@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 
 const COLOR_HEX = {
   red:    '#ef4444',
@@ -26,7 +27,7 @@ export default function RoomLobby() {
 
   async function fetchRoom() {
     try {
-      const res = await fetch(`/api/rooms/${code}`);
+      const res = await apiFetch(`/api/rooms/${code}`);
       if (!res.ok) { setError('Room not found'); return; }
       const data = await res.json();
       setRoom(data);
@@ -47,7 +48,7 @@ export default function RoomLobby() {
   async function handleStart() {
     setStarting(true);
     try {
-      const res = await fetch(`/api/rooms/${code}/start`, {
+      const res = await apiFetch(`/api/rooms/${code}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player_id: playerId }),
@@ -63,7 +64,7 @@ export default function RoomLobby() {
 
   async function handleLeave() {
     try {
-      await fetch(`/api/rooms/${code}/leave`, {
+      await apiFetch(`/api/rooms/${code}/leave`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player_id: playerId }),

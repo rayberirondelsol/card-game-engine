@@ -12,6 +12,7 @@ import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { executeSequence } from '../utils/sequenceExecutor.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
+import { apiFetch } from '../utils/api';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -521,7 +522,7 @@ export default function GameTable({ room = null }) {
   useEffect(() => {
     async function fetchGame() {
       try {
-        const res = await fetch(`/api/games/${id}`);
+        const res = await apiFetch(`/api/games/${id}`);
         if (!res.ok) throw new Error('Game not found');
         const data = await res.json();
         setGame(data);
@@ -541,7 +542,7 @@ export default function GameTable({ room = null }) {
   useEffect(() => {
     async function fetchCards() {
       try {
-        const res = await fetch(`/api/games/${id}/cards`);
+        const res = await apiFetch(`/api/games/${id}/cards`);
         if (res.ok) {
           const data = await res.json();
           setAvailableCards(data);
@@ -557,7 +558,7 @@ export default function GameTable({ room = null }) {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const res = await fetch(`/api/games/${id}/categories`);
+        const res = await apiFetch(`/api/games/${id}/categories`);
         if (res.ok) {
           const data = await res.json();
           setCategories(data);
@@ -573,7 +574,7 @@ export default function GameTable({ room = null }) {
   useEffect(() => {
     async function fetchCardBacks() {
       try {
-        const res = await fetch(`/api/games/${id}/card-backs`);
+        const res = await apiFetch(`/api/games/${id}/card-backs`);
         if (res.ok) {
           const data = await res.json();
           setCardBacks(data);
@@ -1988,7 +1989,7 @@ export default function GameTable({ room = null }) {
   function openTokenModal() {
     setShowTokenModal(true);
     if (id) {
-      fetch(`/api/games/${id}/table-assets`)
+      apiFetch(`/api/games/${id}/table-assets`)
         .then(r => r.ok ? r.json() : [])
         .then(assets => setImageTokenLibrary(assets.filter(a => a.type === 'token')))
         .catch(() => {});
@@ -1998,7 +1999,7 @@ export default function GameTable({ room = null }) {
   function openDiceModal() {
     setShowDiceModal(true);
     if (id) {
-      fetch(`/api/games/${id}/custom-dice`)
+      apiFetch(`/api/games/${id}/custom-dice`)
         .then(r => r.ok ? r.json() : [])
         .then(dice => setCustomDiceLibrary(dice))
         .catch(() => {});
@@ -2864,7 +2865,7 @@ export default function GameTable({ room = null }) {
     setSaving(true);
     try {
       const stateData = getGameState();
-      const res = await fetch(`/api/games/${id}/saves`, {
+      const res = await apiFetch(`/api/games/${id}/saves`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, state_data: stateData }),
@@ -2907,7 +2908,7 @@ export default function GameTable({ room = null }) {
     try {
       setAutoSaveStatus('saving');
       const stateData = getGameState();
-      const res = await fetch(`/api/games/${id}/saves/auto`, {
+      const res = await apiFetch(`/api/games/${id}/saves/auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state_data: stateData }),
@@ -2941,12 +2942,17 @@ export default function GameTable({ room = null }) {
     // Also auto-save when navigating away
     function handleBeforeUnload() {
       if (autoSaveEnabledRef.current && performAutoSaveRef.current) {
-        // Use sendBeacon for reliable save on page unload
+        // sendBeacon cannot set an Authorization header, so the guarded API
+        // would 401 it. keepalive:true is the fetch equivalent that survives
+        // unload (payload cap ~64KB, which a table state stays well under).
         const stateData = typeof getGameState === 'function' ? getGameState() : null;
         if (stateData) {
-          navigator.sendBeacon(`/api/games/${id}/saves/auto`,
-            new Blob([JSON.stringify({ state_data: stateData })], { type: 'application/json' })
-          );
+          apiFetch(`/api/games/${id}/saves/auto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state_data: stateData }),
+            keepalive: true,
+          }).catch(() => {});
         }
       }
     }
@@ -2970,14 +2976,14 @@ export default function GameTable({ room = null }) {
       let res;
       if (editingSetupId) {
         // Update existing setup
-        res = await fetch(`/api/games/${id}/setups/${editingSetupId}`, {
+        res = await apiFetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
         });
       } else {
         // Create new setup
-        res = await fetch(`/api/games/${id}/setups`, {
+        res = await apiFetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
@@ -3272,7 +3278,7 @@ export default function GameTable({ room = null }) {
     saveLoadedRef.current = true;
     async function loadSave() {
       try {
-        const res = await fetch(`/api/games/${id}/saves/${saveId}`);
+        const res = await apiFetch(`/api/games/${id}/saves/${saveId}`);
         if (!res.ok) {
           console.error('Failed to load save:', res.status);
           return;
@@ -3307,7 +3313,7 @@ export default function GameTable({ room = null }) {
       setupLoadedRef.current = true;
       async function loadSetup() {
         try {
-          const res = await fetch(`/api/games/${id}/setups/${setupId}`);
+          const res = await apiFetch(`/api/games/${id}/setups/${setupId}`);
           if (!res.ok) {
             console.error('Failed to load setup:', res.status);
             return;
@@ -3349,7 +3355,7 @@ export default function GameTable({ room = null }) {
       setEditingSetupId(editSetupIdParam);
       async function loadSetupForEdit() {
         try {
-          const res = await fetch(`/api/games/${id}/setups/${editSetupIdParam}`);
+          const res = await apiFetch(`/api/games/${id}/setups/${editSetupIdParam}`);
           if (!res.ok) {
             console.error('Failed to load setup for editing:', res.status);
             return;

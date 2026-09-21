@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../utils/api';
 
 const PLAYER_COLORS = [
   { value: 'red',    hex: '#ef4444', label: 'Red' },
@@ -22,7 +23,7 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/rooms', {
+      const res = await apiFetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

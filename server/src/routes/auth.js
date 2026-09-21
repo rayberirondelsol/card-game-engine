@@ -30,7 +30,7 @@ function createSession(userId) {
   return token;
 }
 
-function getSessionUser(token) {
+export function getSessionUser(token) {
   if (!token) return null;
   const db = getDb();
   const now = Math.floor(Date.now() / 1000);
@@ -40,9 +40,19 @@ function getSessionUser(token) {
   return row || null;
 }
 
+// Registration is open unless CGE_ALLOW_REGISTRATION is explicitly switched off.
+// Read per request so it can be toggled without a rebuild (and in tests).
+function registrationAllowed() {
+  return !/^(0|false|no|off)$/i.test((process.env.CGE_ALLOW_REGISTRATION || '').trim());
+}
+
 export async function authRoutes(fastify) {
   // ── Register ──────────────────────────────────────────────────────────────
   fastify.post('/api/auth/register', async (req, reply) => {
+    if (!registrationAllowed()) {
+      return reply.status(403).send({ error: 'Registrierung ist deaktiviert' });
+    }
+
     const { email, password } = req.body || {};
 
     if (!email || !password) {

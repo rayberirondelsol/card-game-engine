@@ -15,7 +15,7 @@ import { cardsRoutes } from './routes/cards.js';
 import { categoriesRoutes } from './routes/categories.js';
 import { cardBacksRoutes } from './routes/card-backs.js';
 import { ttsImportRoutes } from './routes/tts-import.js';
-import { authRoutes } from './routes/auth.js';
+import { authRoutes, getSessionUser } from './routes/auth.js';
 import { roomsRoutes } from './routes/rooms.js';
 import { tableAssetsRoutes } from './routes/table-assets.js';
 import { customDiceRoutes } from './routes/custom-dice.js';
@@ -60,6 +60,32 @@ export async function buildApp(opts = { logger: true }) {
     root: UPLOADS_DIR,
     prefix: '/uploads/',
     decorateReply: false
+  });
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  // Everything under /api/ needs a valid session token, except the auth
+  // endpoints themselves (otherwise nobody could ever log in) and /api/health.
+  //
+  // Matching is done against the *matched route pattern* (request.routeOptions.url),
+  // not the raw request URL, so no amount of encoding, dot-segments or query
+  // string trickery can make a guarded route look public.
+  //
+  // /uploads/* is deliberately NOT guarded: images are loaded via <img src=...>,
+  // which cannot send an Authorization header. Locking it down needs a
+  // cookie-based scheme instead. KNOWN GAP: upload URLs are readable by anyone
+  // who can guess/obtain them.
+  const PUBLIC_API_ROUTES = /^\/api\/(health$|auth\/)/;
+
+  fastify.addHook('onRequest', async (request, reply) => {
+    const routePath = request.routeOptions?.url || '';
+    if (!routePath.startsWith('/api/')) return;      // /uploads/*, 404s, etc.
+    if (PUBLIC_API_ROUTES.test(routePath)) return;
+
+    const header = request.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (!token || !getSessionUser(token)) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
   });
 
   // Register routes

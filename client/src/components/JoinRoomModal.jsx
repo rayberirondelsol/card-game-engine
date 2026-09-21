@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/api';
 
 const PLAYER_COLORS = [
   { value: 'red',    hex: '#ef4444', label: 'Red' },
@@ -23,7 +24,7 @@ export default function JoinRoomModal({ onClose, onJoined }) {
     if (code.length !== 6) { setTakenColors([]); return; }
     const controller = new AbortController();
     setChecking(true);
-    fetch(`/api/rooms/${code.toUpperCase()}`, { signal: controller.signal })
+    apiFetch(`/api/rooms/${code.toUpperCase()}`, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
         if (data.players) {
@@ -49,7 +50,7 @@ export default function JoinRoomModal({ onClose, onJoined }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/rooms/${code.toUpperCase()}/join`, {
+      const res = await apiFetch(`/api/rooms/${code.toUpperCase()}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: displayName.trim(), color }),

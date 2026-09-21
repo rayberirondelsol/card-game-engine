@@ -4,6 +4,7 @@ import CreateRoomModal from '../components/CreateRoomModal';
 import JoinRoomModal from '../components/JoinRoomModal';
 import CameraCardScanner from '../components/CameraCardScanner';
 import { isTouchDevice } from '../utils/touchUtils';
+import { apiFetch } from '../utils/api';
 
 export default function GameDetail() {
   const { id } = useParams();
@@ -129,7 +130,7 @@ export default function GameDetail() {
 
   async function fetchGame() {
     try {
-      const res = await fetch(`/api/games/${id}`);
+      const res = await apiFetch(`/api/games/${id}`);
       if (!res.ok) throw new Error('Game not found');
       const data = await res.json();
       setGame(data);
@@ -143,7 +144,7 @@ export default function GameDetail() {
 
   async function fetchSaves() {
     try {
-      const res = await fetch(`/api/games/${id}/saves`);
+      const res = await apiFetch(`/api/games/${id}/saves`);
       if (res.ok) {
         const data = await res.json();
         setSaves(data);
@@ -155,7 +156,7 @@ export default function GameDetail() {
 
   async function fetchSetups() {
     try {
-      const res = await fetch(`/api/games/${id}/setups`);
+      const res = await apiFetch(`/api/games/${id}/setups`);
       if (res.ok) {
         const data = await res.json();
         setSetups(data);
@@ -167,7 +168,7 @@ export default function GameDetail() {
 
   async function fetchCards() {
     try {
-      const res = await fetch(`/api/games/${id}/cards`);
+      const res = await apiFetch(`/api/games/${id}/cards`);
       if (res.ok) {
         const data = await res.json();
         setCards(data);
@@ -179,7 +180,7 @@ export default function GameDetail() {
 
   async function fetchCategories() {
     try {
-      const res = await fetch(`/api/games/${id}/categories`);
+      const res = await apiFetch(`/api/games/${id}/categories`);
       if (res.ok) {
         const data = await res.json();
         setCategories(data);
@@ -191,7 +192,7 @@ export default function GameDetail() {
 
   async function fetchCardBacks() {
     try {
-      const res = await fetch(`/api/games/${id}/card-backs`);
+      const res = await apiFetch(`/api/games/${id}/card-backs`);
       if (res.ok) {
         const data = await res.json();
         setCardBacks(data);
@@ -203,7 +204,7 @@ export default function GameDetail() {
 
   async function fetchTableAssets() {
     try {
-      const res = await fetch(`/api/games/${id}/table-assets`);
+      const res = await apiFetch(`/api/games/${id}/table-assets`);
       if (res.ok) {
         const data = await res.json();
         setTableAssets(data);
@@ -215,7 +216,7 @@ export default function GameDetail() {
 
   async function handleDeleteTableAsset(assetId, name) {
     if (!confirm(`"${name || 'Asset'}" löschen?`)) return;
-    const res = await fetch(`/api/games/${id}/table-assets/${assetId}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/games/${id}/table-assets/${assetId}`, { method: 'DELETE' });
     if (res.ok) {
       setTableAssets(prev => prev.filter(a => a.id !== assetId));
     }
@@ -223,20 +224,20 @@ export default function GameDetail() {
 
   async function fetchCustomDice() {
     try {
-      const res = await fetch(`/api/games/${id}/custom-dice`);
+      const res = await apiFetch(`/api/games/${id}/custom-dice`);
       if (res.ok) setCustomDice(await res.json());
     } catch (err) {}
   }
 
   async function handleDeleteCustomDie(dieId, name) {
     if (!confirm(`"${name || 'Würfel'}" löschen?`)) return;
-    const res = await fetch(`/api/games/${id}/custom-dice/${dieId}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/games/${id}/custom-dice/${dieId}`, { method: 'DELETE' });
     if (res.ok) setCustomDice(prev => prev.filter(d => d.id !== dieId));
   }
 
   async function handleRenameCustomDie(dieId, newName) {
     if (!newName.trim()) return;
-    const res = await fetch(`/api/games/${id}/custom-dice/${dieId}`, {
+    const res = await apiFetch(`/api/games/${id}/custom-dice/${dieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
@@ -248,7 +249,7 @@ export default function GameDetail() {
   }
 
   async function handleUpdateTableAsset(assetId, fields) {
-    const res = await fetch(`/api/games/${id}/table-assets/${assetId}`, {
+    const res = await apiFetch(`/api/games/${id}/table-assets/${assetId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
@@ -275,7 +276,7 @@ export default function GameDetail() {
       formData.append('file', file);
 
       try {
-        const res = await fetch(`/api/games/${id}/card-backs/upload`, {
+        const res = await apiFetch(`/api/games/${id}/card-backs/upload`, {
           method: 'POST',
           body: formData,
         });
@@ -317,7 +318,7 @@ export default function GameDetail() {
     if (!confirm(`Delete card back "${cardBackName}"? Cards using this back will lose their assignment.`)) return;
 
     try {
-      const res = await fetch(`/api/games/${id}/card-backs/${cardBackId}`, {
+      const res = await apiFetch(`/api/games/${id}/card-backs/${cardBackId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -333,7 +334,7 @@ export default function GameDetail() {
 
   async function handleAssignCardBack(cardId, cardBackId) {
     try {
-      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+      const res = await apiFetch(`/api/games/${id}/cards/${cardId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_back_id: cardBackId || null }),
@@ -365,7 +366,7 @@ export default function GameDetail() {
 
       try {
         // Use auto-import endpoint that detects and splits multi-card images automatically
-        const res = await fetch(`/api/games/${id}/cards/auto-import`, {
+        const res = await apiFetch(`/api/games/${id}/cards/auto-import`, {
           method: 'POST',
           body: formData,
         });
@@ -385,7 +386,7 @@ export default function GameDetail() {
           failCount++;
           const errData = await res.json();
           // Fallback: try old upload endpoint if auto-import fails
-          const fallbackRes = await fetch(`/api/games/${id}/cards/upload`, {
+          const fallbackRes = await apiFetch(`/api/games/${id}/cards/upload`, {
             method: 'POST',
             body: (() => { const fd = new FormData(); fd.append('file', file); return fd; })(),
           });
@@ -434,7 +435,7 @@ export default function GameDetail() {
     if (!confirm(`Delete card "${cardName}"?`)) return;
 
     try {
-      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+      const res = await apiFetch(`/api/games/${id}/cards/${cardId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -449,7 +450,7 @@ export default function GameDetail() {
 
   async function handleAssignCardToCategory(cardId, categoryId) {
     try {
-      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+      const res = await apiFetch(`/api/games/${id}/cards/${cardId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category_id: categoryId || null }),
@@ -484,7 +485,7 @@ export default function GameDetail() {
 
     setSavingCardName(true);
     try {
-      const res = await fetch(`/api/games/${id}/cards/${cardId}`, {
+      const res = await apiFetch(`/api/games/${id}/cards/${cardId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmedName }),
@@ -520,7 +521,7 @@ export default function GameDetail() {
     if (rotatingCardId) return;
     setRotatingCardId(cardId);
     try {
-      const res = await fetch(`/api/games/${id}/cards/${cardId}/rotate`, {
+      const res = await apiFetch(`/api/games/${id}/cards/${cardId}/rotate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ degrees }),
@@ -543,7 +544,7 @@ export default function GameDetail() {
     if (ocrRenaming) return;
     setOcrRenaming(true);
     try {
-      const res = await fetch(`/api/games/${id}/ocr-rename`, {
+      const res = await apiFetch(`/api/games/${id}/ocr-rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -592,7 +593,7 @@ export default function GameDetail() {
     formData.append('file', file);
 
     try {
-      const res = await fetch(`/api/games/${id}/tts-import/analyze`, {
+      const res = await apiFetch(`/api/games/${id}/tts-import/analyze`, {
         method: 'POST',
         body: formData,
       });
@@ -685,7 +686,7 @@ export default function GameDetail() {
     setTtsError('');
 
     try {
-      const res = await fetch(`/api/games/${id}/tts-import/execute`, {
+      const res = await apiFetch(`/api/games/${id}/tts-import/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -731,7 +732,7 @@ export default function GameDetail() {
             tokens: data.tokens || [],
             boards: data.boards || [],
           };
-          await fetch(`/api/games/${id}/saves`, {
+          await apiFetch(`/api/games/${id}/saves`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: saveName, state_data: stateData }),
@@ -786,7 +787,7 @@ export default function GameDetail() {
     formData.append('file', file);
 
     try {
-      const res = await fetch(`/api/games/${id}/cards/analyze-split`, {
+      const res = await apiFetch(`/api/games/${id}/cards/analyze-split`, {
         method: 'POST',
         body: formData,
       });
@@ -830,7 +831,7 @@ export default function GameDetail() {
     setSplitError('');
 
     try {
-      const res = await fetch(`/api/games/${id}/cards/execute-split`, {
+      const res = await apiFetch(`/api/games/${id}/cards/execute-split`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -880,7 +881,7 @@ export default function GameDetail() {
 
     setEditSaving(true);
     try {
-      const res = await fetch(`/api/games/${id}`, {
+      const res = await apiFetch(`/api/games/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName.trim(), description: editDesc.trim() }),
@@ -901,7 +902,7 @@ export default function GameDetail() {
   async function handleDeleteGame() {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/games/${id}`, {
+      const res = await apiFetch(`/api/games/${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete game');
@@ -938,7 +939,7 @@ export default function GameDetail() {
         body.parent_category_id = newCategoryParentId;
       }
 
-      const res = await fetch(`/api/games/${id}/categories`, {
+      const res = await apiFetch(`/api/games/${id}/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -990,7 +991,7 @@ export default function GameDetail() {
 
     setEditCategorySaving(true);
     try {
-      const res = await fetch(`/api/games/${id}/categories/${editCategoryId}`, {
+      const res = await apiFetch(`/api/games/${id}/categories/${editCategoryId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editCategoryName.trim() }),
@@ -1022,7 +1023,7 @@ export default function GameDetail() {
   async function handleDeleteCategory() {
     setDeletingCategory(true);
     try {
-      const res = await fetch(`/api/games/${id}/categories/${deleteCategoryId}`, {
+      const res = await apiFetch(`/api/games/${id}/categories/${deleteCategoryId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -1767,7 +1768,7 @@ export default function GameDetail() {
                         onBlur={async (e) => {
                           const newName = e.target.value.trim();
                           if (!newName || newName === cb.name) return;
-                          const res = await fetch(`/api/games/${id}/card-backs/${cb.id}`, {
+                          const res = await apiFetch(`/api/games/${id}/card-backs/${cb.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: newName }),
@@ -2028,7 +2029,7 @@ export default function GameDetail() {
                           onClick={async () => {
                             if (!window.confirm(`Delete setup "${setup.name}"?`)) return;
                             try {
-                              const res = await fetch(`/api/games/${id}/setups/${setup.id}`, { method: 'DELETE' });
+                              const res = await apiFetch(`/api/games/${id}/setups/${setup.id}`, { method: 'DELETE' });
                               if (res.ok) {
                                 setSetups(prev => prev.filter(s => s.id !== setup.id));
                                 setSuccessMessage(`Setup "${setup.name}" deleted`);
@@ -2082,7 +2083,7 @@ export default function GameDetail() {
                           onClick={async () => {
                             if (!window.confirm(`Delete save "${save.name}"?`)) return;
                             try {
-                              const res = await fetch(`/api/games/${id}/saves/${save.id}`, { method: 'DELETE' });
+                              const res = await apiFetch(`/api/games/${id}/saves/${save.id}`, { method: 'DELETE' });
                               if (res.ok) {
                                 setSaves(prev => prev.filter(s => s.id !== save.id));
                               }

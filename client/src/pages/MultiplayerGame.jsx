@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameRoom } from '../hooks/useGameRoom.js';
 import GameTable from './GameTable.jsx';
+import { apiFetch } from '../utils/api';
 
 /**
  * Wrapper component that connects to a multiplayer room via WebSocket
@@ -18,7 +19,7 @@ export default function MultiplayerGame() {
 
   useEffect(() => {
     // Fetch room info to get the game ID
-    fetch(`/api/rooms/${code}`)
+    apiFetch(`/api/rooms/${code}`)
       .then(r => r.json())
       .then(data => {
         if (data.game_id) setGameId(data.game_id);

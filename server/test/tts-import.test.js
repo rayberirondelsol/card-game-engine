@@ -21,8 +21,10 @@ process.env.CGE_UPLOADS_DIR = path.join(TMP, 'uploads');
 
 const { buildApp } = await import('../src/index.js');
 const { closeDatabase } = await import('../src/database.js');
+const { authHeaders } = await import('./helpers.js');
 
 let app;
+let headers; // the API requires a valid session token
 let sheetServer;
 let sheetBase;
 
@@ -45,6 +47,7 @@ before(async () => {
 
   app = await buildApp({ logger: false });
   await app.ready();
+  headers = authHeaders();
 });
 
 after(async () => {
@@ -83,12 +86,12 @@ async function multipart(json) {
   const req = new Request('http://x', { method: 'POST', body: fd });
   return {
     payload: Buffer.from(await req.arrayBuffer()),
-    headers: { 'content-type': req.headers.get('content-type') },
+    headers: { ...headers, 'content-type': req.headers.get('content-type') },
   };
 }
 
 async function createGame(name) {
-  const res = await app.inject({ method: 'POST', url: '/api/games', payload: { name } });
+  const res = await app.inject({ method: 'POST', url: '/api/games', headers, payload: { name } });
   assert.equal(res.statusCode, 201, res.body);
   return res.json().id;
 }
@@ -107,6 +110,7 @@ async function importFixture(gameId) {
   const execute = await app.inject({
     method: 'POST',
     url: `/api/games/${gameId}/tts-import/execute`,
+    headers,
     payload: { tempId, selectedDeckIndices: [0, 1], createCategories: true },
   });
   assert.equal(execute.statusCode, 200, execute.body);
@@ -114,7 +118,7 @@ async function importFixture(gameId) {
 }
 
 async function cardNames(gameId) {
-  const res = await app.inject({ method: 'GET', url: `/api/games/${gameId}/cards` });
+  const res = await app.inject({ method: 'GET', url: `/api/games/${gameId}/cards`, headers });
   assert.equal(res.statusCode, 200, res.body);
   return res.json().map((c) => c.name);
 }

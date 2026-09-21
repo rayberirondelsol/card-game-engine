@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { apiFetch } from '../utils/api';
 
 // --- State machine states ---
 const S = {
@@ -208,7 +209,7 @@ async function uploadCardImage(gameId, imageDataUrl, name, categoryId, cardBackI
   fd.append('file', dataUrlToFile(imageDataUrl, `${name}.jpg`));
   if (categoryId) fd.append('category_id', categoryId);
   if (cardBackId)  fd.append('card_back_id', cardBackId);
-  const res = await fetch(`/api/games/${gameId}/cards/upload?is_camera_scan=true`, { method: 'POST', body: fd });
+  const res = await apiFetch(`/api/games/${gameId}/cards/upload?is_camera_scan=true`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error('Upload failed');
   return res.json();
 }
@@ -216,7 +217,7 @@ async function uploadCardImage(gameId, imageDataUrl, name, categoryId, cardBackI
 async function uploadCardBackImage(gameId, imageDataUrl) {
   const fd = new FormData();
   fd.append('file', dataUrlToFile(imageDataUrl, 'card-back-scan.jpg'));
-  const res = await fetch(`/api/games/${gameId}/card-backs/upload?is_camera_scan=true`, { method: 'POST', body: fd });
+  const res = await apiFetch(`/api/games/${gameId}/card-backs/upload?is_camera_scan=true`, { method: 'POST', body: fd });
   if (!res.ok) throw new Error('Card back upload failed');
   return res.json();
 }

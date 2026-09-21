@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
 import JoinRoomModal from '../components/JoinRoomModal';
+import { apiFetch } from '../utils/api';
 
 export default function StartScreen() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function StartScreen() {
 
   async function fetchGames() {
     try {
-      const res = await fetch('/api/games');
+      const res = await apiFetch('/api/games');
       if (!res.ok) throw new Error('Failed to fetch games');
       const data = await res.json();
       setGames(data);
@@ -54,7 +55,7 @@ export default function StartScreen() {
     }
     setNameError(null);
     try {
-      const res = await fetch('/api/games', {
+      const res = await apiFetch('/api/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newGameName, description: newGameDesc }),
@@ -81,7 +82,7 @@ export default function StartScreen() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/games/${deleteTarget.id}`, {
+      const res = await apiFetch(`/api/games/${deleteTarget.id}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete game');
@@ -99,7 +100,7 @@ export default function StartScreen() {
 
   async function openCreateRoom(e, game) {
     e.stopPropagation();
-    const res = await fetch(`/api/games/${game.id}/setups`);
+    const res = await apiFetch(`/api/games/${game.id}/setups`);
     setCreateRoomSetups(res.ok ? await res.json() : []);
     setCreateRoomTarget(game);
   }
