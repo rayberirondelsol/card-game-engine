@@ -1,5 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { rmSync } from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const UPLOADS_DIR = path.resolve(process.env.CGE_UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads'));
 
 export async function gamesRoutes(fastify) {
   // GET /api/games - List all games
@@ -84,6 +92,21 @@ export async function gamesRoutes(fastify) {
     const stmt = db.prepare('DELETE FROM games WHERE id = ?');
     stmt.run(id);
     console.log('[SQL] DELETE FROM games WHERE id = ?', id);
+
+    // Delete the game's uploaded images. Only ever touch a directory strictly
+    // inside UPLOADS_DIR - a malformed or traversing id must not escape it.
+    const gameUploadsDir = path.resolve(UPLOADS_DIR, id);
+    if (gameUploadsDir.startsWith(UPLOADS_DIR + path.sep)) {
+      try {
+        rmSync(gameUploadsDir, { recursive: true, force: true });
+        console.log('[Games] Deleted uploads directory:', gameUploadsDir);
+      } catch (err) {
+        // A DB row is already gone; leaked files are not worth a 500.
+        console.error('[Games] Error deleting uploads directory:', err);
+      }
+    } else {
+      console.warn('[Games] Refused to delete uploads path outside uploads root:', gameUploadsDir);
+    }
 
     return { success: true, message: 'Game deleted' };
   });
