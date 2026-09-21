@@ -75,7 +75,7 @@ function getDieSheetGrid(numFaces, imgWidth, imgHeight) {
   return best;
 }
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const UPLOADS_DIR = process.env.CGE_UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
 // Ensure uploads directory exists
 if (!existsSync(UPLOADS_DIR)) {
@@ -461,7 +461,7 @@ async function sliceSpriteSheet(imageBuffer, numWidth, numHeight, deckKey, deckI
       // Determine card name: OCR > TTS nickname > fallback
       const fullCardID = parseInt(deckKey) * 100 + cardIndex;
       const nickname = cardNames[fullCardID] || '';
-      let cardName = nickname || `Card ${cardIndex + 1}`;
+      let cardName = nickname || `Card ${deckKey}-${cardIndex + 1}`;
 
       if (ocrNamePosition && ocrWorker) {
         const ocrText = await ocrCardName(extractedBuffer, ocrNamePosition, ocrWorker);

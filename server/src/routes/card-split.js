@@ -10,7 +10,7 @@ import sharp from 'sharp';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const UPLOADS_DIR = process.env.CGE_UPLOADS_DIR || path.join(__dirname, '..', '..', 'uploads');
 
 // Standard card aspect ratios (width/height)
 const STANDARD_CARD_RATIOS = [

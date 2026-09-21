@@ -6,12 +6,13 @@ import { mkdirSync, existsSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'card-game-engine.db');
+// CGE_DB_PATH lets tests point at a throwaway DB instead of server/data/.
+const DB_PATH = process.env.CGE_DB_PATH || path.join(__dirname, '..', 'data', 'card-game-engine.db');
 
 let db;
 
 export async function setupDatabase() {
-  const dataDir = path.join(__dirname, '..', 'data');
+  const dataDir = path.dirname(DB_PATH);
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
   }

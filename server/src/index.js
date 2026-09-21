@@ -27,18 +27,20 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3001;
 
 // Ensure uploads directory exists
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const UPLOADS_DIR = process.env.CGE_UPLOADS_DIR || path.join(__dirname, '..', 'uploads');
 if (!existsSync(UPLOADS_DIR)) {
   mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-async function start() {
+/**
+ * Build a fully wired Fastify instance (DB + plugins + routes) without listening.
+ * Tests use this with app.inject(); start() uses it for production.
+ */
+export async function buildApp(opts = { logger: true }) {
   // Initialize database
   await setupDatabase();
 
-  const fastify = Fastify({
-    logger: true
-  });
+  const fastify = Fastify(opts);
 
   // Register CORS for frontend dev server
   await fastify.register(cors, {
@@ -74,6 +76,12 @@ async function start() {
   await fastify.register(tableAssetsRoutes);
   await fastify.register(customDiceRoutes);
 
+  return fastify;
+}
+
+async function start() {
+  const fastify = await buildApp({ logger: true });
+
   // Graceful shutdown
   const shutdown = async () => {
     console.log('[Server] Shutting down...');
@@ -99,4 +107,7 @@ async function start() {
   }
 }
 
-start();
+// Only auto-start when executed directly (`node src/index.js`), not when imported by tests.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
+  start();
+}
