@@ -3,6 +3,13 @@
  * Uses the raw `ws` package attached to Fastify's underlying HTTP server.
  *
  * Connection URL: GET /ws/rooms/:code?player_id=<id>
+ *
+ * Authentication: the upgrade happens on the raw HTTP server, outside Fastify's
+ * hook chain, so the /api guard in src/index.js does not cover it — the check
+ * below is the only one. The session token travels in Sec-WebSocket-Protocol
+ * (`new WebSocket(url, [WS_SUBPROTOCOL, token])`) because browsers cannot set
+ * headers on a WebSocket, and a ?token= query parameter would leak the session
+ * into URLs, access logs and referrers.
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
@@ -10,14 +17,28 @@ import { getRoom, setConnection, getAllRooms, serializeBoardState } from '../roo
 import { handleMessage } from './messageHandler.js';
 import { broadcast, sendToPlayer } from './broadcast.js';
 import { getDb } from '../database.js';
+import { getSessionUser } from '../routes/auth.js';
+
+/** Marker subprotocol; the client offers [WS_SUBPROTOCOL, <session token>]. */
+export const WS_SUBPROTOCOL = 'cge.v1';
 
 let wss = null;
+
+/** Reject an upgrade with a real HTTP response, so the client can tell why. */
+function reject(socket, status, reason) {
+  socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+}
 
 // Periodic DB snapshot every 30 seconds
 let snapshotInterval = null;
 
 export function setupWebSocketServer(httpServer) {
-  wss = new WebSocketServer({ noServer: true });
+  wss = new WebSocketServer({
+    noServer: true,
+    // Echo the marker back (never the token): the browser closes the connection
+    // unless the server selects one of the offered protocols.
+    handleProtocols: (protocols) => (protocols.has(WS_SUBPROTOCOL) ? WS_SUBPROTOCOL : false),
+  });
 
   // Attach upgrade handler to the underlying Node.js HTTP server
   httpServer.on('upgrade', (request, socket, head) => {
@@ -27,7 +48,15 @@ export function setupWebSocketServer(httpServer) {
     // Match /ws/rooms/:code
     const match = pathname.match(/^\/ws\/rooms\/([A-Z0-9]{6})$/i);
     if (!match) {
-      socket.destroy();
+      reject(socket, 404, 'Not Found');
+      return;
+    }
+
+    // Sec-WebSocket-Protocol: "cge.v1, <session token>"
+    const offered = (request.headers['sec-websocket-protocol'] || '').split(',').map((p) => p.trim());
+    const token = offered.find((p) => p && p !== WS_SUBPROTOCOL);
+    if (!offered.includes(WS_SUBPROTOCOL) || !getSessionUser(token)) {
+      reject(socket, 401, 'Unauthorized');
       return;
     }
 
@@ -35,7 +64,7 @@ export function setupWebSocketServer(httpServer) {
     const playerId = url.searchParams.get('player_id');
 
     if (!playerId) {
-      socket.destroy();
+      reject(socket, 400, 'Bad Request');
       return;
     }
 
@@ -100,7 +129,7 @@ export function setupWebSocketServer(httpServer) {
             newHost.isHost = true;
             broadcast(room, { type: 'host_changed', new_host_id: newHost.id });
           }
-        }, 60000);
+        }, 60000).unref();
       }
     });
 
@@ -127,12 +156,23 @@ export function setupWebSocketServer(httpServer) {
     snapshotAllRooms();
   }, 30000);
 
+  // No background timer should hold the event loop open on its own (the listening
+  // HTTP server does that in production), otherwise tests hang after app.close().
+  pingInterval.unref();
+  snapshotInterval.unref();
+
   wss.on('close', () => {
     clearInterval(pingInterval);
     clearInterval(snapshotInterval);
   });
 
   console.log('[WS] WebSocket server attached to HTTP server');
+}
+
+/** Tear down the server and its timers (tests; production exits the process). */
+export function closeWebSocketServer() {
+  if (wss) wss.close();
+  wss = null;
 }
 
 function snapshotAllRooms() {

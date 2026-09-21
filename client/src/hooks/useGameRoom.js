@@ -7,6 +7,12 @@ const WS_URL = (code, playerId) => {
   return `${proto}://${host}:${port}/ws/rooms/${code}?player_id=${playerId}`;
 };
 
+// Matches WS_SUBPROTOCOL in server/src/websocket/roomWs.js. A browser cannot set
+// headers on a WebSocket, so the session token rides along as a second
+// subprotocol instead of a ?token= query parameter (which would leak into URLs,
+// access logs and referrers).
+const WS_SUBPROTOCOL = 'cge.v1';
+
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const CURSOR_THROTTLE_MS = 33; // ~30fps
@@ -35,8 +41,10 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
 
   const connect = useCallback(() => {
     if (!roomCode || !myPlayerId) return;
+    const token = localStorage.getItem('auth_token');
+    if (!token) return; // not logged in: the server would reject the upgrade anyway
     const url = WS_URL(roomCode, myPlayerId);
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(url, [WS_SUBPROTOCOL, token]);
     wsRef.current = ws;
 
     ws.onopen = () => {
