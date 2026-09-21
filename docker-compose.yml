@@ -17,7 +17,8 @@ services:
       - NODE_ENV=production
       - PORT=3001
       # Set to 0/false to close /api/auth/register once your accounts exist.
-      - CGE_ALLOW_REGISTRATION=true
+      # Closed: the accounts that need access already exist.
+      - CGE_ALLOW_REGISTRATION=false
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
       interval: 30s
