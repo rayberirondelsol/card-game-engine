@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ZoneShape from './ZoneShape';
 import { zoneSlots } from '../utils/zoneGeometry';
-import { screenToWorld, rectFromPoints, isDrawable, createZone } from '../utils/zoneDraft';
+import {
+  screenToWorld, rectFromPoints, isDrawable, createZone,
+  panelSide, moveZone, resizeZone, RESIZE_HANDLES, handleAnchor,
+} from '../utils/zoneDraft';
 
 const SHAPES = [
   { value: 'rect',       label: 'Rectangle' },
@@ -20,6 +23,13 @@ const LAYOUTS = [
 ];
 
 const KINDS = ['card', 'asset', 'die'];
+
+const HANDLE_CURSORS = {
+  nw: 'nwse-resize', se: 'nwse-resize',
+  ne: 'nesw-resize', sw: 'nesw-resize',
+  n: 'ns-resize', s: 'ns-resize',
+  e: 'ew-resize', w: 'ew-resize',
+};
 
 
 const PLAYER_COLORS = [
@@ -94,8 +104,21 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
   const drawStart = useRef(null);
   const [drawRect, setDrawRect] = useState(null);
   const [showPresetModal, setShowPresetModal] = useState(false);
+  // An in-flight move or resize: the zone as it was when the drag started, so
+  // every frame is computed from the original and small errors cannot add up.
+  const [drag, setDrag] = useState(null);
 
   const selectedZone = zones.find(z => z.id === selectedZoneId) || null;
+
+  function containerRect() {
+    return containerRef?.current?.getBoundingClientRect() || null;
+  }
+
+  // The panel is in screen space over a table that pans and zooms, so it docks
+  // to whichever side of the selected zone has more room. Drawing and correcting
+  // a zone at the left table edge is what M2.6 is about; a fixed left panel made
+  // both impossible without closing it first.
+  const side = selectedZone ? panelSide(selectedZone, camera, containerRect()) : 'right';
 
   // Escape gets out of drawing – the only way out otherwise is finishing a drag.
   useEffect(() => {
@@ -108,11 +131,42 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
   }, [armed]);
 
   function toWorld(e) {
-    return screenToWorld(
-      { x: e.clientX, y: e.clientY },
-      camera,
-      containerRef?.current?.getBoundingClientRect() || null,
-    );
+    return screenToWorld({ x: e.clientX, y: e.clientY }, camera, containerRect());
+  }
+
+  /**
+   * Moving and resizing run on window listeners, not on the grip: the pointer
+   * leaves a 10px handle on the first fast frame, and a drag that stops when it
+   * does is worse than no drag at all.
+   */
+  useEffect(() => {
+    if (!drag) return;
+    function onMove(e) {
+      // Released outside the window: the mouseup never arrived, so the zone
+      // would otherwise stick to the pointer on the way back in.
+      if (e.buttons === 0) { setDrag(null); return; }
+      const p = toWorld(e);
+      const dx = p.x - drag.start.x;
+      const dy = p.y - drag.start.y;
+      updateZone(drag.zone.id, drag.handle
+        ? resizeZone(drag.zone, drag.handle, dx, dy)
+        : moveZone(drag.zone, dx, dy));
+    }
+    function onUp() { setDrag(null); }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [drag, zones]);
+
+  function startDrag(e, zone, handle) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedZoneId(zone.id);
+    setDrag({ zone, handle, start: toWorld(e) });
   }
 
   function cancelDraw() {
@@ -176,6 +230,11 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
     setShowPresetModal(false);
   }
 
+  // Handles live inside the scaled world layer, so they are drawn at 1/zoom to
+  // stay the same size on screen – a 10px grip at zoom 0.3 is not grabbable.
+  const zoom = camera.zoom || 1;
+  const handleSize = 10 / zoom;
+
   const worldTransform = {
     transformOrigin: '50% 50%',
     transform: `scale(${camera.zoom}) translate(${camera.x}px, ${camera.y}px)`,
@@ -234,12 +293,54 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
                   }}
                 />
               ))}
+              {/* The label badge doubles as the move grip: a small, deliberate
+                  target, so the zone body does not become a drag surface over
+                  the cards it covers – and no modifier key is needed, with Alt
+                  already booked twice on this table. */}
               <div
-                className="absolute top-1 left-2 font-semibold px-1 py-0.5 rounded"
-                style={{ backgroundColor: `${hex}CC`, color: '#fff', fontSize: '10px' }}
+                data-testid={`zone-move-${zone.id}`}
+                className="absolute top-1 left-2 font-semibold px-1 py-0.5 rounded select-none"
+                style={{ backgroundColor: `${hex}CC`, color: '#fff', fontSize: '10px', cursor: 'move' }}
+                onMouseDown={e => startDrag(e, zone, null)}
+                onClick={e => e.stopPropagation()}
+                title="Drag to move this zone"
               >
                 {zone.label}
               </div>
+
+              {isSelected && !armed && (
+                <>
+                  {/* For a circle or a hex the handles sit on the bounding box,
+                      away from the figure. The outline says which box they belong to. */}
+                  {zone.shape && zone.shape !== 'rect' && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{ border: `${1 / zoom}px dashed ${hex}80` }}
+                    />
+                  )}
+                  {RESIZE_HANDLES.map(h => {
+                    const { fx, fy } = handleAnchor(h);
+                    return (
+                      <div
+                        key={h}
+                        data-testid={`zone-resize-${zone.id}-${h}`}
+                        className="absolute rounded-sm"
+                        style={{
+                          left: zone.width * fx - handleSize / 2,
+                          top: zone.height * fy - handleSize / 2,
+                          width: handleSize,
+                          height: handleSize,
+                          backgroundColor: '#fff',
+                          border: `${1 / zoom}px solid ${hex}`,
+                          cursor: HANDLE_CURSORS[h],
+                        }}
+                        onMouseDown={e => startDrag(e, zone, h)}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    );
+                  })}
+                </>
+              )}
             </div>
           );
         })}
@@ -260,9 +361,16 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
         />
       )}
 
-      {/* Zone property panel */}
-      {selectedZone && (
-        <div data-ui-element className="absolute left-4 top-1/2 -translate-y-1/2 w-64 bg-slate-900/95 border border-slate-700 rounded-xl p-4 z-50 space-y-3">
+      {/* Zone property panel. Docks away from the zone it edits, steps aside
+          entirely while a zone is being drawn, and stays below the modals
+          (z-50) it used to cover the confirm button of. */}
+      {selectedZone && !armed && (
+        <div
+          data-ui-element
+          data-testid="zone-properties-panel"
+          data-side={side}
+          className={`absolute ${side === 'left' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-64 bg-slate-900/95 border border-slate-700 rounded-xl p-4 z-40 space-y-3`}
+        >
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Zone Properties</h3>
             <button onClick={() => setSelectedZoneId(null)} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
@@ -480,7 +588,7 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
             ? 'Drag on the table to size it · Esc to cancel'
             : zones.length === 0
               ? 'No zones yet'
-              : 'Click a zone to edit it'}
+              : 'Click a zone to edit · drag its label to move, its corners to resize'}
         </span>
         <button
           type="button"

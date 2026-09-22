@@ -3036,7 +3036,10 @@ export default function GameTable({ room = null }) {
       }
       const saved = await res.json();
       setShowSetupSaveModal(false);
-      setSetupName('');
+      // Keep the name the setup now has. Clearing it here was why the update
+      // dialog came back empty, and why the quick-save path below renamed a
+      // saved setup to "Untitled Setup" on the second press.
+      setSetupName(saved.name || name);
       setSaveToast(editingSetupId ? `Setup "${name}" updated` : `Setup "${name}" saved`);
       setTimeout(() => setSaveToast(null), 4000);
       // Update editingSetupId if it was a new setup, so future saves update it
@@ -5077,14 +5080,11 @@ export default function GameTable({ room = null }) {
             {setupMode && (
               <button
                 onClick={() => {
-                  if (!setupName && !editingSetupId) {
-                    setShowSetupSaveModal(true);
-                  } else if (editingSetupId) {
-                    // Quick-save existing setup
-                    saveSetup(setupName || 'Untitled Setup');
-                  } else {
-                    setShowSetupSaveModal(true);
-                  }
+                  // An existing setup already has a name, so updating it needs
+                  // no dialog. Without one, ask – never invent "Untitled Setup"
+                  // and rename the user's setup behind his back.
+                  if (editingSetupId && setupName.trim()) saveSetup(setupName.trim());
+                  else setShowSetupSaveModal(true);
                 }}
                 data-testid="toolbar-save-setup-btn"
                 className={`flex flex-col items-center gap-0.5 rounded-lg text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/30 transition-colors ${isMobileLandscape ? 'px-2 py-1.5' : 'px-3 py-1.5'}`}
@@ -5562,13 +5562,15 @@ export default function GameTable({ room = null }) {
         <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="setup-save-modal">
           <h3 className="text-white font-semibold mb-3">{editingSetupId ? 'Update Setup' : 'Save Setup'}</h3>
           <p className="text-slate-400 text-sm mb-3">
-            {editingSetupId ? 'Update the setup with the current table state.' : 'Save the current table arrangement as a reusable game setup.'}
+            {editingSetupId
+              ? 'Update the setup with the current table state. It keeps its name unless you change it here.'
+              : 'Save the current table arrangement as a reusable game setup.'}
           </p>
           <input
             type="text"
             value={setupName}
             onChange={(e) => setSetupName(e.target.value)}
-            placeholder="Enter setup name..."
+            placeholder={editingSetupId ? 'Setup name' : 'Enter setup name...'}
             data-testid="setup-name-input"
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
             autoFocus
