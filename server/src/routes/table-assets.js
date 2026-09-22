@@ -19,8 +19,11 @@ export async function tableAssetsRoutes(fastify) {
       return reply.status(404).send({ error: 'Game not found' });
     }
 
+    // `category` is the human-readable pool label used by the draw_assets
+    // setup step; the raw category_id is a UUID and useless in a sequence.
     const assets = db.prepare(
-      'SELECT * FROM table_assets WHERE game_id = ? ORDER BY created_at DESC'
+      `SELECT t.*, (SELECT name FROM categories WHERE id = t.category_id) AS category
+       FROM table_assets t WHERE t.game_id = ? ORDER BY t.created_at DESC`
     ).all(id);
 
     return assets;
@@ -46,6 +49,7 @@ export async function tableAssetsRoutes(fastify) {
     if (body.name !== undefined) { updates.push('name = ?'); values.push(String(body.name)); }
     if (body.quantity !== undefined) { updates.push('quantity = ?'); values.push(Math.max(1, parseInt(body.quantity) || 1)); }
     if (body.category_id !== undefined) { updates.push('category_id = ?'); values.push(body.category_id || null); }
+    if (body.back_image_path !== undefined) { updates.push('back_image_path = ?'); values.push(body.back_image_path || null); }
     if (body.width !== undefined) { updates.push('width = ?'); values.push(Math.max(10, parseInt(body.width) || 60)); }
     if (body.height !== undefined) { updates.push('height = ?'); values.push(Math.max(10, parseInt(body.height) || 60)); }
 

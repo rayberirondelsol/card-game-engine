@@ -184,6 +184,10 @@ export async function setupDatabase() {
     db.exec('ALTER TABLE table_assets ADD COLUMN category_id TEXT');
     console.log('[DB] Migration: added category_id column to table_assets');
   }
+  if (!tableAssetCols.includes('back_image_path')) {
+    db.exec('ALTER TABLE table_assets ADD COLUMN back_image_path TEXT');
+    console.log('[DB] Migration: added back_image_path column to table_assets');
+  }
 
   // Migrations: add new columns to existing tables if they don't exist yet
   const cardColumns = db.prepare("PRAGMA table_info(cards)").all().map(c => c.name);

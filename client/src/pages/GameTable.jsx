@@ -1976,6 +1976,7 @@ export default function GameTable({ room = null }) {
       : type === 'hitDie' ? setHitDice
       : type === 'note' ? setNotes
       : type === 'token' ? setTokens
+      : type === 'board' ? setBoards
       : type === 'textField' ? setTextFields
       : null;
     if (setter) {
@@ -2671,6 +2672,11 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        // set by the setup sequence's asset steps (place_asset / draw_assets)
+        assetId: t.assetId || null,
+        faceDown: t.faceDown || false,
+        frontImageUrl: t.frontImageUrl || null,
+        backImageUrl: t.backImageUrl || null,
       })),
       boards: boards.map(b => ({
         id: b.id,
@@ -3217,6 +3223,10 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        assetId: t.assetId || null,
+        faceDown: t.faceDown || false,
+        frontImageUrl: t.frontImageUrl || null,
+        backImageUrl: t.backImageUrl || null,
       }));
       // Merge migrated markers with existing tokens
       setTokens([...restoredTokens, ...migratedTokens]);
@@ -3333,7 +3343,10 @@ export default function GameTable({ room = null }) {
           if (parsedSeq.length > 0) {
             try {
               const parsed = typeof stateToLoad === 'string' ? JSON.parse(stateToLoad) : stateToLoad;
-              stateToLoad = executeSequence(parsed, parsedSeq, parsedZones);
+              // Asset steps (place_asset / draw_assets / ...) draw from the game's table assets.
+              const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
+              const assets = assetsRes.ok ? await assetsRes.json() : [];
+              stateToLoad = executeSequence(parsed, parsedSeq, parsedZones, { assets });
             } catch (err) {
               console.error('Sequence execution failed:', err);
             }
@@ -6067,7 +6080,7 @@ export default function GameTable({ room = null }) {
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   {(() => {
-                    const lists = { counter: counters, die: dice, hitDie: hitDice, note: notes, token: tokens, textField: textFields };
+                    const lists = { counter: counters, die: dice, hitDie: hitDice, note: notes, token: tokens, board: boards, textField: textFields };
                     const obj = (lists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
                     return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
                   })()}
