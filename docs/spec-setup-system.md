@@ -172,6 +172,27 @@ Rechteck, Kreis, Hex.
 **Abnahme:** Ein Objekt, das in eine Zone mit `snap` fällt, sitzt auf einem Platz;
 eine volle Zone nimmt nichts mehr an; eine Zone mit `accepts: ['asset']` weist Karten ab.
 
+### M2.5 — Zonen überhaupt anlegen können
+Nachgetragen, weil beim Prüfen von M2 aufgefallen: `ZoneEditor` hat zwar
+`handleMouseDown`/`Move`/`Up` samt Alt-Prüfung, **bindet sie aber nirgends**. Der
+Kommentar verweist auf den Parent, der sie weder übergeben bekommt noch erreichen
+könnte. Alt-Ziehen tut also nichts, und die gestrichelte Vorschau kann nie erscheinen.
+
+Folge: jede Zone muss aus den vier Spieler-Vorlagen stammen, und die sind
+ausnahmslos Rechtecke mit fest verdrahteten Koordinaten. Kreis und Hex aus M2 sind
+nur erreichbar, indem man eine Vorlagenzone nachträglich umstellt. Eine Leiste mit
+vier Plätzen lässt sich nicht anlegen, ohne eine „Player 1"-Zone zu missbrauchen.
+
+Für ein System, dessen Zweck das Definieren von Zonen ist, geht das vor M3.
+
+Umfang: Zeichnen reparieren · eine **sichtbare** Möglichkeit, eine Zone anzulegen
+(nicht nur ein Tastenkürzel, das man raten muss) · die Spieler-Vorlagen entkoppeln,
+sodass „keine Spielerzonen, nur Ablagen" ein normaler Weg ist und der Vorlagendialog
+nicht bei jedem leeren Setup erscheint.
+
+**Abnahme:** Eine Zone lässt sich ohne Vorlage anlegen, direkt als Kreis oder Hex,
+und überlebt Speichern und Neuladen.
+
 ### M3 — Rasterebene
 Raster manuell definierbar, Objekte rasten auf Felder ein, Felder sind benennbar
 (`A1`, `S14`).
