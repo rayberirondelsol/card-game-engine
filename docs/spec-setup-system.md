@@ -141,6 +141,18 @@ meldet den Fehler. Es offen hinzulegen wäre schlimmer als es wegzulassen: eine 
 Zone sieht man sofort, ein ungewollt offenes Bosstoken verrät genau die Information,
 die verborgen bleiben soll — womöglich unbemerkt.
 
+### Verdeckt heißt überall verdeckt
+
+Ein verdeckt liegendes Objekt darf seinen Namen **nirgends** preisgeben — nicht in
+Listen, Legenden, Tooltips, Vorschauen, Protokollen oder im ausgelieferten Zustand.
+
+Beim ersten echten Durchlauf gefunden: die „Token Legend" am Spieltisch listet alle
+Token mit Namen, auch die verdeckten. Vier verdeckte Bosstoken in der Leiste — und
+daneben steht, welche vier es sind. Damit ist der Zweck der verdeckten Leiste
+hinfällig, obwohl weder die Legende noch der Aufbau für sich falsch sind.
+
+Die Regel gilt für jede künftige Anzeige, die über Tischobjekte spricht.
+
 ### Fehler sind sichtbar
 
 Ein übersprungener Schritt darf nicht nur in der Browser-Konsole landen. Ein Aufbau,
