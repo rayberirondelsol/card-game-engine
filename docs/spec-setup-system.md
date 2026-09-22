@@ -229,18 +229,25 @@ zuklappen zu müssen; der Speichern-Dialog ist ohne Umweg bedienbar; der Name st
 beim Aktualisieren schon da; eine vorhandene Zone lässt sich verschieben und in der
 Größe ändern.
 
-### M3 — Verankerung und Rasterebene
-Zwei Dinge, die denselben Mechanismus brauchen und deshalb zusammen gebaut werden:
+### M3a — Verankerung
+Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
+in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.
 
-**Verankerung** (Abschnitt 4): Zonen und Raster können optional an ein Asset gebunden
-werden und folgen ihm dann in Lage und Größe. Ohne Anker bleibt alles absolut.
-
-**Raster**: manuell definierbar, Objekte rasten auf Felder ein, Felder sind benennbar
-(`A1`, `S14`).
+Die Auflösung „relative Box am Anker → absolute Box" gehört in **eine** allgemeine
+Funktion, weil M3b sie für Raster genauso braucht.
 
 **Abnahme:** Eine am Brett verankerte Zone sitzt nach dem Verschieben **und** nach dem
-Skalieren des Bretts weiterhin auf demselben aufgedruckten Bereich. Eine Figur auf
-Feld `C7` liegt nach erneutem Laden wieder auf `C7`.
+Skalieren des Bretts weiterhin auf demselben aufgedruckten Bereich.
+
+### M3b — Rasterebene
+Raster manuell definierbar, an dieselbe Verankerung anschließbar, Objekte rasten auf
+Felder ein, Felder sind benennbar (`A1`, `S14`).
+
+**Abnahme:** Eine Figur auf Feld `C7` liegt nach erneutem Laden wieder auf `C7`.
+
+*Getrennt von M3a, weil nur die Verankerung die Aufbau-Sequenz blockiert: eine
+Sequenz auf unverankerte Zonen zu schreiben und danach zu verankern hieße, den
+Aufbau zweimal zu bauen. Das Raster blockiert nichts.*
 
 ### M4 — Fortschrittsebene
 `progress` je Spiel · Schritt `filter_by_progress` · UI zum Setzen von Status.
