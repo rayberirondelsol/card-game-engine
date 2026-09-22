@@ -229,6 +229,27 @@ zuklappen zu müssen; der Speichern-Dialog ist ohne Umweg bedienbar; der Name st
 beim Aktualisieren schon da; eine vorhandene Zone lässt sich verschieben und in der
 Größe ändern.
 
+### M2.7 — Asset-Schritte im Sequenz-Editor
+Nachgetragen, weil beim Bauen des ersten echten Aufbaus aufgefallen: `STEP_TYPES` in
+`SetupSequenceEditor.jsx` kennt nur die sieben Kartenschritte. **Keiner der fünf
+Asset-Schritte aus M1** — `place_asset`, `draw_assets`, `set_asset_face`,
+`lock_asset`, `unlock_asset` — steht im Auswahlfeld.
+
+Der Executor kann sie, der Editor kann sie nicht ausdrücken. Dasselbe Muster wie die
+nie gebundenen Zeichen-Handler aus M2.5: Fähigkeit gebaut, Bedienung fehlt.
+
+Konkret heißt das, der zentrale Schritt des Referenzfalls — *„vier Bösewicht-Token
+verdeckt in die Leiste ziehen"* — lässt sich über die Oberfläche **gar nicht**
+anlegen. Eine Sequenz ließe sich nur als JSON schreiben, und das Ergebnis könnte
+niemand danach bearbeiten.
+
+Umfang: die fünf Schritte im Editor anlegbar und bearbeitbar machen, mit den Feldern,
+die sie brauchen — Asset bzw. Pool, Zielzone, Anzahl, verdeckt ja/nein. Pools sind
+die Kategorien der Table-Assets, Zonen kommen aus dem Setup.
+
+**Abnahme:** Der komplette Aufbau aus Abschnitt 7 lässt sich in der Oberfläche
+zusammenklicken, ohne JSON anzufassen.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.
