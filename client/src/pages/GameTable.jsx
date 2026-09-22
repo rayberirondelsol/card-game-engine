@@ -4827,7 +4827,9 @@ export default function GameTable({ room = null }) {
         {tokens.length > 0 && (
           <div
             className={`flex justify-end pointer-events-none ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}
-            style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
+            /* Der offene Kartenschrank belegt rechts 16rem. Die Legende rueckt
+               entsprechend nach links, statt sich darunter zu schieben. */
+            style={{ paddingRight: showCardDrawer ? '17rem' : 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
           >
           {/* Token Legend */}
           {showLegend && (
@@ -4945,7 +4947,7 @@ export default function GameTable({ room = null }) {
       {/* Card Drawer Panel - landscape: narrower side panel */}
       {showCardDrawer && (
         <div
-          className={`absolute right-0 z-30 pointer-events-auto safe-area-right transition-all duration-300 ease-in-out ${
+          className={`absolute right-0 z-50 pointer-events-auto safe-area-right transition-all duration-300 ease-in-out ${
             isMobileLandscape ? 'w-48' : 'sm:w-64 w-full'
           }`}
           style={{
