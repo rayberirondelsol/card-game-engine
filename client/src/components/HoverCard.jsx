@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { tableObjectView } from '../utils/tableObjectView';
 
 /**
  * HoverCard component displays an enlarged preview of a card when hovering
@@ -24,6 +25,13 @@ export default function HoverCard({
 }) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
+
+  // Spec section 6 "Verdeckt heißt überall verdeckt": the front face stays
+  // mounted for the flip animation, so its alt text and name label are readable
+  // even while rotated away. Not currently rendered by GameTable (see the
+  // "Hover-to-enlarge preview removed" comment there), gated anyway so
+  // re-wiring it does not reopen the hole.
+  const view = tableObjectView({ name: cardName, faceDown });
 
   // Base card dimensions – use actual image aspect ratio when available
   const BASE_W = 100;
@@ -112,7 +120,7 @@ export default function HoverCard({
             {imagePath ? (
               <img
                 src={imagePath}
-                alt={cardName}
+                alt={view.caption}
                 className="w-full h-full object-contain"
                 draggable={false}
               />
@@ -133,7 +141,7 @@ export default function HoverCard({
                   <path d="M21 15l-5-5L5 21" />
                 </svg>
                 <span className="text-gray-500 text-center font-medium" style={{ fontSize: `${12 * scale / 2}px` }}>
-                  {cardName}
+                  {view.name}
                 </span>
               </div>
             )}
@@ -142,7 +150,7 @@ export default function HoverCard({
               className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center py-1 px-2"
               style={{ fontSize: `${14 * scale / 2}px` }}
             >
-              {cardName}
+              {view.caption}
             </div>
           </div>
 

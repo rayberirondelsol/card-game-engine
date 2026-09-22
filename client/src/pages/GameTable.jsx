@@ -13,6 +13,7 @@ import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../utils/anchoring';
+import { tableObjectView } from '../utils/tableObjectView';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -164,7 +165,11 @@ function drawSolidBackground(ctx, width, height, color) {
 }
 
 // Token shape components
-function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
+function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUrl = null }) {
+  // `label` is painted on the token, `caption` is the tooltip / alt text.
+  // They are separate because a face-down token has no label to paint but
+  // still needs a tooltip that says so - see utils/tableObjectView.js.
+  const tip = caption || label;
   const commonClasses = "flex items-center justify-center shadow-lg border-2 border-white/60";
   const textClasses = "text-white sm:text-[10px] text-xs font-bold leading-none drop-shadow-sm";
 
@@ -174,7 +179,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className={`${commonClasses} rounded-full`}
           style={{ width: size, height: size, backgroundColor: color }}
-          title={label || 'Circle Token'}
+          title={tip || 'Circle Token'}
         >
           {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
@@ -185,7 +190,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className={`${commonClasses} rounded-sm`}
           style={{ width: size, height: size, backgroundColor: color }}
-          title={label || 'Square Token'}
+          title={tip || 'Square Token'}
         >
           {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
@@ -196,7 +201,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className="relative flex items-center justify-center"
           style={{ width: size, height: size }}
-          title={label || 'Triangle Token'}
+          title={tip || 'Triangle Token'}
         >
           <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
@@ -219,7 +224,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className="relative flex items-center justify-center"
           style={{ width: size, height: size }}
-          title={label || 'Star Token'}
+          title={tip || 'Star Token'}
         >
           <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
@@ -242,7 +247,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className="relative flex items-center justify-center"
           style={{ width: size, height: size }}
-          title={label || 'Hexagon Token'}
+          title={tip || 'Hexagon Token'}
         >
           <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
@@ -265,7 +270,7 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className="relative flex items-center justify-center"
           style={{ width: size, height: size }}
-          title={label || 'Diamond Token'}
+          title={tip || 'Diamond Token'}
         >
           <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
@@ -288,9 +293,9 @@ function TokenShape({ shape, color, size = 30, label = '', imageUrl = null }) {
         <div
           className="relative shadow-lg rounded-sm overflow-hidden"
           style={{ width: size, height: size }}
-          title={label || 'Image Token'}
+          title={tip || 'Image Token'}
         >
-          <img src={imageUrl} alt={label || 'token'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
+          <img src={imageUrl} alt={tip || 'token'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
         </div>
       );
 
@@ -3848,12 +3853,17 @@ export default function GameTable({ room = null }) {
           const isStack = stackSize > 1;
           const isDropTarget = stackDropTarget === stackId; // Highlight if this stack is a drop target
           const { w: cardW, h: cardH } = getCardDims(card);
+          // Spec section 6: a face-down card keeps its name to itself. The front
+          // face stays mounted for the flip animation, so its alt text and name
+          // label are readable in the DOM even while rotated away - and the
+          // wrapper's tooltip is plainly visible on hover.
+          const view = tableObjectView(card, 'Card');
 
           return (
             <div
               key={card.tableId}
               data-testid={`table-card-${card.tableId}`}
-              data-card-name={card.name}
+              data-card-name={view.name}
               data-card-id={card.cardId}
               data-table-card="true"
               data-rotation={card.rotation || 0}
@@ -3902,7 +3912,7 @@ export default function GameTable({ room = null }) {
                   stackId: stackId,
                 });
               }}
-              title={isStack ? (stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`) : card.name}
+              title={isStack ? (stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`) : view.caption}
             >
               {/* Stack offset visual - ghost cards behind */}
               {isStack && (
@@ -3969,7 +3979,7 @@ export default function GameTable({ room = null }) {
                     {card.image_path ? (
                       <img
                         src={card.image_path}
-                        alt={card.name}
+                        alt={view.caption}
                         className="w-full h-full object-contain"
                         draggable={false}
                       />
@@ -3981,13 +3991,13 @@ export default function GameTable({ room = null }) {
                           <path d="M21 15l-5-5L5 21" />
                         </svg>
                         <span className="sm:text-[8px] text-xs text-gray-500 text-center leading-tight truncate w-full px-1">
-                          {card.name}
+                          {view.name}
                         </span>
                       </div>
                     )}
                     {/* Card name label */}
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white sm:text-[8px] text-xs text-center py-0.5 truncate px-1">
-                      {card.name}
+                      {view.name}
                     </div>
                   </div>
 
@@ -4053,7 +4063,11 @@ export default function GameTable({ room = null }) {
       })()}
 
       {/* Board / Player Mat Widgets - rendered behind cards */}
-      {boards.map(board => (
+      {boards.map(board => {
+        // A board can be turned face down too - set_asset_face looks in
+        // state.boards as well as state.tokens (sequenceExecutor.findPlaced).
+        const view = tableObjectView(board, 'Board');
+        return (
         <div
           key={board.id}
           data-testid={`board-${board.id}`}
@@ -4073,7 +4087,7 @@ export default function GameTable({ room = null }) {
         >
           <img
             src={board.imageUrl}
-            alt={board.name || 'Board'}
+            alt={view.caption}
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             draggable={false}
           />
@@ -4086,13 +4100,14 @@ export default function GameTable({ room = null }) {
             &times;
           </button>
           {/* Board name label */}
-          {board.name && (
+          {view.name && (
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center py-0.5 truncate px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {board.name}
+              {view.name}
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {/* Floating Counter Widgets */}
       {counters.map(counter => (
@@ -4437,13 +4452,18 @@ export default function GameTable({ room = null }) {
       {tokens.map(token => {
         const tokenSize = token.size || 30;
         const halfSize = Math.floor(tokenSize / 2);
+        // Spec section 6: face down means the name is off the element too -
+        // TokenShape paints it on the token and puts it in the tooltip, and
+        // data-token-label would hand it to anyone reading the DOM.
+        const view = tableObjectView(token, 'Token');
         return (
         <div
           key={token.id}
           data-testid={`token-${token.id}`}
           data-token-shape={token.shape}
           data-token-color={token.color}
-          data-token-label={token.label || ''}
+          data-token-label={view.name}
+          data-face-down={view.hidden ? 'true' : 'false'}
           data-ui-element="true"
           className="absolute z-20 select-none group pointer-events-auto"
           style={{
@@ -4455,7 +4475,7 @@ export default function GameTable({ room = null }) {
           onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
-          <TokenShape shape={token.shape} color={token.color} size={tokenSize} label={token.label} imageUrl={token.imageUrl || null} />
+          <TokenShape shape={token.shape} color={token.color} size={tokenSize} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} />
           {/* Delete button on hover */}
           <button
             onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
@@ -4675,19 +4695,33 @@ export default function GameTable({ room = null }) {
             </button>
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {tokens.map(token => (
+            {tokens.map(token => {
+              // Spec section 6: a face-down token gets a row, but no name. The
+              // row stays because the table shows the token anyway - the count
+              // is already public, and dropping the row would only make the
+              // legend disagree with what is lying there. What goes is the one
+              // thing the face-down bar exists to hide.
+              const view = tableObjectView(token);
+              return (
               <div
                 key={token.id}
                 className="flex items-center gap-2 text-white/80 text-xs"
                 data-testid={`legend-token-${token.id}`}
+                data-face-down={view.hidden ? 'true' : 'false'}
               >
-                <TokenShape shape={token.shape} color={token.color} size={20} label={token.label} />
+                {/* token.imageUrl is whichever face is up, so it is safe as-is. */}
+                <TokenShape shape={token.shape} color={token.color} size={20} label={view.name} imageUrl={token.imageUrl || null} />
                 <span className="flex-1">
-                  {token.label && <span className="font-semibold">{token.label}: </span>}
-                  <span className="capitalize">{token.shape}</span>
+                  {view.hidden
+                    ? <span className="italic text-white/50">{view.caption}</span>
+                    : <>
+                        {view.name && <span className="font-semibold">{view.name}: </span>}
+                        <span className="capitalize">{token.shape}</span>
+                      </>}
                 </span>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
@@ -5750,7 +5784,11 @@ export default function GameTable({ room = null }) {
               </div>
               <div className="p-4 overflow-y-auto flex-1">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                  {stackCards.map((card, index) => (
+                  {stackCards.map((card, index) => {
+                    // This panel already draws the back of a face-down card -
+                    // and then printed its name right underneath it.
+                    const view = tableObjectView(card, 'Card');
+                    return (
                     <div
                       key={card.tableId}
                       data-testid={`browse-card-${card.tableId}`}
@@ -5776,7 +5814,7 @@ export default function GameTable({ room = null }) {
                             </div>
                           )
                         ) : card.image_path ? (
-                          <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
+                          <img src={card.image_path} alt={view.caption} className="w-full h-full object-contain" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-1">
@@ -5784,21 +5822,22 @@ export default function GameTable({ room = null }) {
                               <circle cx="8.5" cy="8.5" r="1.5" />
                               <path d="M21 15l-5-5L5 21" />
                             </svg>
-                            <span className="sm:text-[9px] text-xs text-gray-500 text-center px-1">{card.name}</span>
+                            <span className="sm:text-[9px] text-xs text-gray-500 text-center px-1">{view.name}</span>
                           </div>
                         )}
                         <div className="absolute top-1 left-1 bg-black/70 text-white sm:text-[9px] text-xs px-1.5 py-0.5 rounded font-mono">
                           {index + 1}
                         </div>
                       </div>
-                      <span className="text-slate-300 text-xs mt-1 truncate w-full text-center" title={card.name}>
-                        {card.name}
+                      <span
+                        className={`text-xs mt-1 truncate w-full text-center ${view.hidden ? 'text-slate-500 italic' : 'text-slate-300'}`}
+                        title={view.caption}
+                      >
+                        {view.caption}
                       </span>
-                      {card.faceDown && (
-                        <span className="text-slate-500 sm:text-[10px] text-xs">(face down)</span>
-                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <div className="px-5 py-3 border-t border-slate-700 flex justify-end">
@@ -6503,6 +6542,9 @@ export default function GameTable({ room = null }) {
       {longPressPreviewCard && (() => {
         const previewCard = tableCards.find(c => c.tableId === longPressPreviewCard);
         if (!previewCard) return null;
+        // The preview shows the back of a face-down card - and used to caption
+        // it with the name, which undoes its own branching.
+        const view = tableObjectView(previewCard, 'Card');
         return (
           <div
             className="fixed inset-0 z-[70] flex items-center justify-center"
@@ -6538,7 +6580,7 @@ export default function GameTable({ room = null }) {
                     </div>
                   )
                 ) : previewCard.image_path ? (
-                  <img src={previewCard.image_path} alt={previewCard.name} className="w-full h-full object-contain" />
+                  <img src={previewCard.image_path} alt={view.caption} className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">
@@ -6546,11 +6588,11 @@ export default function GameTable({ room = null }) {
                       <circle cx="8.5" cy="8.5" r="1.5" />
                       <path d="M21 15l-5-5L5 21" />
                     </svg>
-                    <span className="text-sm text-gray-500 text-center px-4">{previewCard.name}</span>
+                    <span className="text-sm text-gray-500 text-center px-4">{view.name}</span>
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm text-center py-1.5 px-2 truncate font-medium">
-                  {previewCard.name}
+                  {view.caption}
                 </div>
               </div>
               <div className="text-center mt-3">
@@ -6636,7 +6678,7 @@ export default function GameTable({ room = null }) {
       {altKeyHeld && hoveredTableCard && !isTouchCapableRef.current && (() => {
         const card = tableCards.find(c => c.tableId === hoveredTableCard);
         if (!card) return null;
-        // Show the front face image regardless of faceDown state for preview
+        const view = tableObjectView(card, 'Card');
         return (
           <div
             className="fixed z-[60] pointer-events-none"
@@ -6661,7 +6703,7 @@ export default function GameTable({ room = null }) {
                   </div>
                 )
               ) : card.image_path ? (
-                <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" />
+                <img src={card.image_path} alt={view.caption} className="w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
                   <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mb-2">
@@ -6669,11 +6711,11 @@ export default function GameTable({ room = null }) {
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <path d="M21 15l-5-5L5 21" />
                   </svg>
-                  <span className="text-sm text-gray-500 text-center px-4">{card.name}</span>
+                  <span className="text-sm text-gray-500 text-center px-4">{view.name}</span>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm text-center py-1.5 px-2 truncate font-medium">
-                {card.name}
+                {view.caption}
               </div>
             </div>
             <div className="text-center mt-2">
