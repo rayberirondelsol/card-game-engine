@@ -10,6 +10,7 @@ import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone, snapPoint } from '../utils/zoneGeometry';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
+import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../utils/anchoring';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
@@ -341,6 +342,9 @@ export default function GameTable({ room = null }) {
   const [editingSetupId, setEditingSetupId] = useState(null);
   const [sequenceSteps, setSequenceSteps] = useState([]);
   const [showSequenceEditor, setShowSequenceEditor] = useState(false);
+  // The game's table assets, only needed in setup mode: the sequence editor
+  // addresses them by name and draws from their categories (= pools).
+  const [tableAssets, setTableAssets] = useState([]);
   const setupLoadedRef = useRef(false);
 
   // Multiplayer state
@@ -583,6 +587,15 @@ export default function GameTable({ room = null }) {
     }
     if (id) fetchCategories();
   }, [id]);
+
+  // Fetch table assets for the sequence editor (pools = their categories)
+  useEffect(() => {
+    if (!id || !setupMode) return;
+    apiFetch(`/api/games/${id}/table-assets`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(setTableAssets)
+      .catch(() => {});
+  }, [id, setupMode]);
 
   // Fetch card backs for the game
   useEffect(() => {
@@ -6612,6 +6625,8 @@ export default function GameTable({ room = null }) {
               .map(id => stackNames[id]).filter(Boolean)
           }
           availableZoneLabels={zones.map(z => z.label).filter(Boolean)}
+          availablePools={assetPools(tableAssets)}
+          availableAssetNames={assetNames(tableAssets)}
           isOpen={showSequenceEditor}
           onToggle={() => setShowSequenceEditor(prev => !prev)}
         />
