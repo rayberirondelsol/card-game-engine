@@ -1,6 +1,6 @@
 # Spec: Variabler Spielaufbau
 
-Status: **Entwurf zur Abnahme** · Stand 2026-09-22
+Status: **Abgenommen** · Stand 2026-09-22
 
 ## 1. Ziel
 
@@ -117,9 +117,21 @@ Ohne das sind zufällige Schritte nicht testbar. Gleicher Seed → gleicher Aufb
 
 ### Verdeckte Objekte
 
-Verdeckt legen setzt eine Rückseite voraus. `table_assets` haben heute nur ein Bild;
-sie brauchen ein zweites Feld für die Rückseite. Objekte ohne Rückseite können nicht
-verdeckt gelegt werden — der Schritt scheitert dann sichtbar statt still.
+Verdeckt legen setzt eine Rückseite voraus (`table_assets.back_image_path`). Ein
+Objekt ohne Rückseite wird bei `faceDown: true` **nicht platziert**, und der Schritt
+meldet den Fehler. Es offen hinzulegen wäre schlimmer als es wegzulassen: eine leere
+Zone sieht man sofort, ein ungewollt offenes Bosstoken verrät genau die Information,
+die verborgen bleiben soll — womöglich unbemerkt.
+
+### Fehler sind sichtbar
+
+Ein übersprungener Schritt darf nicht nur in der Browser-Konsole landen. Ein Aufbau,
+bei dem drei Schritte still ausgefallen sind, ist sonst von einem korrekten nicht zu
+unterscheiden — und fällt erst mitten in der Partie auf.
+
+`executeSequence` liefert deshalb neben dem Zustand ein **Protokoll** je Schritt
+(`ok` / `skipped` / `failed` mit Begründung). Die Oberfläche zeigt nach dem Aufbau an,
+was nicht geklappt hat.
 
 ## 7. Referenzfall: Townsfolk Tussle
 
@@ -174,13 +186,36 @@ dem Freischalten eines weiteren Objekts eines mehr.
 
 **Später, nicht Teil dieser Spec:** Rastererkennung (Assistent zu M3).
 
-## 9. Offene Punkte
+## 9. Entschiedene Punkte
 
-1. **Ableitung von Setups** — kopieren oder referenzieren? Kopieren ist einfacher,
-   Referenzieren hält Korrekturen automatisch synchron.
-2. **Wie werden Objekte in Sequenzen adressiert?** Über Name, Kategorie oder ein
-   eigenes Pool-Label. Muss stabil bleiben, wenn Assets neu importiert werden.
-3. **Mehrere Spieler.** Zonen „je Spieler" (Handkarten) sind im Vokabular noch nicht
-   ausgedrückt.
-4. **Fortschritt pro Kampagne oder pro Spiel?** Wer zwei Gruppen parallel spielt,
-   braucht zwei Stände.
+**Ableitung von Setups: kopieren.** Referenzieren zieht Override-Semantik nach sich —
+was passiert, wenn im abgeleiteten Setup eine geerbte Zone verschoben wird? Ab da
+braucht es Diffing und Konfliktauflösung. Dazu ist stille Fortpflanzung gefährlich:
+ein Setup ändert sich, weil an einem anderen gearbeitet wurde. Pro Spiel gibt es eine
+Handvoll Setups, die Duplikation ist billig. Statt einer lebenden Verbindung gibt es
+die explizite Aktion **„aus Setup X neu ableiten"**.
+
+**Adressierung: `assetName` (= `table_assets.name`) und `pool` (= Kategoriename).**
+Nutzt vorhandene Strukturen, keine neue Tabelle. Schwachstelle: viele importierte
+Assets haben einen leeren Namen, und ein Neuimport kann Namen ändern. Gegenmittel:
+**Validierung beim Speichern eines Setups** — Schritte, die auf einen fehlenden,
+leeren oder mehrdeutigen Namen zeigen, werden beim Bearbeiten gemeldet, nicht erst
+beim Aufbau.
+
+**Spielerzonen: vertagt.** Bei fester Spielerzahl legt man sie von Hand an. Die
+richtige Verallgemeinerung sind nicht Spielerzonen, sondern **Setup-Parameter**
+(z. B. Spieleranzahl), auf die Schritte sich beziehen können — bei Townsfolk Tussle
+hängen daran auch die Bosswerte (Spalten 2P–5P) und die Zahl der Heldentaten. Die
+enge Variante würde später wieder herausgerissen; gebaut wird sie, sobald ein zweites
+Spiel sie braucht.
+
+**Fortschritt: pro Kampagne, mit einer implizit angelegten Standard-Kampagne.** Die
+einzige Stelle, an der bewusst Vorhalt gezahlt wird. Eine `campaign_id` plus
+Default-Zeile kostet wenig; sie später nachzurüsten hieße, jede Fortschrittsreferenz,
+den Filterschritt, die Oberfläche und vorhandene Daten anzufassen. Solange es eine
+Kampagne gibt, merkt man nichts davon.
+
+## 10. Offene Punkte
+
+- **Rastererkennung** (Assistent zu M3) — Verfahren noch offen.
+- **Setup-Parameter** als Verallgemeinerung der Spielerzahl — Vokabular noch offen.
