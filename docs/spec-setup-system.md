@@ -193,6 +193,24 @@ nicht bei jedem leeren Setup erscheint.
 **Abnahme:** Eine Zone lässt sich ohne Vorlage anlegen, direkt als Kreis oder Hex,
 und überlebt Speichern und Neuladen.
 
+### M2.6 — Bedienbarkeit des Zoneneditors
+Aus dem ersten echten Aufbau (Townsfolk Tussle, drei Zonen von Hand angelegt):
+
+- **Das Eigenschaften-Panel überdeckt den Tisch links** (fest bei x ≈ 20–300, nicht
+  verschiebbar). Zonen am linken Spielfeldrand lassen sich nicht zeichnen, solange es
+  offen ist — bei Townsfolk Tussle gehört genau dorthin die Bösewicht-Leiste.
+- **Das Panel liegt auch über dem Speichern-Dialog**; der Bestätigungsknopf ist
+  verdeckt und erst nach Schließen des Panels erreichbar.
+- **Der Update-Dialog zeigt den bestehenden Setup-Namen nicht**, sondern ein leeres
+  Feld mit Platzhalter. Wer nichts einträgt, riskiert ein namenloses Setup.
+- **Zonen lassen sich nach dem Anlegen weder verschieben noch skalieren.** Korrektur
+  geht nur über Löschen und neu zeichnen — beim ersten Aufbau sofort spürbar.
+
+**Abnahme:** Eine Zone lässt sich am linken Spielfeldrand anlegen, ohne etwas
+zuklappen zu müssen; der Speichern-Dialog ist ohne Umweg bedienbar; der Name steht
+beim Aktualisieren schon da; eine vorhandene Zone lässt sich verschieben und in der
+Größe ändern.
+
 ### M3 — Rasterebene
 Raster manuell definierbar, Objekte rasten auf Felder ein, Felder sind benennbar
 (`A1`, `S14`).
