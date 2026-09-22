@@ -72,6 +72,24 @@ Bossplätzen hat `capacity: 4`.
 **`snap`**: legt fest, ob abgelegte Objekte auf den nächsten Platz bzw. das nächste
 Rasterfeld einrasten.
 
+### Zonen am Brett verankern
+
+Heute liegen Zonen in **absoluten Tischkoordinaten**, unabhängig vom Spielbrett.
+Für Zonen, die einen **aufgedruckten Bereich** des Bretts abbilden, ist das falsch:
+bei Townsfolk Tussle sind Bösewicht-Leiste und Buyin'/Beatin' Order Bar auf dem
+Hauptbrett gedruckt, die Nachschub-Auslage auf dem Sideboard. Verschiebt oder
+skaliert jemand das Brett, wandern die Zonen nicht mit — und eine still verrutschte
+Zone merkt man erst mitten im Spiel.
+
+Das Sperren des Bretts (M1) entschärft nur den Unfall, nicht den Fall „Brett neu
+importiert, anderes Format" oder „Setup mit anderer Brettgrafik".
+
+Eine Zone bekommt deshalb optional einen **Anker**: `anchor: { assetId, relX, relY,
+relWidth, relHeight }` — Lage und Größe relativ zur Box des Assets, aufgelöst beim
+Rendern. Ohne Anker bleibt die Zone absolut wie bisher. Dasselbe gilt für Raster
+(Abschnitt 5 verlangt schon, dass ein Raster „an ein Bild oder einen Tischbereich
+gebunden" ist) — es ist derselbe Mechanismus und wird einmal gebaut, nicht zweimal.
+
 ## 5. Raster
 
 Ein Setup kann **mehrere** Raster haben, jedes an ein Bild oder einen Tischbereich
@@ -211,11 +229,18 @@ zuklappen zu müssen; der Speichern-Dialog ist ohne Umweg bedienbar; der Name st
 beim Aktualisieren schon da; eine vorhandene Zone lässt sich verschieben und in der
 Größe ändern.
 
-### M3 — Rasterebene
-Raster manuell definierbar, Objekte rasten auf Felder ein, Felder sind benennbar
+### M3 — Verankerung und Rasterebene
+Zwei Dinge, die denselben Mechanismus brauchen und deshalb zusammen gebaut werden:
+
+**Verankerung** (Abschnitt 4): Zonen und Raster können optional an ein Asset gebunden
+werden und folgen ihm dann in Lage und Größe. Ohne Anker bleibt alles absolut.
+
+**Raster**: manuell definierbar, Objekte rasten auf Felder ein, Felder sind benennbar
 (`A1`, `S14`).
 
-**Abnahme:** Eine Figur auf Feld `C7` liegt nach erneutem Laden wieder auf `C7`.
+**Abnahme:** Eine am Brett verankerte Zone sitzt nach dem Verschieben **und** nach dem
+Skalieren des Bretts weiterhin auf demselben aufgedruckten Bereich. Eine Figur auf
+Feld `C7` liegt nach erneutem Laden wieder auf `C7`.
 
 ### M4 — Fortschrittsebene
 `progress` je Spiel · Schritt `filter_by_progress` · UI zum Setzen von Status.
