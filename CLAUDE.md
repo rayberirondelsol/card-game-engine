@@ -79,8 +79,9 @@ SPA-Fallback.
 
 `docs/spec-setup-system.md` beschreibt den **variablen Spielaufbau** — Setups mit
 Zonen, Raster und einer Aufbau-Sequenz, damit ein Spiel einmal eingerichtet und
-danach reproduzierbar aufgebaut werden kann. Die Spec ist der Vertrag; M1 und M2
-sind umgesetzt, M3 (Raster) und M4 (Fortschrittsebene) stehen aus.
+danach reproduzierbar aufgebaut werden kann. Die Spec ist der Vertrag; M1, M2 und
+M2.5 (Zonen zeichnen) sind umgesetzt, M3 (Raster) und M4 (Fortschrittsebene)
+stehen aus.
 
 Wer daran arbeitet: erst die Spec lesen, dann `client/src/utils/sequenceExecutor.js`
 und `zoneGeometry.js`.

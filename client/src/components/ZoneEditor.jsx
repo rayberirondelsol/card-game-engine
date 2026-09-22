@@ -1,6 +1,7 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ZoneShape from './ZoneShape';
 import { zoneSlots } from '../utils/zoneGeometry';
+import { screenToWorld, rectFromPoints, isDrawable, createZone } from '../utils/zoneDraft';
 
 const SHAPES = [
   { value: 'rect',       label: 'Rectangle' },
@@ -73,83 +74,78 @@ function zoneSlotPreview(zone) {
 }
 
 /**
- * ZoneEditor – used in setup mode to draw and configure player zones.
+ * ZoneEditor – used in setup mode to draw and configure zones.
+ *
+ * Zones are positioned in world coordinates inside a wrapper carrying the same
+ * camera transform GameTable puts on its world wrapper, rather than each zone
+ * computing its own screen position. The editor's panels stay outside it, in
+ * screen space, where a zoomed-out table must not shrink them.
+ *
  * Props:
  *   zones: array of zone objects
  *   onZonesChange: (zones) => void
- *   camera: { x, y, zoom } – current camera transform to convert screen→world coords
+ *   camera: { x, y, zoom } – current camera transform
  *   containerRef: ref to the canvas container element
  */
-export default function ZoneEditor({ zones = [], onZonesChange, camera, containerRef }) {
+export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0, y: 0, zoom: 1 }, containerRef }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawShape, setDrawShape] = useState('rect');
+  const [armed, setArmed] = useState(false);
   const drawStart = useRef(null);
   const [drawRect, setDrawRect] = useState(null);
-  const [showPresetModal, setShowPresetModal] = useState(() => zones.length === 0);
+  const [showPresetModal, setShowPresetModal] = useState(false);
 
   const selectedZone = zones.find(z => z.id === selectedZoneId) || null;
 
-  // Convert screen coords to world coords
-  function screenToWorld(sx, sy) {
-    const rect = containerRef?.current?.getBoundingClientRect() || { left: 0, top: 0 };
-    return {
-      x: (sx - rect.left - camera.x) / camera.zoom,
-      y: (sy - rect.top - camera.y) / camera.zoom,
-    };
-  }
-
-  function handleMouseDown(e) {
-    if (e.button !== 0 || !e.altKey) return; // Alt+drag to draw zone
-    e.preventDefault();
-    const world = screenToWorld(e.clientX, e.clientY);
-    drawStart.current = world;
-    setIsDrawing(true);
-    setDrawRect({ x: world.x, y: world.y, width: 0, height: 0 });
-  }
-
-  function handleMouseMove(e) {
-    if (!isDrawing || !drawStart.current) return;
-    const world = screenToWorld(e.clientX, e.clientY);
-    setDrawRect({
-      x: Math.min(drawStart.current.x, world.x),
-      y: Math.min(drawStart.current.y, world.y),
-      width: Math.abs(world.x - drawStart.current.x),
-      height: Math.abs(world.y - drawStart.current.y),
-    });
-  }
-
-  function handleMouseUp(e) {
-    if (!isDrawing || !drawRect) return;
-    setIsDrawing(false);
-    if (drawRect.width < 50 || drawRect.height < 50) {
-      setDrawRect(null);
-      return;
+  // Escape gets out of drawing – the only way out otherwise is finishing a drag.
+  useEffect(() => {
+    if (!armed) return;
+    function onKey(e) {
+      if (e.key === 'Escape') cancelDraw();
     }
-    // Pick next available color
-    const usedColors = new Set(zones.filter(z => z.type === 'player').map(z => z.color));
-    const nextColor = PLAYER_COLORS.find(c => !usedColors.has(c.value))?.value || 'red';
-    const newZone = {
-      id: generateId(),
-      type: 'player',
-      shape: 'rect',
-      color: nextColor,
-      label: `Player ${zones.filter(z => z.type === 'player').length + 1}`,
-      x: Math.round(drawRect.x),
-      y: Math.round(drawRect.y),
-      width: Math.round(drawRect.width),
-      height: Math.round(drawRect.height),
-      cameraX: Math.round(drawRect.x),
-      cameraY: Math.round(drawRect.y),
-      cameraZoom: 1.0,
-      exclusive: true,
-      startingHandCardIds: [],
-      dealStackId: null,
-      dealCount: 0,
-    };
-    onZonesChange([...zones, newZone]);
-    setSelectedZoneId(newZone.id);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [armed]);
+
+  function toWorld(e) {
+    return screenToWorld(
+      { x: e.clientX, y: e.clientY },
+      camera,
+      containerRef?.current?.getBoundingClientRect() || null,
+    );
+  }
+
+  function cancelDraw() {
+    setArmed(false);
     setDrawRect(null);
     drawStart.current = null;
+  }
+
+  function handleDrawMouseDown(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    drawStart.current = toWorld(e);
+    setDrawRect({ ...drawStart.current, width: 0, height: 0 });
+  }
+
+  function handleDrawMouseMove(e) {
+    if (!drawStart.current) return;
+    e.stopPropagation();
+    setDrawRect(rectFromPoints(drawStart.current, toWorld(e)));
+  }
+
+  function handleDrawMouseUp(e) {
+    if (!drawStart.current) return;
+    e.stopPropagation();
+    const rect = rectFromPoints(drawStart.current, toWorld(e));
+    drawStart.current = null;
+    setDrawRect(null);
+    if (!isDrawable(rect)) return; // a click or a twitch, not a zone
+    const zone = createZone(rect, { shape: drawShape, zones });
+    onZonesChange([...zones, zone]);
+    setSelectedZoneId(zone.id);
+    setArmed(false);
   }
 
   function updateZone(id, updates) {
@@ -180,24 +176,93 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
     setShowPresetModal(false);
   }
 
+  const worldTransform = {
+    transformOrigin: '50% 50%',
+    transform: `scale(${camera.zoom}) translate(${camera.x}px, ${camera.y}px)`,
+  };
+
   return (
     <div>
-      {/* Transparent draw overlay attached via onMouseDown/Move/Up in parent */}
-      {drawRect && (
+      {/* World space: zones and the drag preview, in table coordinates. */}
+      <div className="absolute inset-0 pointer-events-none z-30" style={worldTransform}>
+        {drawRect && (
+          <div
+            data-testid="zone-draw-preview"
+            className="absolute pointer-events-none"
+            style={{ left: drawRect.x, top: drawRect.y, width: drawRect.width, height: drawRect.height }}
+          >
+            <ZoneShape shape={drawShape} width={drawRect.width} height={drawRect.height} hex="#ffffff" fill="1A" dashed />
+          </div>
+        )}
+
+        {zones.map(zone => {
+          const colorObj = PLAYER_COLORS.find(c => c.value === zone.color);
+          const hex = colorObj?.hex || '#94a3b8';
+          const isSelected = zone.id === selectedZoneId;
+          return (
+            <div
+              key={zone.id}
+              data-testid={`zone-${zone.id}`}
+              className={`absolute ${armed ? '' : 'cursor-pointer pointer-events-auto'}`}
+              style={{
+                left: zone.x,
+                top: zone.y,
+                width: zone.width,
+                height: zone.height,
+                boxSizing: 'border-box',
+              }}
+              onClick={() => setSelectedZoneId(isSelected ? null : zone.id)}
+            >
+              <ZoneShape
+                shape={zone.shape}
+                width={zone.width}
+                height={zone.height}
+                hex={hex}
+                fill={isSelected ? '30' : '18'}
+                dashed={!isSelected}
+              />
+              {(zone.snap ? zoneSlotPreview(zone) : []).map((s, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full pointer-events-none"
+                  style={{
+                    left: s.x - zone.x - 3,
+                    top: s.y - zone.y - 3,
+                    width: 6,
+                    height: 6,
+                    backgroundColor: hex,
+                  }}
+                />
+              ))}
+              <div
+                className="absolute top-1 left-2 font-semibold px-1 py-0.5 rounded"
+                style={{ backgroundColor: `${hex}CC`, color: '#fff', fontSize: '10px' }}
+              >
+                {zone.label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Screen space: the surface that catches the drag while drawing is armed. */}
+      {armed && (
         <div
-          className="absolute pointer-events-none border-2 border-dashed border-white/60 bg-white/10 rounded"
-          style={{
-            left: drawRect.x * camera.zoom + camera.x,
-            top: drawRect.y * camera.zoom + camera.y,
-            width: drawRect.width * camera.zoom,
-            height: drawRect.height * camera.zoom,
-          }}
+          data-testid="zone-draw-surface"
+          data-ui-element
+          className="absolute inset-0 z-40"
+          style={{ cursor: 'crosshair' }}
+          onMouseDown={handleDrawMouseDown}
+          onMouseMove={handleDrawMouseMove}
+          onMouseUp={handleDrawMouseUp}
+          onMouseLeave={handleDrawMouseUp}
+          onContextMenu={e => { e.preventDefault(); cancelDraw(); }}
         />
       )}
 
       {/* Zone property panel */}
       {selectedZone && (
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 w-64 bg-slate-900/95 border border-slate-700 rounded-xl p-4 z-50 space-y-3">
+        <div data-ui-element className="absolute left-4 top-1/2 -translate-y-1/2 w-64 bg-slate-900/95 border border-slate-700 rounded-xl p-4 z-50 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Zone Properties</h3>
             <button onClick={() => setSelectedZoneId(null)} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
@@ -345,23 +410,24 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
         </div>
       )}
 
-      {/* Layout preset picker modal – shown on first entry or via "Change Layout" */}
+      {/* Player layout presets – one way to start, never the only one. */}
       {showPresetModal && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div data-ui-element className="absolute inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 w-80 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-white font-semibold text-sm">Choose Player Layout</h3>
-              {zones.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowPresetModal(false)}
-                  className="text-slate-400 hover:text-white text-lg leading-none"
-                >
-                  &times;
-                </button>
-              )}
+              <h3 className="text-white font-semibold text-sm">Player Layouts</h3>
+              <button
+                type="button"
+                onClick={() => setShowPresetModal(false)}
+                className="text-slate-400 hover:text-white text-lg leading-none"
+              >
+                &times;
+              </button>
             </div>
-            <p className="text-slate-400 text-xs">Select a preset to place player zones on the table. You can adjust them afterwards.</p>
+            <p className="text-slate-400 text-xs">
+              A shortcut for the common case: player zones, evenly placed, ready to adjust.
+              {zones.length > 0 && <span className="text-amber-400"> Replaces the {zones.length} zone{zones.length === 1 ? '' : 's'} you have now.</span>}
+            </p>
             <div className="flex flex-col gap-2">
               {Object.entries(PRESET_LAYOUTS).map(([key, preset]) => (
                 <button
@@ -378,71 +444,50 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
                 onClick={() => setShowPresetModal(false)}
                 className="w-full px-4 py-2 text-xs text-slate-400 hover:text-white transition-colors"
               >
-                Skip – I'll draw zones manually
+                Cancel
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Zone overlays for editing */}
-      {zones.map(zone => {
-        const colorObj = PLAYER_COLORS.find(c => c.value === zone.color);
-        const hex = colorObj?.hex || '#94a3b8';
-        const isSelected = zone.id === selectedZoneId;
-        return (
-          <div
-            key={zone.id}
-            className="absolute cursor-pointer"
-            style={{
-              left: zone.x * camera.zoom + camera.x,
-              top: zone.y * camera.zoom + camera.y,
-              width: zone.width * camera.zoom,
-              height: zone.height * camera.zoom,
-              boxSizing: 'border-box',
-            }}
-            onClick={() => setSelectedZoneId(isSelected ? null : zone.id)}
-          >
-            <ZoneShape
-              shape={zone.shape}
-              width={zone.width * camera.zoom}
-              height={zone.height * camera.zoom}
-              hex={hex}
-              fill={isSelected ? '30' : '18'}
-              dashed={!isSelected}
-            />
-            {(zone.snap ? zoneSlotPreview(zone) : []).map((s, i) => (
-              <div
-                key={i}
-                className="absolute rounded-full pointer-events-none"
-                style={{
-                  left: (s.x - zone.x) * camera.zoom - 3,
-                  top: (s.y - zone.y) * camera.zoom - 3,
-                  width: 6,
-                  height: 6,
-                  backgroundColor: hex,
-                }}
-              />
-            ))}
-            <div
-              className="absolute top-1 left-2 text-xs font-semibold px-1 py-0.5 rounded"
-              style={{ backgroundColor: `${hex}CC`, color: '#fff', fontSize: '10px' }}
-            >
-              {zone.label}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Instructions hint + change layout */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/40 px-3 py-1.5 rounded-full">
-        <span className="text-xs text-white/50 pointer-events-none">Alt + drag to draw a zone · Click zone to edit</span>
+      {/* Toolbar: drawing a zone is a button with a shape, not a shortcut to guess. */}
+      <div
+        data-ui-element
+        data-testid="zone-toolbar"
+        className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded-full shadow-lg"
+      >
+        <select
+          value={drawShape}
+          onChange={e => setDrawShape(e.target.value)}
+          title="Shape of the next zone"
+          className="px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white"
+        >
+          {SHAPES.map(sh => <option key={sh.value} value={sh.value}>{sh.label}</option>)}
+        </select>
+        <button
+          type="button"
+          data-testid="zone-add-button"
+          onClick={() => (armed ? cancelDraw() : setArmed(true))}
+          className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+            armed ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+          }`}
+        >
+          {armed ? 'Cancel' : '+ Add Zone'}
+        </button>
+        <span className="text-xs text-white/60">
+          {armed
+            ? 'Drag on the table to size it · Esc to cancel'
+            : zones.length === 0
+              ? 'No zones yet'
+              : 'Click a zone to edit it'}
+        </span>
         <button
           type="button"
           onClick={() => setShowPresetModal(true)}
           className="text-xs text-slate-300 hover:text-white underline underline-offset-2 transition-colors"
         >
-          Change Layout
+          Player layouts
         </button>
       </div>
     </div>
