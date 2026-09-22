@@ -1,4 +1,5 @@
 import React from 'react';
+import ZoneShape from './ZoneShape';
 
 const COLOR_HEX = {
   red:    '#ef4444',
@@ -26,17 +27,16 @@ export default function ZoneOverlay({ zones = [], myColor = null }) {
         return (
           <div
             key={zone.id}
-            className="absolute pointer-events-none rounded"
+            className="absolute pointer-events-none"
             style={{
               left: zone.x,
               top: zone.y,
               width: zone.width,
               height: zone.height,
-              border: `2px solid ${hex}`,
-              backgroundColor: `${hex}${isMyZone ? '18' : '0C'}`,
               boxSizing: 'border-box',
             }}
           >
+            <ZoneShape shape={zone.shape} width={zone.width} height={zone.height} hex={hex} fill={isMyZone ? '18' : '0C'} />
             <div
               className="absolute top-1 left-2 text-xs font-semibold px-1.5 py-0.5 rounded"
               style={{

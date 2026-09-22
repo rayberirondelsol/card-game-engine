@@ -1,4 +1,25 @@
 import React, { useState, useRef, useCallback } from 'react';
+import ZoneShape from './ZoneShape';
+import { zoneSlots } from '../utils/zoneGeometry';
+
+const SHAPES = [
+  { value: 'rect',       label: 'Rectangle' },
+  { value: 'circle',     label: 'Circle' },
+  { value: 'hex-pointy', label: 'Hex (pointy top)' },
+  { value: 'hex-flat',   label: 'Hex (flat top)' },
+];
+
+const LAYOUTS = [
+  { value: '',       label: 'Default (spread)' },
+  { value: 'row',    label: 'Row' },
+  { value: 'column', label: 'Column' },
+  { value: 'grid',   label: 'Grid' },
+  { value: 'stack',  label: 'Stack' },
+  { value: 'free',   label: 'Free' },
+];
+
+const KINDS = ['card', 'asset', 'die'];
+
 
 const PLAYER_COLORS = [
   { value: 'red',    hex: '#ef4444', label: 'Red' },
@@ -44,6 +65,11 @@ const PRESET_LAYOUTS = {
 
 function generateId() {
   return Math.random().toString(36).slice(2, 11);
+}
+
+/** The places a snapping zone offers, so the author sees what he configured. */
+function zoneSlotPreview(zone) {
+  return zoneSlots(zone) || [];
 }
 
 /**
@@ -105,6 +131,7 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
     const newZone = {
       id: generateId(),
       type: 'player',
+      shape: 'rect',
       color: nextColor,
       label: `Player ${zones.filter(z => z.type === 'player').length + 1}`,
       x: Math.round(drawRect.x),
@@ -215,6 +242,76 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
               </div>
             </div>
           )}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Shape</label>
+            <select
+              value={selectedZone.shape || 'rect'}
+              onChange={e => updateZone(selectedZone.id, { shape: e.target.value })}
+              className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+            >
+              {SHAPES.map(sh => <option key={sh.value} value={sh.value}>{sh.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Accepts (none checked = everything)</label>
+            <div className="flex gap-3">
+              {KINDS.map(kind => {
+                const list = Array.isArray(selectedZone.accepts) ? selectedZone.accepts : [];
+                const on = list.includes(kind);
+                return (
+                  <label key={kind} className="flex items-center gap-1 text-xs text-gray-300 capitalize">
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => updateZone(selectedZone.id, {
+                        accepts: on ? list.filter(k => k !== kind) : [...list, kind],
+                      })}
+                    />
+                    {kind}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Capacity (empty = unlimited)</label>
+            <input
+              type="number"
+              min="1"
+              value={selectedZone.capacity ?? ''}
+              onChange={e => updateZone(selectedZone.id, {
+                capacity: e.target.value === '' ? null : Math.max(1, Number(e.target.value)),
+              })}
+              className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Layout</label>
+            <select
+              value={selectedZone.layout || ''}
+              onChange={e => updateZone(selectedZone.id, { layout: e.target.value || null })}
+              className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+            >
+              {LAYOUTS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+            </select>
+            {['row', 'column', 'grid'].includes(selectedZone.layout) && !selectedZone.capacity && (
+              <p className="text-[10px] text-amber-400 mt-1">Set a capacity to get fixed places.</p>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-gray-400">Snap to places</label>
+            <button
+              type="button"
+              onClick={() => updateZone(selectedZone.id, { snap: !selectedZone.snap })}
+              className="relative inline-flex h-5 w-9 rounded-full transition-colors"
+              style={{ backgroundColor: selectedZone.snap ? '#22c55e' : '#475569' }}
+            >
+              <span
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
+                style={{ transform: `translateX(${selectedZone.snap ? '18px' : '2px'})` }}
+              />
+            </button>
+          </div>
           <div className="flex items-center justify-between">
             <label className="text-xs text-gray-400">Exclusive (only owner may act)</label>
             <button
@@ -296,18 +393,37 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera, containe
         return (
           <div
             key={zone.id}
-            className="absolute rounded cursor-pointer"
+            className="absolute cursor-pointer"
             style={{
               left: zone.x * camera.zoom + camera.x,
               top: zone.y * camera.zoom + camera.y,
               width: zone.width * camera.zoom,
               height: zone.height * camera.zoom,
-              border: `2px ${isSelected ? 'solid' : 'dashed'} ${hex}`,
-              backgroundColor: `${hex}${isSelected ? '30' : '18'}`,
               boxSizing: 'border-box',
             }}
             onClick={() => setSelectedZoneId(isSelected ? null : zone.id)}
           >
+            <ZoneShape
+              shape={zone.shape}
+              width={zone.width * camera.zoom}
+              height={zone.height * camera.zoom}
+              hex={hex}
+              fill={isSelected ? '30' : '18'}
+              dashed={!isSelected}
+            />
+            {(zone.snap ? zoneSlotPreview(zone) : []).map((s, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  left: (s.x - zone.x) * camera.zoom - 3,
+                  top: (s.y - zone.y) * camera.zoom - 3,
+                  width: 6,
+                  height: 6,
+                  backgroundColor: hex,
+                }}
+              />
+            ))}
             <div
               className="absolute top-1 left-2 text-xs font-semibold px-1 py-0.5 rounded"
               style={{ backgroundColor: `${hex}CC`, color: '#fff', fontSize: '10px' }}

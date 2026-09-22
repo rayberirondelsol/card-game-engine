@@ -8,6 +8,7 @@ import PlayerHUD from '../components/PlayerHUD';
 import PlayerCursors from '../components/PlayerCursor';
 import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
+import { zoneAt, zoneContains, zoneRejects, countInZone, snapPoint } from '../utils/zoneGeometry';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
@@ -1161,6 +1162,9 @@ export default function GameTable({ room = null }) {
     cardDragOffsetRef.current = {
       x: worldPointer.x - card.x,
       y: worldPointer.y - card.y,
+      // where it came from - a zone that refuses the drop puts it back here
+      originX: card.x,
+      originY: card.y,
     };
     setDraggingCard(tableId);
 
@@ -1404,6 +1408,33 @@ export default function GameTable({ room = null }) {
       return;
     }
 
+    // A zone may refuse the drop (wrong kind of object, or full) or snap it
+    // onto one of its places. Same rules and the same wording as in the setup
+    // sequence, shown in the same hint block - a drag that silently does
+    // nothing is indistinguishable from one that worked.
+    const dropZone = zoneAt(zones, card.x, card.y);
+    let zoneSnap = null;
+    if (dropZone) {
+      const mine = new Set(card.inStack
+        ? tableCards.filter(c => c.inStack === card.inStack).map(c => c.tableId)
+        : [draggingCard]);
+      const others = tableCards.filter(c => !mine.has(c.tableId));
+      const refusal = zoneRejects(dropZone, 'card', countInZone(dropZone, others, tokens));
+      if (refusal) {
+        const { originX, originY } = cardDragOffsetRef.current;
+        const dx = (originX ?? card.x) - card.x;
+        const dy = (originY ?? card.y) - card.y;
+        setTableCards(prev => prev.map(c => (mine.has(c.tableId) ? { ...c, x: c.x + dx, y: c.y + dy } : c)));
+        setSetupIssues([{ index: 0, type: 'drop', target: dropZone.label || null, status: 'skipped', reason: refusal }]);
+        setDraggingCard(null);
+        setGridHighlight(null);
+        setStackDropTarget(null);
+        return;
+      }
+      const taken = [...others, ...tokens].filter(o => zoneContains(dropZone, o.x, o.y));
+      zoneSnap = snapPoint(dropZone, card.x, card.y, taken);
+    }
+
     // Check if card/stack is being dropped on another stack
     const STACK_DROP_THRESHOLD = 80; // Distance in pixels to trigger stack merge
     let targetStack = null;
@@ -1505,8 +1536,9 @@ export default function GameTable({ room = null }) {
 
     // No stack merge - always snap to grid on release
     const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
-    const finalX = snapToGrid(card.x);
-    const finalY = snapToGrid(card.y);
+    // A snapping zone owns the position inside it; outside, the table grid does.
+    const finalX = zoneSnap ? zoneSnap.x : snapToGrid(card.x);
+    const finalY = zoneSnap ? zoneSnap.y : snapToGrid(card.y);
     const snapDx = finalX - card.x;
     const snapDy = finalY - card.y;
 
@@ -5788,7 +5820,7 @@ export default function GameTable({ room = null }) {
             </svg>
             <div className="text-sm">
               <div className="font-medium mb-1">
-                {setupIssues.length} setup step{setupIssues.length > 1 ? 's' : ''} did not work
+                {setupIssues.length} action{setupIssues.length > 1 ? 's' : ''} did not work
               </div>
               <ul className="space-y-0.5 text-white/90">
                 {setupIssues.map(e => (

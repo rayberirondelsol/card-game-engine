@@ -20,6 +20,8 @@
  * @param {object}        [options]   – { assets: table_assets rows, rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
+import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone } from './zoneGeometry.js';
+
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
 }
@@ -121,26 +123,68 @@ function findPlaced(state, asset, name) {
 }
 
 /**
- * Centre of the i-th of n slots inside a zone, spread along the zone's longer
- * axis so several drawn assets don't end up on the same spot. n = 1 → centre.
+ * Centre of the i-th of n slots inside a zone. A zone with a layout and a
+ * capacity has fixed places and hands out place i; one without keeps the old
+ * spread along the longer axis, so zones saved before M2 land where they
+ * always did. n = 1 → centre.
  */
-function zoneSlot(zone, i = 0, n = 1) {
-  const w = zone.width || 100;
-  const h = zone.height || 140;
-  const frac = (i + 0.5) / n;
-  return h >= w
-    ? { x: zone.x + w / 2, y: zone.y + h * frac }
-    : { x: zone.x + w * frac, y: zone.y + h / 2 };
+const zoneSlot = zoneSlotFor;
+
+/** How many objects already sit in the zone – the number capacity is measured against. */
+function occupancy(state, zone) {
+  return countInZone(zone, state.cards, state.tokens);
 }
 
-/** Target position of a step: an explicit x/y, or the centre of a named zone. */
-function resolvePosition(step, zones) {
-  if (step.targetZoneLabel) {
-    const zone = zones.find(z => norm(z.label) === norm(step.targetZoneLabel));
-    return zone ? zoneSlot(zone) : null;
+/** The zone a step names, or null. */
+function findZone(zones, label) {
+  return zones.find(z => norm(z.label) === norm(label)) || null;
+}
+
+/**
+ * Split candidate zones into the ones that take one more object of `kind` and
+ * the reasons the others do not. `free` is how many more each usable zone
+ * holds, `occupied` how many sit there already (= the next free place).
+ */
+function zoneRoom(state, targetZones, kind) {
+  const usable = [], problems = [];
+  const free = new Map(), occupied = new Map();
+  for (const zone of targetZones) {
+    const taken = occupancy(state, zone);
+    const refusal = zoneRejects(zone, kind, taken);
+    if (refusal) { problems.push(refusal); continue; }
+    const cap = zoneCapacity(zone);
+    usable.push(zone);
+    occupied.set(zone, taken);
+    free.set(zone, cap === null ? Infinity : cap - taken);
   }
-  if (typeof step.x === 'number' && typeof step.y === 'number') return { x: step.x, y: step.y };
-  return null;
+  return { usable, free, occupied, problems };
+}
+
+/** Deal items round robin over the usable zones, stopping at each zone's free count. */
+function shareOut(items, usable, free) {
+  const groups = new Map(usable.map(z => [z, []]));
+  const leftovers = [];
+  let cursor = 0;
+  for (const item of items) {
+    let placed = false;
+    for (let t = 0; t < usable.length; t++) {
+      const zone = usable[(cursor + t) % usable.length];
+      if (free.get(zone) > 0) {
+        groups.get(zone).push(item);
+        free.set(zone, free.get(zone) - 1);
+        cursor = (cursor + t + 1) % usable.length;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) leftovers.push(item);
+  }
+  return { groups, leftovers };
+}
+
+/** "zone X is full (4)" for every zone that ran out of room during this step. */
+function fullZones(usable, free, kind) {
+  return usable.filter(z => free.get(z) <= 0).map(z => zoneRejects(z, kind, Infinity)).filter(Boolean);
 }
 
 /**
@@ -279,40 +323,55 @@ function applyStep(state, step, zones, assets, rng, entry) {
       }
       if (!targetZones.length) return skip(`zone "${targetZoneLabel ?? '(any)'}" not found`);
 
+      // A zone that does not take cards, or that is already full, is not dealt
+      // into at all - the cards stay in the stack where they can still be used.
+      const { usable, free, occupied, problems } = zoneRoom(state, targetZones, 'card');
+      if (!usable.length) return skip(problems.join('; '));
+
       const sorted = [...stack.cards].sort((a, b) => b.zIndex - a.zIndex); // top first
-      let cardsToDeal = count > 0 ? sorted.slice(0, count) : sorted;
-      const dealtIds = new Set(cardsToDeal.map(c => c.tableId));
+      const wanted = count > 0 ? sorted.slice(0, count) : sorted;
+      const { groups, leftovers } = shareOut(wanted, usable, free);
+
+      const dealt = [];
+      for (const [zone, group] of groups) {
+        const slots = zoneSlots(zone);
+        const start = occupied.get(zone);
+        group.forEach((card, i) => {
+          // Fixed places seat the card on the next free one; a zone without
+          // them keeps the old behaviour and drops every card on its centre.
+          const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneCenter(zone);
+          state.cards.push({
+            tableId: card.tableId || crypto.randomUUID(),
+            cardId: card.cardId,
+            name: card.name,
+            image_path: card.image_path,
+            card_back_id: card.card_back_id || null,
+            x: pos.x,
+            y: pos.y,
+            zIndex: card.zIndex,
+            faceDown,
+            rotation: card.rotation || 0,
+            face_up: !faceDown,
+          });
+          dealt.push(card);
+        });
+      }
 
       // Remove dealt cards from stack
+      const dealtIds = new Set(dealt.map(c => c.tableId));
       stack.cards = stack.cards.filter(c => !dealtIds.has(c.tableId));
       if (stack.cards.length === 0) {
         state.stacks = state.stacks.filter(s => s !== stack);
       }
 
-      // Distribute cards to zones
-      cardsToDeal.forEach((card, i) => {
-        const zone = targetZones[i % targetZones.length];
-        const x = zone.x + (zone.width || 100) / 2;
-        const y = zone.y + (zone.height || 140) / 2;
-        state.cards.push({
-          tableId: card.tableId || crypto.randomUUID(),
-          cardId: card.cardId,
-          name: card.name,
-          image_path: card.image_path,
-          card_back_id: card.card_back_id || null,
-          x,
-          y,
-          zIndex: card.zIndex,
-          faceDown,
-          rotation: card.rotation || 0,
-          face_up: !faceDown,
-        });
-      });
-
-      if (count > 0 && cardsToDeal.length < count) {
-        return fail(`stack "${stackLabel}" held only ${cardsToDeal.length} of ${count} requested cards`);
+      const notes = [...problems];
+      if (leftovers.length) {
+        notes.push(`${leftovers.length} of ${wanted.length} cards stayed in the stack: ${fullZones(usable, free, 'card').join('; ')}`);
       }
-      return state;
+      if (count > 0 && dealt.length + leftovers.length < count) {
+        notes.push(`stack "${stackLabel}" held only ${wanted.length} of ${count} requested cards`);
+      }
+      return notes.length ? fail(notes.join('; ')) : state;
     }
 
     case 'place_asset': {
@@ -320,10 +379,25 @@ function applyStep(state, step, zones, assets, rng, entry) {
       if (!asset) return skip(`asset "${step.assetName}" not found`);
 
       const existing = findPlaced(state, asset, step.assetName);
-      const target = resolvePosition(step, zones);
-      const noPos = step.targetZoneLabel
-        ? `zone "${step.targetZoneLabel}" not found`
-        : `no position given for "${step.assetName}"`;
+      let target = null;
+      let noPos = `no position given for "${step.assetName}"`;
+
+      if (step.targetZoneLabel) {
+        const zone = findZone(zones, step.targetZoneLabel);
+        if (!zone) {
+          noPos = `zone "${step.targetZoneLabel}" not found`;
+        } else {
+          // Moving the object within its own zone must not count it twice.
+          const here = existing && zoneContains(zone, existing.x, existing.y) ? 1 : 0;
+          const taken = occupancy(state, zone) - here;
+          const refusal = zoneRejects(zone, 'asset', taken);
+          if (refusal) return skip(refusal);
+          const slots = zoneSlots(zone);
+          target = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(zone);
+        }
+      } else if (typeof step.x === 'number' && typeof step.y === 'number') {
+        target = { x: step.x, y: step.y };
+      }
 
       if (existing) {
         if (existing.locked) return skip(`"${step.assetName}" is locked, not moving it`);
@@ -350,6 +424,11 @@ function applyStep(state, step, zones, assets, rng, entry) {
         : zones;
       if (!targetZones.length) return skip(`zone "${targetZoneLabel ?? '(any)'}" not found`);
 
+      // Same rule as for cards: a zone that refuses tokens, or is full, is not
+      // drawn into. Nothing leaves the pool, so a corrected setup draws again.
+      const { usable, free, occupied, problems } = zoneRoom(state, targetZones, 'asset');
+      if (!usable.length) return skip(problems.join('; '));
+
       const wanted = Math.max(1, Number(count) || 1);
       const n = Math.min(wanted, candidates.length);
 
@@ -366,22 +445,23 @@ function applyStep(state, step, zones, assets, rng, entry) {
       const placeable = faceDown ? drawn.filter(a => a.back_image_path) : drawn;
 
       // Group per target zone first, then spread each group inside its zone.
-      const perZone = new Map();
-      placeable.forEach((asset, i) => {
-        const zone = targetZones[i % targetZones.length];
-        if (!perZone.has(zone)) perZone.set(zone, []);
-        perZone.get(zone).push(asset);
-      });
+      const { groups: perZone, leftovers } = shareOut(placeable, usable, free);
 
       for (const [zone, group] of perZone) {
+        const slots = zoneSlots(zone);
+        const start = occupied.get(zone);
         group.forEach((asset, i) => {
-          const { x, y } = zoneSlot(zone, i, group.length);
+          const { x, y } = slots
+            ? slots[Math.min(start + i, slots.length - 1)]
+            : zoneSlot(zone, i, group.length);
           state.tokens.push(assetToken(asset, x, y, faceDown));
         });
       }
 
-      const problems = [];
       if (n < wanted) problems.push(`pool "${pool}" holds only ${n} of ${wanted} requested assets`);
+      if (leftovers.length) {
+        problems.push(`${leftovers.length} of ${placeable.length} assets not placed: ${fullZones(usable, free, 'asset').join('; ')}`);
+      }
       if (refused.length) {
         problems.push(`no back side, not placed face down: ${refused.map(a => a.name).join(', ')}`);
       }
