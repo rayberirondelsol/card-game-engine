@@ -99,6 +99,7 @@ export function setupWebSocketServer(httpServer) {
       board_state: room.boardState,
       players: Array.from(room.players.values()),
       zones: room.zones,
+      grids: room.grids,
       room_code: roomCode,
       game_id: room.gameId,
     };

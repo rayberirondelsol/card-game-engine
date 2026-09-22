@@ -8,7 +8,10 @@ import PlayerHUD from '../components/PlayerHUD';
 import PlayerCursors from '../components/PlayerCursor';
 import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
-import { zoneAt, zoneContains, zoneRejects, countInZone, snapPoint } from '../utils/zoneGeometry';
+import GridOverlay from '../components/GridOverlay';
+import GridEditor from '../components/GridEditor';
+import { zoneAt, zoneContains, zoneRejects, countInZone } from '../utils/zoneGeometry';
+import { resolveGrids, snapInto, placeOnGrids } from '../utils/gridGeometry';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
@@ -362,6 +365,7 @@ export default function GameTable({ room = null }) {
 
   // Multiplayer state
   const [zones, setZones] = useState([]);
+  const [grids, setGrids] = useState([]);
   const applyingRemoteRef = useRef(false);
   const roomRef = useRef(null);
 
@@ -420,6 +424,9 @@ export default function GameTable({ room = null }) {
   // builds, because it runs before any of this exists.
   const anchors = useMemo(() => anchorBoxes(boards, tokens), [boards, tokens]);
   const tableZones = useMemo(() => resolveZones(zones, anchors), [zones, anchors]);
+  // Grids (M3b) go the same way and through the same resolution: `grids` is
+  // what was saved, `tableGrids` is where the fields are right now.
+  const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -1448,7 +1455,7 @@ export default function GameTable({ room = null }) {
     // sequence, shown in the same hint block - a drag that silently does
     // nothing is indistinguishable from one that worked.
     const dropZone = zoneAt(tableZones, card.x, card.y);
-    let zoneSnap = null;
+    let hit = null;
     if (dropZone) {
       const mine = new Set(card.inStack
         ? tableCards.filter(c => c.inStack === card.inStack).map(c => c.tableId)
@@ -1467,8 +1474,10 @@ export default function GameTable({ room = null }) {
         return;
       }
       const taken = [...others, ...tokens].filter(o => zoneContains(dropZone, o.x, o.y));
-      zoneSnap = snapPoint(dropZone, card.x, card.y, taken);
+      hit = snapInto(card.x, card.y, { zone: dropZone, grids: tableGrids, taken });
     }
+    // Outside any zone a grid still claims the drop (M3b).
+    if (!hit) hit = snapInto(card.x, card.y, { grids: tableGrids });
 
     // Check if card/stack is being dropped on another stack
     const STACK_DROP_THRESHOLD = 80; // Distance in pixels to trigger stack merge
@@ -1516,10 +1525,10 @@ export default function GameTable({ room = null }) {
         const newZ = maxZIndex + 1;
         setTableCards(prev => prev.map(c => {
           if (c.tableId === targetSingleCard.tableId) {
-            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ };
+            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ, gridId: null, cell: null };
           }
           if (c.tableId === draggingCard) {
-            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ + 1 };
+            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ + 1, gridId: null, cell: null };
           }
           return c;
         }));
@@ -1549,6 +1558,8 @@ export default function GameTable({ room = null }) {
               x: targetPosition.x,
               y: targetPosition.y,
               zIndex: maxTargetZ + idx + 1,
+              gridId: null,
+              cell: null,
             };
           }
           return c;
@@ -1558,7 +1569,7 @@ export default function GameTable({ room = null }) {
         // Adding single card to stack - place it on top
         setTableCards(prev => prev.map(c =>
           c.tableId === draggingCard
-            ? { ...c, inStack: targetStack, x: targetPosition.x, y: targetPosition.y, zIndex: maxTargetZ + 1 }
+            ? { ...c, inStack: targetStack, x: targetPosition.x, y: targetPosition.y, zIndex: maxTargetZ + 1, gridId: null, cell: null }
             : c
         ));
         setMaxZIndex(Math.max(maxZIndex, maxTargetZ + 1));
@@ -1571,9 +1582,10 @@ export default function GameTable({ room = null }) {
 
     // No stack merge - always snap to grid on release
     const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
-    // A snapping zone owns the position inside it; outside, the table grid does.
-    const finalX = zoneSnap ? zoneSnap.x : snapToGrid(card.x);
-    const finalY = zoneSnap ? zoneSnap.y : snapToGrid(card.y);
+    // A zone's places or a grid field own the position; where neither claims
+    // the drop, the table's own 80px lattice does, exactly as before.
+    const finalX = hit.snapped ? hit.x : snapToGrid(card.x);
+    const finalY = hit.snapped ? hit.y : snapToGrid(card.y);
     const snapDx = finalX - card.x;
     const snapDy = finalY - card.y;
 
@@ -1583,7 +1595,8 @@ export default function GameTable({ room = null }) {
         const isSelected = selectedCards.has(c.tableId);
         const isInSelectedStack = c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
         if (isSelected || isInSelectedStack) {
-          return { ...c, x: c.x + snapDx, y: c.y + snapDy };
+          // Moved as part of a selection, not dropped on a field of its own.
+          return { ...c, x: c.x + snapDx, y: c.y + snapDy, gridId: null, cell: null };
         }
         return c;
       }));
@@ -1598,7 +1611,10 @@ export default function GameTable({ room = null }) {
     } else {
       setTableCards(prev => prev.map(c => {
         if (c.tableId !== draggingCard) return c;
-        return { ...c, x: finalX, y: finalY };
+        // The field, not the coordinates, is what makes a card come back to the
+        // same place after the board moved. A card in a multi-selection or in a
+        // stack keeps no field: it moved as part of something else.
+        return { ...c, x: finalX, y: finalY, gridId: hit.gridId, cell: hit.cell };
       }));
       if (room) room.sendAction({ type: 'card_move', table_id: draggingCard, x: finalX, y: finalY });
     }
@@ -1939,11 +1955,31 @@ export default function GameTable({ room = null }) {
     if (draggingObj && draggingObj.type === 'token') {
       const token = tokens.find(t => t.id === draggingObj.id);
       if (token) {
+        // Attaching to a card is the most specific thing a token can do – it
+        // was dropped on a particular card – so it beats both a zone's places
+        // and a grid field, and clears any field the token used to hold.
         const snap = findNearestCardCorner(token.x, token.y);
         if (snap) {
           setTokens(prev => prev.map(t =>
-            t.id === draggingObj.id ? { ...t, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner } : t
+            t.id === draggingObj.id
+              ? { ...t, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner, gridId: null, cell: null }
+              : t
           ));
+        } else {
+          const dropZone = zoneAt(tableZones, token.x, token.y);
+          const taken = dropZone
+            ? [...tableCards, ...tokens.filter(t => t.id !== token.id)].filter(o => zoneContains(dropZone, o.x, o.y))
+            : [];
+          const hit = snapInto(token.x, token.y, { zone: dropZone, grids: tableGrids, taken });
+          if (hit.snapped) {
+            setTokens(prev => prev.map(t =>
+              t.id === draggingObj.id ? { ...t, x: hit.x, y: hit.y, gridId: hit.gridId, cell: hit.cell } : t
+            ));
+          } else if (token.gridId || token.cell) {
+            // Dragged off the grid: the field it names is no longer where it
+            // is, and a stale field would teleport it on the next load.
+            setTokens(prev => prev.map(t => (t.id === draggingObj.id ? { ...t, gridId: null, cell: null } : t)));
+          }
         }
       }
     }
@@ -2677,6 +2713,8 @@ export default function GameTable({ room = null }) {
         faceDown: c.faceDown,
         rotation: c.rotation || 0,
         face_up: !c.faceDown,
+        gridId: c.gridId || null,
+        cell: c.cell || null,
       })),
       stacks,
       hand: handCards.map(c => ({
@@ -2742,6 +2780,10 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        // The grid field this object sits on (M3b), if any. Coordinates alone
+        // stop meaning "C7" as soon as the board they belong to has moved.
+        gridId: t.gridId || null,
+        cell: t.cell || null,
         // set by the setup sequence's asset steps (place_asset / draw_assets)
         assetId: t.assetId || null,
         faceDown: t.faceDown || false,
@@ -2912,6 +2954,7 @@ export default function GameTable({ room = null }) {
               setCustomDiceOnTable(msg.board_state.customDice.map(d => ({ ...d, rolling: false })));
           }
           if (msg.zones) setZones(msg.zones);
+          if (msg.grids) setGrids(msg.grids);
           break;
         default:
           // Unknown or cursor/player messages handled by useGameRoom hook
@@ -2935,6 +2978,13 @@ export default function GameTable({ room = null }) {
       setZones(room.zones);
     }
   }, [room?.zones]);
+
+  // Same for the grids, so a room table snaps like a hotseat one.
+  useEffect(() => {
+    if (room?.grids && room.grids.length > 0) {
+      setGrids(room.grids);
+    }
+  }, [room?.grids]);
 
   // Save the game state to the backend
   async function saveGameState(name) {
@@ -3055,14 +3105,14 @@ export default function GameTable({ room = null }) {
         res = await apiFetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids }),
         });
       } else {
         // Create new setup
         res = await apiFetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids }),
         });
       }
       if (!res.ok) {
@@ -3090,7 +3140,7 @@ export default function GameTable({ room = null }) {
   }
 
   // Load a game state from serialized data
-  function loadGameState(stateData) {
+  function loadGameState(stateData, gridsForPlacement = null) {
     // Parse state_data if it's a string
     let state = stateData;
     if (typeof state === 'string') {
@@ -3137,6 +3187,8 @@ export default function GameTable({ room = null }) {
           faceDown: c.faceDown !== undefined ? c.faceDown : !c.face_up,
           rotation: c.rotation || 0,
           inStack: null,
+          gridId: c.gridId || null,
+          cell: c.cell || null,
         });
         if (c.zIndex > restoredMaxZ) restoredMaxZ = c.zIndex;
       });
@@ -3189,6 +3241,8 @@ export default function GameTable({ room = null }) {
     }
 
     // Migrate old markers to tokens (backward compatibility)
+    let allTokens = [];
+    let restoredBoards = [];
     const migratedTokens = [];
     if (state.markers && Array.isArray(state.markers)) {
       state.markers.forEach(m => {
@@ -3296,21 +3350,25 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        gridId: t.gridId || null,
+        cell: t.cell || null,
         assetId: t.assetId || null,
         faceDown: t.faceDown || false,
         frontImageUrl: t.frontImageUrl || null,
         backImageUrl: t.backImageUrl || null,
       }));
       // Merge migrated markers with existing tokens
-      setTokens([...restoredTokens, ...migratedTokens]);
+      allTokens = [...restoredTokens, ...migratedTokens];
+      setTokens(allTokens);
     } else {
       // Only migrated markers
+      allTokens = migratedTokens;
       setTokens(migratedTokens);
     }
 
     // Restore boards
     if (state.boards && Array.isArray(state.boards)) {
-      setBoards(state.boards.map(b => ({
+      restoredBoards = state.boards.map(b => ({
         id: b.id || crypto.randomUUID(),
         imageUrl: b.imageUrl,
         name: b.name || '',
@@ -3319,9 +3377,25 @@ export default function GameTable({ room = null }) {
         width: b.width || 200,
         height: b.height || 200,
         locked: b.locked || false,
-      })));
+      }));
+      setBoards(restoredBoards);
     } else {
       setBoards([]);
+    }
+
+    // M3b: anything that remembers a grid field goes back onto that field,
+    // against the grids as they resolve on the table just restored. This is
+    // what makes a figure on C7 be on C7 again and not merely at the
+    // coordinates C7 happened to have when it was put down - the board may
+    // have been moved or re-imported at another size in between.
+    //
+    // The grids are passed in where the caller has just read them from a setup
+    // (`grids` state would still be empty at that point); otherwise they are
+    // the ones already on the table.
+    const gridsNow = resolveGrids(gridsForPlacement || grids, anchorBoxes(restoredBoards, allTokens));
+    if (gridsNow.length) {
+      setTokens(prev => placeOnGrids(prev, gridsNow));
+      setTableCards(prev => placeOnGrids(prev, gridsNow));
     }
 
     // Restore text fields
@@ -3407,6 +3481,11 @@ export default function GameTable({ room = null }) {
             try { parsedZones = JSON.parse(setup.zone_data); } catch {}
           }
           setZones(parsedZones);
+          let parsedGrids = [];
+          if (setup.grid_data) {
+            try { parsedGrids = JSON.parse(setup.grid_data); } catch {}
+          }
+          setGrids(parsedGrids);
 
           // Execute setup sequence for new games (not savegame loads)
           let parsedSeq = [];
@@ -3427,7 +3506,9 @@ export default function GameTable({ room = null }) {
               console.error('Sequence execution failed:', err);
             }
           }
-          loadGameState(stateToLoad);
+          // The grids go along explicitly: `grids` is only set on the next
+          // render, and the objects have to be placed now.
+          loadGameState(stateToLoad, parsedGrids);
           setSaveToast(`Loaded setup: "${setup.name}"`);
           setTimeout(() => setSaveToast(null), 4000);
         } catch (err) {
@@ -3451,7 +3532,12 @@ export default function GameTable({ room = null }) {
           }
           const setup = await res.json();
           setSetupName(setup.name);
-          loadGameState(setup.state_data);
+          let editGrids = [];
+          if (setup.grid_data) {
+            try { editGrids = JSON.parse(setup.grid_data); } catch {}
+          }
+          setGrids(editGrids);
+          loadGameState(setup.state_data, editGrids);
           if (setup.zone_data) {
             try { setZones(JSON.parse(setup.zone_data)); } catch {}
           }
@@ -6653,7 +6739,31 @@ export default function GameTable({ room = null }) {
         </>
       )}
 
-      {/* Zone editor overlays in setup mode */}
+      {/* A grid is line art over a board that usually has one printed on it,
+          so while playing only the grids that explicitly ask for it are drawn.
+          In setup mode GridEditor draws them all, with their field names.
+          Snapping never depends on this. */}
+      {!setupMode && tableGrids.some(g => g.showInPlay) && (
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={{
+            transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+            transformOrigin: '50% 50%',
+          }}
+        >
+          <GridOverlay grids={tableGrids.filter(g => g.showInPlay)} />
+        </div>
+      )}
+
+      {/* Zone and grid editor overlays in setup mode */}
+      {setupMode && (
+        <GridEditor
+          grids={tableGrids}
+          anchors={anchors}
+          onGridsChange={setGrids}
+          camera={cameraRef.current}
+        />
+      )}
       {setupMode && (
         <ZoneEditor
           zones={tableZones}

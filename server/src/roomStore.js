@@ -27,6 +27,7 @@ export function createRoom({ roomCode, gameId, hostPlayerId, setupId = null }) {
       customDice: [],
     },
     zones: [],
+    grids: [],
     lastSnapshot: new Date(),
   };
   rooms.set(roomCode, room);

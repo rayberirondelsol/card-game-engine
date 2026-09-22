@@ -23,7 +23,7 @@ export async function setupsRoutes(fastify) {
   fastify.post('/api/games/:id/setups', async (request, reply) => {
     const db = getDb();
     const { id } = request.params;
-    const { name, state_data, zone_data, sequence_data } = request.body || {};
+    const { name, state_data, zone_data, sequence_data, grid_data } = request.body || {};
 
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
     if (!game) {
@@ -42,10 +42,13 @@ export async function setupsRoutes(fastify) {
     const seqJson = sequence_data !== undefined
       ? (typeof sequence_data === 'string' ? sequence_data : JSON.stringify(sequence_data))
       : '[]';
+    const gridJson = grid_data !== undefined
+      ? (typeof grid_data === 'string' ? grid_data : JSON.stringify(grid_data))
+      : '[]';
 
     db.prepare(
-      'INSERT INTO setups (id, game_id, name, state_data, zone_data, sequence_data) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(setupId, id, name.trim(), stateJson, zoneJson, seqJson);
+      'INSERT INTO setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(setupId, id, name.trim(), stateJson, zoneJson, seqJson, gridJson);
     console.log('[SQL] INSERT INTO setups', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);
@@ -72,7 +75,7 @@ export async function setupsRoutes(fastify) {
   fastify.put('/api/games/:id/setups/:setupId', async (request, reply) => {
     const db = getDb();
     const { id, setupId } = request.params;
-    const { name, state_data, zone_data, sequence_data } = request.body || {};
+    const { name, state_data, zone_data, sequence_data, grid_data } = request.body || {};
 
     const existing = db.prepare(
       'SELECT * FROM setups WHERE id = ? AND game_id = ?'
@@ -90,6 +93,9 @@ export async function setupsRoutes(fastify) {
     const seqJson = sequence_data !== undefined
       ? (typeof sequence_data === 'string' ? sequence_data : JSON.stringify(sequence_data))
       : null;
+    const gridJson = grid_data !== undefined
+      ? (typeof grid_data === 'string' ? grid_data : JSON.stringify(grid_data))
+      : null;
 
     db.prepare(
       `UPDATE setups SET
@@ -97,9 +103,10 @@ export async function setupsRoutes(fastify) {
         state_data = COALESCE(?, state_data),
         zone_data = COALESCE(?, zone_data),
         sequence_data = COALESCE(?, sequence_data),
+        grid_data = COALESCE(?, grid_data),
         updated_at = datetime('now')
       WHERE id = ?`
-    ).run(name || null, stateJson, zoneJson, seqJson, setupId);
+    ).run(name || null, stateJson, zoneJson, seqJson, gridJson, setupId);
     console.log('[SQL] UPDATE setups WHERE id = ?', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);

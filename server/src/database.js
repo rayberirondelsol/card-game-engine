@@ -210,6 +210,12 @@ export async function setupDatabase() {
     db.exec("ALTER TABLE setups ADD COLUMN sequence_data TEXT DEFAULT '[]'");
     console.log('[DB] Migration: added sequence_data column to setups');
   }
+  // M3b: the grids of a setup. Own column rather than a field inside zone_data,
+  // because a grid is not a zone and a setup has both independently.
+  if (!setupColumns.includes('grid_data')) {
+    db.exec("ALTER TABLE setups ADD COLUMN grid_data TEXT DEFAULT '[]'");
+    console.log('[DB] Migration: added grid_data column to setups');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');

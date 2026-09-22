@@ -221,6 +221,7 @@ export async function roomsRoutes(fastify) {
 
       // Load setup if configured
       let zones = [];
+      let grids = [];
       if (room.setup_id) {
         const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(room.setup_id);
         if (setup) {
@@ -232,7 +233,13 @@ export async function roomsRoutes(fastify) {
           try {
             zones = JSON.parse(setup.zone_data || '[]');
           } catch {}
+          // M3b: without the grids a room table would snap differently from a
+          // hotseat one on the same setup.
+          try {
+            grids = JSON.parse(setup.grid_data || '[]');
+          } catch {}
           liveRoom.zones = zones;
+          liveRoom.grids = grids;
         }
       }
 
@@ -243,6 +250,7 @@ export async function roomsRoutes(fastify) {
         type: 'room_started',
         board_state: liveRoom.boardState,
         zones: liveRoom.zones,
+        grids: liveRoom.grids,
       });
     }
 
