@@ -13,9 +13,15 @@ export async function gamesRoutes(fastify) {
   // GET /api/games - List all games
   fastify.get('/api/games', async (request, reply) => {
     const db = getDb();
-    const stmt = db.prepare('SELECT * FROM games ORDER BY updated_at DESC');
-    const games = stmt.all();
-    console.log('[SQL] SELECT * FROM games ORDER BY updated_at DESC');
+    // card_count is derived here rather than stored on games, so it can never
+    // drift from the cards table. COUNT over the LEFT JOIN yields 0, not null,
+    // for a game without cards.
+    const sql = `SELECT g.*, COUNT(c.id) AS card_count
+       FROM games g LEFT JOIN cards c ON c.game_id = g.id
+       GROUP BY g.id
+       ORDER BY g.updated_at DESC`;
+    const games = db.prepare(sql).all();
+    console.log('[SQL]', sql.replace(/\s+/g, ' '));
     return games;
   });
 
