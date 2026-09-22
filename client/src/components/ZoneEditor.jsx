@@ -5,6 +5,7 @@ import {
   screenToWorld, rectFromPoints, isDrawable, createZone,
   panelSide, moveZone, resizeZone, RESIZE_HANDLES, handleAnchor,
 } from '../utils/zoneDraft';
+import { setAnchor } from '../utils/anchoring';
 
 const SHAPES = [
   { value: 'rect',       label: 'Rectangle' },
@@ -96,8 +97,13 @@ function zoneSlotPreview(zone) {
  *   onZonesChange: (zones) => void
  *   camera: { x, y, zoom } – current camera transform
  *   containerRef: ref to the canvas container element
+ *   anchors: the boxes of the assets on the table a zone can be bound to
+ *
+ * The zones handed in are already resolved (GameTable does that once); the
+ * editor works on plain absolute boxes like before and only has to keep the
+ * relative box in step when one is corrected by hand.
  */
-export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0, y: 0, zoom: 1 }, containerRef }) {
+export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, camera = { x: 0, y: 0, zoom: 1 }, containerRef }) {
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [drawShape, setDrawShape] = useState('rect');
   const [armed, setArmed] = useState(false);
@@ -203,7 +209,22 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
   }
 
   function updateZone(id, updates) {
-    onZonesChange(zones.map(z => z.id === id ? { ...z, ...updates } : z));
+    onZonesChange(zones.map(z => {
+      if (z.id !== id) return z;
+      const next = { ...z, ...updates };
+      // Moving or resizing an anchored zone means "it belongs here on the
+      // board", so the correction becomes the new relative box. Without this
+      // the zone would snap back on the next render, which looks like the drag
+      // was simply ignored.
+      const anchor = next.anchor && anchors.find(a => a.id === next.anchor.assetId);
+      return anchor ? setAnchor(next, anchor) : next;
+    }));
+  }
+
+  /** Bind the zone to an asset (keeping it where it is), or cut it loose. */
+  function bindZone(zone, assetId) {
+    const anchor = anchors.find(a => a.id === assetId) || null;
+    onZonesChange(zones.map(z => (z.id === zone.id ? setAnchor(z, anchor) : z)));
   }
 
   function deleteZone(id) {
@@ -424,6 +445,38 @@ export default function ZoneEditor({ zones = [], onZonesChange, camera = { x: 0,
             >
               {SHAPES.map(sh => <option key={sh.value} value={sh.value}>{sh.label}</option>)}
             </select>
+          </div>
+          {/* Anchoring (M3a): a zone that maps a printed area of a board follows
+              it instead of standing in table coordinates. Only assets that are
+              on the table can be chosen - an anchor to something absent is the
+              situation this is meant to prevent, not to create. */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Anchored to</label>
+            <select
+              data-testid="zone-anchor-select"
+              value={selectedZone.anchor?.assetId || ''}
+              onChange={e => bindZone(selectedZone, e.target.value)}
+              className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+            >
+              <option value="">Table (absolute)</option>
+              {anchors.map(a => (
+                <option key={a.id} value={a.id}>{a.label || 'Unnamed asset'}</option>
+              ))}
+              {selectedZone.anchorMissing && (
+                <option value={selectedZone.anchor.assetId}>(missing asset)</option>
+              )}
+            </select>
+            {selectedZone.anchorMissing ? (
+              <p className="text-[10px] text-amber-400 mt-1">
+                Its asset is not on the table. The zone stays where it last sat until the asset is back.
+              </p>
+            ) : (
+              <p className="text-[10px] text-gray-500 mt-1">
+                {selectedZone.anchor
+                  ? 'Follows the asset when it is moved or scaled.'
+                  : 'Anchoring keeps the zone where it is now.'}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">Accepts (none checked = everything)</label>

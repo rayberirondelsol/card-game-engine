@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
 import SwipeModal from '../components/SwipeModal';
@@ -11,6 +11,7 @@ import ZoneEditor from '../components/ZoneEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone, snapPoint } from '../utils/zoneGeometry';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
+import { resolveZones, anchorBoxes } from '../utils/anchoring';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -393,6 +394,15 @@ export default function GameTable({ room = null }) {
   const [boards, setBoards] = useState([]);
   const [textFields, setTextFields] = useState([]);
   const [customDiceOnTable, setCustomDiceOnTable] = useState([]);
+
+  // The one place zones are resolved for the table (spec M3a). `zones` keeps
+  // what was saved - the anchor plus the last absolute box; everything that
+  // draws or hit-tests a zone gets `tableZones` and never sees an anchor, so
+  // the overlay, the editor and the drop test cannot end up disagreeing about
+  // where a zone is. The executor resolves the same way against the state it
+  // builds, because it runs before any of this exists.
+  const anchors = useMemo(() => anchorBoxes(boards, tokens), [boards, tokens]);
+  const tableZones = useMemo(() => resolveZones(zones, anchors), [zones, anchors]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -1412,7 +1422,7 @@ export default function GameTable({ room = null }) {
     // onto one of its places. Same rules and the same wording as in the setup
     // sequence, shown in the same hint block - a drag that silently does
     // nothing is indistinguishable from one that worked.
-    const dropZone = zoneAt(zones, card.x, card.y);
+    const dropZone = zoneAt(tableZones, card.x, card.y);
     let zoneSnap = null;
     if (dropZone) {
       const mine = new Set(card.inStack
@@ -6575,7 +6585,7 @@ export default function GameTable({ room = null }) {
                 transformOrigin: '50% 50%',
               }}
             >
-              <ZoneOverlay zones={zones} myColor={room.myColor} />
+              <ZoneOverlay zones={tableZones} myColor={room.myColor} />
             </div>
           )}
         </>
@@ -6584,7 +6594,8 @@ export default function GameTable({ room = null }) {
       {/* Zone editor overlays in setup mode */}
       {setupMode && (
         <ZoneEditor
-          zones={zones}
+          zones={tableZones}
+          anchors={anchors}
           onZonesChange={setZones}
           camera={cameraRef.current}
           containerRef={containerRef}

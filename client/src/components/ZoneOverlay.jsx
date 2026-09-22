@@ -40,12 +40,17 @@ export default function ZoneOverlay({ zones = [], myColor = null }) {
             <div
               className="absolute top-1 left-2 text-xs font-semibold px-1.5 py-0.5 rounded"
               style={{
-                backgroundColor: `${hex}CC`,
+                backgroundColor: zone.anchorMissing ? '#b45309CC' : `${hex}CC`,
                 color: '#fff',
                 fontSize: '11px',
               }}
+              /* An anchored zone whose asset is missing sits at its last known
+                 place. Saying so on the badge is the whole point: a zone that
+                 quietly stopped covering what it names is noticed mid-game. */
+              title={zone.anchorMissing ? 'Anchor asset is not on the table – last known position' : undefined}
             >
               {zone.label || (zone.type === 'shared' ? 'Shared' : zone.color)}
+              {zone.anchorMissing ? ' ⚠' : ''}
             </div>
           </div>
         );

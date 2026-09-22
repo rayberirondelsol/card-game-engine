@@ -21,6 +21,7 @@
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone } from './zoneGeometry.js';
+import { resolveZones, anchorBoxes } from './anchoring.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -219,11 +220,19 @@ function assetToken(asset, x, y, faceDown) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, zones, assets, rng, entry) {
+function applyStep(state, step, allZones, assets, rng, entry) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
   if (!state.boards) state.boards = [];
+
+  // Anchored zones are resolved against the table as this step finds it, not
+  // as the sequence started: step 1 lays the board out, step 2 fills a zone
+  // printed on it. Resolving once up front would use the board's old position
+  // - and a zone that is off by the width of a board is not subtle, but it is
+  // also not visible in the protocol. A zone whose anchor is not on the table
+  // keeps its saved absolute box (see anchoring.js).
+  const zones = resolveZones(allZones, anchorBoxes(state.boards, state.tokens));
 
   /** Nothing happened – a precondition was missing. */
   const skip = (reason) => { entry.status = 'skipped'; entry.reason = reason; return state; };

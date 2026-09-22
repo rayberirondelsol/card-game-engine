@@ -98,12 +98,23 @@ export function zoneRejects(zone, kind, occupied = 0) {
   return null;
 }
 
-/** How many of `objects` (anything with x/y) currently sit in the zone. */
+/**
+ * How many of `objects` (anything with x/y) currently sit in the zone.
+ *
+ * The object a zone is anchored to is not one of them: a zone printed on the
+ * board is not a place where the board lies. Counting it would make a boss bar
+ * with four places hold three as soon as the board's centre happens to fall
+ * inside it – and the step protocol would blame a full zone.
+ */
 export function countInZone(zone, ...lists) {
+  const anchorId = zone?.anchor?.assetId || null;
   let n = 0;
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
-    for (const o of list) if (zoneContains(zone, o?.x, o?.y)) n++;
+    for (const o of list) {
+      if (anchorId && (o?.assetId || o?.id) === anchorId) continue;
+      if (zoneContains(zone, o?.x, o?.y)) n++;
+    }
   }
   return n;
 }
