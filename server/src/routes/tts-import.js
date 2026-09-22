@@ -134,6 +134,23 @@ function downloadImage(url) {
 }
 
 /**
+ * Rückseite eines Assets laden und ablegen. Schlägt der Download fehl, wird das
+ * Asset ohne Rückseite importiert (null) statt den ganzen Import zu kippen.
+ */
+async function downloadBackImage(secondaryUrl, gameUploadsDir, gameId) {
+  if (!secondaryUrl) return null;
+  try {
+    const buffer = await downloadImage(secondaryUrl);
+    const filename = `${uuidv4()}.png`;
+    await sharp(buffer).rotate().png().toFile(path.join(gameUploadsDir, filename));
+    return `/uploads/${gameId}/${filename}`;
+  } catch (err) {
+    console.warn(`[TTS Import] Failed to download back image ${secondaryUrl}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Parse a TTS JSON save file and extract non-card image assets
  * (Custom_Token, Custom_Tile, Figurine_Custom, Custom_Board)
  */
@@ -147,6 +164,10 @@ function extractNonCardAssetsFromTTS(ttsData) {
 
     const name = obj.Name || '';
     const imageUrl = obj.CustomImage?.ImageURL || obj.CustomToken?.ImageURL || null;
+    // TTS legt die Rückseite einer Kachel/Figur in ImageSecondaryURL ab.
+    // Identische URL heißt „keine eigene Rückseite" — dann nichts doppelt ablegen.
+    const secondary = obj.CustomImage?.ImageSecondaryURL || null;
+    const imageSecondaryUrl = secondary && secondary !== imageUrl ? secondary : null;
     const ttsX = obj.Transform?.posX || 0;
     const ttsZ = obj.Transform?.posZ || 0;
     const scaleX = obj.Transform?.scaleX || 1;
@@ -155,15 +176,15 @@ function extractNonCardAssetsFromTTS(ttsData) {
 
     if (name === 'Custom_Token' || name === 'Custom_Tile') {
       if (imageUrl) {
-        tokens.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'token' });
+        tokens.push({ imageUrl, imageSecondaryUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'token' });
       }
     } else if (name === 'Figurine_Custom') {
       if (imageUrl) {
-        tokens.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'figurine' });
+        tokens.push({ imageUrl, imageSecondaryUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'figurine' });
       }
     } else if (name === 'Custom_Board') {
       if (imageUrl) {
-        boards.push({ imageUrl, nickname, ttsX, ttsZ, scaleX, scaleZ });
+        boards.push({ imageUrl, imageSecondaryUrl, nickname, ttsX, ttsZ, scaleX, scaleZ });
       }
     } else if (name === 'Custom_Die' || name === 'Custom_Dice') {
       // Extract face images from States (one image per die face)
@@ -881,7 +902,7 @@ export async function ttsImportRoutes(fastify) {
       const WORLD_CENTER_Y = 450;
 
       const insertAssetStmt = db.prepare(
-        'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height, back_image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
       );
 
       const tokensToImport = selectedTokenIndices != null && Array.isArray(selectedTokenIndices)
@@ -923,7 +944,8 @@ export async function ttsImportRoutes(fastify) {
           const size = Math.round(Math.max(asset.scaleX, asset.scaleZ) * 60);
           const clampedSize = Math.max(size, 30);
           const assetId = uuidv4();
-          insertAssetStmt.run(assetId, id, 'token', asset.nickname || '', relPath, asset.imageUrl, clampedSize, clampedSize);
+          const backPath = await downloadBackImage(asset.imageSecondaryUrl, gameUploadsDir, id);
+          insertAssetStmt.run(assetId, id, 'token', asset.nickname || '', relPath, asset.imageUrl, clampedSize, clampedSize, backPath);
           importedTokens.push({
             id: assetId,
             shape: 'image',
@@ -980,7 +1002,8 @@ export async function ttsImportRoutes(fastify) {
           const boardWidth = Math.round((metadata.width || 400) * Math.min(1, 600 / (metadata.width || 400)));
           const boardHeight = Math.round((metadata.height || 300) * Math.min(1, 600 / (metadata.width || 400)));
           const assetId = uuidv4();
-          insertAssetStmt.run(assetId, id, 'board', asset.nickname || 'Board', relPath, asset.imageUrl, boardWidth, boardHeight);
+          const backPath = await downloadBackImage(asset.imageSecondaryUrl, gameUploadsDir, id);
+          insertAssetStmt.run(assetId, id, 'board', asset.nickname || 'Board', relPath, asset.imageUrl, boardWidth, boardHeight, backPath);
           importedBoards.push({
             id: assetId,
             imageUrl: relPath,

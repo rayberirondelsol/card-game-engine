@@ -195,6 +195,31 @@ erreichbar.
 ergibt denselben Aufbau, anderer Seed einen anderen; ein gesperrtes Objekt lässt sich
 nicht verschieben.
 
+### M1b — Die Rückseiten der Kacheln gehen beim Import verloren
+Beim Bau des Townsfolk-Tussle-Aufbaus aufgefallen: `extractNonCardAssetsFromTTS`
+in `server/src/routes/tts-import.js` liest ausschließlich `CustomImage.ImageURL`.
+`ImageSecondaryURL` — in Tabletop Simulator die **Rückseite** einer Kachel — wird
+nie angefasst, obwohl `table_assets.back_image_path` existiert und der Client die
+Seite umschalten kann (`set_asset_face`).
+
+Im Mod `2999560617` tragen **43 von 83 `Custom_Tile`** eine eigene Rückseite.
+Betroffen sind genau die Teile, die der Aufbau braucht:
+
+- **Das Sideboard** (751×2501). Importiert ist die Seite *Fight Phase*; die Seite
+  *Town Phase* fehlt. Das Regelwerk legt es in Schritt 1 aber **mit der Town-Phase-
+  Seite nach oben** aus.
+- **Die acht Bösewicht-Tableaus** (je 1500×3000). Importiert ist je eine Seite; die
+  Szenarioseite mit der Rasterkarte, den R/T-Feldern und den SETUP-Schritten fehlt —
+  also genau das, was „Kampf beginnen" auslegen müsste.
+
+Die acht Bösewicht-**Token** haben ihre Rückseite nur deshalb, weil sie nachträglich
+von Hand eingetragen wurde. Das ist keine Lösung, sondern der Beleg für die Lücke.
+
+**Abnahme:** Ein Import legt zu jeder Kachel mit abweichender `ImageSecondaryURL`
+auch deren Bild ab und trägt es als `back_image_path` ein; Kacheln ohne zweite Seite
+(oder mit identischer) behalten `back_image_path = NULL`. Für das bestehende Spiel
+werden die fehlenden Rückseiten nachgetragen, ohne die Assets neu anzulegen.
+
 ### M2 — Zonen mit Form und Einrasten
 Zonen bekommen `shape`, `accepts`, `capacity`, `layout`, `snap`. Editor unterstützt
 Rechteck, Kreis, Hex.
