@@ -17,6 +17,7 @@ import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../utils/anchoring';
 import { tableObjectView } from '../utils/tableObjectView';
+import { assetToken } from '../utils/assetToken.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -176,7 +177,11 @@ function drawSolidBackground(ctx, width, height, color) {
 }
 
 // Token shape components
-function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUrl = null }) {
+function TokenShape({ shape, color, size = 30, width = null, height = null, label = '', caption = '', imageUrl = null }) {
+  // M3c: Bild-Token tragen `width`/`height` (Seitenverhältnis des Bildes).
+  // Alte Spielstände und die geometrischen Formen haben nur `size`.
+  const w = width || size;
+  const h = height || size;
   // `label` is painted on the token, `caption` is the tooltip / alt text.
   // They are separate because a face-down token has no label to paint but
   // still needs a tooltip that says so - see utils/tableObjectView.js.
@@ -189,7 +194,7 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className={`${commonClasses} rounded-full`}
-          style={{ width: size, height: size, backgroundColor: color }}
+          style={{ width: w, height: h, backgroundColor: color }}
           title={tip || 'Circle Token'}
         >
           {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
@@ -200,7 +205,7 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className={`${commonClasses} rounded-sm`}
-          style={{ width: size, height: size, backgroundColor: color }}
+          style={{ width: w, height: h, backgroundColor: color }}
           title={tip || 'Square Token'}
         >
           {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
@@ -211,10 +216,10 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className="relative flex items-center justify-center"
-          style={{ width: size, height: size }}
+          style={{ width: w, height: h }}
           title={tip || 'Triangle Token'}
         >
-          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+          <svg width={w} height={h} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
               points="50,10 90,90 10,90"
               fill={color}
@@ -234,10 +239,10 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className="relative flex items-center justify-center"
-          style={{ width: size, height: size }}
+          style={{ width: w, height: h }}
           title={tip || 'Star Token'}
         >
-          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+          <svg width={w} height={h} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
               points="50,5 61,38 95,38 68,58 79,91 50,71 21,91 32,58 5,38 39,38"
               fill={color}
@@ -257,10 +262,10 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className="relative flex items-center justify-center"
-          style={{ width: size, height: size }}
+          style={{ width: w, height: h }}
           title={tip || 'Hexagon Token'}
         >
-          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+          <svg width={w} height={h} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
               points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5"
               fill={color}
@@ -280,10 +285,10 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className="relative flex items-center justify-center"
-          style={{ width: size, height: size }}
+          style={{ width: w, height: h }}
           title={tip || 'Diamond Token'}
         >
-          <svg width={size} height={size} viewBox="0 0 100 100" className="drop-shadow-lg">
+          <svg width={w} height={h} viewBox="0 0 100 100" className="drop-shadow-lg">
             <polygon
               points="50,10 90,50 50,90 10,50"
               fill={color}
@@ -303,7 +308,7 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className="relative shadow-lg rounded-sm overflow-hidden"
-          style={{ width: size, height: size }}
+          style={{ width: w, height: h }}
           title={tip || 'Image Token'}
         >
           <img src={imageUrl} alt={tip || 'token'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
@@ -314,7 +319,7 @@ function TokenShape({ shape, color, size = 30, label = '', caption = '', imageUr
       return (
         <div
           className={`${commonClasses} rounded-full`}
-          style={{ width: size, height: size, backgroundColor: color }}
+          style={{ width: w, height: h, backgroundColor: color }}
         >
           {label && <span className={textClasses}>{label.substring(0, 3)}</span>}
         </div>
@@ -2775,6 +2780,8 @@ export default function GameTable({ room = null }) {
         label: t.label || '',
         imageUrl: t.imageUrl || null,
         size: t.size || null,
+        width: t.width || null,
+        height: t.height || null,
         x: t.x,
         y: t.y,
         attachedTo: t.attachedTo || null,
@@ -3345,6 +3352,8 @@ export default function GameTable({ room = null }) {
         label: t.label || '',
         imageUrl: t.imageUrl || null,
         size: t.size || null,
+        width: t.width || null,
+        height: t.height || null,
         x: t.x,
         y: t.y,
         attachedTo: t.attachedTo || null,
@@ -4542,8 +4551,9 @@ export default function GameTable({ room = null }) {
 
       {/* Floating Token Widgets */}
       {tokens.map(token => {
-        const tokenSize = token.size || 30;
-        const halfSize = Math.floor(tokenSize / 2);
+        // M3c: Bild-Token haben ein Seitenverhältnis, alte nur `size`.
+        const tokenW = token.width || token.size || 30;
+        const tokenH = token.height || token.size || 30;
         // Spec section 6: face down means the name is off the element too -
         // TokenShape paints it on the token and puts it in the tooltip, and
         // data-token-label would hand it to anyone reading the DOM.
@@ -4559,15 +4569,15 @@ export default function GameTable({ room = null }) {
           data-ui-element="true"
           className="absolute z-20 select-none group pointer-events-auto"
           style={{
-            left: token.x - halfSize,
-            top: token.y - halfSize,
+            left: token.x - Math.floor(tokenW / 2),
+            top: token.y - Math.floor(tokenH / 2),
             cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
-          <TokenShape shape={token.shape} color={token.color} size={tokenSize} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} />
+          <TokenShape shape={token.shape} color={token.color} size={tokenW} width={tokenW} height={tokenH} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} />
           {/* Delete button on hover */}
           <button
             onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
@@ -5523,20 +5533,16 @@ export default function GameTable({ room = null }) {
                     key={token.id}
                     onClick={() => {
                       const canvas = canvasRef.current;
-                      const size = token.width || 60;
-                      const newToken = {
-                        id: crypto.randomUUID(),
-                        shape: 'image',
-                        imageUrl: token.image_path,
-                        label: token.name || '',
-                        size,
-                        x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-                        y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
-                        color: null,
-                        attachedTo: null,
-                        attachedCorner: null,
-                        locked: false,
-                      };
+                      // M3c: dieselbe Fabrik wie der Schritt `place_asset` -
+                      // sonst fehlen assetId, beide Bildseiten und das
+                      // Seitenverhältnis, und das Brett taugt nicht als Anker.
+                      // Immer aufgedeckt: der Dialog hat keine Seitenwahl.
+                      const newToken = assetToken(
+                        token,
+                        (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
+                        (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+                        false,
+                      );
                       setTokens(prev => [...prev, newToken]);
                       if (room) room.sendAction({ type: 'token_create', token: newToken });
                       setShowTokenModal(false);

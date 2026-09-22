@@ -22,6 +22,7 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
+import { assetToken } from './assetToken.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -186,36 +187,6 @@ function shareOut(items, usable, free) {
 /** "zone X is full (4)" for every zone that ran out of room during this step. */
 function fullZones(usable, free, kind) {
   return usable.filter(z => free.get(z) <= 0).map(z => zoneRejects(z, kind, Infinity)).filter(Boolean);
-}
-
-/**
- * Build a table token from a table_asset row.
- * Laying an object face down needs a back side; without one it is NOT placed
- * (spec §6) – an unintentionally face-up token gives away exactly the
- * information that was meant to stay hidden, and nobody would notice. The
- * caller turns the null into a protocol entry.
- */
-function assetToken(asset, x, y, faceDown) {
-  const back = asset.back_image_path || null;
-  if (faceDown && !back) return null;
-  const down = Boolean(faceDown);
-  return {
-    id: crypto.randomUUID(),
-    assetId: asset.id,
-    shape: 'image',
-    color: null,
-    label: asset.name || '',
-    imageUrl: down ? back : asset.image_path,
-    frontImageUrl: asset.image_path,
-    backImageUrl: back,
-    faceDown: down,
-    size: asset.width || 60,
-    x,
-    y,
-    attachedTo: null,
-    attachedCorner: null,
-    locked: false,
-  };
 }
 
 // ── Action handlers ───────────────────────────────────────────────────────────

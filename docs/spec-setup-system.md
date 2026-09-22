@@ -329,6 +329,45 @@ Felder ein, Felder sind benennbar (`A1`, `S14`).
 Sequenz auf unverankerte Zonen zu schreiben und danach zu verankern hieße, den
 Aufbau zweimal zu bauen. Das Raster blockiert nichts.*
 
+### M3c — Ein von Hand ausgelegtes Brett taugt als Anker
+Beim Bau des Grundaufbaus aufgefallen, und ein harter Blocker für genau das, was
+der Aufbau können soll: „Spielbrett auslegen, Raster darauf, Zonen darauf, Brett
+fixieren."
+
+Ein Bild-Asset kommt auf zwei Wegen auf den Tisch, und die beiden Wege erzeugen
+**nicht dasselbe Objekt**:
+
+| | `assetToken()` (Schritt `place_asset`) | „Add Token"-Dialog (von Hand) |
+|---|---|---|
+| `assetId` | die Asset-ID | **`null`** |
+| `frontImageUrl` / `backImageUrl` | gesetzt | **fehlen** |
+| `faceDown` | gesetzt | **fehlt** |
+
+`assetBox` in `anchoring.js` gibt für ein Objekt ohne `assetId` und ohne
+Breite/Höhe **`null`** zurück — es taucht also gar nicht erst in der Ankerliste
+auf. **Ein von Hand ausgelegtes Brett lässt sich damit weder als Zonen- noch als
+Rasteranker wählen.** Es lässt sich außerdem nicht umdrehen, weil die zweite
+Seite nicht mitkommt.
+
+Dazu die zweite Hälfte: **Bild-Token sind quadratisch.** Beide Wege setzen
+`size: asset.width`, und `TokenShape` bekommt genau eine Kantenlänge. Der
+Hauptplan ist 3000×2500, das Sideboard 751×2501 — beide werden also in ein
+Quadrat eingepasst und sitzen mit Rand darin. Ein Raster, das auf dem
+**aufgedruckten** Raster liegen soll, müsste diesen Rand mitrechnen, und der
+hängt am Seitenverhältnis des Bildes. `assetBox` liest `width`/`height` bereits
+bevorzugt — nur gesetzt hat sie beim Token nie jemand.
+
+Ursache ist dieselbe wie bei M2.8 und M1b: **dieselbe Sache wird an zwei Stellen
+gebaut, und nur eine wurde nachgezogen.** Die Abhilfe ist deshalb nicht, den
+Dialog um die fehlenden Felder zu ergänzen, sondern **beide Wege durch dieselbe
+Fabrik zu schicken**.
+
+**Abnahme:** Ein über „Add Token" ausgelegtes Bild-Asset erscheint in der
+Ankerliste, lässt sich umdrehen und sperren, und hat das Seitenverhältnis seines
+Bildes. Ein Raster, das auf den aufgedruckten A–S × 1–14-Feldern des Hauptplans
+liegt, bleibt darauf liegen, wenn das Brett verschoben wird. Alte Spielstände mit
+Token, die nur `size` haben, funktionieren unverändert weiter.
+
 ### M4 — Fortschrittsebene
 `progress` je Spiel · Schritt `filter_by_progress` · UI zum Setzen von Status.
 
