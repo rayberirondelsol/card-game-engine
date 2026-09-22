@@ -57,6 +57,14 @@ const GRID_SIZE = 80; // pixels per grid cell
 const CARD_WIDTH = 100;
 const CARD_HEIGHT = 140;
 
+// Context-menu heading per objType. Types not listed are title-cased from the
+// key ("counter" -> "Counter"); only multi-word ones need an entry.
+const OBJ_TYPE_LABELS = {
+  textField: 'Text Field',
+  hitDie: 'Hit Die',
+  customDie: 'Custom Die',
+};
+
 /**
  * Returns the display dimensions for a card based on its actual image aspect ratio.
  * Landscape cards (width > height) swap the default portrait dimensions so the
@@ -440,7 +448,6 @@ export default function GameTable({ room = null }) {
   // Toolbar modals
   const [showCounterModal, setShowCounterModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
-  const [showHitDiceModal, setShowHitDiceModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
@@ -1734,7 +1741,7 @@ export default function GameTable({ room = null }) {
     };
     setCustomDiceOnTable(prev => [...prev, newDie]);
     if (room) room.sendAction({ type: 'custom_die_place', die: newDie });
-    setShowTokenModal(false);
+    setShowDiceModal(false); // custom dice are placed from the dice modal
   }
 
   function rollCustomDie(dieId) {
@@ -1790,7 +1797,7 @@ export default function GameTable({ room = null }) {
       locked: false,
     };
     setHitDice(prev => [...prev, newDie]);
-    setShowHitDiceModal(false);
+    setShowDiceModal(false); // the hit-die buttons live in the dice modal
   }
 
   function rollHitDie(dieId) {
@@ -3708,7 +3715,6 @@ export default function GameTable({ room = null }) {
   // ===== MODAL DISMISS HELPERS =====
   function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); }
   function dismissDiceModal() { setShowDiceModal(false); }
-  function dismissHitDiceModal() { setShowHitDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
   function dismissTokenModal() { setShowTokenModal(false); }
   function dismissTextFieldModal() { setShowTextFieldModal(false); setNewTextFieldText(''); setNewTextFieldFontSize(16); setNewTextFieldColor('#ffffff'); }
@@ -5290,7 +5296,7 @@ export default function GameTable({ room = null }) {
                 {customDiceLibrary.map(die => (
                   <button
                     key={die.id}
-                    onClick={() => { placeCustomDie(die); setShowDiceModal(false); }}
+                    onClick={() => placeCustomDie(die)}
                     className="flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 border-slate-600 hover:border-purple-400 bg-slate-700 hover:bg-slate-600 transition-all"
                     title={`${die.name} (d${die.num_faces})`}
                   >
@@ -6202,7 +6208,7 @@ export default function GameTable({ room = null }) {
             {contextMenu.objType && (
               <>
                 <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                  {contextMenu.objType === 'textField' ? 'Text Field' : contextMenu.objType === 'hitDie' ? 'Hit Die' : contextMenu.objType.charAt(0).toUpperCase() + contextMenu.objType.slice(1)}
+                  {OBJ_TYPE_LABELS[contextMenu.objType] || contextMenu.objType.charAt(0).toUpperCase() + contextMenu.objType.slice(1)}
                 </div>
                 <button
                   onClick={() => {
@@ -6212,7 +6218,7 @@ export default function GameTable({ room = null }) {
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   {(() => {
-                    const lists = { counter: counters, die: dice, hitDie: hitDice, note: notes, token: tokens, board: boards, textField: textFields };
+                    const lists = { counter: counters, die: dice, customDie: customDiceOnTable, hitDie: hitDice, note: notes, token: tokens, board: boards, textField: textFields };
                     const obj = (lists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
                     return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
                   })()}
@@ -6239,6 +6245,7 @@ export default function GameTable({ room = null }) {
                     const { objType, objId } = contextMenu;
                     if (objType === 'counter') setCounters(prev => prev.filter(c => c.id !== objId));
                     else if (objType === 'die') setDice(prev => prev.filter(d => d.id !== objId));
+                    else if (objType === 'customDie') deleteCustomDieFromTable(objId);
                     else if (objType === 'hitDie') setHitDice(prev => prev.filter(d => d.id !== objId));
                     else if (objType === 'note') deleteNote(objId);
                     else if (objType === 'token') { setTokens(prev => prev.filter(t => t.id !== objId)); if (room) room.sendAction({ type: 'token_delete', token_id: objId }); }

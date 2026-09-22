@@ -47,6 +47,16 @@ function registrationAllowed() {
 }
 
 export async function authRoutes(fastify) {
+  // Logout carries no body, but a client that sets `Content-Type: application/json`
+  // anyway would get Fastify's FST_ERR_CTP_EMPTY_JSON_BODY 400 instead of being
+  // logged out. Scoped to this plugin (registered via fastify.register), so an
+  // empty JSON body is `{}` for the auth routes and the routes' own validation
+  // answers — every other plugin keeps the default parser.
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    if (!body) return done(null, {});
+    try { done(null, JSON.parse(body)); } catch (err) { err.statusCode = 400; done(err); }
+  });
+
   // ── Register ──────────────────────────────────────────────────────────────
   fastify.post('/api/auth/register', async (req, reply) => {
     if (!registrationAllowed()) {

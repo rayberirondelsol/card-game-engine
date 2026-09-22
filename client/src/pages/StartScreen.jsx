@@ -32,6 +32,19 @@ export default function StartScreen() {
     }
   }, []);
 
+  // Ends the session on the server first — dropping the token locally alone
+  // would leave it valid for 30 days. A hard reload (not navigate) so main.jsx
+  // re-runs its auth check and renders <AuthPage/>.
+  async function handleLogout() {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Server unreachable: still drop the local token.
+    }
+    localStorage.removeItem('auth_token');
+    window.location.assign('/');
+  }
+
   async function fetchGames() {
     try {
       const res = await apiFetch('/api/games');
@@ -124,12 +137,20 @@ export default function StartScreen() {
           <h1 className="text-4xl font-bold text-[var(--color-text)]">
             Card Game Engine
           </h1>
-          <button
-            onClick={() => setShowJoinRoom(true)}
-            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors text-sm font-medium"
-          >
-            Join Room
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowJoinRoom(true)}
+              className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors text-sm font-medium"
+            >
+              Join Room
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 border border-[var(--color-border)] text-[var(--color-text-secondary)] rounded-lg hover:bg-[var(--color-surface)] hover:text-[var(--color-text)] transition-colors text-sm font-medium"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
         <p className="text-[var(--color-text-secondary)] mb-8">
           Your virtual tabletop for any card game
