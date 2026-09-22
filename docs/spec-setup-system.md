@@ -202,12 +202,19 @@ Assets haben einen leeren Namen, und ein Neuimport kann Namen ändern. Gegenmitt
 leeren oder mehrdeutigen Namen zeigen, werden beim Bearbeiten gemeldet, nicht erst
 beim Aufbau.
 
-**Spielerzonen: vertagt.** Bei fester Spielerzahl legt man sie von Hand an. Die
-richtige Verallgemeinerung sind nicht Spielerzonen, sondern **Setup-Parameter**
-(z. B. Spieleranzahl), auf die Schritte sich beziehen können — bei Townsfolk Tussle
-hängen daran auch die Bosswerte (Spalten 2P–5P) und die Zahl der Heldentaten. Die
-enge Variante würde später wieder herausgerissen; gebaut wird sie, sobald ein zweites
-Spiel sie braucht.
+**Spielerzonen: teils vorhanden, Rest vertagt.** Korrektur einer früheren Annahme:
+Zonen kennen bereits `type` (*Player Zone* / *Shared Zone*), eine Spielerfarbe, ein
+`exclusive`-Flag („only owner may act"), und `ZoneOverlay` hebt die eigene Zone
+anhand von `room.myColor` hervor. Auf **Zonenebene** gibt es Spielerbezug also schon.
+
+Es fehlt die **Sequenzebene**: „teile jeder Spielerzone 3 Karten aus" ist nicht
+ausdrückbar, man schreibt drei Schritte. Und es fehlt ein **Setup-Parameter
+Spieleranzahl** — bei Townsfolk Tussle hängen daran auch die Bosswerte (Spalten
+2P–5P) und die Zahl der Heldentaten. Der Preset-Dialog („1–4 Spieler") legt die Zahl
+beim Zeichnen fest, nicht zur Laufzeit.
+
+Beides wird gebaut, sobald ein zweites Spiel es braucht — die enge Variante würde
+sonst später wieder herausgerissen.
 
 **Fortschritt: pro Kampagne, mit einer implizit angelegten Standard-Kampagne.** Die
 einzige Stelle, an der bewusst Vorhalt gezahlt wird. Eine `campaign_id` plus
