@@ -262,6 +262,28 @@ die Kategorien der Table-Assets, Zonen kommen aus dem Setup.
 **Abnahme:** Der komplette Aufbau aus Abschnitt 7 lässt sich in der Oberfläche
 zusammenklicken, ohne JSON anzufassen.
 
+### M2.8 — Die Schichten des Setup-Modus überdecken sich nicht
+Beim Weiterbauen des Townsfolk-Tussle-Aufbaus gemessen (736×794, `elementsFromPoint`
+auf die Mitte jeder Schaltfläche):
+
+- **Das Setup-Banner verdeckt die rechte Kopfleiste.** Es liegt `fixed top-4 right-4`
+  und ist 468 px breit; darunter liegen der Knopf „Cards (n)", die Zoom-, die Pan- und
+  die Speicher-Anzeige. Der Kartenschrank lässt sich im Setup-Modus **nicht öffnen** —
+  ein Klick landet auf dem Banner. Damit kommt keine Karte auf den Tisch, es gibt keine
+  benannten Stapel, und `shuffle`/`deal_to_zone` haben nichts zu adressieren.
+- **Die Zonen-Werkzeugleiste verdeckt die Raster-Werkzeugleiste.** Beide stapeln sich
+  über feste Abstände (`bottom-28` und `bottom-40`, also 48 px Luft). Sobald die
+  Zonenleiste umbricht — bei dieser Breite ist sie 82 px hoch — schiebt sie sich über
+  die Rasterleiste.
+
+Beides ist derselbe Fehler: **eine absolut positionierte Schicht beansprucht einen
+Streifen, dessen Höhe sie nicht misst.** Andere Zahlen verschieben die Kollision nur.
+
+**Abnahme:** Im Setup-Modus ist jede Schaltfläche der Kopfleiste und beider
+Werkzeugleisten an ihrem eigenen Mittelpunkt anklickbar — geprüft mit
+`scripts/check-setup-overlays.js` bei mehreren Fensterbreiten. Die Schichten stapeln
+sich im Fluss, nicht über geratene Abstände.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.

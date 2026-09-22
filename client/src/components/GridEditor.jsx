@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import GridOverlay from './GridOverlay';
 import { createGrid, setGridAnchor, gridBox, GRID_TYPES } from '../utils/gridGeometry';
 
@@ -22,6 +23,13 @@ import { createGrid, setGridAnchor, gridBox, GRID_TYPES } from '../utils/gridGeo
 export default function GridEditor({ grids = [], anchors = [], onGridsChange, camera = { x: 0, y: 0, zoom: 1 } }) {
   const [selectedId, setSelectedId] = useState(null);
   const selected = grids.find(g => g.id === selectedId) || null;
+
+  // Die Werkzeugleiste wohnt im gemeinsamen Stapel, den GameTable im
+  // Setup-Modus aufspannt - dort stapelt sie sich im Fluss über der
+  // Zonenleiste statt über einen geratenen Abstand. Fehlt der Anker (Editor
+  // ausserhalb des Setup-Modus benutzt), wird die Leiste eben nicht gezeigt.
+  const [toolbarAnchor, setToolbarAnchor] = useState(null);
+  useEffect(() => { setToolbarAnchor(document.getElementById('setup-toolbar-stack')); }, []);
 
   function updateGrid(id, updates) {
     onGridsChange(grids.map(g => {
@@ -227,10 +235,11 @@ export default function GridEditor({ grids = [], anchors = [], onGridsChange, ca
       )}
 
       {/* Toolbar, above the zone toolbar. */}
+      {toolbarAnchor && createPortal(
       <div
         data-ui-element
         data-testid="grid-toolbar"
-        className="absolute bottom-40 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded-full shadow-lg"
+        className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded-full shadow-lg"
       >
         <select
           data-testid="grid-select"
@@ -258,7 +267,8 @@ export default function GridEditor({ grids = [], anchors = [], onGridsChange, ca
             {selected.cols} × {selected.rows} fields
           </span>
         )}
-      </div>
+      </div>,
+      toolbarAnchor)}
     </div>
   );
 }

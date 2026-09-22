@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ZoneShape from './ZoneShape';
 import { zoneSlots } from '../utils/zoneGeometry';
 import {
@@ -113,6 +114,13 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
   // An in-flight move or resize: the zone as it was when the drag started, so
   // every frame is computed from the original and small errors cannot add up.
   const [drag, setDrag] = useState(null);
+
+  // Die Werkzeugleiste wohnt im gemeinsamen Stapel, den GameTable im
+  // Setup-Modus aufspannt - dort stapelt sie sich im Fluss unter der
+  // Rasterleiste statt über einen geratenen Abstand. Fehlt der Anker (Editor
+  // ausserhalb des Setup-Modus benutzt), wird die Leiste eben nicht gezeigt.
+  const [toolbarAnchor, setToolbarAnchor] = useState(null);
+  useEffect(() => { setToolbarAnchor(document.getElementById('setup-toolbar-stack')); }, []);
 
   const selectedZone = zones.find(z => z.id === selectedZoneId) || null;
 
@@ -613,10 +621,11 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
       )}
 
       {/* Toolbar: drawing a zone is a button with a shape, not a shortcut to guess. */}
+      {toolbarAnchor && createPortal(
       <div
         data-ui-element
         data-testid="zone-toolbar"
-        className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded-full shadow-lg"
+        className="pointer-events-auto flex items-center gap-2 bg-slate-900/90 border border-slate-700 px-3 py-2 rounded-full shadow-lg"
       >
         <select
           value={drawShape}
@@ -650,7 +659,8 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
         >
           Player layouts
         </button>
-      </div>
+      </div>,
+      toolbarAnchor)}
     </div>
   );
 }

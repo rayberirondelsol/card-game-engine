@@ -4695,7 +4695,7 @@ export default function GameTable({ room = null }) {
       </div>{/* End world-space transform wrapper */}
 
       {/* Top bar with game name and back button - compact in landscape */}
-      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
+      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
         <div className={`flex items-center justify-between transition-all duration-300 ease-in-out ${isMobileLandscape ? 'p-1.5' : 'p-3'}`} style={{ paddingLeft: isMobileLandscape ? 'max(0.5rem, env(safe-area-inset-left, 0px))' : 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
           <div className={`flex items-center ${isMobileLandscape ? 'gap-1.5' : 'gap-3'} pointer-events-auto`}>
             <button
@@ -4763,81 +4763,137 @@ export default function GameTable({ room = null }) {
             </span>
           </div>
         </div>
-      </div>
 
-      {/* Token Legend */}
-      {showLegend && tokens.length > 0 && (
-        <div
-          className="absolute z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 max-w-xs"
-          style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', right: 'max(1rem, env(safe-area-inset-right, 0px))' }}
-          data-testid="token-legend"
-          data-ui-element="true"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-white/90 text-sm font-semibold">Token Legend</h4>
-            <button
-              onClick={() => setShowLegend(false)}
-              className="text-white/60 hover:text-white/90 transition-colors"
-              title="Hide Legend"
+        {/* Setup-Banner als zweite Zeile derselben Kopfleiste. Es lag vorher
+            `fixed top-4 right-4` und beanspruchte damit einen Streifen, dessen
+            Höhe es nie gemessen hat - genau über den Knöpfen aus Zeile 1. Im
+            Fluss kann es die erste Zeile nicht mehr überdecken, egal wie hoch
+            die wird, und `env(safe-area-inset-top)` gilt automatisch mit. */}
+        {setupMode && (
+          <div
+            className={`flex justify-end ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}
+            style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
+          >
+            <div
+              className="pointer-events-auto bg-emerald-700/90 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-3 backdrop-blur-sm"
+              data-testid="setup-mode-banner"
+              data-ui-element="true"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+              <span className="text-sm font-medium">
+                {editingSetupId ? `Editing Setup: ${setupName}` : 'Setup Editor Mode'}
+              </span>
+              <button
+                onClick={() => setShowSequenceEditor(prev => !prev)}
+                data-testid="setup-banner-sequence-btn"
+                className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+              >
+                Sequence{sequenceSteps.length > 0 ? ` (${sequenceSteps.length})` : ''}
+              </button>
+              <button
+                onClick={() => setShowSetupSaveModal(true)}
+                data-testid="setup-banner-save-btn"
+                className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+              >
+                {editingSetupId ? 'Save' : 'Save Setup'}
+              </button>
+              <button
+                onClick={() => navigate(`/games/${id}`)}
+                data-testid="setup-banner-exit-btn"
+                className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                Exit
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Die Token-Legende hing an `top: calc(4rem + …)` - derselbe geratene
+            Streifen wie beim Banner. Sie steht jetzt als dritte Zeile im Fluss
+            derselben Kopfleiste und rutscht damit automatisch unter das Banner,
+            sobald der Setup-Modus die zweite Zeile einblendet. */}
+        {tokens.length > 0 && (
+          <div
+            className={`flex justify-end pointer-events-none ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}
+            style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}
+          >
+          {/* Token Legend */}
+          {showLegend && (
+            <div
+              className="pointer-events-auto bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-3 max-w-xs"
+              data-testid="token-legend"
+              data-ui-element="true"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white/90 text-sm font-semibold">Token Legend</h4>
+                <button
+                  onClick={() => setShowLegend(false)}
+                  className="text-white/60 hover:text-white/90 transition-colors"
+                  title="Hide Legend"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {tokens.map(token => {
+                  // Spec section 6: a face-down token gets a row, but no name. The
+                  // row stays because the table shows the token anyway - the count
+                  // is already public, and dropping the row would only make the
+                  // legend disagree with what is lying there. What goes is the one
+                  // thing the face-down bar exists to hide.
+                  const view = tableObjectView(token);
+                  return (
+                  <div
+                    key={token.id}
+                    className="flex items-center gap-2 text-white/80 text-xs"
+                    data-testid={`legend-token-${token.id}`}
+                    data-face-down={view.hidden ? 'true' : 'false'}
+                  >
+                    {/* token.imageUrl is whichever face is up, so it is safe as-is. */}
+                    <TokenShape shape={token.shape} color={token.color} size={20} label={view.name} imageUrl={token.imageUrl || null} />
+                    <span className="flex-1">
+                      {view.hidden
+                        ? <span className="italic text-white/50">{view.caption}</span>
+                        : <>
+                            {view.name && <span className="font-semibold">{view.name}: </span>}
+                            <span className="capitalize">{token.shape}</span>
+                          </>}
+                    </span>
+                  </div>
+                );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Legend Toggle Button (when legend is hidden) */}
+          {!showLegend && (
+            <button
+              onClick={() => setShowLegend(true)}
+              className="pointer-events-auto bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-2 text-white/80 hover:text-white/90 transition-colors"
+              data-testid="show-legend-btn"
+              data-ui-element="true"
+              title="Show Token Legend"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
               </svg>
             </button>
+          )}
           </div>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {tokens.map(token => {
-              // Spec section 6: a face-down token gets a row, but no name. The
-              // row stays because the table shows the token anyway - the count
-              // is already public, and dropping the row would only make the
-              // legend disagree with what is lying there. What goes is the one
-              // thing the face-down bar exists to hide.
-              const view = tableObjectView(token);
-              return (
-              <div
-                key={token.id}
-                className="flex items-center gap-2 text-white/80 text-xs"
-                data-testid={`legend-token-${token.id}`}
-                data-face-down={view.hidden ? 'true' : 'false'}
-              >
-                {/* token.imageUrl is whichever face is up, so it is safe as-is. */}
-                <TokenShape shape={token.shape} color={token.color} size={20} label={view.name} imageUrl={token.imageUrl || null} />
-                <span className="flex-1">
-                  {view.hidden
-                    ? <span className="italic text-white/50">{view.caption}</span>
-                    : <>
-                        {view.name && <span className="font-semibold">{view.name}: </span>}
-                        <span className="capitalize">{token.shape}</span>
-                      </>}
-                </span>
-              </div>
-            );
-            })}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Legend Toggle Button (when legend is hidden) */}
-      {!showLegend && tokens.length > 0 && (
-        <button
-          onClick={() => setShowLegend(true)}
-          className="absolute z-30 bg-black/80 backdrop-blur-md border border-white/20 rounded-lg p-2 text-white/80 hover:text-white/90 transition-colors"
-          style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))', right: 'max(1rem, env(safe-area-inset-right, 0px))' }}
-          data-testid="show-legend-btn"
-          data-ui-element="true"
-          title="Show Token Legend"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6" />
-            <line x1="8" y1="12" x2="21" y2="12" />
-            <line x1="8" y1="18" x2="21" y2="18" />
-            <line x1="3" y1="6" x2="3.01" y2="6" />
-            <line x1="3" y1="12" x2="3.01" y2="12" />
-            <line x1="3" y1="18" x2="3.01" y2="18" />
-          </svg>
-        </button>
-      )}
 
       {/* Swipe edge indicator for mobile - visible when drawer is closed on touch devices */}
       {!showCardDrawer && isTouchCapableRef.current && (
@@ -5748,43 +5804,6 @@ export default function GameTable({ room = null }) {
           </div>
         </div>
       </SwipeModal>
-
-      {/* Setup Mode Banner */}
-      {setupMode && (
-        <div
-          className="fixed top-4 right-4 z-40 bg-emerald-700/90 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-3 backdrop-blur-sm"
-          data-testid="setup-mode-banner"
-          data-ui-element="true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-          </svg>
-          <span className="text-sm font-medium">
-            {editingSetupId ? `Editing Setup: ${setupName}` : 'Setup Editor Mode'}
-          </span>
-          <button
-            onClick={() => setShowSequenceEditor(prev => !prev)}
-            data-testid="setup-banner-sequence-btn"
-            className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-          >
-            Sequence{sequenceSteps.length > 0 ? ` (${sequenceSteps.length})` : ''}
-          </button>
-          <button
-            onClick={() => setShowSetupSaveModal(true)}
-            data-testid="setup-banner-save-btn"
-            className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
-          >
-            {editingSetupId ? 'Save' : 'Save Setup'}
-          </button>
-          <button
-            onClick={() => navigate(`/games/${id}`)}
-            data-testid="setup-banner-exit-btn"
-            className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-          >
-            Exit
-          </button>
-        </div>
-      )}
 
       {/* Split Stack Modal */}
       {showSplitModal && splitStackId && (() => {
@@ -6753,6 +6772,20 @@ export default function GameTable({ room = null }) {
         >
           <GridOverlay grids={tableGrids.filter(g => g.showInPlay)} />
         </div>
+      )}
+
+      {/* Gemeinsamer Anker für die Werkzeugleisten des Setup-Modus. Raster- und
+          Zonenleiste hängen sich hier per Portal hinein und stapeln sich im
+          Fluss (Rasterleiste oben, Zonenleiste unten - die DOM-Reihenfolge
+          ergibt sich aus der Mount-Reihenfolge weiter unten). Vorher stapelten
+          sie über geratene Abstände (`bottom-28`/`bottom-40`), und sobald eine
+          Leiste umbrach, verdeckte sie die andere. */}
+      {setupMode && (
+        <div
+          id="setup-toolbar-stack"
+          data-ui-element="true"
+          className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"
+        />
       )}
 
       {/* Zone and grid editor overlays in setup mode */}
