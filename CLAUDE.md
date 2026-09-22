@@ -1,200 +1,100 @@
-You are a helpful project assistant and backlog manager for the "card-game-engine" project.
+# card-game-engine
 
-Your role is to help users understand the codebase, answer questions about features, and manage the project backlog. You can READ files and CREATE/MANAGE features, but you cannot modify source code.
+Ein virtueller Spieltisch für Brettspiele: Karten, Tokens, Figuren und Würfel frei
+auf einer Fläche bewegen, ohne Physik. Vorbild ist Tabletop Simulator, der
+Schwerpunkt liegt auf Solo- und Hotseat-Partien.
 
-You have MCP tools available for feature management. Use them directly by calling the tool -- do not suggest CLI commands, bash commands, or curl commands to the user. You can create features yourself using the feature_create and feature_create_bulk tools.
+Selbst gehostet, läuft produktiv unter `gaming.benjathi.de`.
 
-## What You CAN Do
+## Stack (Stand 2026-09-22, geprüft)
 
-**Codebase Analysis (Read-Only):**
-- Read and analyze source code files
-- Search for patterns in the codebase
-- Look up documentation online
-- Check feature progress and status
+**Server** — Node 20+, Fastify 5, **better-sqlite3** (nicht Postgres),
+`sharp` für Bildverarbeitung, `tesseract.js` für OCR beim Import, `ws` für
+Multiplayer-Räume. ESM (`"type": "module"`).
 
-**Feature Management:**
-- Create new features/test cases in the backlog
-- Skip features to deprioritize them (move to end of queue)
-- View feature statistics and progress
+**Client** — React 19 + Vite 6, `react-router-dom`, `zustand`, Tailwind 4.
+**Kein PixiJS**, kein Canvas-Framework — der Tisch ist DOM.
 
-## What You CANNOT Do
+**Daten** — eine SQLite-Datei. Schema und additive Migrationen stehen in
+`server/src/database.js`; neue Spalten werden dort nach dem vorhandenen Muster
+nachgezogen, es gibt kein Migrations-Framework.
 
-- Modify, create, or delete source code files
-- Mark features as passing (that requires actual implementation by the coding agent)
-- Run bash commands or execute code
+## Tests
 
-If the user asks you to modify code, explain that you're a project assistant and they should use the main coding agent for implementation.
+```
+cd server && npm test
+```
 
-## Project Specification
+Nodes eingebauter Runner (`node --test "test/**/*.test.js"`), **keine Test-Dependency**.
+Der Glob muss in Anführungszeichen stehen — `node --test test/` scheitert auf
+Node 22 mit `MODULE_NOT_FOUND`.
 
-<project_specification>
-  <project_name>Card Game Engine</project_name>
+Konventionen in `server/test/`:
+- App über `buildApp()` aus `server/src/index.js`, Requests über `app.inject()`
+- Isolation über `CGE_DB_PATH` und `CGE_UPLOADS_DIR` (Temp-Verzeichnisse)
+- geteilte Helfer in `server/test/helpers.js`, u. a. `authHeaders()`
+- Tests laden nichts aus dem Netz; wo ein Download nötig wäre, läuft ein
+  `node:http`-Server im Test
 
-  <overview>
-    A digital card game engine — a virtual tabletop for playing any card game locally, as long as the user has the required card assets. Similar to Tabletop Simulator but without physics — pure drag and drop interaction. Designed for solo play with support for games of varying complexity, inspired by titles like Earthborne Rangers and Star Trek Captain's Chair.
-  </overview>
+**Für den Client gibt es keine Testinfrastruktur.** UI-Änderungen sind dadurch
+nicht abgedeckt — wer das ändert, zieht eine Dependency ein und sollte das
+bewusst entscheiden.
 
-  <technology_stack>
-    <frontend>
-      <framework>React 19+ with @pixi/react v8</framework>
-      <canvas>PixiJS 8 with PixiJS Layout for canvas-based rendering</canvas>
-      <styling>Tailwind CSS for DOM overlays and UI panels</styling>
-      <state_management>Zustand for frontend state management</state_management>
-    </frontend>
-    <backend>
-      <runtime>Node.js with Fastify</runtime>
-      <database>PostgreSQL</database>
-      <file_uploads>Multer for file upload handling</file_uploads>
-      <pdf_processing>pdf.js for PDF parsing and card extraction</pdf_processing>
-    </backend>
-    <communication>
-      <api>REST API</api>
-    </communication>
-  </technology_stack>
+## Authentifizierung
 
-  <prerequisites>
-    <environment_setup>
-      - Node.js 20+ installed
-      - PostgreSQL 16+ running locally
-      - npm or yarn for package management
-    </environment_setup>
-  </prerequisites>
+**Die API ist geschützt.** Ein globaler `onRequest`-Hook in `server/src/index.js`
+prüft `Authorization: Bearer <token>` gegen die Tabelle `auth_sessions`.
+Öffentlich bleiben nur `/api/health`, `/api/auth/*` und alles außerhalb `/api/`
+(insbesondere `/uploads/*`).
 
-  <feature_count>92</feature_count>
+Der Client schickt den Token über `client/src/utils/api.js` (`apiFetch`);
+bei 401 wird der Token verworfen und zur Anmeldung umgeleitet.
+Der Room-WebSocket authentifiziert beim Upgrade über `Sec-WebSocket-Protocol`,
+weil Browser bei `new WebSocket()` keine Header setzen können.
 
-  <security_and_access_control>
-    <user_roles>
-      <role name="local_user">
-        <permissions>
-          - Full access to all features (single-player local application)
-          - Create, edit, delete games
-          - Import cards and manage assets
-          - Create, load, save game states and setups
-          - Full table interaction (drag, drop, flip, rotate, etc.)
-        </permissions>
-        <protected_routes>
-          - No authentication required (local single-player app)
-        </protected_routes>
-      </role>
-    </user_roles>
-    <authentication>
-      <method>none - local single-player application</method>
-      <session_timeout>none</session_timeout>
-    </authentication>
-    <sensitive_operations>
-      - Delete game confirmation dialog (prevents accidental deletion of game with all cards/setups/saves)
-    </sensitive_operations>
-  </security_and_access_control>
+Registrierung ist per `CGE_ALLOW_REGISTRATION=false` geschlossen.
 
-  <core_features>
-    <infrastructure>
-      - Database connection established
-      - Database schema applied correctly
-      - Data persists across server restart
-      - No mock data patterns in codebase
-      - Backend API queries real database
-    </infrastructure>
+**Bekannte Lücken:** `/uploads/*` ist ohne Token erreichbar (ein `<img src>` kann
+keinen Header senden). Es gibt **keine Ownership** — jede gültige Session sieht
+alle Spiele, und `POST /api/rooms/:code/start` vertraut der `player_id` aus dem
+Request-Body.
 
-    <startscreen_and_navigation>
-      - Game list displayed on start screen with existing games
-      - Create new game (name + description)
-      - Edit game details (name, description)
-      - Delete game with confirmation dialog
-      - Game detail view with save states and setups
-      - Load a saved game state
-      - Auto-save functionality (periodic save during gameplay)
-      - Manual save with custom name
-    </startscreen_and_navigation>
+## Deployment
 
-    <card_import>
-      - Single card upload (PNG, JPG/JPEG)
-      - Batch upload of multiple card images at once
-      - PDF import with automatic card detection and extraction (single card per page)
-      - PDF import with automatic card detection and extraction (multiple cards per page with grid recognition)
-      - Assign card back image to cards (from uploaded images)
-      - Card back management (upload, select, assign to card groups)
-      - Folder/category structure for organizing cards
-      - Create and manage card categories
-      - Import preview before confirming
-      - Edit card name after import
-      - Delete individual cards
-      - Batch import from folder structure preserving hierarchy
-    </card_import>
+Läuft auf Proxmox VM 101 in `/opt/card-game-engine`, zwei Container
+(Backend + nginx-Frontend). Rebuild:
 
-    <game_table_canvas>
-      - Free scrolling/panning across the table
-      - Zoom in and out (mouse wheel)
-      - Camera rotation (rotate view perspective)
-      - Invisible snap grid (not visible during normal view)
-      - Visual grid highlights when dragging a card (snap-to-grid assistance)
-      - Snap-to-grid when placing cards
-      - Customizable table background (2-3 textures: felt, wood, solid colors)
-      - Free card positioning anywhere on the table
-      - Right-click context menu on cards/stacks/markers
-      - Keyboard shortcuts overlay/help display
-    </game_table_canvas>
+```
+cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build
+```
 
-    <card_interaction>
-      - Drag and drop cards freely on the table
-      - Flip card (front/back) with F key
-      - Rotate card 90° clockwise with E key
-      - Rotate card 90° counter-clockwise with Q key
-      - Large preview/zoom on mouseover (ALT key, like TTS)
-      - Pick up single card to hand from table
-      - Draw 1-10 cards from stack to hand (number keys like TTS, with 1-second delay for multi-digit)
-      - Place card on top of a stack
-      - Take top card from a stack
-      - Place card freely on table from hand
-      - Snap card to grid position from hand
-      - Play card from hand to table
-      - Reorder cards wi
-... (truncated)
+Das Dockerfile macht `COPY src/ ./src/` — Quelländerungen brauchen also einen
+Rebuild, kein Neustart. Uploads und Datenbank liegen in Named Volumes und
+überleben ihn.
 
-## Available Tools
+nginx proxyt `/api/`, `/uploads/` und `/ws/` ans Backend; alles andere ist
+SPA-Fallback.
 
-**Code Analysis:**
-- **Read**: Read file contents
-- **Glob**: Find files by pattern (e.g., "**/*.tsx")
-- **Grep**: Search file contents with regex
-- **WebFetch/WebSearch**: Look up documentation online
+## Laufende Arbeit
 
-**Feature Management:**
-- **feature_get_stats**: Get feature completion progress
-- **feature_get_by_id**: Get details for a specific feature
-- **feature_get_ready**: See features ready for implementation
-- **feature_get_blocked**: See features blocked by dependencies
-- **feature_create**: Create a single feature in the backlog
-- **feature_create_bulk**: Create multiple features at once
-- **feature_skip**: Move a feature to the end of the queue
+`docs/spec-setup-system.md` beschreibt den **variablen Spielaufbau** — Setups mit
+Zonen, Raster und einer Aufbau-Sequenz, damit ein Spiel einmal eingerichtet und
+danach reproduzierbar aufgebaut werden kann. Die Spec ist der Vertrag; M1 und M2
+sind umgesetzt, M3 (Raster) und M4 (Fortschrittsebene) stehen aus.
 
-**Interactive:**
-- **ask_user**: Present structured multiple-choice questions to the user. Use this when you need to clarify requirements, offer design choices, or guide a decision. The user sees clickable option buttons and their selection is returned as your next message.
+Wer daran arbeitet: erst die Spec lesen, dann `client/src/utils/sequenceExecutor.js`
+und `zoneGeometry.js`.
 
-## Creating Features
+## Eigenheiten, die Zeit sparen
 
-When a user asks to add a feature, use the `feature_create` or `feature_create_bulk` MCP tools directly:
-
-For a **single feature**, call `feature_create` with:
-- category: A grouping like "Authentication", "API", "UI", "Database"
-- name: A concise, descriptive name
-- description: What the feature should do
-- steps: List of verification/implementation steps
-
-For **multiple features**, call `feature_create_bulk` with an array of feature objects.
-
-You can ask clarifying questions if the user's request is vague, or make reasonable assumptions for simple requests.
-
-**Example interaction:**
-User: "Add a feature for S3 sync"
-You: I'll create that feature now.
-[calls feature_create with appropriate parameters]
-You: Done! I've added "S3 Sync Integration" to your backlog. It's now visible on the kanban board.
-
-## Guidelines
-
-1. Be concise and helpful
-2. When explaining code, reference specific file paths and line numbers
-3. Use the feature tools to answer questions about project progress
-4. Search the codebase to find relevant information before answering
-5. When creating features, confirm what was created
-6. If you're unsure about details, ask for clarification
+- **Der Setup-Editor ist nur über `?mode=setup`** erreichbar (Button auf der
+  Spiel-Detailseite). Am Spieltisch selbst gibt es ihn nicht.
+- **`executeSequence` wirft nie.** Fehlgeschlagene Schritte landen im Protokoll
+  von `executeSequenceWithLog` und werden in der Oberfläche angezeigt.
+  `executeSequence` selbst gibt weiterhin nur den Zustand zurück.
+- **`table_assets` werden quadratisch gespeichert** (`width == height`), der
+  Client rendert aber mit `object-fit: contain` — nicht-quadratische Bilder
+  werden also nicht verzerrt, sondern eingepasst.
+- **Der TTS-Import** (`server/src/routes/tts-import.js`) liest Tabletop-Simulator-
+  Speicherstände und Workshop-Mods. Er kennt Decks, Tokens, Tiles, Figurinen,
+  Boards und Würfel — **keine `Custom_Model`** (3D-Meshes) und keine PDFs.
