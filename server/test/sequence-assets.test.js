@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { executeSequence } = await import('../../client/src/utils/sequenceExecutor.js');
+const { executeSequence, executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -108,20 +108,18 @@ test('draw_assets with faceDown places assets face down showing back_image_path'
   }
 });
 
-test('an asset without back_image_path cannot be placed face down - it lands face up', () => {
-  const out = executeSequence(
+test('an asset without back_image_path is not placed face down - it is not placed at all', () => {
+  const { state, log } = executeSequenceWithLog(
     emptyState(),
     [{ type: 'draw_assets', pool: 'Figuren', count: 2, targetZoneLabel: 'Start A', faceDown: true }],
     ZONES,
     { assets: assetFixture(), rng: seededRng(5) }
   );
 
-  assert.equal(out.tokens.length, 2, 'assets are still placed, just not face down');
-  for (const t of out.tokens) {
-    assert.equal(t.faceDown, false);
-    assert.equal(t.imageUrl, t.frontImageUrl);
-    assert.equal(t.backImageUrl, null);
-  }
+  assert.equal(state.tokens.length, 0, 'an asset without a back side must not land on the table');
+  assert.equal(log[0].status, 'failed');
+  assert.match(log[0].reason, /Held A/);
+  assert.match(log[0].reason, /Held B/);
 });
 
 test('draw_assets with a pool smaller than count draws all of them without crashing', () => {
@@ -323,4 +321,128 @@ test('existing three-argument calls keep working (shuffle still uses Math.random
   assert.equal(out.stacks[0].cards.length, 5);
   assert.deepEqual(out.stacks[0].cards.map(c => c.zIndex), [1, 2, 3, 4, 5]);
   assert.ok(out.stacks[0].cards.every(c => c.faceDown === true));
+});
+
+// ── Face down without a back side (spec section 6, "Verdeckte Objekte") ──────
+//
+// Placing such an object face up would leak exactly the information that was
+// meant to stay hidden, so it is not placed at all and the step reports it.
+
+/** A pool where one of four assets has no back side. */
+const MIXED_POOL = [
+  { id: 'm-0', name: 'Mit Ruecken 1', type: 'token', category: 'Mix', image_path: '/uploads/m0.png', back_image_path: BOSS_BACK, width: 60 },
+  { id: 'm-1', name: 'Ohne Ruecken', type: 'token', category: 'Mix', image_path: '/uploads/m1.png', back_image_path: null, width: 60 },
+  { id: 'm-2', name: 'Mit Ruecken 2', type: 'token', category: 'Mix', image_path: '/uploads/m2.png', back_image_path: BOSS_BACK, width: 60 },
+  { id: 'm-3', name: 'Mit Ruecken 3', type: 'token', category: 'Mix', image_path: '/uploads/m3.png', back_image_path: BOSS_BACK, width: 60 },
+];
+
+test('draw_assets drops only the back-less asset, keeps the rest, and reports the step as failed', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [{ type: 'draw_assets', pool: 'Mix', count: 4, targetZoneLabel: 'Bossleiste', faceDown: true }],
+    ZONES,
+    { assets: MIXED_POOL, rng: seededRng(4) }
+  );
+
+  assert.equal(state.tokens.length, 3, 'the three assets with a back side still land in the zone');
+  assert.ok(!state.tokens.some(t => t.label === 'Ohne Ruecken'), 'the back-less asset must not be on the table');
+  for (const t of state.tokens) {
+    assert.equal(t.faceDown, true);
+    assert.equal(t.imageUrl, BOSS_BACK);
+  }
+  // the three that made it are still spread over the bar, not stacked on one spot
+  assert.equal(new Set(state.tokens.map(t => t.y)).size, 3);
+
+  assert.equal(log[0].status, 'failed');
+  assert.match(log[0].reason, /Ohne Ruecken/);
+});
+
+test('place_asset with faceDown and no back side places nothing and reports it', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [{ type: 'place_asset', assetName: 'Held A', x: 10, y: 20, faceDown: true }],
+    ZONES,
+    { assets: assetFixture() }
+  );
+
+  assert.equal(state.tokens.length, 0);
+  assert.equal(log[0].status, 'failed');
+  assert.match(log[0].reason, /Held A/);
+});
+
+test('set_asset_face faceDown on an asset without a back side takes it off the table', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [
+      { type: 'place_asset', assetName: 'Held A', x: 10, y: 20 },
+      { type: 'set_asset_face', assetName: 'Held A', faceDown: true },
+    ],
+    ZONES,
+    { assets: assetFixture() }
+  );
+
+  assert.equal(state.tokens.length, 0, 'leaving it face up would leak what should stay hidden');
+  assert.equal(log[0].status, 'ok');
+  assert.equal(log[1].status, 'failed');
+  assert.match(log[1].reason, /Held A/);
+});
+
+// ── Protocol (spec section 6, "Fehler sind sichtbar") ────────────────────────
+
+test('executeSequenceWithLog reports ok / skipped / failed per step with enough context', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [
+      { type: 'place_asset', assetName: 'Held A', x: 1, y: 2 },
+      { type: 'place_asset', assetName: 'Niemand', x: 1, y: 2 },
+      { type: 'draw_assets', pool: 'Figuren', count: 1, targetZoneLabel: 'Start A', faceDown: true },
+      { type: 'pflanzt_einen_baum' },
+    ],
+    ZONES,
+    { assets: assetFixture(), rng: seededRng(1) }
+  );
+
+  assert.deepEqual(log.map(e => e.status), ['ok', 'skipped', 'failed', 'skipped']);
+  assert.deepEqual(log.map(e => e.index), [0, 1, 2, 3]);
+  assert.deepEqual(log.map(e => e.type), ['place_asset', 'place_asset', 'draw_assets', 'pflanzt_einen_baum']);
+  assert.equal(log[0].reason, null, 'a step that worked needs no reason');
+  assert.equal(log[1].target, 'Niemand', 'the entry must name what the step pointed at');
+  assert.match(log[1].reason, /Niemand/);
+  assert.equal(log[2].target, 'Figuren');
+  assert.ok(log[2].reason.length > 0);
+  assert.equal(state.tokens.length, 1, 'only the first step placed anything');
+});
+
+test('a broken step does not stop the steps behind it', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [
+      { type: 'shuffle', stackLabel: 'Nicht Da' },
+      { type: 'place_asset', assetName: 'Held A', x: 1, y: 2 },
+    ],
+    ZONES,
+    { assets: assetFixture() }
+  );
+
+  assert.equal(log[0].status, 'skipped');
+  assert.equal(log[0].target, 'Nicht Da');
+  assert.equal(log[1].status, 'ok', 'a failed step must not stop the rest of the setup');
+  assert.equal(state.tokens.length, 1);
+});
+
+// ── Backwards compatibility of the protocol ─────────────────────────────────
+
+test('executeSequence still returns the plain state, executeSequenceWithLog wraps it', () => {
+  const step = [{ type: 'place_asset', assetName: 'Held A', x: 5, y: 6 }];
+  const opts = { assets: assetFixture() };
+
+  const plain = executeSequence(emptyState(), step, ZONES, opts);
+  const { state, log } = executeSequenceWithLog(emptyState(), step, ZONES, opts);
+
+  assert.equal(plain.tokens.length, 1);
+  assert.equal(plain.tokens[0].x, 5);
+  assert.ok(!('log' in plain), 'the protocol must not be smuggled into the state');
+  assert.deepEqual(Object.keys(plain).sort(), Object.keys(state).sort());
+  assert.equal(log.length, 1);
+  assert.equal(log[0].status, 'ok');
 });

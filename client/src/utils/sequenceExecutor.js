@@ -1,12 +1,18 @@
 /**
  * executeSequence – pure transformation function for setup sequences.
  * Applies an ordered list of setup actions to a game state snapshot.
- * Never throws: failed steps are skipped with a console.warn.
+ * Never throws: a step that cannot run is skipped and recorded in the protocol.
  *
  * Card steps address stacks by `stackLabel`; asset steps (tokens, figures,
  * boards) address a single asset by `assetName` (the table_assets name) and a
  * draw pool by `pool` (the asset's category name) – the same human-readable
  * label idea the stacks and zones already use.
+ *
+ * Two entry points, same work:
+ *   executeSequence(...)        → the new state (what every existing caller expects)
+ *   executeSequenceWithLog(...) → { state, log }
+ * The protocol lives beside the state, never inside it: the state is persisted
+ * as JSON, and a log smuggled into it would end up in the database.
  *
  * @param {object|string} stateData  – serialized game state (object or JSON string)
  * @param {Array}         sequenceData – array of sequence step objects
@@ -15,36 +21,59 @@
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
-  // Parse stateData if it's a string
+  return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
+}
+
+/**
+ * Same as executeSequence, but also returns one protocol entry per step:
+ * `{ index, type, target, status, reason }` with status `ok` | `skipped`
+ * (nothing happened, precondition missing) | `failed` (the step ran but could
+ * not do what it says). A setup with three silently skipped steps must not
+ * look like a correct one, so the caller is expected to show this.
+ *
+ * @returns {{ state: object, log: Array<{index:number,type:string,target:?string,status:string,reason:?string}> }}
+ */
+export function executeSequenceWithLog(stateData, sequenceData, zones = [], options = {}) {
   let state;
   try {
     state = typeof stateData === 'string' ? JSON.parse(stateData) : stateData;
   } catch (err) {
-    console.error('[sequenceExecutor] Failed to parse stateData:', err);
-    return stateData;
+    return {
+      state: stateData,
+      log: [{ index: -1, type: '(sequence)', target: null, status: 'failed', reason: `state could not be parsed: ${err.message}` }],
+    };
   }
 
   // Deep clone to avoid mutating the original
   state = JSON.parse(JSON.stringify(state));
 
+  const log = [];
   if (!Array.isArray(sequenceData) || sequenceData.length === 0) {
-    return state;
+    return { state, log };
   }
 
   const { assets = [], rng = Math.random } = options || {};
 
-  for (const step of sequenceData) {
+  sequenceData.forEach((step, index) => {
+    const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
+    log.push(entry);
     try {
-      state = applyStep(state, step, zones, assets, rng);
+      state = applyStep(state, step, zones, assets, rng, entry);
     } catch (err) {
-      console.warn(`[sequenceExecutor] Step "${step.type}" failed, skipping:`, err.message);
+      entry.status = 'failed';
+      entry.reason = err.message;
     }
-  }
+  });
 
-  return state;
+  return { state, log };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** What a step points at – enough to recognise it in the protocol. */
+function stepTarget(step) {
+  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.targetZoneLabel ?? null;
+}
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
 function buildStackIndex(state) {
@@ -108,9 +137,7 @@ function zoneSlot(zone, i = 0, n = 1) {
 function resolvePosition(step, zones) {
   if (step.targetZoneLabel) {
     const zone = zones.find(z => norm(z.label) === norm(step.targetZoneLabel));
-    if (zone) return zoneSlot(zone);
-    console.warn(`[sequenceExecutor] zone "${step.targetZoneLabel}" not found`);
-    return null;
+    return zone ? zoneSlot(zone) : null;
   }
   if (typeof step.x === 'number' && typeof step.y === 'number') return { x: step.x, y: step.y };
   return null;
@@ -118,15 +145,15 @@ function resolvePosition(step, zones) {
 
 /**
  * Build a table token from a table_asset row.
- * An asset without back_image_path cannot be placed face down: it is still
- * placed, but face up, and a warning is logged.
+ * Laying an object face down needs a back side; without one it is NOT placed
+ * (spec §6) – an unintentionally face-up token gives away exactly the
+ * information that was meant to stay hidden, and nobody would notice. The
+ * caller turns the null into a protocol entry.
  */
 function assetToken(asset, x, y, faceDown) {
   const back = asset.back_image_path || null;
-  if (faceDown && !back) {
-    console.warn(`[sequenceExecutor] asset "${asset.name}" has no back_image_path, placing it face up`);
-  }
-  const down = Boolean(faceDown) && Boolean(back);
+  if (faceDown && !back) return null;
+  const down = Boolean(faceDown);
   return {
     id: crypto.randomUUID(),
     assetId: asset.id,
@@ -148,18 +175,23 @@ function assetToken(asset, x, y, faceDown) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, zones, assets, rng) {
+function applyStep(state, step, zones, assets, rng, entry) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
   if (!state.boards) state.boards = [];
+
+  /** Nothing happened – a precondition was missing. */
+  const skip = (reason) => { entry.status = 'skipped'; entry.reason = reason; return state; };
+  /** The step ran but did not achieve what it says. */
+  const fail = (reason) => { entry.status = 'failed'; entry.reason = reason; return state; };
 
   const idx = buildStackIndex(state);
 
   switch (step.type) {
     case 'shuffle': {
       const stack = idx.get(step.stackLabel);
-      if (!stack) { console.warn(`[sequenceExecutor] shuffle: stack "${step.stackLabel}" not found`); return state; }
+      if (!stack) return skip(`stack "${step.stackLabel}" not found`);
       shuffleArray(stack.cards, rng);
       reassignZIndices(stack.cards);
       return state;
@@ -167,21 +199,21 @@ function applyStep(state, step, zones, assets, rng) {
 
     case 'set_face_down': {
       const stack = idx.get(step.stackLabel);
-      if (!stack) { console.warn(`[sequenceExecutor] set_face_down: stack "${step.stackLabel}" not found`); return state; }
+      if (!stack) return skip(`stack "${step.stackLabel}" not found`);
       stack.cards.forEach(c => { c.faceDown = true; });
       return state;
     }
 
     case 'set_face_up': {
       const stack = idx.get(step.stackLabel);
-      if (!stack) { console.warn(`[sequenceExecutor] set_face_up: stack "${step.stackLabel}" not found`); return state; }
+      if (!stack) return skip(`stack "${step.stackLabel}" not found`);
       stack.cards.forEach(c => { c.faceDown = false; });
       return state;
     }
 
     case 'flip_top_card': {
       const stack = idx.get(step.stackLabel);
-      if (!stack || !stack.cards.length) { console.warn(`[sequenceExecutor] flip_top_card: stack "${step.stackLabel}" not found or empty`); return state; }
+      if (!stack || !stack.cards.length) return skip(`stack "${step.stackLabel}" not found or empty`);
       // Top card = highest zIndex
       const top = stack.cards.reduce((best, c) => c.zIndex > best.zIndex ? c : best, stack.cards[0]);
       top.faceDown = false;
@@ -191,8 +223,8 @@ function applyStep(state, step, zones, assets, rng) {
     case 'split': {
       const { stackLabel, count, outputLabels = [], spacing = 130 } = step;
       const sourceStack = idx.get(stackLabel);
-      if (!sourceStack) { console.warn(`[sequenceExecutor] split: stack "${stackLabel}" not found`); return state; }
-      if (!count || count < 2) { console.warn(`[sequenceExecutor] split: count must be ≥ 2`); return state; }
+      if (!sourceStack) return skip(`stack "${stackLabel}" not found`);
+      if (!count || count < 2) return skip('count must be at least 2');
 
       const allCards = [...sourceStack.cards].sort((a, b) => a.zIndex - b.zIndex);
       const totalCards = allCards.length;
@@ -238,14 +270,14 @@ function applyStep(state, step, zones, assets, rng) {
     case 'deal_to_zone': {
       const { stackLabel, count, targetZoneLabel, faceDown = false } = step;
       const stack = idx.get(stackLabel);
-      if (!stack || !stack.cards.length) { console.warn(`[sequenceExecutor] deal_to_zone: stack "${stackLabel}" not found or empty`); return state; }
+      if (!stack || !stack.cards.length) return skip(`stack "${stackLabel}" not found or empty`);
 
       // Determine target zones
       let targetZones = zones;
       if (targetZoneLabel) {
         targetZones = zones.filter(z => z.label === targetZoneLabel);
       }
-      if (!targetZones.length) { console.warn(`[sequenceExecutor] deal_to_zone: no zones found`); return state; }
+      if (!targetZones.length) return skip(`zone "${targetZoneLabel ?? '(any)'}" not found`);
 
       const sorted = [...stack.cards].sort((a, b) => b.zIndex - a.zIndex); // top first
       let cardsToDeal = count > 0 ? sorted.slice(0, count) : sorted;
@@ -277,52 +309,65 @@ function applyStep(state, step, zones, assets, rng) {
         });
       });
 
+      if (count > 0 && cardsToDeal.length < count) {
+        return fail(`stack "${stackLabel}" held only ${cardsToDeal.length} of ${count} requested cards`);
+      }
       return state;
     }
 
     case 'place_asset': {
       const asset = findAsset(assets, step.assetName);
-      if (!asset) { console.warn(`[sequenceExecutor] place_asset: asset "${step.assetName}" not found`); return state; }
+      if (!asset) return skip(`asset "${step.assetName}" not found`);
 
       const existing = findPlaced(state, asset, step.assetName);
       const target = resolvePosition(step, zones);
+      const noPos = step.targetZoneLabel
+        ? `zone "${step.targetZoneLabel}" not found`
+        : `no position given for "${step.assetName}"`;
 
       if (existing) {
-        if (existing.locked) { console.warn(`[sequenceExecutor] place_asset: "${step.assetName}" is locked, not moving it`); return state; }
-        if (!target) { console.warn(`[sequenceExecutor] place_asset: no position for "${step.assetName}"`); return state; }
+        if (existing.locked) return skip(`"${step.assetName}" is locked, not moving it`);
+        if (!target) return skip(noPos);
         existing.x = target.x;
         existing.y = target.y;
         return state;
       }
 
-      if (!target) { console.warn(`[sequenceExecutor] place_asset: no position for "${step.assetName}"`); return state; }
-      state.tokens.push(assetToken(asset, target.x, target.y, step.faceDown));
+      if (!target) return skip(noPos);
+      const token = assetToken(asset, target.x, target.y, step.faceDown);
+      if (!token) return fail(`"${step.assetName}" has no back side and was not placed face down`);
+      state.tokens.push(token);
       return state;
     }
 
     case 'draw_assets': {
       const { pool, count = 1, targetZoneLabel, faceDown = false } = step;
       const candidates = pool ? assets.filter(a => norm(a.category) === norm(pool)) : [];
-      if (!candidates.length) { console.warn(`[sequenceExecutor] draw_assets: pool "${pool}" is empty or unknown`); return state; }
+      if (!candidates.length) return skip(`pool "${pool}" is empty or unknown`);
 
       const targetZones = targetZoneLabel
         ? zones.filter(z => norm(z.label) === norm(targetZoneLabel))
         : zones;
-      if (!targetZones.length) { console.warn(`[sequenceExecutor] draw_assets: no zones found`); return state; }
+      if (!targetZones.length) return skip(`zone "${targetZoneLabel ?? '(any)'}" not found`);
 
       const wanted = Math.max(1, Number(count) || 1);
       const n = Math.min(wanted, candidates.length);
-      if (n < wanted) {
-        console.warn(`[sequenceExecutor] draw_assets: pool "${pool}" holds only ${n} of ${wanted} requested assets`);
-      }
 
       const bag = [...candidates];
       shuffleArray(bag, rng);
       const drawn = bag.slice(0, n);
 
+      // A drawn asset without a back side is dropped, the rest of the draw still
+      // happens: three of four bosses in the bar is a visible gap and keeps the
+      // work, while an empty bar would throw away three correct placements.
+      // Dropping happens before the slots are handed out, so what is placed is
+      // still spread evenly.
+      const refused = faceDown ? drawn.filter(a => !a.back_image_path) : [];
+      const placeable = faceDown ? drawn.filter(a => a.back_image_path) : drawn;
+
       // Group per target zone first, then spread each group inside its zone.
       const perZone = new Map();
-      drawn.forEach((asset, i) => {
+      placeable.forEach((asset, i) => {
         const zone = targetZones[i % targetZones.length];
         if (!perZone.has(zone)) perZone.set(zone, []);
         perZone.get(zone).push(asset);
@@ -335,17 +380,24 @@ function applyStep(state, step, zones, assets, rng) {
         });
       }
 
-      return state;
+      const problems = [];
+      if (n < wanted) problems.push(`pool "${pool}" holds only ${n} of ${wanted} requested assets`);
+      if (refused.length) {
+        problems.push(`no back side, not placed face down: ${refused.map(a => a.name).join(', ')}`);
+      }
+      return problems.length ? fail(problems.join('; ')) : state;
     }
 
     case 'set_asset_face': {
       const obj = findPlaced(state, findAsset(assets, step.assetName), step.assetName);
-      if (!obj) { console.warn(`[sequenceExecutor] set_asset_face: "${step.assetName}" is not on the table`); return state; }
+      if (!obj) return skip(`"${step.assetName}" is not on the table`);
 
       const down = Boolean(step.faceDown);
       if (down && !obj.backImageUrl) {
-        console.warn(`[sequenceExecutor] set_asset_face: "${step.assetName}" has no back side, staying face up`);
-        return state;
+        // Same rule as placing: rather off the table than face up by accident.
+        state.tokens = state.tokens.filter(o => o !== obj);
+        state.boards = state.boards.filter(o => o !== obj);
+        return fail(`"${step.assetName}" has no back side; taken off the table instead of leaving it face up`);
       }
       obj.faceDown = down;
       obj.imageUrl = down ? obj.backImageUrl : (obj.frontImageUrl || obj.imageUrl);
@@ -355,7 +407,7 @@ function applyStep(state, step, zones, assets, rng) {
     case 'lock_asset':
     case 'unlock_asset': {
       const obj = findPlaced(state, findAsset(assets, step.assetName), step.assetName);
-      if (!obj) { console.warn(`[sequenceExecutor] ${step.type}: "${step.assetName}" is not on the table`); return state; }
+      if (!obj) return skip(`"${step.assetName}" is not on the table`);
       obj.locked = step.type === 'lock_asset';
       return state;
     }
@@ -363,21 +415,20 @@ function applyStep(state, step, zones, assets, rng) {
     case 'move': {
       if (step.assetName) {
         const obj = findPlaced(state, findAsset(assets, step.assetName), step.assetName);
-        if (!obj) { console.warn(`[sequenceExecutor] move: "${step.assetName}" is not on the table`); return state; }
-        if (obj.locked) { console.warn(`[sequenceExecutor] move: "${step.assetName}" is locked, not moving it`); return state; }
+        if (!obj) return skip(`"${step.assetName}" is not on the table`);
+        if (obj.locked) return skip(`"${step.assetName}" is locked, not moving it`);
         obj.x = step.x ?? obj.x;
         obj.y = step.y ?? obj.y;
         return state;
       }
       const stack = idx.get(step.stackLabel);
-      if (!stack) { console.warn(`[sequenceExecutor] move: stack "${step.stackLabel}" not found`); return state; }
+      if (!stack) return skip(`stack "${step.stackLabel}" not found`);
       stack.x = step.x ?? stack.x;
       stack.y = step.y ?? stack.y;
       return state;
     }
 
     default:
-      console.warn(`[sequenceExecutor] Unknown step type: "${step.type}"`);
-      return state;
+      return skip(`unknown step type "${step.type}"`);
   }
 }

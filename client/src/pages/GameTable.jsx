@@ -9,7 +9,7 @@ import PlayerCursors from '../components/PlayerCursor';
 import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
-import { executeSequence } from '../utils/sequenceExecutor.js';
+import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -326,6 +326,9 @@ export default function GameTable({ room = null }) {
   const [saveName, setSaveName] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(null);
+  // Steps of the last setup sequence that did not work - shown until dismissed,
+  // because a setup with silently skipped steps looks exactly like a correct one.
+  const [setupIssues, setSetupIssues] = useState(null);
   const saveLoadedRef = useRef(false);
 
   // Setup state
@@ -3346,7 +3349,10 @@ export default function GameTable({ room = null }) {
               // Asset steps (place_asset / draw_assets / ...) draw from the game's table assets.
               const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
               const assets = assetsRes.ok ? await assetsRes.json() : [];
-              stateToLoad = executeSequence(parsed, parsedSeq, parsedZones, { assets });
+              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets });
+              stateToLoad = built;
+              const bad = log.filter(e => e.status !== 'ok');
+              setSetupIssues(bad.length ? bad : null);
             } catch (err) {
               console.error('Sequence execution failed:', err);
             }
@@ -5764,6 +5770,36 @@ export default function GameTable({ room = null }) {
           </svg>
           <span className="text-sm font-medium">{saveToast}</span>
           <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+        </div>
+      )}
+
+      {/* Setup Sequence Problems - stays until dismissed */}
+      {setupIssues && (
+        <div
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
+          data-testid="setup-issues"
+          data-ui-element="true"
+        >
+          <div className="flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+            <div className="text-sm">
+              <div className="font-medium mb-1">
+                {setupIssues.length} setup step{setupIssues.length > 1 ? 's' : ''} did not work
+              </div>
+              <ul className="space-y-0.5 text-white/90">
+                {setupIssues.map(e => (
+                  <li key={e.index}>
+                    #{e.index + 1} {e.type}{e.target ? ' "' + e.target + '"' : ''} &mdash; {e.status}: {e.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button onClick={() => setSetupIssues(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+          </div>
         </div>
       )}
 
