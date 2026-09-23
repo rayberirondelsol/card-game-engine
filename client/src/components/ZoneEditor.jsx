@@ -5,6 +5,7 @@ import { zoneSlots } from '../../../shared/zoneGeometry.js';
 import {
   screenToWorld, rectFromPoints, isDrawable, createZone,
   panelSide, moveZone, resizeZone, RESIZE_HANDLES, handleAnchor,
+  parseSlotLabels, slotLabelsText,
 } from '../utils/zoneDraft';
 import { setAnchor } from '../../../shared/anchoring.js';
 
@@ -531,6 +532,36 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
             {['row', 'column', 'grid'].includes(selectedZone.layout) && !selectedZone.capacity && (
               <p className="text-[10px] text-amber-400 mt-1">Set a capacity to get fixed places.</p>
             )}
+          </div>
+          {/*
+            M7: die Plaetze einer Leiste koennen Namen tragen - fuer die
+            Bosseleiste sind das die Schwierigkeitsstufen. `reveal_next` bindet
+            den Namen des Platzes als $revealedTier. Ohne dieses Feld waere das
+            eine Faehigkeit, die nur ueber handgeschriebenes JSON erreichbar ist.
+          */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Place names (comma separated, optional)</label>
+            <input
+              type="text"
+              value={slotLabelsText(selectedZone)}
+              placeholder="CHUMP, HOOLIGAN, TROUBLEMAKER, FINAL FIGHT"
+              onChange={e => updateZone(selectedZone.id, { slotLabels: parseSlotLabels(e.target.value) })}
+              className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+            />
+            {(() => {
+              const names = Array.isArray(selectedZone.slotLabels) ? selectedZone.slotLabels : null;
+              const places = zoneSlots(selectedZone)?.length ?? null;
+              if (!names) {
+                return <p className="text-[10px] text-gray-500 mt-1">A step can read the name of the place it revealed from ($revealedTier).</p>;
+              }
+              // Die eine Verwechslung, die still falsch waere: zu wenige Namen
+              // heisst, dass der letzte Platz keinen hat - und der letzte Platz
+              // ist der Endkampf.
+              if (places !== null && names.length !== places) {
+                return <p className="text-[10px] text-amber-400 mt-1">{names.length} name{names.length === 1 ? '' : 's'} for {places} place{places === 1 ? '' : 's'} - they are matched by position.</p>;
+              }
+              return <p className="text-[10px] text-gray-500 mt-1">Read as $revealedTier, matched by position.</p>;
+            })()}
           </div>
           <div className="flex items-center justify-between">
             <label className="text-xs text-gray-400">Snap to places</label>

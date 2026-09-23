@@ -340,3 +340,154 @@ test('a sequence without reveal_next behaves exactly as before', () => {
   assert.equal(side.imageUrl, '/uploads/boards/side.png');
   assert.equal(side.locked, true);
 });
+
+// ── M7/T4: der Platz bindet die Stufe ────────────────────────────────────────
+//
+// Die vier Plätze der Bösewicht-Leiste *sind* die Schwierigkeitsstufen. Wir
+// spielen die verkürzte Variante: ein offener Marker belegt Platz 1, die
+// Bösewichte stehen dahinter. Eine aus der Runde abgeleitete Stufe wäre hier
+// durchgehend um eins daneben - deshalb kommt sie vom Platz.
+
+const TIERS = ['CHUMP', 'HOOLIGAN', 'TROUBLEMAKER', 'FINAL FIGHT'];
+
+/** Dieselbe Leiste wie `Bosseleiste`, nur mit Namen an den Plätzen. */
+const TIER_ZONE = {
+  id: 'z5', label: 'Stufenleiste', x: 100, y: 700, width: 400, height: 80,
+  accepts: ['asset'], capacity: 4, layout: 'row', slotLabels: TIERS,
+};
+const TIER_ZONES = [...ZONES, TIER_ZONE];
+
+/**
+ * Die Kurzpartie: der Marker liegt **offen** auf Platz 1, dahinter `count`
+ * verdeckte Bösewichte. Mit drei davon bleibt Platz 4 der letzte - auch wenn
+ * nichts darauf liegt.
+ */
+function shortGameBar(count = 3) {
+  return executeSequence(
+    emptyState(),
+    [
+      { type: 'place_asset', assetName: 'Einzelgänger', targetZoneLabel: 'Stufenleiste', faceDown: false },
+      ...BOSSES.slice(0, count).map(n => ({ type: 'place_asset', assetName: `Bösewicht: ${n}`, targetZoneLabel: 'Stufenleiste', faceDown: true })),
+    ],
+    TIER_ZONES,
+    opts()
+  );
+}
+
+const counterNames = (state) => (state.counters || []).map(c => c.name);
+
+test('reveal_next binds the slot and its name, skipping the face-up short-game marker', () => {
+  const { state, log, bindings, revealedLast } = executeSequenceWithLog(
+    shortGameBar(),
+    [
+      { type: 'reveal_next', zoneLabel: 'Stufenleiste' },
+      { type: 'place_counter', name: 'Platz $revealedSlot: $revealedTier', value: 0, x: 0, y: 0 },
+    ],
+    TIER_ZONES,
+    opts()
+  );
+
+  assert.deepEqual(log.map(e => e.status), ['ok', 'ok'], log.map(e => e.reason).join(' | '));
+  const up = state.tokens.filter(t => !t.faceDown && t.label.startsWith('Bösewicht: '));
+  assert.equal(up.length, 1);
+  assert.equal(up[0].label, 'Bösewicht: Klaus', 'der erste *verdeckte*, nicht der Marker');
+  assert.equal(bindings.revealedSlot, '2', 'Platz 2, weil der Marker Platz 1 belegt');
+  assert.equal(bindings.revealedTier, 'HOOLIGAN');
+  assert.equal(revealedLast, false);
+  assert.deepEqual(counterNames(state), ['Platz 2: HOOLIGAN']);
+});
+
+test('the last slot of the bar is the last slot, also when only three bosses lie in it', () => {
+  const reveal = { type: 'reveal_next', zoneLabel: 'Stufenleiste' };
+
+  // Zwei Aufdeckungen: Platz 2 und 3 - beide nicht der letzte.
+  const middle = executeSequenceWithLog(shortGameBar(), [reveal, reveal], TIER_ZONES, opts());
+  assert.deepEqual(middle.log.map(e => e.status), ['ok', 'ok'], middle.log.map(e => e.reason).join(' | '));
+  assert.equal(middle.bindings.revealedSlot, '3');
+  assert.equal(middle.bindings.revealedTier, 'TROUBLEMAKER');
+  assert.equal(middle.revealedLast, false, 'der dritte von vier Plätzen ist nicht der Endkampf');
+
+  // Der dritte Bösewicht steht auf Platz 4 - dem letzten der Zone.
+  const last = executeSequenceWithLog(shortGameBar(), [reveal, reveal, reveal], TIER_ZONES, opts());
+  assert.deepEqual(last.log.map(e => e.status), ['ok', 'ok', 'ok'], last.log.map(e => e.reason).join(' | '));
+  assert.equal(last.bindings.revealedSlot, '4');
+  assert.equal(last.bindings.revealedTier, 'FINAL FIGHT');
+  assert.equal(last.revealedLast, true, 'Endkampf kommt vom letzten Platz, nicht vom Abzählen der Objekte');
+});
+
+test('a zone without slotLabels binds the slot but leaves $revealedTier unresolved', () => {
+  const { state, log, bindings } = executeSequenceWithLog(
+    barState(),
+    [
+      { type: 'reveal_next', zoneLabel: 'Bosseleiste' },
+      { type: 'place_counter', name: 'Platz $revealedSlot', value: 0, x: 0, y: 0 },
+      { type: 'place_counter', name: 'Stufe $revealedTier', value: 0, x: 0, y: 0 },
+    ],
+    ZONES,
+    opts()
+  );
+
+  assert.deepEqual(log.map(e => e.status), ['ok', 'ok', 'skipped']);
+  assert.equal(bindings.revealedSlot, '1');
+  assert.equal(bindings.revealedTier, undefined, 'kein Name heißt kein Name, kein erfundener Index');
+  assert.deepEqual(counterNames(state), ['Platz 1']);
+});
+
+// ── M7/T4: Platzhalter gelten in jedem Namensfeld ────────────────────────────
+
+const CARDS = [
+  { id: 'c1', name: 'Wut', category: 'Aktionen: Klaus', image_path: '/uploads/cards/c1.png', width: 120, height: 180 },
+  { id: 'c2', name: 'Hieb', category: 'Aktionen: Klaus', image_path: '/uploads/cards/c2.png', width: 120, height: 180 },
+  { id: 'c3', name: 'Ruhe', category: 'Aktionen: Bertha', image_path: '/uploads/cards/c3.png', width: 120, height: 180 },
+];
+
+const cardOpts = () => ({ assets: assetFixture(), cards: CARDS });
+
+test('placeholders are replaced in category and label, not only in assetName', () => {
+  const { state, log } = executeSequenceWithLog(
+    shortGameBar(),
+    [
+      { type: 'reveal_next', zoneLabel: 'Stufenleiste' },
+      { type: 'place_stack', category: 'Aktionen: $revealedBase', label: 'Deck $revealedTier', x: 500, y: 500 },
+    ],
+    TIER_ZONES,
+    cardOpts()
+  );
+
+  assert.deepEqual(log.map(e => e.status), ['ok', 'ok'], log.map(e => e.reason).join(' | '));
+  assert.equal(state.stacks.length, 1);
+  assert.equal(state.stacks[0].label, 'Deck HOOLIGAN');
+  assert.deepEqual(state.stacks[0].cards.map(c => c.name), ['Wut', 'Hieb'], 'nur die Kategorie des aufgedeckten Bösewichts');
+});
+
+test('a step with an unbound placeholder in cell is skipped, never taken literally', () => {
+  const grids = [{ id: 'g1', label: 'Kampffeld', x: 0, y: 0, width: 1000, height: 1000, cols: 10, rows: 10, type: 'square', labels: { cols: 'alpha', rows: 'numeric' } }];
+  const { state, log } = executeSequenceWithLog(
+    emptyState(),
+    [
+      { type: 'place_asset', assetName: 'Sideboard', gridLabel: 'Kampffeld', cell: '$B' },
+      { type: 'place_stack', category: 'Aktionen: $revealedBase', label: 'Deck', x: 0, y: 0 },
+    ],
+    ZONES,
+    { assets: assetFixture(), cards: CARDS, grids }
+  );
+
+  assert.deepEqual(log.map(e => e.status), ['skipped', 'skipped']);
+  assert.match(log[0].reason, /\$B/, 'der Grund nennt den ungebundenen Platzhalter');
+  assert.equal(state.boards.length, 0, 'nichts gelegt');
+  assert.equal(state.stacks.length, 0);
+});
+
+test('an under-filled bar does not promote its last object to the last slot', () => {
+  // Marker plus zwei Bösewichte: drei Objekte auf einer Leiste mit vier
+  // Plätzen. Der letzte davon steht auf Platz 3 - Platz 4 ist leer und bleibt
+  // der Endkampf. Aus der Zahl der Objekte abgeleitet wäre hier still
+  // TROUBLEMAKER zum FINAL FIGHT geworden.
+  const reveal = { type: 'reveal_next', zoneLabel: 'Stufenleiste' };
+  const out = executeSequenceWithLog(shortGameBar(2), [reveal, reveal], TIER_ZONES, opts());
+
+  assert.deepEqual(out.log.map(e => e.status), ['ok', 'ok'], out.log.map(e => e.reason).join(' | '));
+  assert.equal(out.bindings.revealedSlot, '3');
+  assert.equal(out.bindings.revealedTier, 'TROUBLEMAKER');
+  assert.equal(out.revealedLast, false, 'der Platz zählt, nicht wie viel darauf liegt');
+});

@@ -68,7 +68,11 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // What `reveal_next` bound, for the placeholders in the steps behind it.
   // Beside the state for the same reason as the log: the state is persisted as
   // JSON, and a binding smuggled into it would end up in the database.
-  const ctx = { revealed: null };
+  //
+  // `vars` ist die Ersetzungstabelle (Platzhaltername → Text), `revealedLast`
+  // die eine Tatsache, die kein Text ist: kam das Aufgedeckte vom letzten Platz
+  // der Leiste? Das ist, was der Endkampf liest (M7).
+  const ctx = { vars: {}, revealedLast: false };
 
   sequenceData.forEach((step, index) => {
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
@@ -81,7 +85,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     }
   });
 
-  return { state, log };
+  return { state, log, bindings: ctx.vars, revealedLast: ctx.revealedLast };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -179,17 +183,53 @@ function findGrid(grids, label) {
  * puts them without a capacity.
  */
 function inSlotOrder(zone, objects) {
+  return slotOrder(zone, objects).entries.map(e => e.o);
+}
+
+/**
+ * Dieselbe Reihenfolge, zusätzlich mit dem Platz, auf dem jedes Objekt liegt,
+ * und mit der Anzahl der Plätze, die die Zone *hat* (M7).
+ *
+ * Die Zahl kommt von der Zone, nicht vom Zählen der Objekte: eine Leiste mit
+ * vier Plätzen, auf der nur drei Dinge liegen, hat trotzdem vier Plätze - und
+ * „letzter Platz" heißt dann der vierte, nicht der dritte. Genau das ist der
+ * Kurzpartie-Fall, und ein Abzählen wäre dort still um eins daneben.
+ *
+ * Eine Zone ohne feste Plätze hat nur ihre Lesereihenfolge; dort *ist* die
+ * Position darin der Platz - mehr weiß die Zone über sich nicht.
+ */
+function slotOrder(zone, objects) {
   const slots = zoneSlots(zone);
   const dist2 = (p, o) => (p.x - o.x) ** 2 + (p.y - o.y) ** 2;
   const place = (o) => (slots ? slots.reduce((best, s, i) => (dist2(s, o) < dist2(slots[best], o) ? i : best), 0) : 0);
-  return objects
+  const sorted = objects
     .map(o => ({ o, k: [place(o), o.y, o.x] }))
-    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2])
-    .map(e => e.o);
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2]);
+  return {
+    slotCount: slots ? slots.length : sorted.length,
+    entries: sorted.map((e, i) => ({ o: e.o, slot: slots ? e.k[0] : i })),
+  };
 }
 
-/** Longest first: "$revealedBase" also starts with "$revealed". */
-const REVEALED = /\$revealedBase|\$revealed/g;
+/**
+ * Ein Platzhalter: `$` und ein Name. Der gierige Name macht „längster zuerst"
+ * automatisch - `$revealedBase` ist *ein* Treffer und nicht `$revealed` plus
+ * „Base". Ein einzelnes `$` ohne Namen ist keiner.
+ */
+const PLACEHOLDER = /\$[A-Za-z][A-Za-z0-9]*/g;
+const PLACEHOLDER_ONE = /\$[A-Za-z][A-Za-z0-9]*/;
+
+/** Steht in diesem Wert ein Platzhalter? Auch die Validierung im Editor fragt das. */
+export function hasPlaceholder(value) {
+  return typeof value === 'string' && PLACEHOLDER_ONE.test(value);
+}
+
+/**
+ * Die Namensfelder eines Schritts - jedes davon kann einen Platzhalter tragen
+ * (M7). Eine Liste an einer Stelle, nicht eine Sonderbehandlung je Feld: der
+ * `assetName`-Sonderfall hat genau deshalb jedes neue Feld verpasst.
+ */
+const NAME_FIELDS = ['assetName', 'cell', 'category', 'label', 'name'];
 
 /** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
 function baseName(name) {
@@ -279,14 +319,22 @@ function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, c
 
   const idx = buildStackIndex(state);
 
-  // Placeholders are resolved once, here, so that every step addressing an
-  // asset by name gets them and none of them repeats the substitution. Nothing
-  // bound means unresolved: falling back to the literal "$revealed" would
-  // address whatever asset happens to carry that name, and guessing a boss is
-  // worse than not laying one out.
-  if (typeof step.assetName === 'string' && step.assetName.includes('$revealed')) {
-    if (!ctx.revealed) return skip(`"${step.assetName}": nothing revealed yet`);
-    step = { ...step, assetName: step.assetName.replace(REVEALED, (m) => (m === '$revealed' ? ctx.revealed : baseName(ctx.revealed))) };
+  // Placeholders are resolved once, here, for *every* name field of the step,
+  // so that none of the handlers repeats the substitution. Nothing bound means
+  // unresolved: falling back to the literal "$revealed" would address whatever
+  // asset happens to carry that name, and guessing a boss is worse than not
+  // laying one out.
+  for (const field of NAME_FIELDS) {
+    const raw = step[field];
+    if (!hasPlaceholder(raw)) continue;
+    let missing = null;
+    const filled = raw.replace(PLACEHOLDER, (m) => {
+      const value = ctx.vars[m.slice(1)];
+      if (value === undefined) { missing = missing || m; return m; }
+      return value;
+    });
+    if (missing) return skip(`"${raw}": ${missing} is not bound`);
+    step = { ...step, [field]: filled };
   }
 
   switch (step.type) {
@@ -639,8 +687,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, c
       const zone = findZone(zones, step.zoneLabel);
       if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
 
-      const obj = inSlotOrder(zone, objectsInZone(zone, state.tokens, state.boards)).find(o => o.faceDown);
-      if (!obj) return skip(`nothing face down in zone "${step.zoneLabel}"`);
+      const { entries, slotCount } = slotOrder(zone, objectsInZone(zone, state.tokens, state.boards));
+      const hit = entries.find(e => e.o.faceDown);
+      if (!hit) return skip(`nothing face down in zone "${step.zoneLabel}"`);
+      const obj = hit.o;
 
       if (step.targetZoneLabel) {
         const target = findZone(zones, step.targetZoneLabel);
@@ -659,7 +709,27 @@ function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, c
       }
 
       Object.assign(obj, assetFace(obj, false));
-      ctx.revealed = obj.label || obj.name || null;
+
+      // Der Platz bindet die Stufe, nicht die Runde (M7). Der Index fiel in
+      // `slotOrder` ohnehin an; bisher wurde er weggeworfen.
+      //
+      // Jedes Aufdecken bindet neu, statt die alte Tabelle zu ergänzen: was
+      // zum vorigen Bösewicht gehörte, gilt für diesen nicht mehr - ein
+      // stehengebliebenes $revealedTier wäre still falsch.
+      const name = obj.label || obj.name || null;
+      const labels = Array.isArray(zone.slotLabels) ? zone.slotLabels : null;
+      const tier = String(labels?.[hit.slot] ?? '').trim();
+      ctx.vars = {};
+      if (name) {
+        ctx.vars.revealed = name;
+        ctx.vars.revealedBase = baseName(name);
+      }
+      ctx.vars.revealedSlot = String(hit.slot + 1);
+      // Kein Name heißt kein Name: $revealedTier bleibt ungebunden und der
+      // Schritt dahinter wird übersprungen, statt dass hier ein Index als
+      // Stufe ausgegeben wird, den niemand so aufgeschrieben hat.
+      if (tier) ctx.vars.revealedTier = tier;
+      ctx.revealedLast = hit.slot === slotCount - 1;
       return state;
     }
 

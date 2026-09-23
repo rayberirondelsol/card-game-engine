@@ -13,6 +13,7 @@
  */
 import { counterMax } from '../../../shared/counters.js';
 import { cellFromLabel } from '../../../shared/gridGeometry.js';
+import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -262,10 +263,11 @@ export function validateStep(step, ctx = {}) {
     else if (!known(stackLabels, step.stackLabel)) problems.push(`stack "${step.stackLabel}" not found`);
   }
   if (fields.has('assetName')) {
-    // Ein Platzhalter ($revealed) steht fuer einen Namen, den erst reveal_next
-    // am Tisch kennt - hier gaebe es dazu nur einen falschen Alarm.
+    // Ein Platzhalter ($revealed, $revealedTier) steht fuer einen Namen, den
+    // erst der Tisch kennt - hier gaebe es dazu nur einen falschen Alarm. Das
+    // gilt in jedem Namensfeld, nicht nur hier (M7/T4).
     if (!step?.assetName) problems.push('no asset chosen');
-    else if (!step.assetName.includes('$revealed') && !known(names, step.assetName)) problems.push(`asset "${step.assetName}" not found`);
+    else if (!hasPlaceholder(step.assetName) && !known(names, step.assetName)) problems.push(`asset "${step.assetName}" not found`);
   }
   // reveal_next liest die Zone, aus der aufgedeckt wird - anders als bei
   // targetZoneLabel ist "keine" hier keine gueltige Wahl.
@@ -282,7 +284,7 @@ export function validateStep(step, ctx = {}) {
   // ist Pflicht: ohne ihn findet `remove_stack` den Stapel nie wieder.
   if (fields.has('category')) {
     if (!step?.category) problems.push('no card category chosen');
-    else if (!known(cardCategories, step.category)) problems.push(`card category "${step.category}" is empty or unknown`);
+    else if (!hasPlaceholder(step.category) && !known(cardCategories, step.category)) problems.push(`card category "${step.category}" is empty or unknown`);
   }
   if (fields.has('label') && !String(step?.label ?? '').trim()) problems.push('no stack name given');
   // M7/T1: Raster und Feld gehoeren zusammen - ein Feld ohne Raster ist keine
@@ -293,7 +295,9 @@ export function validateStep(step, ctx = {}) {
     if (!step?.gridLabel) problems.push('no grid chosen for the field');
     else if (Array.isArray(grids) && grids.length && !grid) problems.push(`grid "${step.gridLabel}" not found`);
     else if (!step?.cell) problems.push('no field chosen');
-    else if (grid && !cellFromLabel(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
+    // Ein Platzhalter ($B, $D1) ist kein Feldname: welches Feld er meint, weiß
+    // erst `build_scenario` am Tisch (M7/T4).
+    else if (grid && !hasPlaceholder(step.cell) && !cellFromLabel(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
   }
   // M7/T2: bei `clear_grid` *ist* das Raster die Adresse, nicht eine von dreien
   // wie bei `place_asset` - "keins" ist hier also keine gueltige Wahl.

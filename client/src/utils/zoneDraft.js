@@ -196,3 +196,24 @@ export function handleAnchor(handle) {
     fy: h.includes('n') ? 0 : h.includes('s') ? 1 : 0.5,
   };
 }
+
+// ── Die Namen der Plätze (M7/T4) ─────────────────────────────────────────────
+
+/**
+ * Eine Zeile → die Namen der Plätze, oder `null` für „keine".
+ *
+ * Getrimmt wird jeder Eintrag, leere *am Ende* fallen weg - ein Komma zu viel
+ * ist kein weiterer Platz. Ein leerer Eintrag **in der Mitte** bleibt stehen:
+ * ihn wegzuwerfen verschöbe jeden Namen dahinter um eins, und die Stufe hängt
+ * am Platz genau deshalb, weil so eine Verschiebung still falsch wäre.
+ */
+export function parseSlotLabels(text) {
+  const list = String(text ?? '').split(',').map(s => s.trim());
+  while (list.length && !list[list.length - 1]) list.pop();
+  return list.length ? list : null;
+}
+
+/** Der Weg zurück ins Eingabefeld. */
+export function slotLabelsText(zone) {
+  return Array.isArray(zone?.slotLabels) ? zone.slotLabels.join(', ') : '';
+}

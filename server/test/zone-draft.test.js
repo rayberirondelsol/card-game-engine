@@ -139,3 +139,38 @@ test('a drawn zone configured for places yields exactly that many', () => {
   assert.equal(slots.length, 4);
   for (const s of slots) assert.ok(zoneContains(zone, s.x, s.y));
 });
+
+// ── M7/T4: die Namen der Plätze ──────────────────────────────────────────────
+//
+// Die vier Plätze der Bösewicht-Leiste sind Schwierigkeitsstufen, und wie sie
+// heißen, sind Daten im `zone_data`. Eingegeben werden sie als eine Zeile - und
+// die Umrechnung ist das, was hier schiefgehen kann.
+
+const { parseSlotLabels, slotLabelsText } = await import('../../client/src/utils/zoneDraft.js');
+
+test('parseSlotLabels turns one line into the names of the places', () => {
+  assert.deepEqual(
+    parseSlotLabels('CHUMP, HOOLIGAN, TROUBLEMAKER, FINAL FIGHT'),
+    ['CHUMP', 'HOOLIGAN', 'TROUBLEMAKER', 'FINAL FIGHT']
+  );
+
+  // Nichts ist nichts, kein leerer Name auf Platz 1.
+  assert.equal(parseSlotLabels(''), null);
+  assert.equal(parseSlotLabels('   ,  '), null);
+  assert.equal(parseSlotLabels(undefined), null);
+
+  // Ein leerer Eintrag *in der Mitte* behält seinen Platz. Ihn wegzuwerfen
+  // würde jeden Namen dahinter um eins verschieben - still, und genau das ist
+  // der Fehler, gegen den die Stufe überhaupt am Platz hängt.
+  assert.deepEqual(parseSlotLabels(', HOOLIGAN, TROUBLEMAKER'), ['', 'HOOLIGAN', 'TROUBLEMAKER']);
+
+  // Hinten abgeschnitten: wer ein Komma zu viel tippt, meint keinen Platz mehr.
+  assert.deepEqual(parseSlotLabels('CHUMP, HOOLIGAN, '), ['CHUMP', 'HOOLIGAN']);
+});
+
+test('slotLabelsText is the way back into the input field', () => {
+  const names = ['CHUMP', 'HOOLIGAN', 'TROUBLEMAKER', 'FINAL FIGHT'];
+  assert.deepEqual(parseSlotLabels(slotLabelsText({ slotLabels: names })), names, 'Rundreise verlustfrei');
+  assert.equal(slotLabelsText({}), '');
+  assert.equal(slotLabelsText(null), '');
+});

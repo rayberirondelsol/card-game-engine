@@ -437,3 +437,35 @@ test('a grid step built by the editor runs in the executor', () => {
   const klaus = state.tokens.find(t => t.label === 'Klaus');
   assert.deepEqual([klaus.x, klaus.y, klaus.cell], [150, 390, 'C7']);
 });
+
+// ── M7/T4: Platzhalter sind kein Tippfehler ──────────────────────────────────
+//
+// Ein Platzhalter steht für einen Namen, den erst der Tisch kennt. Wer ihn hier
+// anmahnt, produziert einen Fehlalarm je Schritt - und Warnungen, die immer
+// dastehen, liest niemand mehr.
+
+test('validateStep leaves placeholders alone in every name field', () => {
+  const ctx = { ...gridCtx(), cardCategories: ['Aktionen: Klaus'] };
+
+  // Feld: erst am Tisch bekannt, also kein "das Raster hat kein Feld $B".
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: '$B' }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: '$revealed', gridLabel: 'Kampffeld', cell: '$D1' }, ctx), []);
+
+  // Kartenkategorie: dieselbe Idee wie beim Assetnamen.
+  assert.deepEqual(validateStep({ type: 'place_stack', category: 'Aktionen: $revealedBase', label: 'Verhaltensdeck', x: 0, y: 0 }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'place_stack', category: 'Aktionen: Klaus', label: 'Deck $revealedTier', x: 0, y: 0 }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'place_counter', name: 'Stufe $revealedTier', value: 0, x: 0, y: 0 }, ctx), []);
+
+  // Ohne Platzhalter bleibt die Prüfung scharf.
+  assert.equal(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'Z99' }, ctx).length, 1);
+  assert.equal(validateStep({ type: 'place_stack', category: 'Gibt es nicht', label: 'Deck', x: 0, y: 0 }, ctx).length, 1);
+
+  // Und ein leeres Feld bleibt ein leeres Feld, kein Platzhalter.
+  assert.equal(validateStep({ type: 'place_counter', name: '', value: 0, x: 0, y: 0 }, ctx).length, 1);
+});
+
+test('a field placeholder hides x/y just like a real field does', () => {
+  const fields = stepFields({ type: 'place_asset', assetName: '$revealed', gridLabel: 'Kampffeld', cell: '$B' });
+  assert.ok(!fields.includes('x') && !fields.includes('y'), 'ein Feldziel schließt Koordinaten aus');
+  assert.ok(fields.includes('cell') && fields.includes('gridLabel'));
+});
