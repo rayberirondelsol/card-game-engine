@@ -655,3 +655,44 @@ Sideboard auf die Kampfseite und legt das Tableau genau dieses Bösewichts mit d
 Szenarioseite nach oben neben das Brett. Ein zweiter Druck nimmt den nächsten
 Bösewicht, nicht denselben. Nach dem vierten ist kein verdeckter mehr da und der
 Schritt wird im Protokoll als übersprungen gemeldet.
+
+### Nachtrag: `clear_zone` — eine Zone wieder leer machen
+
+Beim ersten echten Durchlauf von „Kampf beginnen" aufgefallen: der **zweite**
+Druck scheitert, und das Protokoll sagt genau warum —
+`reveal_next "Bösewicht-Leiste" — skipped: zone "Bösewicht-Platz" is full (1)`.
+
+Der besiegte Bösewicht liegt noch auf seinem Platz, und sein Tableau noch neben
+dem Brett. Am echten Tisch räumt man beides weg, wenn der Kampf vorbei ist. Das
+Vokabular kennt aber nur Hinlegen und Austeilen, nichts zum Abräumen — es fehlt
+das Gegenstück zu `deal_to_zone`.
+
+`clear_zone { zoneLabel, targetZoneLabel? }`:
+- nimmt **alle** Objekte aus `zoneLabel`,
+- legt sie in `targetZoneLabel`, wenn eines angegeben ist (mit dessen
+  `accepts`/`capacity`, wie überall),
+- **nimmt sie vom Tisch**, wenn keines angegeben ist,
+- und überspringt sich, wenn die Zone leer ist oder nicht existiert.
+
+Ohne Ziel wird gelöscht, und das ist die gefährlichere Hälfte. Deshalb gilt sie
+ausschließlich für Objekte, **die in der Zone liegen** — nie für den Anker, auf
+dem die Zone hängt (dieselbe Ausnahme, die `countInZone` schon kennt: ein Brett
+mit einer Zone darauf liegt nicht *in* ihr).
+
+#### Folge für „Kampf beginnen"
+Der Ablauf bekommt zwei Schritte davor, und das Tableau eine eigene Zone, damit
+man es überhaupt abräumen kann:
+
+1. `clear_zone` **Bösewicht-Platz** → **Besiegte Bösewichte** (der Vorgänger
+   wandert in die Trophäenreihe, statt gelöscht zu werden — er ist besiegt,
+   nicht verschwunden)
+2. `clear_zone` **Bösewicht-Tableau** (ohne Ziel: zurück in die Schachtel)
+3. `reveal_next` Bösewicht-Leiste → Bösewicht-Platz
+4. `set_asset_face` Sideboard auf die Kampfseite
+5. `place_asset` `Tableau: $revealedBase` → Zone **Bösewicht-Tableau**,
+   Szenarioseite nach oben
+
+**Abnahme:** Viermal „Kampf beginnen" deckt vier **verschiedene** Bösewichte auf,
+legt jedes Mal das passende Tableau hin und räumt das vorige weg. Der fünfte
+Druck meldet im Protokoll, dass nichts mehr aufzudecken ist — und ändert sonst
+nichts.

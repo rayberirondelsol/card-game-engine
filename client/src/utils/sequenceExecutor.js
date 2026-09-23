@@ -220,6 +220,12 @@ function shareOut(items, usable, free) {
   return { groups, leftovers };
 }
 
+/** Was für ein Ding das ist, in der Sprache von `accepts`: Karte oder Asset. */
+const kindOf = (o) => (o?.cardId ? 'card' : 'asset');
+
+/** Wie ein Objekt im Protokoll heißt. */
+const objName = (o) => o?.label || o?.name || o?.cardId || '?';
+
 /** "zone X is full (4)" for every zone that ran out of room during this step. */
 function fullZones(usable, free, kind) {
   return usable.filter(z => free.get(z) <= 0).map(z => zoneRejects(z, kind, Infinity)).filter(Boolean);
@@ -538,6 +544,62 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
       Object.assign(obj, assetFace(obj, false));
       ctx.revealed = obj.label || obj.name || null;
       return state;
+    }
+
+    // Das Gegenstück zu `deal_to_zone` (Spec 11, Nachtrag): eine Zone wieder
+    // leer machen. Ohne Ziel wird gelöscht, und das ist die gefährlichere
+    // Hälfte - deshalb gilt der Schritt nur für das, was *in* der Zone liegt,
+    // nie für den Anker, auf dem sie hängt. Diese Ausnahme kennt
+    // `objectsInZone` bereits; hier wird sie nur nicht umgangen.
+    case 'clear_zone': {
+      const zone = findZone(zones, step.zoneLabel);
+      if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
+
+      const inside = inSlotOrder(zone, objectsInZone(zone, state.cards, state.tokens));
+      if (!inside.length) return skip(`zone "${step.zoneLabel}" is empty`);
+
+      // Gesperrt heißt gesperrt: `place_asset` und `move` verschieben ein
+      // gesperrtes Objekt nicht, also räumt clear_zone es auch nicht weg -
+      // das Schloss ausgerechnet gegen das Löschen wirkungslos zu machen wäre
+      // die falsche Richtung.
+      const locked = inside.filter(o => o.locked);
+      const movable = inside.filter(o => !o.locked);
+      const notes = locked.length ? [`left in place, locked: ${locked.map(objName).join(', ')}`] : [];
+      if (!movable.length) return fail(notes.join('; '));
+
+      if (step.targetZoneLabel) {
+        const target = findZone(zones, step.targetZoneLabel);
+        if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
+
+        // Eine Zone kann Karten und Assets halten; `accepts` gilt je Sorte, die
+        // Kapazität teilen sie sich (`occupancy` zählt beide). Darum einmal
+        // `zoneRoom` pro Sorte, gerechnet wird mit dem ersten Ergebnis.
+        const rooms = [...new Set(movable.map(kindOf))].map(k => zoneRoom(state, [target], k));
+        const blocked = rooms.filter(r => !r.usable.length);
+        if (blocked.length) return skip(blocked.flatMap(r => r.problems).join('; '));
+
+        const { free, occupied } = rooms[0];
+        const { groups, leftovers } = shareOut(movable, [target], free);
+        const slots = zoneSlots(target);
+        const start = occupied.get(target);
+        groups.get(target).forEach((obj, i) => {
+          const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneCenter(target);
+          obj.x = pos.x;
+          obj.y = pos.y;
+        });
+
+        // Was nicht mitkommt, bleibt liegen und steht mit Namen im Protokoll -
+        // stillschweigend verschwinden darf hier nichts.
+        if (leftovers.length) {
+          notes.push(`${leftovers.length} of ${movable.length} objects stayed in zone "${step.zoneLabel}": ${fullZones([target], free, kindOf(leftovers[0])).join('; ')} (${leftovers.map(objName).join(', ')})`);
+        }
+      } else {
+        const gone = new Set(movable);
+        state.cards = state.cards.filter(o => !gone.has(o));
+        state.tokens = state.tokens.filter(o => !gone.has(o));
+      }
+
+      return notes.length ? fail(notes.join('; ')) : state;
     }
 
     case 'lock_asset':

@@ -32,6 +32,7 @@ export const STEP_TYPES = [
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
+  { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -112,7 +113,10 @@ export function defaultStep(type, ctx = {}) {
     case 'unlock_asset':
       return { type, assetName: first(names) };
     case 'reveal_next':
-      // Ohne Zielzone: Aufdecken und Verschieben sind zwei Entscheidungen.
+    case 'clear_zone':
+      // Ohne Zielzone: Aufdecken bzw. Abraeumen und Verschieben sind zwei
+      // Entscheidungen - und ein vorgegebenes Ziel waere beim Abraeumen die
+      // falsche Vorgabe, weil "vom Tisch nehmen" der haeufigere Fall ist.
       return { type, zoneLabel: zone, targetZoneLabel: '' };
     default:
       return { type, stackLabel };
@@ -155,6 +159,10 @@ export function describeStep(step) {
     case 'reveal_next': {
       const into = step?.targetZoneLabel ? ` into zone ${q(step.targetZoneLabel)}` : '';
       return `Reveal the next face-down object in zone ${q(step.zoneLabel)}${into}`;
+    }
+    case 'clear_zone': {
+      const into = step?.targetZoneLabel ? `into zone ${q(step.targetZoneLabel)}` : 'off the table';
+      return `Clear zone ${q(step.zoneLabel)} ${into}`;
     }
     case 'lock_asset': return `Lock ${q(step.assetName)}`;
     case 'unlock_asset': return `Unlock ${q(step.assetName)}`;
