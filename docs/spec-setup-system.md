@@ -1062,3 +1062,277 @@ verdeckte Bösewichte, drei Dörfler mit Tableaus, zehn Ladenkarten, sechs
 Heldentaten und dreizehn Zähler. Die Zonen tragen keine Ankerwarnung mehr, weil
 ihr Ankerobjekt auf dem Tisch liegt. Ein zweiter Spieler, der später beitritt,
 sieht dasselbe.
+
+### M7 — Die Kampfvorbereitung baut das Szenario auf
+
+Die Aktion „Kampf beginnen" (Abschnitt 11) räumt heute auf, deckt den nächsten
+Bösewicht auf, dreht das Dorf-Board und legt sein Tableau hin. Danach hört sie
+auf — und genau dort fängt die Arbeit an, die man viermal pro Partie von Hand
+macht: Gelände auf Rasterfelder, Bösewicht auf sein Startfeld, Dörfler auf drei
+der fünf angebotenen Felder, Tableau umdrehen, Grundwerte, bei Bossen aus „Üble
+Nachbarn" die Überfall-Karten, und das Verhaltensdeck als Nachziehstapel
+(Regelvideo E01, 01:08:27–01:17:22).
+
+Abschnitt 11 hat das Terrain ausdrücklich ausgeklammert, mit der Begründung, der
+Bauplan sei nur Artwork und das Raten von Zuordnungen falsch. Das bleibt richtig
+— **die Zuordnung wird abgelesen, nicht geraten.** Was sich ändert: sie wird
+einmal als **Daten** erfasst und danach ausgeführt, statt viermal pro Partie von
+Hand gestellt zu werden. Das ist derselbe Handel, den das ganze Aufbausystem
+macht.
+
+#### Befund: das Vokabular kann davon nichts
+
+Geprüft am Stand 2026-09-23:
+
+- **`place_asset` kennt kein Rasterfeld.** `STEP_TYPES` führt für ihn
+  `assetName · targetZoneLabel · x · y · faceDown`; der Executor löst Zone oder
+  Koordinaten auf, sonst nichts. Und tiefer: **der Executor bekommt Raster
+  überhaupt nicht** — `executeSequence(state, sequence, zones, { assets, rng })`,
+  und beide Aufrufer sowie `POST /api/rooms/:code/start` übergeben nur `assets`.
+  Ein Raster liegt in `setups.grid_data` und wird erst *nach* der Sequenz über
+  `placeOnGrids` angewandt. Ein Feldziel ist deshalb kein neues Feld, sondern
+  eine neue Eingabe durch alle vier Schichten.
+- **`place_asset` legt nie eine zweite Kopie.** `findPlaced` findet das
+  vorhandene Objekt und verschiebt es. Drei gleiche Geländeplättchen auf drei
+  Feldern sind heute nicht ausdrückbar; die Spalte `quantity` aus M1c wird von
+  keinem Schritt gelesen.
+- **Aus einer Kartenkategorie einen Stapel bauen gibt es nur von Hand.**
+  `placeCategoryAsStack` lebt in `GameTable.jsx` und arbeitet auf der geladenen
+  Kartenbibliothek. Der Executor kennt Karten nur, wenn sie schon im Zustand
+  liegen. Das Verhaltensdeck des Bösewichts — eine Kategorie, die erst nach dem
+  Aufdecken feststeht — ist damit nicht aufbaubar.
+- **Es gibt kein Abräumen für Raster und Stapel.** `clear_zone` liest
+  `objectsInZone` über `state.cards`/`state.tokens`; Karten in einem Stapel
+  liegen in `stack.cards` und sind unsichtbar. Kampffeld und Verhaltensdeck des
+  besiegten Bösewichts bleiben liegen — derselbe Fehler, der schon einmal den
+  zweiten Druck auf „Kampf beginnen" scheitern ließ.
+- **`reveal_next` bindet nur den Namen.** `$revealed` und `$revealedBase` sagen,
+  *wer* aufgedeckt wurde, nicht *von welchem Platz*. Die Stufe des Bösewichts
+  hängt aber am Platz, nicht am Bösewicht.
+- **Platzhalter gelten nur für `assetName`.** Die Ersetzung steht an einer
+  Stelle und fasst genau ein Feld an. Jedes neue Feld bekäme sie nicht.
+- **Aktionen haben keine Bedienung zum Anlegen.** `action_data` wird im Client
+  gelesen und nirgends geschrieben. Die vorhandene Aktion kann nur über die API
+  entstanden sein. Dasselbe Muster wie M2.5 und M2.7.
+
+#### Die Stufe kommt vom Platz, nicht von der Runde
+
+Die vier Plätze der Bösewicht-Leiste sind Schwierigkeitsstufen:
+**CHUMP → HOOLIGAN → TROUBLEMAKER → FINAL FIGHT**. Jedes Boss-Tableau führt
+Texte für alle vier; welcher gilt, entscheidet der Platz, von dem das Token kam.
+
+Ein Rundenzähler taugt dafür nicht. Wir spielen die verkürzte Variante mit
+**drei** Bösewichten: der Marker „Kurzpartie: erste Runde überspringen" belegt
+den **ersten** Platz, die drei Bösewichte stehen auf HOOLIGAN, TROUBLEMAKER und
+FINAL FIGHT. Runde 1 der Partie ist Stufe 2. Jede Ableitung aus einer
+Rundenzahl wäre hier um eins daneben — und zwar still.
+
+**Die Regel:** `reveal_next` bindet neben dem Namen den **Platz**, von dem es
+das Objekt genommen hat. Der Index fällt im Schritt ohnehin an (`inSlotOrder`),
+er wird heute nur weggeworfen.
+
+- `$revealedSlot` — die Platznummer, 1-basiert.
+- `$revealedTier` — der **Name** des Platzes, wenn die Zone welche hat.
+- Eine Zone bekommt dafür optional `slotLabels: [...]`, parallel zu `slots` aus
+  dem Nachtrag zu Abschnitt 4. Die Namen sind Daten im `zone_data`, nicht Code:
+  nichts im Code weiß, dass ein Platz „TROUBLEMAKER" heißt.
+- **Endkampf ist der letzte Platz der Leiste**, nicht der vierte. Damit stimmt
+  es in der vollen wie in der verkürzten Partie, ohne dass irgendwo eine Zahl
+  gepflegt werden muss.
+- Der Kurzpartie-Marker liegt **offen**. `reveal_next` sucht das erste
+  *verdeckte* Objekt; ein verdeckt liegender Marker würde als Bösewicht
+  aufgedeckt. Das ist eine Aufbau-Regel, keine Code-Regel, und sie steht hier,
+  weil sie sonst niemand ahnt.
+
+#### Die Szenarioseite gilt für jeden Kampf
+
+Vom Nutzer bestätigt (2026-09-23): Die Szenarioseite des Tableaus gilt für
+**jeden** Kampf gegen diesen Bösewicht. Nur ihr **unterer Abschnitt** — die
+Marker `FF1..FF5` bzw. „EG" — gilt zusätzlich, wenn dieser Bösewicht der
+Endgegner ist; bei allen davor wird er vollständig ignoriert. Das Banner
+„FINAL FIGHT" steht auf allen Szenarioseiten und bezeichnet nur diesen unteren
+Abschnitt.
+
+Für den Aufbau heißt das: **ein Szenario je Bösewicht, mit einem zusätzlichen
+Endkampf-Abschnitt** — kein zweites Szenario, keine zweite Aktion, kein zweiter
+Knopf.
+
+#### Die Szenariodaten
+
+Die Zuordnung „welches Gelände auf welches Feld" steht nur als Artwork auf den
+Tableau-Rückseiten und wird von Hand abgelesen. Sie sind **Daten, nicht Code**,
+und sie gehören in eine neue Spalte **`setups.scenario_data`** — additive
+Migration, genau wie `grid_data` und `action_data`. Begründung: die Felder
+(`C7`, `J5`) sind Felder *eines bestimmten Rasters eines bestimmten Setups*.
+Am Spiel gespeichert wären sie eine Referenz ins Leere, sobald ein zweites
+Setup ein anderes Raster benutzt.
+
+```json
+{
+  "gridLabel": "Kampffeld",
+  "bosses": {
+    "Patches": {
+      "scenario": "Meal Time's Over",
+      "terrain": [
+        { "assetName": "Fetid Furball", "cells": ["C7", "D7", "H9"] },
+        { "assetName": "Wheat Field",   "cells": ["M4"] }
+      ],
+      "fields": { "B": "J5", "D": ["A1", "B3", "C4", "D6", "E9"] },
+      "decks":  [{ "category": "Verhalten: Patches", "label": "Verhaltensdeck" }],
+      "final":  {
+        "terrain": [{ "assetName": "Giant Milk Jug", "cells": ["K2", "K3"] }],
+        "fields":  { "FF": ["K2", "K3", "L2", "L3", "M2"] }
+      }
+    }
+  }
+}
+```
+
+- Schlüssel ist der **Basisname** (`$revealedBase`), damit Token
+  („Bösewicht: Patches") und Tableau („Tableau: Patches") denselben Eintrag
+  treffen.
+- `final` ist **additiv**: sein Gelände kommt dazu, seine Felder kommen dazu.
+  Nennt es dieselben Schlüssel, gewinnt `final` — der Endkampf ändert den
+  Aufbau, er ersetzt ihn nicht.
+- 20 Bösewichte, 20 Einträge. Erfasst wird, wer wirklich gezogen wurde.
+
+#### Der neue Schritt: `build_scenario`
+
+`build_scenario { gridLabel, final: "auto" | true | false }`
+
+- schlägt das Szenario des **zuletzt aufgedeckten** Bösewichts nach
+  (`$revealedBase`),
+- legt jedes genannte Geländeplättchen auf jedes genannte Feld — **je Feld ein
+  eigenes Objekt**, weil zehn Fetid Furball zehn Plättchen sind und nicht eines,
+  das zehnmal umzieht,
+- **bindet die benannten Felder als Platzhalter** für die folgenden Schritte:
+  `$B`, `$D1`…`$D5`, im Endkampf zusätzlich `$FF1`…`$FF5`,
+- `final: "auto"` heißt: Endkampf genau dann, wenn `reveal_next` vom **letzten
+  Platz** der Leiste genommen hat.
+
+**Warum ein Schritt, der Daten liest, und nicht dreißig Schritte je Bösewicht:**
+Zwanzig Bösewichte mal zwei Ausprägungen mal fünfzehn Plättchen wären 600
+handgeschriebene Schritte — und die richtige Folge ließe sich erst *nach* dem
+Aufdecken auswählen, was kein Knopf kann. Der Code weiß dabei nichts über
+Townsfolk Tussle: er kennt „Szenariodaten", so wie er „Zonen" kennt.
+
+**Wer auf B und auf die D-Felder kommt, entscheidet der Autor**, nicht der
+Schritt — mit gewöhnlichen `place_asset`-Schritten auf die gebundenen Felder:
+
+```
+place_asset  "$revealed"        → Raster "Kampffeld", Feld "$B"
+place_asset  "Figur: Granny"    → Raster "Kampffeld", Feld "$D1"
+place_asset  "Figur: Hank"      → Raster "Kampffeld", Feld "$D3"
+```
+
+Die Regel bietet fünf D-Felder an und die Dörfler wählen drei davon in
+Initiativreihenfolge. Das bleibt eine Entscheidung (Abschnitt 11), sie wird nur
+**einmal im Editor** getroffen statt viermal pro Partie am Tisch. Wer anders
+aufstellen will, tauscht die Feldnummer in drei Schritten — dieselbe Lösung wie
+bei den drei Dörflern in M4a.
+
+#### Sinnvoll scheitern statt halb aufbauen
+
+- **Kein Eintrag für diesen Bösewicht** → der Schritt wird `skipped` mit
+  `no scenario data for "Patches"`. Es wird nichts gelegt. Ein halb gestelltes
+  Kampffeld ist schlimmer als ein leeres: das leere sieht man.
+- **Erst prüfen, dann legen.** Unbekanntes Asset, Feld außerhalb des Rasters,
+  unbekanntes Raster — der ganze Schritt scheitert, **bevor** das erste Objekt
+  liegt, und nennt jeden Fehler im Protokoll. Kein Teilaufbau.
+- **Die Platzhalter werden nur gebunden, wenn der Schritt gelaufen ist.** Ohne
+  Bindung bleibt `$D1` unaufgelöst und die folgenden `place_asset` werden
+  übersprungen — dieselbe Regel wie bei `$revealed` heute. Es wird nicht geraten
+  und nicht auf den rohen Text zurückgefallen.
+
+#### Was noch fehlt, damit die Aktion durchläuft
+
+- **`place_asset` bekommt ein Rasterziel:** `gridLabel` + `cell` (`C7`).
+  Zone, Rasterfeld und x/y sind **drei einander ausschließende** Arten zu sagen,
+  wo etwas hingehört; die Zonenregeln (`accepts`, `capacity`) gelten nur, wenn
+  die Zone die Adresse ist. Das gelegte Objekt merkt sich `gridId` + `cell`, wie
+  jedes von Hand eingerastete — sonst liegt das Gelände nach dem nächsten Laden
+  auf alten Koordinaten (M3b).
+- **Der Executor bekommt Raster** — `options.grids`, aufgelöst je Schritt gegen
+  den Tisch, *wie er ihn vorfindet*, mit `resolveGrids`/`anchorBoxes`, genau wie
+  die Zonen heute. Alle vier Aufrufstellen ziehen mit: Aufbau am Tisch, Aktion
+  am Tisch, Raumstart, Sequenz-Editor (für die Auswahl und die Prüfung).
+- **`place_stack { category, label, x, y, faceDown }`** — eine Kartenkategorie
+  als Nachziehstapel. Das gibt es im Client seit jeher als „+ Stack"; als
+  Schritt fehlte es. Damit baut die Aktion das Verhaltensdeck
+  (`category: "Verhalten: $revealedBase"`, `label: "Verhaltensdeck"`) und die
+  Überfall-Karten. Ein fester `label` neben der variablen `category` ist das, was
+  das Abräumen beim nächsten Kampf möglich macht: der Stapel heißt immer gleich,
+  egal welcher Bösewicht darin steckt. Mischen bleibt `shuffle` — es gibt keinen
+  zweiten Weg dafür.
+- **`remove_stack { stackLabel }`** — der Stapel samt Karten vom Tisch.
+- **`clear_grid { gridLabel }`** — alles, was auf diesem Raster steht, vom
+  Tisch. Das ist das Gegenstück zu `clear_zone` für die Fläche, auf der gekämpft
+  wird. Es löscht; was überleben soll (der besiegte Bösewicht in die
+  Trophäenreihe), wird **vorher** mit `clear_zone` weggeräumt. Dörflerfiguren
+  dürfen weg: der nächste Kampf legt sie neu.
+- **Platzhalter gelten in jedem Namensfeld** — `assetName`, `cell`, `category`,
+  `label`, `name`. Eine Ersetzung an einer Stelle, für alle Felder, nicht eine
+  je Feld.
+
+#### Bewusst nicht Teil davon
+
+- **Keine Bedingungen im Vokabular.** Kein `if`, kein `when`, kein `optional`.
+  Ein Schritt, der nichts findet, wird übersprungen und sagt warum — das ist die
+  ehrliche Antwort, und ein Schalter, der ein Überspringen unsichtbar macht, ist
+  ein Schalter, der Fehler unsichtbar macht. Der Endkampf ist deshalb keine
+  Bedingung, sondern ein Abschnitt in den Daten.
+- **Die Werte des Bösewichts.** MVMT und HEALTH sind regelseitig ungeklärt: das
+  Regelvideo leitet sie ab (Bewegung = höchste + 1, Leben = Summe + 3), das
+  Tableau druckt sie in Spalten 2P–5P. Solange das nicht entschieden ist, wäre
+  jede Automatik eine Behauptung. Die Zähler dafür gibt es (M4a); der Weg,
+  ihren Startwert aus den Szenariodaten zu ziehen, steht unten als offener Punkt.
+- **Die Klassenfähigkeit der Stufe ausführen.** Der Aufbau *weiß* die Stufe
+  (`$revealedTier`) und kann sie anschreiben; der Text steht gedruckt auf dem
+  Tableau und wird gelesen. Das System baut auf, es spielt nicht (Abschnitt 1).
+- **Ausrichtung des Bösewichts** („immer zum nächsten Dörfler"). Der Tisch kennt
+  keine Blickrichtung.
+- **Die Aktion im Mehrspielerraum.** `runSetupAction` lädt heute nur lokal; der
+  Raum führt Aktionen nicht aus und verteilt ihr Ergebnis nicht. Das ist ein
+  eigener Meilenstein (vgl. M6, Nachtrag 2), kein Anhängsel hier.
+- **Erfassung der Szenariodaten.** Die 20 Einträge liest ein Mensch von den
+  Tableaus ab. Diese Spec legt die Form fest, nicht den Inhalt.
+
+#### Abnahme
+
+1. Ein `place_asset` mit `Raster "Kampffeld", Feld "C7"` legt das Asset auf die
+   Mitte von C7; nach Speichern und erneutem Laden liegt es wieder auf C7, auch
+   wenn das Brett vorher verschoben wurde. Ein Feld außerhalb des Rasters wird
+   übersprungen und steht mit Grund im Protokoll. Am Tisch **und** im Raum aus
+   demselben Setup liegt es auf demselben Feld.
+2. Der Sequenz-Editor bietet für `place_asset` Raster und Feld an, meldet ein
+   Feld, das es auf dem gewählten Raster nicht gibt, und zeigt x/y nicht mehr an,
+   sobald ein Feld gewählt ist.
+3. `place_stack` mit der Kategorie „Verhalten: Patches" legt einen Stapel mit
+   allen Karten dieser Kategorie unter dem Namen „Verhaltensdeck" ab; ein
+   folgendes `shuffle "Verhaltensdeck"` mischt ihn; `remove_stack
+   "Verhaltensdeck"` nimmt ihn samt Karten wieder vom Tisch.
+4. Nach `reveal_next` aus einer Leiste mit `slotLabels` liefert `$revealedTier`
+   den Namen des Platzes und `$revealedSlot` seine Nummer. Liegt der
+   Kurzpartie-Marker offen auf Platz 1, deckt der erste Druck den Bösewicht auf
+   **Platz 2** auf und `$revealedTier` ist „HOOLIGAN".
+5. `build_scenario` mit Daten für den aufgedeckten Bösewicht legt jedes
+   Geländeplättchen auf jedes genannte Feld — drei gleiche Plättchen sind drei
+   Objekte — und bindet `$B` und `$D1`…`$D5`. Ein Bösewicht ohne Eintrag: nichts
+   liegt, das Protokoll nennt ihn. Ein Eintrag mit einem unbekannten Asset:
+   nichts liegt, das Protokoll nennt das Asset.
+6. Mit `final: "auto"` baut derselbe Knopf für den Bösewicht auf dem **letzten**
+   Platz der Leiste zusätzlich den Endkampf-Abschnitt auf, für alle davor nicht.
+   Das gilt in der verkürzten Partie mit drei Bösewichten genauso.
+7. Zweimal „Kampf beginnen" hintereinander: das Kampffeld des ersten Bösewichts
+   ist leer, sein Verhaltensdeck ist weg, das des zweiten liegt da, und kein
+   Objekt des ersten Szenarios ist übrig.
+8. Alles daraus ist in der Oberfläche anlegbar, ohne JSON anzufassen — bis auf
+   `scenario_data` selbst, das erfasste Daten sind (M2.7 sinngemäß).
+
+#### Offen
+
+- **Startwerte des Bösewichts aus den Szenariodaten in Zähler.** Der Zähler
+  (Name, Ort) gehört ins Setup, die Zahl zum Bösewicht. Der naheliegende Schnitt
+  ist ein Platzhalter im Wert von `place_counter`. Wartet auf die Klärung der
+  Regel selbst.
+- **Aktionen im Raum.**
