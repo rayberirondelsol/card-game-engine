@@ -27,6 +27,7 @@ import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
 import { canStartPan } from '../utils/panTarget.js';
+import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -3109,6 +3110,24 @@ export default function GameTable({ room = null }) {
     }
   }, [room?.grids]);
 
+  // M6-Nachtrag 2: Uebergibt der Raum einen Brettzustand, zeigt der Tisch ihn
+  // an. Der Server hat die Aufbau-Sequenz beim Start bereits ausgefuehrt - hier
+  // wird nur noch geladen, derselbe Weg wie Setup und Spielstand. Die Raster
+  // gehen ausdruecklich mit: `grids` steht erst im naechsten Render, die
+  // Objekte muessen aber jetzt auf ihre Felder.
+  //
+  // `loadGameState` setzt nur State, es sendet nichts - eine Schleife kann hier
+  // also nicht entstehen. Der Referenzvergleich verhindert, dass derselbe
+  // Zustand bei jedem Render erneut geladen wird (`room` ist in
+  // MultiplayerGame.jsx bei jedem Render ein neues Objekt, `room.boardState`
+  // dagegen nur nach einer Server-Nachricht).
+  const appliedBoardStateRef = useRef(null);
+  useEffect(() => {
+    if (!shouldApplyBoardState(room?.boardState, appliedBoardStateRef.current)) return;
+    appliedBoardStateRef.current = room.boardState;
+    loadGameState(room.boardState, room.grids || null);
+  }, [room?.boardState, room?.grids]);
+
   // Save the game state to the backend
   async function saveGameState(name) {
     setSaving(true);
@@ -3188,8 +3207,12 @@ export default function GameTable({ room = null }) {
       }
     }, AUTO_SAVE_INTERVAL);
 
-    // Also auto-save when navigating away
+    // Also auto-save when navigating away. Im Raum nicht: der Zustand gehoert
+    // dem Server, und das Verlassen eines Raums darf ihn nicht als
+    // Einzelspieler-Autosave des Spiels wegschreiben (das Intervall oben
+    // schliesst den Raum bereits aus, dieser Pfad tat es bisher nicht).
     function handleBeforeUnload() {
+      if (room) return;
       if (autoSaveEnabledRef.current && performAutoSaveRef.current) {
         // sendBeacon cannot set an Authorization header, so the guarded API
         // would 401 it. keepalive:true is the fetch equivalent that survives

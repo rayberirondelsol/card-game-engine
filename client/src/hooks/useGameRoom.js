@@ -19,14 +19,15 @@ const CURSOR_THROTTLE_MS = 33; // ~30fps
  * useGameRoom – manages the WebSocket lifecycle for a multiplayer room.
  *
  * Returns:
- *   { connected, players, boardState, zones, sendAction, sendHandCountUpdate,
- *     remoteCursors, myPlayer }
+ *   { connected, players, boardState, zones, grids, sendAction,
+ *     sendHandCountUpdate, remoteCursors, myPlayer }
  */
 export function useGameRoom(roomCode, myPlayerId, onMessage) {
   const [connected, setConnected] = useState(false);
   const [players, setPlayers] = useState([]);
   const [boardState, setBoardState] = useState(null);
   const [zones, setZones] = useState([]);
+  const [grids, setGrids] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState({});
 
   const wsRef = useRef(null);
@@ -61,6 +62,7 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
           setBoardState(msg.board_state);
           setPlayers(msg.players || []);
           setZones(msg.zones || []);
+          setGrids(msg.grids || []);
           break;
         case 'board_sync':
           setBoardState(msg.board_state);
@@ -88,6 +90,7 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
         case 'room_started':
           setBoardState(msg.board_state);
           setZones(msg.zones || []);
+          setGrids(msg.grids || []);
           break;
         case 'host_changed':
           setPlayers(prev => prev.map(p => ({
@@ -166,6 +169,7 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
     players,
     boardState,
     zones,
+    grids,
     remoteCursors,
     myPlayer,
     sendAction,
