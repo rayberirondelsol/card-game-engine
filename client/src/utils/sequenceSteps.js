@@ -11,6 +11,7 @@
  * for one. Offering a field the handler ignores is worse than offering none:
  * it is a promise the setup does not keep.
  */
+import { counterMax } from './counters.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -31,6 +32,7 @@ export const STEP_TYPES = [
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
+  { value: 'place_counter', label: 'Place Counter', fields: ['name', 'value', 'max', 'x', 'y'] },
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
   { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
 ];
@@ -114,6 +116,11 @@ export function defaultStep(type, ctx = {}) {
       return { type, pool: first(pools), count: 1, targetZoneLabel: zone, faceDown: false };
     case 'set_asset_face':
       return { type, assetName: first(names), faceDown: true };
+    case 'place_counter':
+      // Kein `max`: die Obergrenze ist optional und wird nicht geraten. Der
+      // Name bleibt leer, weil ihn nur der Autor kennt - er ist das eine Feld,
+      // das die Validierung darum sofort anmahnt.
+      return { type, name: '', value: 0, x: 0, y: 0 };
     case 'lock_asset':
     case 'unlock_asset':
       return { type, assetName: first(names) };
@@ -162,6 +169,12 @@ export function describeStep(step) {
     }
     case 'draw_assets':
       return `Draw ${step.count ?? 1} from pool ${q(step.pool)} into ${zone}${down(step)}`;
+    case 'place_counter': {
+      // Die Obergrenze steht so da, wie sie am Tisch steht: "2 / 3".
+      const max = counterMax(step?.max);
+      const start = max === undefined ? `${step?.value ?? 0}` : `${step?.value ?? 0} / ${max}`;
+      return `Place counter ${q(step.name)} at ${step.x ?? 0}, ${step.y ?? 0} starting at ${start}`;
+    }
     case 'set_asset_face':
       return `Turn ${q(step.assetName)} ${step.faceDown ? 'face down' : 'face up'}`;
     case 'reveal_next': {
@@ -234,6 +247,22 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('targetStackLabel') && step?.targetStackLabel) {
     if (!known(stackLabels, step.targetStackLabel)) problems.push(`stack "${step.targetStackLabel}" not found`);
     else if (step?.targetZoneLabel) problems.push(`zone and stack given, the zone wins: stack "${step.targetStackLabel}" is ignored`);
+  }
+  // M4a: ein Zähler hat weder Stapel noch Zone, nur einen Namen und eine
+  // Stelle. Beides fehlt der Executor sonst erst am Tisch (er überspringt den
+  // Schritt), und dann ist der Aufbau schon gelaufen.
+  if (fields.has('name') && !String(step?.name ?? '').trim()) problems.push('no counter name given');
+  // Nur hier: `move` darf x oder y weglassen (dann bleibt die Koordinate, wie
+  // sie ist), und `place_asset` mit Zone zeigt x/y gar nicht erst an.
+  if (typeOf(step) === 'place_counter') {
+    const num = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
+    if (!Number.isFinite(num(step?.x)) || !Number.isFinite(num(step?.y))) problems.push('no position given');
+  }
+  // Ein `max`, das keine Zahl ist, stünde am Tisch als "2 / NaN" - also lieber
+  // hier melden. Kein `max` ist die gültige Vorgabe.
+  if (fields.has('max') && step?.max !== undefined && step?.max !== null && step?.max !== ''
+    && counterMax(step.max) === undefined) {
+    problems.push('max must be a number');
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

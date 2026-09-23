@@ -23,6 +23,7 @@
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { assetToken, assetFace } from './assetToken.js';
+import { normalizeCounter } from './counters.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -80,7 +81,9 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
 
 /** What a step points at – enough to recognise it in the protocol. */
 function stepTarget(step) {
-  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? null;
+  // `name` steht am Ende: nur place_counter benutzt es, und der Zähler heißt
+  // im Protokoll so, wie er am Tisch heißt.
+  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -238,6 +241,7 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
   if (!state.boards) state.boards = [];
+  if (!state.counters) state.counters = [];
 
   // Anchored zones are resolved against the table as this step finds it, not
   // as the sequence started: step 1 lays the board out, step 2 fills a zone
@@ -655,6 +659,23 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
 
       if (notes.length) return fail([...remarks, ...notes].join('; '));
       if (remarks.length) entry.reason = remarks.join('; ');
+      return state;
+    }
+
+    // M4a: ein Zähler ist kein Asset – er hat kein Bild und keinen Vorrat, nur
+    // Name, Wert und Stelle. Er wird immer neu angelegt (der Aufbau läuft gegen
+    // einen leeren Tisch); ein zweiter Lauf legt darum einen zweiten an.
+    case 'place_counter': {
+      const name = String(step.name ?? '').trim();
+      if (!name) return skip('no counter name given');
+      // Leer ist keine 0: `Number('')` wäre 0 und legte den Zähler klammheimlich
+      // in die Tischmitte, statt den fehlenden Wert zu melden.
+      const coord = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
+      const [x, y] = [coord(step.x), coord(step.y)];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return skip(`no position given for counter "${name}"`);
+      }
+      state.counters.push(normalizeCounter({ name, value: step.value, max: step.max, x, y }));
       return state;
     }
 

@@ -117,6 +117,35 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
 
+    // M4a: der Zähler hat weder Stapel noch Asset - sein Name ist frei
+    // geschrieben, er beschriftet ihn am Tisch.
+    name: () => field('Name',
+      <input
+        type="text"
+        value={step.name || ''}
+        onChange={e => set({ name: e.target.value })}
+        placeholder="e.g. Coins"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-counter-name`}
+      />),
+
+    value: () => field('Start', number(step.value, 0, undefined, n => set({ value: n }), 'w-20')),
+
+    // Leer heisst "keine Obergrenze" - darum kein `number()`: das ersetzt eine
+    // geleerte Eingabe durch den Vorgabewert und man wuerde `max` nie wieder los.
+    max: () => field('Max',
+      <input
+        type="number"
+        value={step.max ?? ''}
+        placeholder="none"
+        onChange={e => {
+          const n = parseInt(e.target.value, 10);
+          set({ max: Number.isFinite(n) ? n : undefined });
+        }}
+        className={`w-20 ${INPUT}`}
+        data-testid={`step-${index}-counter-max`}
+      />),
+
     // Beim Zurücklegen in einen Stapel hat die Seite drei Antworten, nicht
     // zwei: verdeckt, offen - oder "so wie sie liegt". Ein Häkchen kennt die
     // dritte nicht, und geraten wird nicht (M5.1).

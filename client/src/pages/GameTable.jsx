@@ -18,6 +18,7 @@ import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../utils/anchoring';
 import { tableObjectView } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../utils/assetToken.js';
+import { normalizeCounter, counterDisplay } from '../utils/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -458,6 +459,7 @@ export default function GameTable({ room = null }) {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
+  const [newCounterMax, setNewCounterMax] = useState('');
   const [newDiceType, setNewDiceType] = useState('d6');
   const [newNoteText, setNewNoteText] = useState('');
   const [newTokenShape, setNewTokenShape] = useState('circle');
@@ -1735,19 +1737,22 @@ export default function GameTable({ room = null }) {
   }
 
   // Counter functions
-  function createCounter(name) {
+  function createCounter(name, max) {
     const canvas = canvasRef.current;
     const offset = counters.length * 160;
-    const newCounter = {
-      id: crypto.randomUUID(),
+    // max kommt aus dem Dialog und ist optional - leer heisst "keine Obergrenze"
+    // (normalizeCounter wirft es dann weg).
+    const newCounter = normalizeCounter({
       name: name || 'Counter',
       value: 0,
+      max,
       x: (canvas?.width || 800) / 2 + offset,
       y: (canvas?.height || 600) / 2 - 60,
-    };
+    });
     setCounters(prev => [...prev, newCounter]);
     setShowCounterModal(false);
     setNewCounterName('');
+    setNewCounterMax('');
   }
 
   function incrementCounter(counterId) {
@@ -2840,14 +2845,9 @@ export default function GameTable({ room = null }) {
         image_path: c.image_path,
         card_back_id: c.card_back_id || null,
       })),
-      counters: counters.map(c => ({
-        id: c.id,
-        name: c.name,
-        value: c.value,
-        x: c.x,
-        y: c.y,
-        locked: c.locked || false,
-      })),
+      // M4a: die Felder stehen in utils/counters.js, nicht hier - eine zweite
+      // Liste verlöre das nächste neue Feld (zuletzt `max`) beim Speichern.
+      counters: counters.map(normalizeCounter),
       dice: dice.map(d => ({
         id: d.id,
         type: d.type,
@@ -3384,14 +3384,7 @@ export default function GameTable({ room = null }) {
 
     // Restore counters
     if (state.counters && Array.isArray(state.counters)) {
-      setCounters(state.counters.map(c => ({
-        id: c.id || crypto.randomUUID(),
-        name: c.name,
-        value: c.value,
-        x: c.x,
-        y: c.y,
-        locked: c.locked || false,
-      })));
+      setCounters(state.counters.map(normalizeCounter));
     } else {
       setCounters([]);
     }
@@ -3951,7 +3944,7 @@ export default function GameTable({ room = null }) {
   }
 
   // ===== MODAL DISMISS HELPERS =====
-  function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); }
+  function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); setNewCounterMax(''); }
   function dismissDiceModal() { setShowDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
   function dismissTokenModal() { setShowTokenModal(false); }
@@ -4384,7 +4377,9 @@ export default function GameTable({ room = null }) {
                 className="text-xl font-mono font-bold text-white min-w-[40px] text-center"
                 data-testid={`counter-value-${counter.id}`}
               >
-                {counter.value}
+                {/* M4a: mit Obergrenze steht hier "2 / 3". Erzwungen wird sie
+                    nicht - der rote Marker liegt daneben, der Tisch rechnet nicht. */}
+                {counterDisplay(counter)}
               </span>
               <button
                 onClick={(e) => { e.stopPropagation(); incrementCounter(counter.id); }}
@@ -5494,7 +5489,23 @@ export default function GameTable({ room = null }) {
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && newCounterName.trim()) {
-                createCounter(newCounterName.trim());
+                createCounter(newCounterName.trim(), newCounterMax);
+              }
+            }}
+          />
+          {/* M4a: die Obergrenze gehoert in denselben Dialog - ein eigener Weg
+              "Max nachtragen" waere ein zweiter Knopf fuer ein Feld. Leer heisst
+              keine Obergrenze, und erzwungen wird sie nie. */}
+          <input
+            type="number"
+            value={newCounterMax}
+            onChange={(e) => setNewCounterMax(e.target.value)}
+            placeholder="Maximum (optional, e.g. 3)"
+            data-testid="counter-max-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newCounterName.trim()) {
+                createCounter(newCounterName.trim(), newCounterMax);
               }
             }}
           />
@@ -5506,7 +5517,7 @@ export default function GameTable({ room = null }) {
               Cancel
             </button>
             <button
-              onClick={() => createCounter(newCounterName.trim())}
+              onClick={() => createCounter(newCounterName.trim(), newCounterMax)}
               disabled={!newCounterName.trim()}
               data-testid="counter-create-btn"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
