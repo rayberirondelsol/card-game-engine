@@ -309,6 +309,38 @@ Werkzeugleisten an ihrem eigenen Mittelpunkt anklickbar — geprüft mit
 `scripts/check-setup-overlays.js` bei mehreren Fensterbreiten. Die Schichten stapeln
 sich im Fluss, nicht über geratene Abstände.
 
+### M2.9 — Das Kontextmenü bleibt im Bild
+Beim Prüfen von M3d aufgefallen: Das Kontextmenü wird `fixed` auf den Klickpunkt
+gesetzt (`left: contextMenu.x`, `top: contextMenu.y`) und klappt **immer nach
+unten und nach rechts auf**. Bei 794 px Fensterhöhe lag der Flip-Eintrag eines
+Tokens im unteren Bilddrittel außerhalb des Sichtbaren; ich musste das Fenster
+vergrößern, um ihn überhaupt anklicken zu können.
+
+Das vorhandene `maxHeight: calc(100vh - …)` hilft nicht: es begrenzt die Höhe des
+Elements, nicht seinen Abstand zum unteren Rand. Ein Menü, das bei `top: 700`
+beginnt, darf danach immer noch 100vh hoch sein.
+
+Dasselbe gilt waagerecht: ein Rechtsklick nahe dem rechten Rand schiebt das Menü
+hinaus. Es ist derselbe Fehler, also dieselbe Abhilfe — **eine Schicht wird
+platziert, ohne zu messen, ob sie dorthin passt** (vgl. M2.8).
+
+Betroffen ist genau ein Element; alle elf `setContextMenu({x: e.clientX, …})`
+speisen dasselbe.
+
+#### Die Regel
+Das Menü öffnet weiterhin **unten rechts vom Klick**, solange es dort passt.
+Passt es nicht:
+- nach **oben** klappen (Unterkante auf den Klickpunkt), wenn oben mehr Platz ist,
+- nach **links** klappen (rechte Kante auf den Klickpunkt), wenn rechts kein Platz ist,
+- passt es in keiner Richtung ganz (Menü höher als das Fenster), in den sichtbaren
+  Bereich schieben und die Höhe auf den verfügbaren Platz begrenzen — dann
+  übernimmt das vorhandene `overflow: auto`.
+Ein kleiner Rand zum Fensterrand bleibt frei, und die Safe-Area-Insets zählen mit.
+
+**Abnahme:** Ein Rechtsklick in der untersten Bildzeile und einer in der rechten
+Bildspalte zeigen ein Menü, dessen letzter Eintrag anklickbar ist — geprüft wie
+in M2.8 über `document.elementFromPoint` auf den Mittelpunkt jedes Eintrags.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import HoverCard from '../components/HoverCard';
 import SwipeModal from '../components/SwipeModal';
@@ -21,6 +21,7 @@ import { assetToken, assetFace } from '../utils/assetToken.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
+import { menuPlacement } from '../utils/menuPlacement.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -488,6 +489,36 @@ export default function GameTable({ room = null }) {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
+  const contextMenuRef = useRef(null);
+  // M2.9: Die Platzierung gehört zu genau diesem Menü. Bei einem neuen Klick –
+  // und bei anderem Inhalt, also anderer Höhe – ist sie sofort ungültig, damit
+  // der Layout-Effekt die *ungebremste* Höhe misst und nicht die zuletzt
+  // gekappte; sonst beantwortet sich „passt es?" selbst mit ja.
+  const [placedMenu, setPlacedMenu] = useState(null);
+  const menuPlace = placedMenu && placedMenu.for === contextMenu ? placedMenu : null;
+
+  useLayoutEffect(() => {
+    const el = contextMenuRef.current;
+    if (!contextMenu || !el) return;
+    const rect = el.getBoundingClientRect();
+    // Die Insets stehen als Custom Properties auf :root (index.css); sie hier
+    // zu lesen ersetzt die früheren env()-Margins am Element, die die berechnete
+    // Position sonst wieder verschoben hätten.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const inset = (side) => parseFloat(rootStyle.getPropertyValue(`--safe-area-inset-${side}`)) || 0;
+    setPlacedMenu({
+      for: contextMenu,
+      ...menuPlacement({
+        x: contextMenu.x,
+        y: contextMenu.y,
+        width: rect.width,
+        height: rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        insets: { top: inset('top'), right: inset('right'), bottom: inset('bottom'), left: inset('left') },
+      }),
+    });
+  }, [contextMenu]);
 
   // Number key draw state (TTS-style: press 1-9 or multi-digit like '10' to draw from stack)
   const numberKeyBufferRef = useRef('');
@@ -6081,13 +6112,12 @@ export default function GameTable({ room = null }) {
       {/* Right-click Context Menu */}
       {contextMenu && (
         <div
+          ref={contextMenuRef}
           className="fixed z-50"
           style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-            marginLeft: 'env(safe-area-inset-left, 0px)',
-            marginTop: 'env(safe-area-inset-top, 0px)',
-            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+            left: menuPlace ? menuPlace.left : contextMenu.x,
+            top: menuPlace ? menuPlace.top : contextMenu.y,
+            maxHeight: menuPlace && menuPlace.maxHeight !== null ? menuPlace.maxHeight : undefined,
             overflow: 'auto',
           }}
           data-testid="context-menu"
