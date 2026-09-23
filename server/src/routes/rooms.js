@@ -252,9 +252,16 @@ export async function roomsRoutes(fastify) {
               `SELECT t.*, (SELECT name FROM categories WHERE id = t.category_id) AS category
                FROM table_assets t WHERE t.game_id = ? ORDER BY t.created_at DESC`
             ).all(room.game_id);
+            // Die Kartenbibliothek mit dem *Namen* ihrer Kategorie, genau wie
+            // die Assets sie schon führen: `place_stack` adressiert die
+            // Kategorie über diesen Namen (M7/T3).
+            const cards = db.prepare(
+              `SELECT c.*, (SELECT name FROM categories WHERE id = c.category_id) AS category
+               FROM cards c WHERE c.game_id = ? ORDER BY c.created_at DESC`
+            ).all(room.game_id);
             // Raster wie Zonen in die `options`: `place_asset` darf auf ein
             // Rasterfeld zielen, und der Raum baut auf wie der Tisch (M7/T1).
-            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, grids });
+            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, cards, grids });
             // Fehlgeschlagene Schritte brechen den Start nicht ab – sie werden
             // protokolliert, so wie der Tisch sie in `setupIssues` anzeigt.
             for (const e of log) {

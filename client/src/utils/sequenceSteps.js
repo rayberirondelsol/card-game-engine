@@ -28,6 +28,8 @@ export const STEP_TYPES = [
   { value: 'split', label: 'Split Stack', fields: ['stackLabel', 'count', 'outputLabels', 'spacing'] },
   { value: 'deal_to_zone', label: 'Deal to Zone', fields: ['stackLabel', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'move', label: 'Move Stack', fields: ['stackLabel', 'x', 'y'] },
+  { value: 'place_stack', label: 'Place Stack', fields: ['category', 'label', 'x', 'y', 'faceDown'] },
+  { value: 'remove_stack', label: 'Remove Stack', fields: ['stackLabel'] },
   { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
@@ -91,6 +93,18 @@ export function assetNames(assets) {
   return Array.isArray(assets) ? clean(assets.map(a => a?.name)) : [];
 }
 
+/**
+ * M7/T3: die Stapelnamen, die ein Schritt adressieren kann - die am Tisch
+ * benannten plus die, die ein `place_stack` in dieser Folge erst herstellt.
+ * Ohne die zweite Hälfte wäre `place_stack` ein Schritt, dessen Ergebnis weder
+ * `shuffle` noch `remove_stack` im Editor benennen könnte: der Stapel liegt
+ * beim Bearbeiten nicht am Tisch.
+ */
+export function stackLabelsFor(steps, existing = []) {
+  const made = (Array.isArray(steps) ? steps : []).filter(s => s?.type === 'place_stack').map(s => s?.label);
+  return clean([...(Array.isArray(existing) ? existing : []), ...made]);
+}
+
 // ── New steps ────────────────────────────────────────────────────────────────
 
 const first = (list) => (Array.isArray(list) && list.length ? list[0] : '');
@@ -103,7 +117,7 @@ const first = (list) => (Array.isArray(list) && list.length ? list[0] : '');
  * `validateStep` checks against.
  */
 export function defaultStep(type, ctx = {}) {
-  const { stackLabels = [], zoneLabels = [], pools = [], assetNames: names = [] } = ctx;
+  const { stackLabels = [], zoneLabels = [], pools = [], assetNames: names = [], cardCategories = [] } = ctx;
   const stackLabel = first(stackLabels);
   const zone = first(zoneLabels);
 
@@ -122,6 +136,11 @@ export function defaultStep(type, ctx = {}) {
       return { type, assetName: first(names), targetZoneLabel: '', gridLabel: '', cell: '', x: 0, y: 0, faceDown: false };
     case 'draw_assets':
       return { type, pool: first(pools), count: 1, targetZoneLabel: zone, faceDown: false };
+    case 'place_stack':
+      // Der Stapelname bleibt leer: er ist die eine Entscheidung, die der Schritt
+      // nicht vorwegnehmen darf - er ist der feste Name, unter dem ihn
+      // `shuffle` und `remove_stack` später wiederfinden (M7/T3).
+      return { type, category: first(cardCategories), label: '', x: 0, y: 0, faceDown: false };
     case 'set_asset_face':
       return { type, assetName: first(names), faceDown: true };
     case 'place_counter':
@@ -173,6 +192,9 @@ export function describeStep(step) {
     case 'split': return `Split ${q(step.stackLabel)} into ${step.count ?? 2} stacks`;
     case 'deal_to_zone': return `Deal ${step.count ?? 1} from ${q(step.stackLabel)} to ${zone}${down(step)}`;
     case 'move': return `Move ${q(step.stackLabel)} to ${step.x ?? 0}, ${step.y ?? 0}`;
+    case 'place_stack':
+      return `Place card category ${q(step.category)} as stack ${q(step.label)} at ${step.x ?? 0}, ${step.y ?? 0}${down(step)}`;
+    case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
     case 'place_asset': {
       const where = step.targetZoneLabel
         ? `in zone ${q(step.targetZoneLabel)}`
@@ -229,7 +251,7 @@ const findGrid = (grids, label) =>
  * @returns {string[]} problems, empty when the step is fine
  */
 export function validateStep(step, ctx = {}) {
-  const { stackLabels, zoneLabels, pools, assetNames: names, grids } = ctx || {};
+  const { stackLabels, zoneLabels, pools, assetNames: names, grids, cardCategories } = ctx || {};
   const fields = new Set(stepFields(step));
   const problems = [];
 
@@ -255,6 +277,14 @@ export function validateStep(step, ctx = {}) {
     if (!step?.pool) problems.push('no pool chosen');
     else if (!known(pools, step.pool)) problems.push(`pool "${step.pool}" is empty or unknown`);
   }
+  // M7/T3: `place_stack` liest eine *Karten*kategorie – dieselbe Idee wie der
+  // Pool bei `draw_assets`, nur die andere Bibliothek. Der Stapelname daneben
+  // ist Pflicht: ohne ihn findet `remove_stack` den Stapel nie wieder.
+  if (fields.has('category')) {
+    if (!step?.category) problems.push('no card category chosen');
+    else if (!known(cardCategories, step.category)) problems.push(`card category "${step.category}" is empty or unknown`);
+  }
+  if (fields.has('label') && !String(step?.label ?? '').trim()) problems.push('no stack name given');
   // M7/T1: Raster und Feld gehoeren zusammen - ein Feld ohne Raster ist keine
   // Adresse, und ein Feld, das es auf dem gewaehlten Raster nicht gibt, wird am
   // Tisch uebersprungen. Beides leer heisst "ueber x/y", das ist gueltig.
@@ -290,7 +320,7 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('name') && !String(step?.name ?? '').trim()) problems.push('no counter name given');
   // Nur hier: `move` darf x oder y weglassen (dann bleibt die Koordinate, wie
   // sie ist), und `place_asset` mit Zone zeigt x/y gar nicht erst an.
-  if (typeOf(step) === 'place_counter') {
+  if (typeOf(step) === 'place_counter' || typeOf(step) === 'place_stack') {
     const num = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
     if (!Number.isFinite(num(step?.x)) || !Number.isFinite(num(step?.y))) problems.push('no position given');
   }

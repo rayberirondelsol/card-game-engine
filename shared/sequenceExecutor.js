@@ -17,7 +17,9 @@
  * @param {object|string} stateData  – serialized game state (object or JSON string)
  * @param {Array}         sequenceData – array of sequence step objects
  * @param {Array}         zones       – zone objects from the setup (for deal_to_zone)
- * @param {object}        [options]   – { assets: table_assets rows, grids: grid objects, rng: () => [0,1) }
+ * @param {object}        [options]   – { assets: table_assets rows, cards: card library rows
+ *                                        (each with its category *name*, like assets), grids: grid objects,
+ *                                        rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
@@ -58,7 +60,11 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     return { state, log };
   }
 
-  const { assets = [], grids = [], rng = Math.random } = options || {};
+  // `cards` ist die Kartenbibliothek des Spiels, jede Zeile mit dem *Namen*
+  // ihrer Kategorie – genau wie `assets` ihn schon führt. `place_stack`
+  // adressiert die Kategorie über diesen Namen; die Kartenzeile selbst kennt
+  // nur eine `category_id`, und eine Id ist im Setup keine Adresse.
+  const { assets = [], cards = [], grids = [], rng = Math.random } = options || {};
   // What `reveal_next` bound, for the placeholders in the steps behind it.
   // Beside the state for the same reason as the log: the state is persisted as
   // JSON, and a binding smuggled into it would end up in the database.
@@ -68,7 +74,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
-      state = applyStep(state, step, zones, grids, assets, rng, entry, ctx);
+      state = applyStep(state, step, zones, grids, assets, cards, rng, entry, ctx);
     } catch (err) {
       entry.status = 'failed';
       entry.reason = err.message;
@@ -84,7 +90,10 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
 function stepTarget(step) {
   // `name` steht am Ende: nur place_counter benutzt es, und der Zähler heißt
   // im Protokoll so, wie er am Tisch heißt.
-  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.name ?? null;
+  // `category` vor `label`: wie bei jedem anderen Schritt steht im Protokoll,
+  // *woraus* er baut (place_stack liest eine Kartenkategorie), nicht was dabei
+  // herauskommt. `label` bleibt als Rückfall, damit die Zeile nie namenlos ist.
+  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.category ?? step?.label ?? step?.name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -243,7 +252,7 @@ function fullZones(usable, free, kind) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, allZones, allGrids, assets, rng, entry, ctx = {}) {
+function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, ctx = {}) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
@@ -356,6 +365,75 @@ function applyStep(state, step, allZones, allGrids, assets, rng, entry, ctx = {}
         });
       }
 
+      return state;
+    }
+
+    // M7/T3: aus einer Kartenkategorie einen Nachziehstapel bauen. Im Client
+    // gibt es das seit jeher als „+ Stack"; als Sequenzschritt fehlte es - und
+    // damit war das Verhaltensdeck des Bösewichts, dessen Kategorie erst nach
+    // dem Aufdecken feststeht, nicht aufbaubar.
+    case 'place_stack': {
+      const label = String(step.label ?? '').trim();
+      // Der feste Name neben der variablen Kategorie ist der ganze Zweck: die
+      // Kategorie heißt je Bösewicht anders, der Stapel immer „Verhaltensdeck",
+      // und nur so findet `remove_stack` ihn beim nächsten Kampf wieder.
+      if (!label) return skip('no stack name given');
+      if (idx.get(label)) return skip(`stack "${label}" is already on the table`);
+
+      const inCategory = cards.filter(c => norm(c.category) === norm(step.category));
+      if (!inCategory.length) return skip(`category "${step.category ?? ''}" is empty or unknown`);
+
+      // Leer ist keine 0 – dieselbe Rechnung wie bei `place_counter`: ein
+      // Stapel klammheimlich in der Tischmitte ist schlimmer als ein gemeldeter
+      // fehlender Wert.
+      const coord = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
+      const [x, y] = [coord(step.x), coord(step.y)];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return skip(`no position given for stack "${label}"`);
+
+      const stackId = crypto.randomUUID();
+      const faceDown = Boolean(step.faceDown);
+      // Die Bibliothekskarte per Spread, nicht über eine aufgezählte Feldliste:
+      // die hat hier schon einmal `width`/`height` verschluckt, und quadratische
+      // Karten lagen danach im Hochformat (Spec: Nachtrag zu M2.12). Position
+      // trägt der Stapel, nicht die Karte – `move` verschiebt ihn, ohne die
+      // Karten anzufassen, eine mitgeschriebene x/y wäre sofort veraltet.
+      const stackCards = inCategory.map((card, i) => ({
+        ...card,
+        tableId: crypto.randomUUID(),
+        cardId: card.id,
+        zIndex: i + 1,
+        faceDown,
+        rotation: 0,
+      }));
+
+      state.stacks.push({
+        stackId,
+        label,
+        x,
+        y,
+        cards: stackCards,
+        card_ids: stackCards.map(c => c.cardId),
+        table_ids: stackCards.map(c => c.tableId),
+      });
+      return state;
+    }
+
+    // Das Gegenstück dazu. `clear_zone` kann das nicht: es liest
+    // `state.cards`/`state.tokens`, und die Karten eines Stapels liegen in
+    // `stack.cards` und sind dort unsichtbar.
+    case 'remove_stack': {
+      const stack = idx.get(step.stackLabel);
+      // Kein Stapel dieses Namens heißt: der gewünschte Zustand liegt schon vor
+      // (dieselbe Entscheidung wie beim leeren `clear_zone`). Anders als Zonen
+      // stehen Stapel nirgends im Setup, es gibt also keine Liste, gegen die
+      // sich ein Tippfehler von einem „schon weg" unterscheiden ließe - und der
+      // erste Kampf einer Partie räumt immer ein Deck weg, das es noch nicht
+      // gibt. Der Grund steht trotzdem im Protokoll.
+      if (!stack) {
+        entry.reason = `no stack "${step.stackLabel}" on the table`;
+        return state;
+      }
+      state.stacks = state.stacks.filter(s => s !== stack);
       return state;
     }
 

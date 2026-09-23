@@ -5,6 +5,7 @@ import {
   defaultStep,
   describeStep,
   validateStep,
+  stackLabelsFor,
 } from '../utils/sequenceSteps.js';
 
 /**
@@ -74,6 +75,24 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
 
     pool: () => field('Pool',
       nameSelect(step.pool, ctx.pools, '— no asset categories —', v => set({ pool: v }), `step-${index}-pool`)),
+
+    // M7/T3: `place_stack` baut aus einer *Karten*kategorie einen Nachziehstapel
+    // - dieselbe Auswahl wie „+ Stack" in der Kartenablage, nur als Schritt.
+    category: () => field('Cards',
+      nameSelect(step.category, ctx.cardCategories, '— no card categories —', v => set({ category: v }), `step-${index}-card-category`)),
+
+    // Der feste Name neben der variablen Kategorie: die Kategorie heißt je
+    // Bösewicht anders, der Stapel immer gleich - nur so findet `remove_stack`
+    // ihn beim nächsten Kampf wieder.
+    label: () => field('Stack name',
+      <input
+        type="text"
+        value={step.label || ''}
+        onChange={e => set({ label: e.target.value })}
+        placeholder="e.g. Verhaltensdeck"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-stack-name`}
+      />),
 
     targetZoneLabel: () => field('Zone',
       <select
@@ -242,19 +261,24 @@ export default function SetupSequenceEditor({
   availablePools = [],
   availableAssetNames = [],
   availableGrids = [],
+  availableCardCategories = [],
   isOpen,
   onToggle,
 }) {
   const [addType, setAddType] = useState('shuffle');
 
   const ctx = {
-    stackLabels: availableStackLabels,
+    // Auch die Stapel, die ein `place_stack` dieser Folge erst herstellt: sonst
+    // wäre sein Ergebnis von `shuffle` und `remove_stack` nicht anwählbar, weil
+    // der Stapel beim Bearbeiten nicht am Tisch liegt (M7/T3).
+    stackLabels: stackLabelsFor(steps, availableStackLabels),
     zoneLabels: availableZoneLabels,
     pools: availablePools,
     assetNames: availableAssetNames,
     // Die Raster selbst, nicht nur ihre Namen: die Pruefung eines Feldes
     // braucht die Geometrie (cellFromLabel), die Auswahl nur den Namen.
     grids: availableGrids,
+    cardCategories: availableCardCategories,
   };
 
   function addStep() {

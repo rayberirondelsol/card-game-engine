@@ -292,3 +292,23 @@ von `place_counter`.
 - Welche Bildseite eines Tableaus die Szenarioseite ist, hängt laut M1b am
   Import und ist pro Kachel verschieden — Schritt 9 in T8 ist erst am echten
   Datenbestand festzuzurren.
+
+---
+
+## Nachtraege aus der Umsetzung
+
+- **Die Kategorien heissen im echten Datenbestand `Aktionen: <Boesewicht>`**, nicht
+  `Verhalten: <Boesewicht>` wie in Spec und T8 geschrieben (geprueft an der
+  Produktion: 20 Decks a 15 Karten). T8 muss den richtigen Praefix verwenden.
+- **Ueberfallkarten sind kein eigenes Deck.** Die 9 Ambush-Karten stecken laut
+  Regelreferenz in den jeweiligen Aktionsdecks (dann je 15 Karten). T8 Schritt 18
+  (`place_stack "Ueberfall: ..."`) hat damit keine Datenquelle - vor T8 klaeren,
+  ob er entfaellt oder die Karten anders herauszuloesen sind.
+- **Es sind drei `executeSequenceWithLog`-Aufrufstellen**, nicht zwei:
+  `GameTable.jsx` (Aktion ausfuehren **und** Setup laden) sowie `rooms.js`.
+  Dieser Zaehlfehler stand in mehreren Aufgabenbeschreibungen.
+- **Bosswerte brauchen ein Feld, das entweder eine Vierertabelle oder eine Formel
+  haelt** (T9): die meisten Boesewichte haben gedruckte Werte je Doerflerzahl,
+  Barry Bluff rechnet sie aus den Doerflern, Ms. Falls hat "3 LEB je Doerfler",
+  Patches aendert sie ueber die Kostuem-Mechanik. Siehe `docs/tft-regeln.md` 5.5.
+

@@ -3565,6 +3565,23 @@ export default function GameTable({ room = null }) {
     setTimeout(() => renderCanvas(), 100);
   }
 
+  // M7/T3: die Kartenbibliothek so, wie der Executor sie braucht - jede Zeile
+  // mit dem *Namen* ihrer Kategorie, genau wie `table-assets` ihn schon
+  // mitliefert. `place_stack` adressiert die Kategorie über diesen Namen; die
+  // Kartenzeile selbst kennt nur eine `category_id`. Frisch geladen statt aus
+  // `availableCards`/`categories`: beide kommen aus eigenen Effekten und sind
+  // beim Aufbau eines Setups nicht verlässlich schon da.
+  async function loadCardLibrary() {
+    const [cardsRes, catsRes] = await Promise.all([
+      apiFetch(`/api/games/${id}/cards`),
+      apiFetch(`/api/games/${id}/categories`),
+    ]);
+    const cardRows = cardsRes.ok ? await cardsRes.json() : [];
+    const catRows = catsRes.ok ? await catsRes.json() : [];
+    const nameById = new Map(catRows.map(c => [c.id, c.name]));
+    return cardRows.map(c => ({ ...c, category: nameById.get(c.category_id) || null }));
+  }
+
   // M5: eine Aktion des Setups am Tisch ausloesen. Gleiche Maschinerie wie die
   // Aufbau-Sequenz, nur laeuft sie gegen den *aktuellen* Tisch: getGameState
   // liefert genau die Form, die der Executor erwartet und loadGameState wieder
@@ -3577,7 +3594,8 @@ export default function GameTable({ room = null }) {
     try {
       const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
       const assets = assetsRes.ok ? await assetsRes.json() : [];
-      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, grids });
+      const cards = await loadCardLibrary();
+      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, cards, grids });
       loadGameState(next);
       const bad = log.filter(e => e.status !== 'ok');
       setSetupIssues(bad.length ? bad : null);
@@ -3668,9 +3686,12 @@ export default function GameTable({ room = null }) {
               // Asset steps (place_asset / draw_assets / ...) draw from the game's table assets.
               const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
               const assets = assetsRes.ok ? await assetsRes.json() : [];
+              // Dasselbe fuer die Kartenbibliothek: `place_stack` baut aus einer
+              // Kartenkategorie einen Nachziehstapel (M7/T3).
+              const cardLibrary = await loadCardLibrary();
               // Die Raster wie die Zonen frisch aus dem Setup: `grids` im State
               // ist an dieser Stelle noch leer (M7/T1).
-              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, grids: parsedGrids });
+              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, cards: cardLibrary, grids: parsedGrids });
               stateToLoad = built;
               const bad = log.filter(e => e.status !== 'ok');
               setSetupIssues(bad.length ? bad : null);
@@ -7019,6 +7040,7 @@ export default function GameTable({ room = null }) {
           availablePools={assetPools(tableAssets)}
           availableAssetNames={assetNames(tableAssets)}
           availableGrids={grids}
+          availableCardCategories={categories.map(c => c.name).filter(Boolean)}
           isOpen={showSequenceEditor}
           onToggle={() => setShowSequenceEditor(prev => !prev)}
         />
