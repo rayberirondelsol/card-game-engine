@@ -479,6 +479,48 @@ in der Liste). Die Typliste gehört deshalb an eine Stelle und unter einen Test.
 trägt noch ein Kreuz; ein Langdruck auf ein Token öffnet das Kontextmenü mit
 `Delete`; jeder Objekttyp, den der Tisch zeichnet, hat dort einen Löschen-Zweig.
 
+### M2.12 — Karten behalten ihr Seitenverhältnis
+Vom Nutzer gemeldet: die vielen **quadratischen** Kärtchen werden im rechteckigen
+Standardformat gezeichnet.
+
+`getCardDims` in `GameTable.jsx` kennt genau zwei Antworten: Hochformat
+`100×140` und, wenn `width > height`, Querformat `140×100`. Eine quadratische
+Karte fällt in den Hochformat-Zweig und bekommt einen 100×140-Platz. Das Bild
+selbst wird mit `objectFit: contain` eingepasst, also nicht verzerrt — aber der
+**Platz** ist zu hoch, und darum sitzt die Karte in einem Rahmen aus leerer
+Fläche.
+
+Das betrifft nicht wenige: von den 1087 Karten sind **511 quadratisch**
+(Nachschub, Heldentaten, Ausrüstung — physisch 63×63 mm gegen 63×88 mm bei den
+Hochformaten).
+
+#### Die Regel
+Das Seitenverhältnis der Karte bestimmt den Platz. Die Karte wird unter
+Beibehaltung ihres Verhältnisses in den Bezugsrahmen **eingepasst**, und der
+Rahmen richtet sich nach der Ausrichtung:
+
+- `height >= width` → Rahmen `CARD_WIDTH × CARD_HEIGHT` (100×140)
+- `width > height`  → Rahmen `CARD_HEIGHT × CARD_WIDTH` (140×100)
+
+Daraus folgt für die drei vorkommenden Formate: 744×1039 → 100×140 (unverändert),
+744×744 → **100×100**, 1039×744 → 140×100 (unverändert). Der Sonderfall
+„quadratisch" braucht keinen eigenen Zweig; er fällt einfach heraus.
+
+Kennt eine Karte ihre Maße nicht (`width`/`height` fehlen oder sind 0), bleibt es
+bei 100×140 — so wie heute.
+
+**Bewusst nicht gemacht:** maßstabsgetreu über alle Decks. Die Rollenkarten von
+„Toller Trödel" sind physisch 69,8×120,6 mm und damit größer als eine
+Standardkarte; eingepasst werden sie 81×140 statt 111×192. Alle Karten in einen
+gemeinsamen Rahmen zu stellen ist die übliche Wahl am virtuellen Tisch und
+braucht keinen spielweiten Bezugsmaßstab. Wenn echte Größenverhältnisse gewünscht
+sind, ist das eine eigene Entscheidung.
+
+**Abnahme:** Eine 744×744-Karte belegt am Tisch 100×100 und sitzt bündig in ihrem
+Platz; eine 744×1039-Karte unverändert 100×140; eine 1039×744-Karte unverändert
+140×100; eine Karte ohne Maße 100×140. Das gilt für lose Karten, für Karten im
+Stapel und für die Handkarten.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.

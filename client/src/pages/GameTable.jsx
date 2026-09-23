@@ -23,6 +23,7 @@ import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement } from '../utils/menuPlacement.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
+import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
 
 // Table background configurations
@@ -61,8 +62,6 @@ const TABLE_BACKGROUNDS = {
 
 // Grid configuration for snap-to-grid
 const GRID_SIZE = 80; // pixels per grid cell
-const CARD_WIDTH = 100;
-const CARD_HEIGHT = 140;
 
 // Context-menu heading per objType. Types not listed are title-cased from the
 // key ("counter" -> "Counter"); only multi-word ones need an entry.
@@ -72,18 +71,6 @@ const OBJ_TYPE_LABELS = {
   customDie: 'Custom Die',
 };
 
-/**
- * Returns the display dimensions for a card based on its actual image aspect ratio.
- * Landscape cards (width > height) swap the default portrait dimensions so the
- * card fills its container correctly without being cropped.
- */
-function getCardDims(card) {
-  if (card && card.width > 0 && card.height > 0 && card.width > card.height) {
-    // Landscape card – swap so it renders in landscape orientation
-    return { w: CARD_HEIGHT, h: CARD_WIDTH };
-  }
-  return { w: CARD_WIDTH, h: CARD_HEIGHT };
-}
 const SNAP_THRESHOLD = 20; // pixels within which snap activates
 
 // Snap a value to the nearest grid line
@@ -2502,7 +2489,7 @@ export default function GameTable({ room = null }) {
       if (c.inStack !== stackId) return c;
       if (splitIds.has(c.tableId)) {
         // Split cards: move to new stack (or individual if count=1), offset to the right
-        return { ...c, inStack: newStackId, x: c.x + CARD_WIDTH + 30 };
+        return { ...c, inStack: newStackId, x: c.x + getCardDims(c).w + 30 };
       }
       // Remaining cards: unstack if only 1 left
       if (remainingCount === 1) {
@@ -4070,21 +4057,24 @@ export default function GameTable({ room = null }) {
         }}
       >
       {/* Grid highlight overlay when dragging cards */}
-      {gridHighlight && draggingCard && (
+      {gridHighlight && draggingCard && (() => {
+        const { w: hlW, h: hlH } = getCardDims(tableCards.find(c => c.tableId === draggingCard));
+        return (
         <div
           data-testid="grid-highlight"
           className="absolute pointer-events-none z-10"
           style={{
-            left: gridHighlight.x - CARD_WIDTH / 2 - 4,
-            top: gridHighlight.y - CARD_HEIGHT / 2 - 4,
-            width: CARD_WIDTH + 8,
-            height: CARD_HEIGHT + 8,
+            left: gridHighlight.x - hlW / 2 - 4,
+            top: gridHighlight.y - hlH / 2 - 4,
+            width: hlW + 8,
+            height: hlH + 8,
             border: '2px dashed rgba(59, 130, 246, 0.6)',
             borderRadius: '8px',
             backgroundColor: 'rgba(59, 130, 246, 0.1)',
           }}
         />
-      )}
+        );
+      })()}
 
       {/* Table Cards - render stacks and individual cards */}
       {(() => {
@@ -6044,6 +6034,7 @@ export default function GameTable({ room = null }) {
                     // This panel already draws the back of a face-down card -
                     // and then printed its name right underneath it.
                     const view = tableObjectView(card, 'Card');
+                    const { w: browseW, h: browseH } = getCardDims(card);
                     return (
                     <div
                       key={card.tableId}
@@ -6052,8 +6043,8 @@ export default function GameTable({ room = null }) {
                     >
                       <div className="relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors"
                         style={{
-                          width: (card.width > 0 && card.height > 0 && card.width > card.height) ? 140 : 100,
-                          height: (card.width > 0 && card.height > 0 && card.width > card.height) ? 100 : 140,
+                          width: browseW,
+                          height: browseH,
                           backgroundColor: '#fff'
                         }}>
                         {card.faceDown ? (
@@ -6594,11 +6585,9 @@ export default function GameTable({ room = null }) {
               <div className="flex items-end justify-center" style={{ gap: '2px' }}>
                 {handCards.map((card, index) => {
                   const isMobile = window.innerWidth < 640;
-                  const isLandscapeCard = card.width > 0 && card.height > 0 && card.width > card.height;
                   const baseW = isMobileLandscape ? 45 : (isMobile ? 60 : 80);
                   const baseH = isMobileLandscape ? 63 : (isMobile ? 84 : 112);
-                  const cardWidth = isLandscapeCard ? baseH : baseW;
-                  const cardHeight = isLandscapeCard ? baseW : baseH;
+                  const { w: cardWidth, h: cardHeight } = getCardDims(card, baseW, baseH);
                   const totalCards = handCards.length;
                   const spreadAngle = isMobileLandscape ? Math.min(2, 15 / totalCards) : (isMobile ? Math.min(3, 20 / totalCards) : Math.min(5, 30 / totalCards));
                   const centerIndex = (totalCards - 1) / 2;
@@ -6686,11 +6675,12 @@ export default function GameTable({ room = null }) {
       {hoveredHandCard && !draggingFromHand && (() => {
         const card = handCards.find(c => c.handId === hoveredHandCard);
         if (!card) return null;
+        const previewDims = getCardDims(card, 200, 280);
         return (
           <div className="fixed z-50 pointer-events-none" data-testid="hand-card-preview" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -70%)' }}>
             <div className="rounded-xl overflow-hidden border-2 border-yellow-400 shadow-2xl shadow-black/50" style={{
-              width: (card.width > 0 && card.height > 0 && card.width > card.height) ? 280 : 200,
-              height: (card.width > 0 && card.height > 0 && card.width > card.height) ? 200 : 280,
+              width: previewDims.w,
+              height: previewDims.h,
               backgroundColor: '#fff'
             }}>
               {card.image_path ? (
@@ -6711,9 +6701,7 @@ export default function GameTable({ room = null }) {
       {draggingFromHand && (() => {
         const card = handCards.find(c => c.handId === draggingFromHand);
         if (!card) return null;
-        const ghostDims = (card.width > 0 && card.height > 0 && card.width > card.height)
-          ? { w: CARD_HEIGHT, h: CARD_WIDTH }
-          : { w: CARD_WIDTH, h: CARD_HEIGHT };
+        const ghostDims = getCardDims(card);
         return (
           <div
             className="fixed z-[70] pointer-events-none"
