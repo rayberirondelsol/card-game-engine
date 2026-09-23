@@ -3269,14 +3269,14 @@ export default function GameTable({ room = null }) {
         res = await apiFetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, scenario_data: scenarioData }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, action_data: setupActions, scenario_data: scenarioData }),
         });
       } else {
         // Create new setup
         res = await apiFetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, scenario_data: scenarioData }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, action_data: setupActions, scenario_data: scenarioData }),
         });
       }
       if (!res.ok) {
@@ -3753,6 +3753,12 @@ export default function GameTable({ room = null }) {
             try { editGrids = JSON.parse(setup.grid_data); } catch {}
           }
           setGrids(editGrids);
+          // M5/M7 T7: auch hier laden, nicht nur im Spiel-Ladeweg. `saveSetup`
+          // schickt `action_data` jetzt mit - ohne dieses Laden würde der erste
+          // Speichervorgang aus dem Editor alle Aktionen des Setups löschen.
+          let editActions = [];
+          try { editActions = JSON.parse(setup.action_data || '[]'); } catch {}
+          setSetupActions(Array.isArray(editActions) ? editActions : []);
           setScenarioData(parseScenarioData(setup.scenario_data));
           loadGameState(setup.state_data, editGrids);
           if (setup.zone_data) {
@@ -7056,6 +7062,8 @@ export default function GameTable({ room = null }) {
         <SetupSequenceEditor
           steps={sequenceSteps}
           onStepsChange={setSequenceSteps}
+          actions={setupActions}
+          onActionsChange={setSetupActions}
           availableStackLabels={
             [...new Set(tableCards.filter(c => c.inStack).map(c => c.inStack))]
               .map(id => stackNames[id]).filter(Boolean)

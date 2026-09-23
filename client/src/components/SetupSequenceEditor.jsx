@@ -7,6 +7,13 @@ import {
   validateStep,
   stackLabelsFor,
 } from '../utils/sequenceSteps.js';
+import {
+  createAction,
+  renameAction,
+  deleteAction,
+  setActionSteps,
+  actionSteps,
+} from '../utils/setupActions.js';
 
 /**
  * The setup sequence editor. All the knowledge about steps - which types
@@ -272,6 +279,11 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
 export default function SetupSequenceEditor({
   steps,
   onStepsChange,
+  // M5/M7 T7: die Aktionen desselben Setups. Derselbe Editor, ein Auswahlfeld
+  // davor - eine Aktion ist dieselbe Schrittfolge, nur ausgelöst statt geladen.
+  // Ohne `onActionsChange` verhält sich der Editor wie vorher.
+  actions = null,
+  onActionsChange = null,
   availableStackLabels = [],
   availableZoneLabels = [],
   availablePools = [],
@@ -282,12 +294,34 @@ export default function SetupSequenceEditor({
   onToggle,
 }) {
   const [addType, setAddType] = useState('shuffle');
+  // '' ist die Aufbau-Sequenz, sonst die id einer Aktion.
+  const [subjectId, setSubjectId] = useState('');
+
+  const manageActions = typeof onActionsChange === 'function';
+  const actionList = Array.isArray(actions) ? actions : [];
+  // Zeigt die Auswahl auf eine gelöschte Aktion, fällt sie auf die
+  // Aufbau-Sequenz zurück, statt eine leere Liste als Aktion auszugeben.
+  const current = manageActions && subjectId ? actionList.find(a => a.id === subjectId) : null;
+
+  // Ab hier arbeitet der ganze Editor auf `shownSteps`/`changeSteps` und weiß
+  // nicht mehr, ob er eine Aktion oder den Aufbau bearbeitet.
+  const shownSteps = current ? actionSteps(actionList, current.id) : steps;
+  const changeSteps = current
+    ? next => onActionsChange(setActionSteps(actionList, current.id, next))
+    : onStepsChange;
+  const title = current ? `Action: ${current.label || current.id}` : 'Setup Sequence';
+
+  function addAction() {
+    const created = createAction(actionList);
+    onActionsChange([...actionList, created]);
+    setSubjectId(created.id);
+  }
 
   const ctx = {
     // Auch die Stapel, die ein `place_stack` dieser Folge erst herstellt: sonst
     // wäre sein Ergebnis von `shuffle` und `remove_stack` nicht anwählbar, weil
     // der Stapel beim Bearbeiten nicht am Tisch liegt (M7/T3).
-    stackLabels: stackLabelsFor(steps, availableStackLabels),
+    stackLabels: stackLabelsFor(shownSteps, availableStackLabels),
     zoneLabels: availableZoneLabels,
     pools: availablePools,
     assetNames: availableAssetNames,
@@ -298,28 +332,28 @@ export default function SetupSequenceEditor({
   };
 
   function addStep() {
-    onStepsChange([...steps, defaultStep(addType, ctx)]);
+    changeSteps([...shownSteps, defaultStep(addType, ctx)]);
   }
 
   function updateStep(i, updated) {
-    const next = [...steps];
+    const next = [...shownSteps];
     next[i] = updated;
-    onStepsChange(next);
+    changeSteps(next);
   }
 
   function deleteStep(i) {
-    onStepsChange(steps.filter((_, idx) => idx !== i));
+    changeSteps(shownSteps.filter((_, idx) => idx !== i));
   }
 
   function moveStep(i, direction) {
-    const next = [...steps];
+    const next = [...shownSteps];
     const j = i + direction;
     if (j < 0 || j >= next.length) return;
     [next[i], next[j]] = [next[j], next[i]];
-    onStepsChange(next);
+    changeSteps(next);
   }
 
-  const badSteps = steps.reduce((n, s) => n + (validateStep(s, ctx).length ? 1 : 0), 0);
+  const badSteps = shownSteps.reduce((n, s) => n + (validateStep(s, ctx).length ? 1 : 0), 0);
 
   return (
     <div className="absolute bottom-16 left-4 z-50" data-ui-element="true">
@@ -329,7 +363,8 @@ export default function SetupSequenceEditor({
           className="px-3 py-1.5 text-xs bg-emerald-700/90 hover:bg-emerald-600/90 text-white rounded-lg shadow-lg backdrop-blur-sm border border-emerald-600/50 transition-colors"
           data-testid="sequence-editor-toggle"
         >
-          Sequence{steps.length > 0 ? ` (${steps.length})` : ''}
+          {current ? current.label || 'Action' : 'Sequence'}
+          {shownSteps.length > 0 ? ` (${shownSteps.length})` : ''}
           {badSteps > 0 && <span className="ml-1 text-amber-300">⚠{badSteps}</span>}
         </button>
       ) : (
@@ -339,16 +374,65 @@ export default function SetupSequenceEditor({
         >
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700">
-            <span className="text-white text-sm font-semibold">
-              Setup Sequence
-              {steps.length > 0 && <span className="ml-1 text-emerald-400 text-xs">({steps.length} steps)</span>}
+            <span className="text-white text-sm font-semibold break-words min-w-0" data-testid="sequence-editor-title">
+              {title}
+              {shownSteps.length > 0 && <span className="ml-1 text-emerald-400 text-xs">({shownSteps.length} steps)</span>}
             </span>
             <button
               onClick={onToggle}
-              className="text-slate-400 hover:text-white text-lg leading-none"
+              className="text-slate-400 hover:text-white text-lg leading-none shrink-0"
               data-testid="sequence-editor-close"
             >✕</button>
           </div>
+
+          {/* M5/M7 T7: was dieser Editor gerade bearbeitet. Bis hierher war
+              `action_data` nur über handgeschriebenes JSON an der API
+              erreichbar - dasselbe Muster wie M2.5 und M2.7. */}
+          {manageActions && (
+            <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
+              <select
+                value={current ? current.id : ''}
+                onChange={e => setSubjectId(e.target.value)}
+                className={`flex-1 min-w-0 ${INPUT}`}
+                data-testid="sequence-subject-select"
+              >
+                <option value="">Setup Sequence (on load)</option>
+                {actionList.map(a => (
+                  <option key={a.id} value={a.id}>{a.label || a.id}</option>
+                ))}
+              </select>
+              <button
+                onClick={addAction}
+                className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded shrink-0 transition-colors"
+                data-testid="action-add-btn"
+                title="New action"
+              >+ Action</button>
+            </div>
+          )}
+
+          {/* Umbenennen und Löschen gibt es nur für die gewählte Aktion - die
+              Aufbau-Sequenz heißt nicht und lässt sich nicht löschen. */}
+          {current && (
+            <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
+              <input
+                type="text"
+                value={current.label || ''}
+                onChange={e => onActionsChange(renameAction(actionList, current.id, e.target.value))}
+                placeholder="e.g. Kampf beginnen"
+                className={`flex-1 min-w-0 ${INPUT}`}
+                data-testid="action-rename-input"
+              />
+              <button
+                onClick={() => {
+                  onActionsChange(deleteAction(actionList, current.id));
+                  setSubjectId('');
+                }}
+                className="text-red-400 hover:text-red-300 px-1 shrink-0"
+                data-testid="action-delete-btn"
+                title="Delete action"
+              >✕</button>
+            </div>
+          )}
 
           {/* No stacks warning */}
           {availableStackLabels.length === 0 && (
@@ -366,15 +450,15 @@ export default function SetupSequenceEditor({
 
           {/* Step list */}
           <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
-            {steps.length === 0 && (
+            {shownSteps.length === 0 && (
               <p className="text-slate-500 text-xs text-center py-4">No steps yet. Add one below.</p>
             )}
-            {steps.map((step, i) => (
+            {shownSteps.map((step, i) => (
               <StepRow
                 key={i}
                 step={step}
                 index={i}
-                total={steps.length}
+                total={shownSteps.length}
                 ctx={ctx}
                 onChange={updated => updateStep(i, updated)}
                 onMoveUp={() => moveStep(i, -1)}
