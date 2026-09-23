@@ -19,6 +19,10 @@ import {
   serializeBoardState,
 } from '../roomStore.js';
 import { broadcast, sendToPlayer } from '../websocket/broadcast.js';
+// M6: derselbe Executor wie am Tisch – shared/ liegt neben server/ und client/.
+import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
+import { resolveGrids, placeOnGrids } from '../../../shared/gridGeometry.js';
+import { anchorBoxes } from '../../../shared/anchoring.js';
 
 const VALID_COLORS = ['red', 'blue', 'green', 'purple', 'orange', 'yellow'];
 
@@ -225,11 +229,6 @@ export async function roomsRoutes(fastify) {
       if (room.setup_id) {
         const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(room.setup_id);
         if (setup) {
-          // Load board state from setup
-          try {
-            const setupState = JSON.parse(setup.state_data || '{}');
-            loadBoardState(liveRoom, setup.state_data);
-          } catch {}
           try {
             zones = JSON.parse(setup.zone_data || '[]');
           } catch {}
@@ -238,6 +237,45 @@ export async function roomsRoutes(fastify) {
           try {
             grids = JSON.parse(setup.grid_data || '[]');
           } catch {}
+
+          // M6: der Raum baut auf wie der Tisch – derselbe Executor aus
+          // shared/ und dieselben Eingaben wie in GameTable.jsx. Ohne das
+          // startet ein Raum ohne alles, was die Sequenz herstellt.
+          let sequence = [];
+          try {
+            sequence = JSON.parse(setup.sequence_data || '[]');
+          } catch {}
+
+          let stateJson = setup.state_data;
+          if (Array.isArray(sequence) && sequence.length) {
+            const assets = db.prepare(
+              `SELECT t.*, (SELECT name FROM categories WHERE id = t.category_id) AS category
+               FROM table_assets t WHERE t.game_id = ? ORDER BY t.created_at DESC`
+            ).all(room.game_id);
+            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets });
+            // Fehlgeschlagene Schritte brechen den Start nicht ab – sie werden
+            // protokolliert, so wie der Tisch sie in `setupIssues` anzeigt.
+            for (const e of log) {
+              if (e.status === 'ok') continue;
+              fastify.log.warn(
+                { room: roomCode, step: e.index, type: e.type, target: e.target, status: e.status, reason: e.reason },
+                'setup step did not run'
+              );
+            }
+            stateJson = JSON.stringify(state);
+          }
+          loadBoardState(liveRoom, stateJson);
+
+          // M3b: was sich ein Rasterfeld merkt, gehört wieder darauf – derselbe
+          // Schritt, den `loadGameState` am Tisch macht (placeOnGrids), sonst
+          // steht die Figur im Raum auf veralteten Koordinaten.
+          const state = liveRoom.boardState;
+          const resolved = resolveGrids(grids, anchorBoxes(state.boards, state.tokens));
+          if (resolved.length) {
+            state.tokens = placeOnGrids(state.tokens, resolved);
+            state.cards = placeOnGrids(state.cards, resolved);
+          }
+
           liveRoom.zones = zones;
           liveRoom.grids = grids;
         }

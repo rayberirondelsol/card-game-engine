@@ -23,9 +23,9 @@ import assert from 'node:assert/strict';
 
 const {
   assetBox, anchorBoxes, resolveBox, relativeBox, resolveZones, setAnchor,
-} = await import('../../client/src/utils/anchoring.js');
-const { zoneContains } = await import('../../client/src/utils/zoneGeometry.js');
-const { executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+} = await import('../../shared/anchoring.js');
+const { zoneContains } = await import('../../shared/zoneGeometry.js');
+const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

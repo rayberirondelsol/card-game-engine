@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import GridOverlay from './GridOverlay';
-import { createGrid, setGridAnchor, gridBox, GRID_TYPES } from '../utils/gridGeometry';
+import { createGrid, setGridAnchor, gridBox, GRID_TYPES } from '../../../shared/gridGeometry.js';
 
 /**
  * GridEditor – laying out and configuring grids in setup mode (spec section 5,

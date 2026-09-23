@@ -20,8 +20,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { assetToken } = await import('../../client/src/utils/assetToken.js');
-const { assetBox, anchorBoxes, resolveBox } = await import('../../client/src/utils/anchoring.js');
+const { assetToken } = await import('../../shared/assetToken.js');
+const { assetBox, anchorBoxes, resolveBox } = await import('../../shared/anchoring.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

@@ -20,8 +20,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { assetToken, assetFace } = await import('../../client/src/utils/assetToken.js');
-const { executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+const { assetToken, assetFace } = await import('../../shared/assetToken.js');
+const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 const { handleMessage } = await import('../src/websocket/messageHandler.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────

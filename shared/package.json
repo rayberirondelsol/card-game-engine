@@ -1,0 +1,5 @@
+{
+  "name": "card-game-engine-shared",
+  "private": true,
+  "type": "module"
+}

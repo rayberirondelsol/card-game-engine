@@ -15,9 +15,9 @@ import assert from 'node:assert/strict';
 
 const {
   zoneSlots, zoneSlotFor, zoneCapacity, zoneRejects, snapPoint,
-} = await import('../../client/src/utils/zoneGeometry.js');
-const { resolveZones } = await import('../../client/src/utils/anchoring.js');
-const { executeSequence } = await import('../../client/src/utils/sequenceExecutor.js');
+} = await import('../../shared/zoneGeometry.js');
+const { resolveZones } = await import('../../shared/anchoring.js');
+const { executeSequence } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

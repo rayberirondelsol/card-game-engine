@@ -4,16 +4,16 @@
 //
 // Wie sequence-deal-fields.test.js: der Executor und das Schrittvokabular sind
 // reine Module im Client-Bundle und werden direkt importiert. Das Zähler-Modell
-// selbst liegt seit M4a in client/src/utils/counters.js – genau damit die
+// selbst liegt seit M4a in shared/counters.js – genau damit die
 // Speicher-/Ladewege keine eigene Feldliste mehr führen, an der `max` hängen
 // bleiben könnte (docs/audit-dead-controls.md).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { executeSequence, executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+const { executeSequence, executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 const { STEP_TYPES, stepFields, defaultStep, describeStep, validateStep } = await import('../../client/src/utils/sequenceSteps.js');
-const { normalizeCounter } = await import('../../client/src/utils/counters.js');
+const { normalizeCounter } = await import('../../shared/counters.js');
 
 const emptyState = () => ({ cards: [], stacks: [], tokens: [], boards: [] });
 

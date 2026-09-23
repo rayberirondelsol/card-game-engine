@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ZoneShape from './ZoneShape';
-import { zoneSlots } from '../utils/zoneGeometry';
+import { zoneSlots } from '../../../shared/zoneGeometry.js';
 import {
   screenToWorld, rectFromPoints, isDrawable, createZone,
   panelSide, moveZone, resizeZone, RESIZE_HANDLES, handleAnchor,
 } from '../utils/zoneDraft';
-import { setAnchor } from '../utils/anchoring';
+import { setAnchor } from '../../../shared/anchoring.js';
 
 const SHAPES = [
   { value: 'rect',       label: 'Rectangle' },

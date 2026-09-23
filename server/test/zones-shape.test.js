@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 
 const {
   zoneContains, zoneAccepts, zoneSlots, zoneSlotFor, zoneAt, zoneRejects, snapPoint,
-} = await import('../../client/src/utils/zoneGeometry.js');
-const { executeSequence, executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+} = await import('../../shared/zoneGeometry.js');
+const { executeSequence, executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

@@ -24,7 +24,7 @@ const {
   assetNames,
 } = await import('../../client/src/utils/sequenceSteps.js');
 
-const { executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

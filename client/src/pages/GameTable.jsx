@@ -10,15 +10,15 @@ import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
-import { zoneAt, zoneContains, zoneRejects, countInZone } from '../utils/zoneGeometry';
-import { resolveGrids, snapInto, placeOnGrids } from '../utils/gridGeometry';
+import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/zoneGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
-import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
-import { resolveZones, anchorBoxes } from '../utils/anchoring';
+import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
+import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView } from '../utils/tableObjectView';
-import { assetToken, assetFace } from '../utils/assetToken.js';
-import { normalizeCounter, counterDisplay } from '../utils/counters.js';
+import { assetToken, assetFace } from '../../../shared/assetToken.js';
+import { normalizeCounter, counterDisplay } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -2845,7 +2845,7 @@ export default function GameTable({ room = null }) {
         image_path: c.image_path,
         card_back_id: c.card_back_id || null,
       })),
-      // M4a: die Felder stehen in utils/counters.js, nicht hier - eine zweite
+      // M4a: die Felder stehen in shared/counters.js, nicht hier - eine zweite
       // Liste verlöre das nächste neue Feld (zuletzt `max`) beim Speichern.
       counters: counters.map(normalizeCounter),
       dice: dice.map(d => ({

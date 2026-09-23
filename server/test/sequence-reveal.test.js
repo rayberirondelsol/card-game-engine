@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { executeSequence, executeSequenceWithLog } = await import('../../client/src/utils/sequenceExecutor.js');
+const { executeSequence, executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

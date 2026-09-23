@@ -1,5 +1,5 @@
 import React from 'react';
-import { gridBox, colLabel, rowLabel, GRID_TYPES } from '../utils/gridGeometry';
+import { gridBox, colLabel, rowLabel, GRID_TYPES } from '../../../shared/gridGeometry.js';
 
 /**
  * Draws grids in world space (spec section 5, M3b). The parent applies the

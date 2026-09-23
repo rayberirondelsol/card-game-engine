@@ -2,8 +2,9 @@ services:
   # Backend API server (Node.js + Fastify + SQLite)
   backend:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      # M6: Wurzelkontext, damit shared/ in beide Images kommt.
+      context: .
+      dockerfile: server/Dockerfile
     container_name: card-game-engine-backend
     restart: unless-stopped
     ports:
@@ -31,8 +32,8 @@ services:
   # Frontend (nginx serving Vite build, proxying API to backend)
   frontend:
     build:
-      context: ./client
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: client/Dockerfile
     container_name: card-game-engine-frontend
     restart: unless-stopped
     ports:

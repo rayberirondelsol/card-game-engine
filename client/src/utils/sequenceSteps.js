@@ -11,7 +11,7 @@
  * for one. Offering a field the handler ignores is worse than offering none:
  * it is a promise the setup does not keep.
  */
-import { counterMax } from './counters.js';
+import { counterMax } from '../../../shared/counters.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { executeSequence } = await import('../../client/src/utils/sequenceExecutor.js');
+const { executeSequence } = await import('../../shared/sequenceExecutor.js');
 const { getCardDims } = await import('../../client/src/utils/cardDims.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────

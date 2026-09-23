@@ -83,12 +83,19 @@ danach reproduzierbar aufgebaut werden kann. Die Spec ist der Vertrag; M1, M2, M
 zeichnen), M2.6 (Bedienbarkeit), M2.7 (Asset-Schritte im Sequenz-Editor), M3a
 (Verankerung) und M3b (Raster) sind umgesetzt, M4 (Fortschrittsebene) steht aus.
 
-Wer daran arbeitet: erst die Spec lesen, dann `client/src/utils/sequenceExecutor.js`,
-`sequenceSteps.js` (Schrittvokabular für den Editor: Felder je Typ, Zusammenfassung,
-Validierung — in `server/test/sequence-steps.test.js` geprüft), `zoneGeometry.js`,
-`anchoring.js` (relative Box am Anker → absolute Box) und `gridGeometry.js`
-(Raster; benutzt `resolveBox` aus `anchoring.js`, statt eine zweite Auflösung
-danebenzustellen).
+Wer daran arbeitet: erst die Spec lesen, dann `shared/sequenceExecutor.js`,
+`client/src/utils/sequenceSteps.js` (Schrittvokabular für den Editor: Felder je Typ,
+Zusammenfassung, Validierung — in `server/test/sequence-steps.test.js` geprüft),
+`shared/zoneGeometry.js`, `shared/anchoring.js` (relative Box am Anker → absolute
+Box) und `shared/gridGeometry.js` (Raster; benutzt `resolveBox` aus `anchoring.js`,
+statt eine zweite Auflösung danebenzustellen).
+
+**`shared/` (M6):** `sequenceExecutor`, `zoneGeometry`, `anchoring`, `assetToken`,
+`counters` und `gridGeometry` liegen im Wurzelverzeichnis, weil Tisch **und**
+Raum denselben Aufbau ausführen (`POST /api/rooms/:code/start`). Es gibt genau
+einen Executor — kopiert wird nichts. Beide Images bauen deshalb vom
+Wurzelkontext (`docker-compose.yml`) und legen `shared/` neben die App (`/app` +
+`/shared`), damit die relativen Importpfade lokal und im Container gleich sind.
 
 **Raster (M3b):** nur `square` ist gerechnet, Hex ist ein eigener Schritt —
 `GRID_TYPES` ist die Liste, alles andere antwortet `null` statt Quadratfelder zu

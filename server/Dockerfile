@@ -6,8 +6,10 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy package files first for better layer caching
-COPY package.json package-lock.json ./
+# Der Build-Kontext ist das Repo-Wurzelverzeichnis (M6), damit shared/ mit ins
+# Image kommt. /app ist der Server, /shared liegt daneben - genau wie im Repo,
+# sonst zeigen die relativen Importpfade (../../../shared/...) ins Leere.
+COPY server/package.json server/package-lock.json ./
 
 # Install dependencies
 RUN npm ci --production
@@ -24,8 +26,9 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application source
-COPY package.json ./
-COPY src/ ./src/
+COPY server/package.json ./
+COPY server/src/ ./src/
+COPY shared/ /shared/
 
 # Create data and uploads directories
 RUN mkdir -p /app/data /app/uploads

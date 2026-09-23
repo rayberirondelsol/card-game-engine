@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 const {
   MIN_ZONE_SIZE, screenToWorld, worldToScreen, panelSide, moveZone, resizeZone, createZone,
 } = await import('../../client/src/utils/zoneDraft.js');
-const { zoneContains, zoneCenter } = await import('../../client/src/utils/zoneGeometry.js');
+const { zoneContains, zoneCenter } = await import('../../shared/zoneGeometry.js');
 
 const RECT = { left: 20, top: 10, width: 800, height: 600 };
 const CAMERAS = [

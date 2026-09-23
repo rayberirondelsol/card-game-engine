@@ -23,8 +23,8 @@ const {
   createGrid, gridBox, resolveGrids, setGridAnchor, gridAt,
   cellAt, cellCenter, cellLabel, cellFromLabel, cellPoint,
   snapToGrid, snapInto, placeOnGrids, GRID_TYPES,
-} = await import('../../client/src/utils/gridGeometry.js');
-const { assetBox, anchorBoxes, relativeBox } = await import('../../client/src/utils/anchoring.js');
+} = await import('../../shared/gridGeometry.js');
+const { assetBox, anchorBoxes, relativeBox } = await import('../../shared/anchoring.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 

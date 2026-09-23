@@ -1,0 +1,23 @@
+# Wurzelkontext (M6): shared/ muss in beide Images, also bauen server und client
+# vom Repo-Wurzelverzeichnis. Die .dockerignore in client/ und server/ werden
+# relativ zum Kontext aufgeloest und greifen dabei nicht mehr - was hier fehlt,
+# landet im Build-Kontext.
+node_modules
+**/node_modules
+.git
+.gitignore
+data
+**/data
+uploads
+**/uploads
+*.db
+*.db-shm
+*.db-wal
+.env
+**/.env
+client/dist
+screenshots
+.playwright-mcp
+.serena
+**/Dockerfile
+.dockerignore

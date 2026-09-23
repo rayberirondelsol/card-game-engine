@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 const {
   MIN_ZONE_SIZE, screenToWorld, rectFromPoints, isDrawable, createZone,
 } = await import('../../client/src/utils/zoneDraft.js');
-const { zoneContains, zoneSlots } = await import('../../client/src/utils/zoneGeometry.js');
+const { zoneContains, zoneSlots } = await import('../../shared/zoneGeometry.js');
 
 // The container the table is drawn in. Only left/top/width/height matter.
 const RECT = { left: 20, top: 10, width: 800, height: 600 };

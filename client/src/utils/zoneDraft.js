@@ -7,7 +7,7 @@
  * were never bound to an element. Pure functions here, DOM there.
  */
 
-import { zoneCenter } from './zoneGeometry.js';
+import { zoneCenter } from '../../../shared/zoneGeometry.js';
 
 /** Below this, a drag is a slip of the hand, not a zone. World units. */
 export const MIN_ZONE_SIZE = 40;

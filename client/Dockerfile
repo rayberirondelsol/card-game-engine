@@ -3,17 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files first for better layer caching
-COPY package.json package-lock.json ./
+# Der Build-Kontext ist das Repo-Wurzelverzeichnis (M6), damit shared/ mit ins
+# Image kommt. /app ist der Client, /shared liegt daneben - genau wie im Repo,
+# sonst zeigen die relativen Importpfade (../../../shared/...) ins Leere.
+COPY client/package.json client/package-lock.json ./
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
 
 # Copy source files
-COPY index.html ./
-COPY public/ ./public/
-COPY src/ ./src/
-COPY vite.config.js ./
+COPY client/index.html ./
+COPY client/public/ ./public/
+COPY client/src/ ./src/
+COPY client/vite.config.js ./
+COPY shared/ /shared/
 
 # Set the API URL for production build - will be proxied through nginx
 ENV VITE_API_URL=/api
@@ -28,7 +31,7 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY client/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 80
