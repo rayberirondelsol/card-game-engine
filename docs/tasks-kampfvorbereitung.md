@@ -176,7 +176,8 @@ keine Meldung; jeder Fehlerfall genau eine, mit Bösewicht und Feld im Text.
 **Ziel.** Ein Knopf baut das Szenario des aufgedeckten Bösewichts auf — regulär
 oder als Endkampf.
 
-**Umfang.** `build_scenario { gridLabel, final: "auto"|true|false }`:
+**Umfang.** `build_scenario { final: "auto"|true|false }` (das Raster kommt aus
+den Szenariodaten, nicht aus dem Schritt):
 Eintrag über `$revealedBase` suchen · bei `final` den unteren Abschnitt additiv
 dazunehmen (`auto` = `reveal_next` kam vom letzten Platz) · **erst prüfen, dann
 legen** (`validateScenarioData` auf den einen Eintrag; ein Fehler → `failed`,
@@ -250,7 +251,7 @@ Nutzer) · die Schrittfolge:
 7  reveal_next  Bösewicht-Leiste      → Bösewicht-Platz
 8  set_asset_face  Sideboard          → Kampfseite
 9  place_asset  "Tableau: $revealedBase" → Zone "Bösewicht-Tableau", Szenarioseite
-10 build_scenario  Raster "Kampffeld", final "auto"
+10 build_scenario  final "auto"   (Raster kommt aus scenario_data)
 11 place_asset  "$revealed"           → Kampffeld, Feld "$B"
 12 place_asset  "Figur: …"            → Kampffeld, Feld "$D1"  (dreimal)
 15 set_asset_face  "Tableau: $revealedBase" → Vorderseite

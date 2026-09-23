@@ -1178,7 +1178,6 @@ Setup ein anderes Raster benutzt.
         { "assetName": "Wheat Field",   "cells": ["M4"] }
       ],
       "fields": { "B": "J5", "D": ["A1", "B3", "C4", "D6", "E9"] },
-      "decks":  [{ "category": "Verhalten: Patches", "label": "Verhaltensdeck" }],
       "final":  {
         "terrain": [{ "assetName": "Giant Milk Jug", "cells": ["K2", "K3"] }],
         "fields":  { "FF": ["K2", "K3", "L2", "L3", "M2"] }
@@ -1195,10 +1194,21 @@ Setup ein anderes Raster benutzt.
   Nennt es dieselben Schlüssel, gewinnt `final` — der Endkampf ändert den
   Aufbau, er ersetzt ihn nicht.
 - 20 Bösewichte, 20 Einträge. Erfasst wird, wer wirklich gezogen wurde.
+- **`fields` mischt Einzelwert und Liste, und daraus folgt die Benennung der
+  Platzhalter:** ein String bindet den Schluessel allein (`B` -> `$B`), eine
+  Liste bindet Schluessel plus Position ab 1 (`D` -> `$D1`..`$D5`).
+- **`bosses` ist ein Objekt, doppelte Namen kann es darin nicht geben** - ein
+  zweiter gleicher Schluessel verschwindet schon beim Parsen. Geprueft wird
+  darum die Kollision, die die Namensnormalisierung erzeugt ("Patches" neben
+  "patches").
 
 #### Der neue Schritt: `build_scenario`
 
-`build_scenario { gridLabel, final: "auto" | true | false }`
+`build_scenario { final: "auto" | true | false }`
+
+Das **Raster steht in den Daten**, nicht am Schritt: es gehoert zu den
+abgetippten Feldnamen, nicht zum Knopf. Zwei Quellen fuer dieselbe Adresse
+waeren eine Frage danach, welche gewinnt - und die Antwort braeuchte niemand.
 
 - schlägt das Szenario des **zuletzt aufgedeckten** Bösewichts nach
   (`$revealedBase`),

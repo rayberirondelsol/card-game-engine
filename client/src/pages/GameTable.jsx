@@ -320,6 +320,19 @@ function TokenShape({ shape, color, size = 30, width = null, height = null, labe
   }
 }
 
+/**
+ * Die Szenariodaten eines Setups aus der Spalte, so robust wie die Zonen und
+ * Raster daneben: kaputtes JSON ist kein Grund, das Setup gar nicht zu laden.
+ */
+function parseScenarioData(raw) {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function GameTable({ room = null }) {
   const { id: routeId } = useParams();
   // In multiplayer mode, room.gameId takes precedence over the URL param
@@ -349,6 +362,11 @@ export default function GameTable({ room = null }) {
   // M5: Aktionen des geladenen Setups - benannte Sequenzen, die der Spieler
   // mitten im Spiel ausloest. Leer = am Tisch ist dazu nichts zu sehen.
   const [setupActions, setSetupActions] = useState([]);
+  // M7/T5: die abgelesenen Szenariodaten des Setups - welches Gelaende auf
+  // welches Rasterfeld. Hier nur getragen: gelesen wird sie beim Speichern und
+  // (ab T6) von `build_scenario`. Wer sie nicht laedt, wuerde sie beim naechsten
+  // Speichern ueberschreiben - deshalb haengt sie an *beiden* Ladewegen.
+  const [scenarioData, setScenarioData] = useState({});
   const [runningActionId, setRunningActionId] = useState(null);
   const saveLoadedRef = useRef(false);
 
@@ -3251,14 +3269,14 @@ export default function GameTable({ room = null }) {
         res = await apiFetch(`/api/games/${id}/setups/${editingSetupId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, scenario_data: scenarioData }),
         });
       } else {
         // Create new setup
         res = await apiFetch(`/api/games/${id}/setups`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids }),
+          body: JSON.stringify({ name, state_data: stateData, zone_data: zones, sequence_data: sequenceSteps, grid_data: grids, scenario_data: scenarioData }),
         });
       }
       if (!res.ok) {
@@ -3674,6 +3692,7 @@ export default function GameTable({ room = null }) {
           let parsedActions = [];
           try { parsedActions = JSON.parse(setup.action_data || '[]'); } catch {}
           setSetupActions(Array.isArray(parsedActions) ? parsedActions : []);
+          setScenarioData(parseScenarioData(setup.scenario_data));
 
           // Execute setup sequence for new games (not savegame loads)
           let parsedSeq = [];
@@ -3730,6 +3749,7 @@ export default function GameTable({ room = null }) {
             try { editGrids = JSON.parse(setup.grid_data); } catch {}
           }
           setGrids(editGrids);
+          setScenarioData(parseScenarioData(setup.scenario_data));
           loadGameState(setup.state_data, editGrids);
           if (setup.zone_data) {
             try { setZones(JSON.parse(setup.zone_data)); } catch {}

@@ -23,7 +23,7 @@ export async function setupsRoutes(fastify) {
   fastify.post('/api/games/:id/setups', async (request, reply) => {
     const db = getDb();
     const { id } = request.params;
-    const { name, state_data, zone_data, sequence_data, grid_data, action_data } = request.body || {};
+    const { name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data } = request.body || {};
 
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
     if (!game) {
@@ -48,10 +48,15 @@ export async function setupsRoutes(fastify) {
     const actionJson = action_data !== undefined
       ? (typeof action_data === 'string' ? action_data : JSON.stringify(action_data))
       : '[]';
+    // M7/T5: Objekt statt Liste - der Schluessel ist der Basisname des
+    // Boesewichts, deshalb '{}' statt '[]' als Vorgabe.
+    const scenarioJson = scenario_data !== undefined
+      ? (typeof scenario_data === 'string' ? scenario_data : JSON.stringify(scenario_data))
+      : '{}';
 
     db.prepare(
-      'INSERT INTO setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(setupId, id, name.trim(), stateJson, zoneJson, seqJson, gridJson, actionJson);
+      'INSERT INTO setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(setupId, id, name.trim(), stateJson, zoneJson, seqJson, gridJson, actionJson, scenarioJson);
     console.log('[SQL] INSERT INTO setups', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);
@@ -78,7 +83,7 @@ export async function setupsRoutes(fastify) {
   fastify.put('/api/games/:id/setups/:setupId', async (request, reply) => {
     const db = getDb();
     const { id, setupId } = request.params;
-    const { name, state_data, zone_data, sequence_data, grid_data, action_data } = request.body || {};
+    const { name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data } = request.body || {};
 
     const existing = db.prepare(
       'SELECT * FROM setups WHERE id = ? AND game_id = ?'
@@ -102,6 +107,9 @@ export async function setupsRoutes(fastify) {
     const actionJson = action_data !== undefined
       ? (typeof action_data === 'string' ? action_data : JSON.stringify(action_data))
       : null;
+    const scenarioJson = scenario_data !== undefined
+      ? (typeof scenario_data === 'string' ? scenario_data : JSON.stringify(scenario_data))
+      : null;
 
     db.prepare(
       `UPDATE setups SET
@@ -111,9 +119,10 @@ export async function setupsRoutes(fastify) {
         sequence_data = COALESCE(?, sequence_data),
         grid_data = COALESCE(?, grid_data),
         action_data = COALESCE(?, action_data),
+        scenario_data = COALESCE(?, scenario_data),
         updated_at = datetime('now')
       WHERE id = ?`
-    ).run(name || null, stateJson, zoneJson, seqJson, gridJson, actionJson, setupId);
+    ).run(name || null, stateJson, zoneJson, seqJson, gridJson, actionJson, scenarioJson, setupId);
     console.log('[SQL] UPDATE setups WHERE id = ?', setupId);
 
     const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setupId);

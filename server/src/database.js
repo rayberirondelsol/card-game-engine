@@ -223,6 +223,15 @@ export async function setupDatabase() {
     db.exec("ALTER TABLE setups ADD COLUMN action_data TEXT DEFAULT '[]'");
     console.log('[DB] Migration: added action_data column to setups');
   }
+  // M7/T5: die abgelesenen Szenarien - welches Gelaende auf welches Rasterfeld.
+  // Am Setup und nicht am Spiel, weil die Felder (`C7`, `J5`) Felder *eines
+  // bestimmten Rasters eines bestimmten Setups* sind; am Spiel waeren sie eine
+  // Referenz ins Leere, sobald ein zweites Setup ein anderes Raster benutzt.
+  // Objekt statt Liste: der Schluessel ist der Basisname des Boesewichts.
+  if (!setupColumns.includes('scenario_data')) {
+    db.exec("ALTER TABLE setups ADD COLUMN scenario_data TEXT DEFAULT '{}'");
+    console.log('[DB] Migration: added scenario_data column to setups');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');
