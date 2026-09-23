@@ -1022,3 +1022,43 @@ werden kann; `useGameRoom` ruft sie nur auf.
 der Server beim Start gebaut hat. Unter `http://localhost:5173` verbindet er nach
 `ws://localhost:5173/ws/rooms/<code>` und Vite reicht durch. Code und Spieler-ID
 werden für die Adresse kodiert.
+
+#### Nachtrag 2: der Tisch wirft den Zustand des Raums weg
+Nach dem WebSocket-Fix verband sich der Raum — und blieb trotzdem leer, obwohl
+der Server nachweislich das Richtige schickt. Im `welcome` stecken 16 Karten,
+3 Stapel, 13 Zähler, 12 Token, 11 Zonen und 1 Raster.
+
+`MultiplayerGame.jsx` reicht das als `room`-Objekt an `GameTable` weiter. Dort
+wird `room.sendAction` siebzehnmal gelesen, dazu `room.zones`, `room.players`,
+`room.grids`, `room.myPlayerId`, `room.gameId` und `room.registerActionHandler` —
+**`room.boardState` kein einziges Mal.** Deshalb erschienen Zonen, Raster und
+Mitspieler, aber kein einziges Objekt.
+
+Dasselbe Muster wie schon dreimal in diesem Repo: eine Fähigkeit ist in einer
+Schicht fertig und wird in der Nachbarschicht nicht abgeholt.
+
+#### Die Regel
+**Übergibt der Raum dem Tisch einen Brettzustand, zeigt der Tisch ihn an.**
+Trifft ein `room.boardState` ein, lädt der Tisch ihn — mit denselben Rastern,
+über denselben Weg wie ein Aufbau oder ein Spielstand (`loadGameState`), damit
+Objekte auf ihren Rasterfeldern landen.
+
+- Der Server ist im Raum die Quelle. Ein eintreffender Zustand **ersetzt** den
+  lokalen; es wird nicht zusammengeführt.
+- Das Laden darf **nichts zurücksenden**. Ein Zustand, der eine Aktion auslöst,
+  die den Zustand erneut verteilt, ist eine Schleife.
+- Im Einzelspieler ändert sich nichts: ohne `room` bleibt der bisherige Weg
+  (Aufbau über `?setupId=` bzw. Spielstand) unangetastet.
+
+**Bewusst nicht Teil davon:** die laufende Synchronisation jeder Objektart
+während der Partie. `broadcastBoardSync` ist heute definiert und wird nirgends
+aufgerufen, und es gibt Aktionen, die kein Client sendet
+(`docs/audit-dead-controls.md`). Das ist ein eigener Meilenstein; hier geht es
+allein darum, dass der Raum überhaupt mit dem aufgebauten Tisch beginnt.
+
+**Abnahme:** Ein Raum, der aus dem TFT-Setup gestartet wurde, zeigt nach dem
+Öffnen dasselbe Bild wie der Hotseat-Tisch — Hauptplan, Sideboard, vier
+verdeckte Bösewichte, drei Dörfler mit Tableaus, zehn Ladenkarten, sechs
+Heldentaten und dreizehn Zähler. Die Zonen tragen keine Ankerwarnung mehr, weil
+ihr Ankerobjekt auf dem Tisch liegt. Ein zweiter Spieler, der später beitritt,
+sieht dasselbe.
