@@ -52,6 +52,10 @@ const ZONES = [
     accepts: ['asset'], capacity: 2, layout: 'row',
     anchor: { assetId: 'board-main', relX: 0.25, relY: 0.25, relWidth: 0.5, relHeight: 0.5 },
   },
+  // M5.1: die Ladenauslage aus dem Abnahmefall und eine gleich grosse Zone
+  // daneben, fuer den Fall "Zone und Stapel zugleich".
+  { id: 'z9', label: 'Ladenauslage', x: 2000, y: 600, width: 1000, height: 140, accepts: ['card'], capacity: 10, layout: 'row' },
+  { id: 'z10', label: 'Abwurf', x: 2000, y: 900, width: 1000, height: 140, accepts: ['card'], capacity: 10, layout: 'row' },
 ];
 
 const emptyState = () => ({ cards: [], stacks: [], tokens: [], boards: [] });
@@ -331,18 +335,164 @@ test('four runs of "Kampf beginnen" reveal four different bosses, each clearing 
   assert.deepStrictEqual(sixth.state, fifth.state);
 });
 
+// ── M5.1: zurück unter einen Stapel ────────────────────────────────────
+
+const SUPPLY = 'Nachschub (Tante Emma)';
+
+/** Ein Nachschubstapel aus n verdeckten Karten, zIndex 1..n von unten nach oben. */
+function supplyStack(n = 133) {
+  return {
+    stackId: 's-nachschub', label: SUPPLY, x: 3000, y: 2000,
+    cards: Array.from({ length: n }, (_, i) => ({
+      tableId: `t${i + 1}`, cardId: `c${i + 1}`, name: `Ware ${i + 1}`,
+      image_path: `/uploads/cards/ware-${i + 1}.png`,
+      width: 100, height: 140, faceDown: true, rotation: 0, zIndex: i + 1,
+    })),
+  };
+}
+
+/** Der Abnahmefall: zehn Karten offen in der Ladenauslage, 123 im Stapel. */
+function shopState() {
+  const out = executeSequence(
+    { ...emptyState(), stacks: [supplyStack()] },
+    [{ type: 'deal_to_zone', stackLabel: SUPPLY, count: 10, targetZoneLabel: 'Ladenauslage', faceDown: false }],
+    ZONES,
+    opts()
+  );
+  assert.equal(out.cards.length, 10, 'Vorbedingung: zehn Karten in der Auslage');
+  assert.equal(out.stacks[0].cards.length, 123, 'Vorbedingung: 123 im Stapel');
+  return out;
+}
+
+const supplyOf = (state) => state.stacks.find(s => s.label === SUPPLY);
+const bottomUp = (stack) => [...stack.cards].sort((a, b) => a.zIndex - b.zIndex);
+/** Die Auslage ist eine Reihe – ihre Reihenfolge ist die von links nach rechts. */
+const zoneOrder = (state) => [...state.cards].sort((a, b) => a.x - b.x).map(c => c.tableId);
+const backStep = (extra = {}) => ({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: SUPPLY, ...extra });
+
+test('zehn Karten wandern unter den Stapel zurück – die Zone ist leer, der Stapel hat 133', () => {
+  const before = shopState();
+  const order = zoneOrder(before);
+
+  const { state, log } = executeSequenceWithLog(before, [backStep({ faceDown: true })], ZONES, opts());
+
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.deepEqual(state.cards, [], 'die Auslage ist leer');
+
+  const stack = supplyOf(state);
+  assert.equal(stack.cards.length, 133);
+  assert.equal(new Set(stack.cards.map(c => c.tableId)).size, 133, 'keine Karte doppelt, keine verschwunden');
+
+  const sorted = bottomUp(stack);
+  assert.deepEqual(sorted.slice(0, 10).map(c => c.tableId), order, 'unten, in der Reihenfolge der Auslage');
+  assert.deepEqual(sorted.map(c => c.zIndex), Array.from({ length: 133 }, (_, i) => i + 1), 'jede Karte hat ihren eigenen Platz');
+  assert.ok(sorted.slice(0, 10).every(c => c.faceDown === true), 'faceDown: true dreht sie um');
+  assert.ok(
+    sorted.slice(0, 10).every(c => c.x === stack.x && c.y === stack.y),
+    'sie liegen wieder auf dem Stapel, nicht auf ihrem Platz in der Auslage'
+  );
+});
+
+test('ohne faceDown behält jede zurückgelegte Karte ihre Seite – geraten wird nicht', () => {
+  const before = shopState();
+  before.cards[3].faceDown = true;
+  before.cards[3].face_up = false;
+  const sides = new Map(before.cards.map(c => [c.tableId, c.faceDown]));
+
+  const { state, log } = executeSequenceWithLog(before, [backStep()], ZONES, opts());
+  assert.equal(log[0].status, 'ok', log[0].reason);
+
+  const stack = supplyOf(state);
+  for (const [tableId, faceDown] of sides) {
+    assert.equal(stack.cards.find(c => c.tableId === tableId).faceDown, faceDown, `Karte ${tableId}`);
+  }
+  assert.equal([...sides.values()].filter(Boolean).length, 1, 'genau eine lag verdeckt in der Auslage');
+
+  // Und faceDown: false ist eine Ansage, keine Abwesenheit.
+  const open = executeSequenceWithLog(before, [backStep({ faceDown: false })], ZONES, opts());
+  assert.equal(open.log[0].status, 'ok', open.log[0].reason);
+  assert.ok(bottomUp(supplyOf(open.state)).slice(0, 10).every(c => c.faceDown === false));
+});
+
+test('ein Token in der Zone bleibt liegen und steht mit Namen im Protokoll', () => {
+  const before = shopState();
+  before.tokens.push({ assetId: 'boss-0', label: 'Bösewicht: Klaus', x: 2500, y: 670, width: 60, height: 60, faceDown: false });
+
+  const { state, log } = executeSequenceWithLog(before, [backStep()], ZONES, opts());
+
+  assert.equal(log[0].status, 'failed', 'nur zum Teil abgeräumt ist nicht ok');
+  assert.match(log[0].reason, /Klaus/, 'der Liegengebliebene steht mit Namen im Protokoll');
+  assert.equal(state.tokens.length, 1);
+  assert.deepEqual([state.tokens[0].x, state.tokens[0].y], [2500, 670], 'unverändert liegen geblieben');
+  assert.deepEqual(state.cards, [], 'die Karten sind trotzdem zurück im Stapel');
+  assert.equal(supplyOf(state).cards.length, 133);
+});
+
+test('eine gesperrte Karte bleibt in der Auslage liegen', () => {
+  const before = shopState();
+  const locked = [...before.cards].sort((a, b) => a.x - b.x)[0];
+  locked.locked = true;
+  const where = [locked.x, locked.y];
+
+  const { state, log } = executeSequenceWithLog(before, [backStep()], ZONES, opts());
+
+  assert.equal(log[0].status, 'failed');
+  assert.match(log[0].reason, /locked/);
+  assert.equal(state.cards.length, 1, 'die gesperrte Karte liegt noch da');
+  assert.deepEqual([state.cards[0].x, state.cards[0].y], where, 'und zwar an ihrem Platz');
+  assert.equal(supplyOf(state).cards.length, 132, 'die neun anderen sind zurück');
+});
+
+test('ein Stapel, den es nicht gibt, überspringt den Schritt – nichts wird gelöscht', () => {
+  const before = shopState();
+  const { state, log } = executeSequenceWithLog(
+    before, [backStep({ targetStackLabel: 'Gibt Es Nicht' })], ZONES, opts()
+  );
+
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason, /Gibt Es Nicht/, 'der Grund steht im Protokoll');
+  assert.equal(state.cards.length, 10, 'die Auslage liegt unverändert da');
+  assert.equal(supplyOf(state).cards.length, 123);
+});
+
+test('Zone und Stapel zusammen: die Zone gewinnt, der ignorierte Stapel steht im Protokoll', () => {
+  const before = shopState();
+  const { state, log } = executeSequenceWithLog(
+    before, [backStep({ targetZoneLabel: 'Abwurf' })], ZONES, opts()
+  );
+
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.match(String(log[0].reason), /Nachschub/, 'der ignorierte Stapel ist vermerkt');
+  assert.equal(supplyOf(state).cards.length, 123, 'der Stapel ist unberührt');
+  assert.equal(state.cards.length, 10);
+  assert.ok(state.cards.every(c => c.y === 970), 'die zehn liegen in der Abwurfzone');
+});
+
+test('eine leere Zone in einen Stapel zu räumen ist gelungen, nicht gescheitert', () => {
+  const before = shopState();
+  const { state, log } = executeSequenceWithLog(
+    before, [backStep({ zoneLabel: 'Abwurf' })], ZONES, opts()
+  );
+
+  assert.equal(log[0].status, 'ok');
+  assert.equal(log[0].reason, null, 'kein Grund, es ist ja nichts schiefgegangen');
+  assert.deepStrictEqual(state.stacks, before.stacks, 'der Stapel bleibt, wie er war');
+  assert.equal(state.cards.length, 10);
+});
+
 // ── Vokabular des Editors ────────────────────────────────────────────────────
 
-test('clear_zone is offered with the two fields its handler reads', () => {
+test('clear_zone is offered with the fields its handler reads', () => {
   const ctx = { zoneLabels: ZONES.map(z => z.label) };
 
   assert.ok(STEP_TYPES.some(t => t.value === 'clear_zone'), 'clear_zone missing from STEP_TYPES');
-  assert.deepEqual(stepFields('clear_zone'), ['zoneLabel', 'targetZoneLabel']);
+  assert.deepEqual(stepFields('clear_zone'), ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown']);
 
   const fresh = defaultStep('clear_zone', ctx);
   assert.equal(fresh.type, 'clear_zone');
   assert.equal(fresh.zoneLabel, 'Bösewicht-Leiste', 'prefilled with the first zone, like every other zone step');
-  assert.deepEqual(Object.keys(fresh).sort(), ['targetZoneLabel', 'type', 'zoneLabel']);
+  assert.deepEqual(Object.keys(fresh).sort(), ['targetStackLabel', 'targetZoneLabel', 'type', 'zoneLabel'],
+    'ohne faceDown: eine frische Vorgabe soll keine Seite raten');
 
   const line = describeStep({ type: 'clear_zone', zoneLabel: 'Bösewicht-Platz', targetZoneLabel: 'Besiegte Bösewichte' });
   assert.ok(!line.includes('_'), `shows the raw type: ${line}`);
@@ -353,4 +503,30 @@ test('clear_zone is offered with the two fields its handler reads', () => {
   assert.deepEqual(validateStep({ type: 'clear_zone', zoneLabel: 'Bösewicht-Platz', targetZoneLabel: '' }, ctx), [], 'ohne Ziel ist gültig');
   assert.equal(validateStep({ type: 'clear_zone', zoneLabel: '' }, ctx).length, 1, 'ohne Zone kann der Schritt nicht laufen');
   assert.match(validateStep({ type: 'clear_zone', zoneLabel: 'Gelöscht' }, ctx)[0], /Gelöscht/);
+});
+
+test('das Stapelziel ist im Editor wählbar, lesbar und geprüft (M5.1)', () => {
+  const ctx = { zoneLabels: ZONES.map(z => z.label), stackLabels: [SUPPLY] };
+
+  // Die Seite nur dort anbieten, wo sie etwas bewirkt: in einen Stapel zurück.
+  assert.ok(!stepFields({ type: 'clear_zone', zoneLabel: 'Ladenauslage' }).includes('faceDown'));
+  assert.ok(stepFields({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: SUPPLY }).includes('faceDown'));
+
+  const line = describeStep({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: SUPPLY, faceDown: true });
+  assert.match(line, /Ladenauslage/);
+  assert.match(line, /Nachschub \(Tante Emma\)/, 'der Stapel steht in der Zusammenfassung');
+  assert.match(line, /face down/);
+  assert.ok(!line.includes('undefined'));
+  assert.ok(!describeStep({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: SUPPLY }).includes('undefined'));
+
+  assert.deepEqual(validateStep({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: SUPPLY }, ctx), []);
+  assert.match(
+    validateStep({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetStackLabel: 'Gibt Es Nicht' }, ctx)[0],
+    /Gibt Es Nicht/
+  );
+  assert.equal(
+    validateStep({ type: 'clear_zone', zoneLabel: 'Ladenauslage', targetZoneLabel: 'Abwurf', targetStackLabel: SUPPLY }, ctx).length,
+    1,
+    'beide Ziele zugleich sind ein Autorenfehler, auch wenn die Zone gewinnt'
+  );
 });

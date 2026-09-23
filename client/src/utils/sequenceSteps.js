@@ -32,7 +32,7 @@ export const STEP_TYPES = [
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
-  { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel'] },
+  { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -53,6 +53,11 @@ export function stepFields(step) {
   if (!spec) return [];
   if (spec.value === 'place_asset' && typeof step === 'object' && step?.targetZoneLabel) {
     return spec.fields.filter(f => f !== 'x' && f !== 'y');
+  }
+  // clear_zone: die Seite gilt nur für Karten, die in einen Stapel
+  // zurückgehen. Ohne Stapelziel wäre sie eine Einstellung ohne Wirkung.
+  if (spec.value === 'clear_zone' && typeof step === 'object' && !step?.targetStackLabel) {
+    return spec.fields.filter(f => f !== 'faceDown');
   }
   return [...spec.fields];
 }
@@ -113,11 +118,14 @@ export function defaultStep(type, ctx = {}) {
     case 'unlock_asset':
       return { type, assetName: first(names) };
     case 'reveal_next':
-    case 'clear_zone':
       // Ohne Zielzone: Aufdecken bzw. Abraeumen und Verschieben sind zwei
       // Entscheidungen - und ein vorgegebenes Ziel waere beim Abraeumen die
       // falsche Vorgabe, weil "vom Tisch nehmen" der haeufigere Fall ist.
       return { type, zoneLabel: zone, targetZoneLabel: '' };
+    case 'clear_zone':
+      // Dasselbe fuer beide Ziele - und ohne `faceDown`: die Seite wird nicht
+      // geraten, eine frische Vorgabe laesst jede Karte ihre behalten (M5.1).
+      return { type, zoneLabel: zone, targetZoneLabel: '', targetStackLabel: '' };
     default:
       return { type, stackLabel };
   }
@@ -161,7 +169,12 @@ export function describeStep(step) {
       return `Reveal the next face-down object in zone ${q(step.zoneLabel)}${into}`;
     }
     case 'clear_zone': {
-      const into = step?.targetZoneLabel ? `into zone ${q(step.targetZoneLabel)}` : 'off the table';
+      // Die Seite steht nur dort, wo sie gilt - und nur, wenn sie gesetzt ist:
+      // ohne sie behaelt jede Karte ihre eigene (M5.1).
+      const side = typeof step?.faceDown === 'boolean' ? (step.faceDown ? ', face down' : ', face up') : '';
+      const into = step?.targetZoneLabel ? `into zone ${q(step.targetZoneLabel)}`
+        : step?.targetStackLabel ? `under stack ${q(step.targetStackLabel)}${side}`
+        : 'off the table';
       return `Clear zone ${q(step.zoneLabel)} ${into}`;
     }
     case 'lock_asset': return `Lock ${q(step.assetName)}`;
@@ -215,6 +228,12 @@ export function validateStep(step, ctx = {}) {
   // named one that no longer exists is not.
   if (fields.has('targetZoneLabel') && step?.targetZoneLabel && !known(zoneLabels, step.targetZoneLabel)) {
     problems.push(`zone "${step.targetZoneLabel}" not found`);
+  }
+  // Dasselbe fuer das Stapelziel - und beide zugleich ist ein Autorenfehler,
+  // auch wenn der Schritt ihn ueberlebt (die Zone gewinnt, M5.1).
+  if (fields.has('targetStackLabel') && step?.targetStackLabel) {
+    if (!known(stackLabels, step.targetStackLabel)) problems.push(`stack "${step.targetStackLabel}" not found`);
+    else if (step?.targetZoneLabel) problems.push(`zone and stack given, the zone wins: stack "${step.targetStackLabel}" is ignored`);
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

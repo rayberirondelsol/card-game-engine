@@ -573,6 +573,13 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
       const notes = locked.length ? [`left in place, locked: ${locked.map(objName).join(', ')}`] : [];
       if (!movable.length) return fail(notes.join('; '));
 
+      // Vermerke, die den Schritt nicht scheitern lassen: er tut, was er soll,
+      // nur nicht ganz das, was dastand.
+      const remarks = [];
+      if (step.targetZoneLabel && step.targetStackLabel) {
+        remarks.push(`stack "${step.targetStackLabel}" ignored: a zone and a stack were given, the zone wins`);
+      }
+
       if (step.targetZoneLabel) {
         const target = findZone(zones, step.targetZoneLabel);
         if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
@@ -599,13 +606,56 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
         if (leftovers.length) {
           notes.push(`${leftovers.length} of ${movable.length} objects stayed in zone "${step.zoneLabel}": ${fullZones([target], free, kindOf(leftovers[0])).join('; ')} (${leftovers.map(objName).join(', ')})`);
         }
+      } else if (step.targetStackLabel) {
+        // M5.1: der Rückweg von `deal_to_zone` - die Auslage kommt *unter* den
+        // Nachschubstapel, statt aus dem Spiel zu fliegen.
+        const stack = idx.get(step.targetStackLabel);
+        if (!stack) return skip(`stack "${step.targetStackLabel}" not found`);
+        if (!Array.isArray(stack.cards)) stack.cards = [];
+
+        // In einen Kartenstapel kann nur eine Karte zurück; ein Token darin
+        // wäre ein Fremdkörper, den kein Zug wieder herausholt. Es bleibt
+        // liegen und steht mit Namen im Protokoll - wie eine volle Zielzone.
+        const cards = movable.filter(o => kindOf(o) === 'card');
+        const others = movable.filter(o => kindOf(o) !== 'card');
+        if (others.length) {
+          notes.push(`${others.length} of ${movable.length} objects stayed in zone "${step.zoneLabel}": only cards go back into a stack (${others.map(objName).join(', ')})`);
+        }
+
+        if (cards.length) {
+          // Unten heißt unten: die vorhandenen Karten rücken um so viele
+          // Plätze hoch, wie zurückgelegt werden, und die Zone behält ihre
+          // Reihenfolge (`inSlotOrder` liefert sie bereits so).
+          stack.cards.forEach(c => { c.zIndex += cards.length; });
+          const back = cards.map((card, i) => {
+            // Das Gegenstück zum Austeilen: die Karte behält jedes Feld und
+            // tauscht nur Platz und Stapelzugehörigkeit. Ohne Position bliebe
+            // sie beim nächsten Speichern in der Auslage liegen - `getGameState`
+            // liest die Stapelposition aus der untersten Karte.
+            const returned = { ...card, x: stack.x, y: stack.y, zIndex: i + 1, inStack: stack.stackId };
+            delete returned.gridId;
+            delete returned.cell;
+            // Ohne `faceDown` am Schritt behält jede Karte ihre Seite: eine
+            // geratene Seite wäre schlimmer als gar keine Ansage.
+            if (typeof step.faceDown === 'boolean') {
+              returned.faceDown = step.faceDown;
+              returned.face_up = !step.faceDown;
+            }
+            return returned;
+          });
+          const gone = new Set(cards);
+          state.cards = state.cards.filter(o => !gone.has(o));
+          stack.cards = [...back, ...stack.cards];
+        }
       } else {
         const gone = new Set(movable);
         state.cards = state.cards.filter(o => !gone.has(o));
         state.tokens = state.tokens.filter(o => !gone.has(o));
       }
 
-      return notes.length ? fail(notes.join('; ')) : state;
+      if (notes.length) return fail([...remarks, ...notes].join('; '));
+      if (remarks.length) entry.reason = remarks.join('; ');
+      return state;
     }
 
     case 'lock_asset':

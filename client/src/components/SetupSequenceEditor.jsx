@@ -88,6 +88,22 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         {ctx.zoneLabels.map(l => <option key={l} value={l}>{l}</option>)}
       </select>),
 
+    // M5.1: clear_zone legt Karten unter einen Stapel zurück. Kein Stapel ist
+    // die gültige Vorgabe - dann gilt die Zone bzw. "vom Tisch nehmen".
+    targetStackLabel: () => field('Into stack',
+      <select
+        value={step.targetStackLabel || ''}
+        onChange={e => set({ targetStackLabel: e.target.value })}
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-target-stack`}
+      >
+        <option value="">— no stack —</option>
+        {step.targetStackLabel && !ctx.stackLabels.includes(step.targetStackLabel) && (
+          <option value={step.targetStackLabel}>{step.targetStackLabel} (missing)</option>
+        )}
+        {ctx.stackLabels.map(l => <option key={l} value={l}>{l}</option>)}
+      </select>),
+
     count: () => step.type === 'split'
       ? field('Parts', number(step.count, 2, 2, n => {
           const labels = Array.from({ length: n }, (_, i) => step.outputLabels?.[i] || '');
@@ -101,14 +117,29 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
 
-    faceDown: () => field('Face down',
-      <input
-        type="checkbox"
-        checked={!!step.faceDown}
-        onChange={e => set({ faceDown: e.target.checked })}
-        className="accent-emerald-400"
-        data-testid={`step-${index}-facedown`}
-      />),
+    // Beim Zurücklegen in einen Stapel hat die Seite drei Antworten, nicht
+    // zwei: verdeckt, offen - oder "so wie sie liegt". Ein Häkchen kennt die
+    // dritte nicht, und geraten wird nicht (M5.1).
+    faceDown: () => (step.type === 'clear_zone'
+      ? field('Side',
+        <select
+          value={typeof step.faceDown === 'boolean' ? String(step.faceDown) : ''}
+          onChange={e => set({ faceDown: e.target.value === '' ? undefined : e.target.value === 'true' })}
+          className={`flex-1 ${INPUT}`}
+          data-testid={`step-${index}-side`}
+        >
+          <option value="">Keep each card's side</option>
+          <option value="true">Face down</option>
+          <option value="false">Face up</option>
+        </select>)
+      : field('Face down',
+        <input
+          type="checkbox"
+          checked={!!step.faceDown}
+          onChange={e => set({ faceDown: e.target.checked })}
+          className="accent-emerald-400"
+          data-testid={`step-${index}-facedown`}
+        />)),
 
     outputLabels: () => (
       <div className="mt-1" key="outputLabels">
