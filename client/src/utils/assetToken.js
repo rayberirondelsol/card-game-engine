@@ -45,3 +45,20 @@ export function assetToken(asset, x, y, faceDown) {
     locked: false,
   };
 }
+
+/**
+ * Die eine Definition davon, was Umdrehen heißt (Spec M3d): `faceDown` setzen
+ * UND `imageUrl` zwischen Vorder- und Rückseite tauschen. Nur `faceDown` zu
+ * kippen ließe das alte Bild stehen.
+ *
+ * Nimmt die Zielseite, nicht ein Umschalten – `set_asset_face` setzt eine
+ * absolute Seite, das Kontextmenü rechnet sich `!obj.faceDown` selbst aus.
+ * Gibt die beiden Felder zurück, die der Aufrufer auf sein Objekt legt, oder
+ * `null`, wenn es die gewünschte Seite nicht gibt (verdeckt ohne Rückseite).
+ * Das Objekt selbst wird nicht angefasst.
+ */
+export function assetFace(obj, faceDown) {
+  const down = Boolean(faceDown);
+  if (down && !obj.backImageUrl) return null;
+  return { faceDown: down, imageUrl: down ? obj.backImageUrl : (obj.frontImageUrl || obj.imageUrl) };
+}

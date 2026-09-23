@@ -55,6 +55,8 @@ export function handleMessage(room, playerId, rawData) {
       return handleTokenCreate(room, playerId, payload, timestamp);
     case 'token_delete':
       return handleTokenDelete(room, playerId, payload, timestamp);
+    case 'token_flip':
+      return handleTokenFlip(room, playerId, payload, timestamp);
     case 'counter_move':
       return handleCounterMove(room, playerId, payload, timestamp);
     case 'die_move':
@@ -278,6 +280,24 @@ function handleHandCountUpdate(room, playerId, { count }) {
 function handleTokenCreate(room, playerId, { token }, timestamp) {
   if (token) room.boardState.tokens.push(token);
   broadcast(room, { type: 'token_create', token, from_player_id: playerId, timestamp });
+}
+
+/**
+ * Umdrehen nach dem Vorbild von handleCardFlip (Spec M3d). Die Nachricht traegt
+ * nur die Zielseite; welches Bild dazugehoert, steht im Token selbst – deshalb
+ * setzt der Server beide Felder aus `frontImageUrl`/`backImageUrl`, statt sich
+ * URLs schicken zu lassen. Der Broadcast traegt weder Name noch Bild
+ * ("Verdeckt heisst ueberall verdeckt").
+ */
+function handleTokenFlip(room, playerId, { token_id, face_down }, timestamp) {
+  const token = room.boardState.tokens.find(t => t.id === token_id);
+  // Verdeckt ohne Rueckseite gibt es nicht - sonst stuende hier undefined und
+  // alle saehen ein kaputtes Bild. Der Client bietet es nicht an, aber darauf
+  // verlaesst sich der Server nicht.
+  if (!token || (face_down && !token.backImageUrl)) return;
+  token.faceDown = face_down;
+  token.imageUrl = face_down ? token.backImageUrl : (token.frontImageUrl || token.imageUrl);
+  broadcast(room, { type: 'token_flip', token_id, face_down, from_player_id: playerId, timestamp }, playerId);
 }
 
 function handleTokenDelete(room, playerId, { token_id }, timestamp) {

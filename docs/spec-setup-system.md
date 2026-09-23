@@ -368,6 +368,55 @@ Bildes. Ein Raster, das auf den aufgedruckten A–S × 1–14-Feldern des Hauptp
 liegt, bleibt darauf liegen, wenn das Brett verschoben wird. Alte Spielstände mit
 Token, die nur `size` haben, funktionieren unverändert weiter.
 
+### M3d — Ein Objekt von Hand umdrehen
+Nachtrag zu M3c. Dort hat ein Bild-Token beide Seiten bekommen
+(`frontImageUrl`/`backImageUrl`) und der Renderer richtet sich nach `faceDown` —
+**nur umdrehen kann man es in der Oberfläche nicht.** Im Kontextmenü gibt es für
+`objType` bloß Sperren und Löschen; „Flip" und die Taste `F` hängen beide an
+`contextMenu.cardTableId` bzw. `selectedCards` und fassen ausschließlich
+`tableCards` an. Ein `token_flip` existiert weder im Client noch im Server.
+
+Praktische Folge: Das Sideboard liegt im TFT-Aufbau nur deshalb auf der
+Town-Phase-Seite, weil der Schritt `set_asset_face` es dorthin dreht. Wer im Spiel
+das Boss-Tableau auf die Szenarioseite drehen will — der nächste Schritt der
+Kampfphase — hat dafür keine Bedienung.
+
+Wieder dasselbe Muster: **die Fähigkeit ist fertig, die Bedienung fehlt.**
+
+#### Was ein Umdrehen ist
+`set_asset_face` im Executor ist die Referenz, und es bleibt die einzige Definition:
+`faceDown` umschalten **und** `imageUrl` zwischen `frontImageUrl` und
+`backImageUrl` tauschen. Beides gehört zusammen; nur `faceDown` zu kippen ließe
+das alte Bild stehen. Die Regel lebt in **einer** Funktion, die Kontextmenü und
+Executor benutzen — nicht in zwei Kopien, das war die Ursache von M3c.
+
+#### Entschieden
+- **Ohne Rückseite kein Menüeintrag.** Ein Token, das nur eine Seite hat, bekommt
+  kein „Umdrehen" angeboten. Ein Knopf, der nichts tut, ist genau der Fehler, den
+  `docs/audit-dead-controls.md` auflistet.
+- **Geometrische Token haben keine Seiten** und deshalb auch keinen Eintrag.
+- **Gesperrt heißt unbeweglich, nicht unumdrehbar.** `place_asset` weigert sich,
+  ein gesperrtes Objekt zu verschieben, `set_asset_face` dreht es trotzdem um. Das
+  Kontextmenü hält sich daran: das gesperrte Hauptbrett lässt sich wenden, ohne es
+  erst zu entsperren.
+- **Keine Tastenkürzel, keine Mehrfachauswahl für Token.** Karten haben
+  `selectedCards`, Token nicht, und dafür ein Auswahlmodell zu erfinden ist nicht
+  Teil dieser Aufgabe.
+
+#### Mehrspieler
+`token_flip` nach dem Vorbild von `card_flip`: Client sendet, Server ändert
+`room.boardState` und broadcastet, Client empfängt. Die Nachricht trägt nur
+`token_id` und `face_down` — **nie** die Bild-URLs oder den Namen, sonst verrät
+das Umdrehen nach *verdeckt* genau das, was es verbergen soll (Spec-Abschnitt
+„Verdeckt heißt überall verdeckt"). Dass `room.boardState` beim Beitritt ohnehin
+Namen verdeckter Objekte mitschickt, ist der bereits gemeldete, separate Fehler.
+
+**Abnahme:** Rechtsklick auf ein Bild-Token mit Rückseite bietet „Umdrehen"; der
+Klick tauscht Bild und `faceDown`, und die Token-Legende zeigt danach sofort
+„Face down" statt des Namens. Ein Token ohne Rückseite und ein geometrisches Token
+bieten den Eintrag nicht an. Ein gesperrtes Token lässt sich umdrehen. In einer
+Mehrspielerpartie sehen die anderen dieselbe Seite.
+
 ### M4 — Fortschrittsebene
 `progress` je Spiel · Schritt `filter_by_progress` · UI zum Setzen von Status.
 

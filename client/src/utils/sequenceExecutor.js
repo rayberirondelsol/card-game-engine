@@ -22,7 +22,7 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
-import { assetToken } from './assetToken.js';
+import { assetToken, assetFace } from './assetToken.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -452,15 +452,14 @@ function applyStep(state, step, allZones, assets, rng, entry) {
       const obj = findPlaced(state, findAsset(assets, step.assetName), step.assetName);
       if (!obj) return skip(`"${step.assetName}" is not on the table`);
 
-      const down = Boolean(step.faceDown);
-      if (down && !obj.backImageUrl) {
+      const face = assetFace(obj, step.faceDown);
+      if (!face) {
         // Same rule as placing: rather off the table than face up by accident.
         state.tokens = state.tokens.filter(o => o !== obj);
         state.boards = state.boards.filter(o => o !== obj);
         return fail(`"${step.assetName}" has no back side; taken off the table instead of leaving it face up`);
       }
-      obj.faceDown = down;
-      obj.imageUrl = down ? obj.backImageUrl : (obj.frontImageUrl || obj.imageUrl);
+      Object.assign(obj, face);
       return state;
     }
 

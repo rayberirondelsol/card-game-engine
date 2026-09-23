@@ -17,7 +17,7 @@ import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../utils/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../utils/anchoring';
 import { tableObjectView } from '../utils/tableObjectView';
-import { assetToken } from '../utils/assetToken.js';
+import { assetToken, assetFace } from '../utils/assetToken.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -2914,6 +2914,11 @@ export default function GameTable({ room = null }) {
           break;
         case 'token_delete':
           setTokens(prev => prev.filter(t => t.id !== msg.token_id));
+          break;
+        case 'token_flip':
+          setTokens(prev => prev.map(t => (
+            t.id === msg.token_id ? { ...t, ...(assetFace(t, msg.face_down) || {}) } : t
+          )));
           break;
         case 'counter_move':
           setCounters(prev => prev.map(c => c.id === msg.counter_id ? { ...c, x: msg.x, y: msg.y } : c));
@@ -6336,6 +6341,30 @@ export default function GameTable({ room = null }) {
                     return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
                   })()}
                 </button>
+                {contextMenu.objType === 'token' && (() => {
+                  // Nur Bild-Token mit Rueckseite bekommen den Eintrag (Spec M3d):
+                  // geometrische Token haben keine Seiten, und ein Knopf, der
+                  // nichts tut, ist genau der Fehler aus docs/audit-dead-controls.md.
+                  // Gesperrt heisst unbeweglich, nicht unumdrehbar - `locked` wird
+                  // hier absichtlich nicht geprueft.
+                  const tok = tokens.find(t => t.id === contextMenu.objId);
+                  if (!tok || tok.shape !== 'image' || !tok.backImageUrl) return null;
+                  return (
+                    <button
+                      onClick={() => {
+                        const face = assetFace(tok, !tok.faceDown);
+                        if (face) {
+                          setTokens(prev => prev.map(t => (t.id === tok.id ? { ...t, ...face } : t)));
+                          if (room) room.sendAction({ type: 'token_flip', token_id: tok.id, face_down: face.faceDown });
+                        }
+                        setContextMenu(null);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      {'\u{1F504} Flip'}
+                    </button>
+                  );
+                })()}
                 {contextMenu.objType === 'textField' && (
                   <button
                     onClick={() => {
