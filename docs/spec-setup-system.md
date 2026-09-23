@@ -572,3 +572,86 @@ Kampagne gibt, merkt man nichts davon.
 
 - **Rastererkennung** (Assistent zu M3) — Verfahren noch offen.
 - **Setup-Parameter** als Verallgemeinerung der Spielerzahl — Vokabular noch offen.
+
+## 11. Aktionen — Sequenzen, die mitten im Spiel laufen (M5)
+
+Die Aufbau-Sequenz läuft **genau einmal, beim Laden** (`GameTable.jsx`, im
+`setupId`-Zweig, hinter `setupLoadedRef`). Ein Spiel hat aber wiederkehrende
+Umbauten, die erst während der Partie fällig werden. Townsfolk Tussle ist der
+Referenzfall: **viermal pro Partie** wird aus der Dorfphase eine Kampfphase, und
+was dabei passiert, ist jedes Mal derselbe Ablauf mit einem anderen Bösewicht.
+
+### Begriff
+Eine **Aktion** ist eine benannte Sequenz, die zum Setup gehört und die der
+Spieler **am Tisch auslöst**. Sie läuft gegen den **aktuellen** Tischzustand,
+nicht gegen einen frischen. Sonst ist sie dasselbe wie die Aufbau-Sequenz:
+dieselben Schritte, dasselbe Protokoll, dieselbe Regel „Fehler sind sichtbar".
+
+Gespeichert in `setups.action_data` (eigene Spalte, additive Migration wie
+`grid_data`): eine Liste aus `{ id, label, steps[] }`.
+
+### Der neue Schritt: reveal_next
+Der Ablauf hängt davon ab, **welcher** Bösewicht als nächstes drankommt — und
+das weiß erst der Moment, in dem man ihn aufdeckt. Das Schrittvokabular kennt
+bisher nur feste Namen (`assetName`), also fehlt genau das Bindeglied.
+
+`reveal_next` nimmt `{ zoneLabel, targetZoneLabel? }`:
+- sucht in `zoneLabel` das **erste verdeckte** Objekt (in Slot-Reihenfolge),
+- dreht es auf die Vorderseite (dieselbe Regel wie `set_asset_face`),
+- verschiebt es nach `targetZoneLabel`, wenn eines angegeben ist,
+- und **bindet seinen Namen** für die folgenden Schritte.
+
+Ist kein verdecktes Objekt da, wird der Schritt übersprungen und das steht im
+Protokoll — nicht anders als bei jedem anderen Schritt.
+
+### Platzhalter
+Nach `reveal_next` dürfen folgende Schritte in `assetName` zwei Platzhalter
+benutzen:
+- `$revealed` — der volle Name des aufgedeckten Objekts (Bösewicht: Patches)
+- `$revealedBase` — der Teil **nach dem ersten Doppelpunkt-Leerzeichen** (Patches)
+
+`$revealedBase` gibt es, weil ein Objekt und sein Gegenstück verschiedene Namen
+tragen müssen (zwei Assets gleichen Namens wären für `findAsset` nicht
+unterscheidbar), aber zusammengehören: das **Token** heißt "Bösewicht: Patches",
+das **Tableau** "Tableau: Patches". Ein Schritt schreibt dann
+`assetName: "Tableau: $revealedBase"`.
+
+Ist nichts gebunden — weil kein `reveal_next` lief oder es übersprungen wurde —
+bleibt der Platzhalter **unaufgelöst**, der Schritt findet kein Asset und wird
+übersprungen. Er darf nicht auf den rohen Text zurückfallen und auch nicht raten.
+
+### Bedienung
+Ein Setup mit Aktionen zeigt am Tisch je einen Knopf. Ohne Aktionen ist dort
+nichts — kein leerer Balken.
+
+### Referenzfall: „Kampf beginnen" (Townsfolk Tussle)
+Was die Aktion tut (Regelwerk S. 6 und Regelvideo):
+1. `reveal_next` in der **Bösewicht-Leiste**, Ziel **Buyin'/Beatin'-Leiste** —
+   der Bösewicht wird aufgedeckt und hat den ersten Zug.
+2. **Sideboard** auf die **Fight-Phase-Seite** drehen (also Vorderseite).
+3. **Tableau des Bösewichts** rechts neben den Hauptplan legen, **Szenarioseite
+   nach oben** — das ist der Bauplan für Punkt 4.
+
+**Was die Aktion bewusst NICHT tut**, und warum:
+- **Das Terrain stellen.** Die Szenarioseite ist ein *gezeichneter* Bauplan; welcher
+  Terrain-Token auf welches Feld gehört, steht auf keiner Kachel im Klartext,
+  sondern nur als Artwork. Das aus acht Bildern zu raten hieße, sich Zuordnungen
+  auszudenken. Der Bauplan liegt nach Schritt 3 auf dem Tisch, gelesen wird er
+  vom Menschen — wie am echten Tisch.
+- **R- und T-Felder besetzen.** Sie stehen auf demselben Bauplan, und bei den
+  T-Feldern wählen die Dörfler in Initiativreihenfolge aus fünf Angeboten. Das
+  ist eine Entscheidung, keine Ableitung.
+- **Werte des Bösewichts setzen** (MVMT/HEALTH nach Spieleranzahl). Stehen
+  gedruckt auf der Charakterseite; es gibt in der Engine keine Statusleisten,
+  auf die man sie legen könnte.
+
+Der untere Abschnitt der Szenarioseite (FF1..FF5) gilt nur, wenn dieser
+Bösewicht der Endgegner ist — die Karte selbst gilt für **jeden** Kampf
+(vom Nutzer bestätigt, 2026-09-23).
+
+**Abnahme:** Am Tisch gibt es einen Knopf „Kampf beginnen". Ein Druck deckt den
+obersten verdeckten Bösewicht auf, legt ihn auf die Reihenfolge-Leiste, dreht das
+Sideboard auf die Kampfseite und legt das Tableau genau dieses Bösewichts mit der
+Szenarioseite nach oben neben das Brett. Ein zweiter Druck nimmt den nächsten
+Bösewicht, nicht denselben. Nach dem vierten ist kein verdeckter mehr da und der
+Schritt wird im Protokoll als übersprungen gemeldet.

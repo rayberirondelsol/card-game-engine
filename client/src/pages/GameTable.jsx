@@ -356,6 +356,10 @@ export default function GameTable({ room = null }) {
   // Steps of the last setup sequence that did not work - shown until dismissed,
   // because a setup with silently skipped steps looks exactly like a correct one.
   const [setupIssues, setSetupIssues] = useState(null);
+  // M5: Aktionen des geladenen Setups - benannte Sequenzen, die der Spieler
+  // mitten im Spiel ausloest. Leer = am Tisch ist dazu nichts zu sehen.
+  const [setupActions, setSetupActions] = useState([]);
+  const [runningActionId, setRunningActionId] = useState(null);
   const saveLoadedRef = useRef(false);
 
   // Setup state
@@ -2806,6 +2810,8 @@ export default function GameTable({ room = null }) {
           name: c.name,
           image_path: c.image_path,
           card_back_id: c.card_back_id || null,
+          width: c.width || 0,
+          height: c.height || 0,
           faceDown: c.faceDown,
           rotation: c.rotation || 0,
           zIndex: c.zIndex,
@@ -2827,6 +2833,11 @@ export default function GameTable({ room = null }) {
         name: c.name,
         image_path: c.image_path,
         card_back_id: c.card_back_id || null,
+        // Ohne Breite/Hoehe kaeme eine Querformat-Karte nach dem naechsten
+        // loadGameState als Hochformat zurueck - loadGameState liest beide
+        // Felder, getGameState schrieb sie bisher nicht.
+        width: c.width || 0,
+        height: c.height || 0,
         x: c.x,
         y: c.y,
         zIndex: c.zIndex,
@@ -3553,6 +3564,29 @@ export default function GameTable({ room = null }) {
     setTimeout(() => renderCanvas(), 100);
   }
 
+  // M5: eine Aktion des Setups am Tisch ausloesen. Gleiche Maschinerie wie die
+  // Aufbau-Sequenz, nur laeuft sie gegen den *aktuellen* Tisch: getGameState
+  // liefert genau die Form, die der Executor erwartet und loadGameState wieder
+  // einliest. Die Raster kommen NICHT mit - anders als beim Laden stehen sie
+  // hier bereits im State, loadGameState nimmt dann die vorhandenen.
+  async function runSetupAction(action) {
+    if (runningActionId !== null) return;
+    setRunningActionId(action.id);
+    try {
+      const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
+      const assets = assetsRes.ok ? await assetsRes.json() : [];
+      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets });
+      loadGameState(next);
+      const bad = log.filter(e => e.status !== 'ok');
+      setSetupIssues(bad.length ? bad : null);
+    } catch (err) {
+      console.error('Action failed:', err);
+      setSetupIssues([{ index: -1, type: action.label || action.id, target: null, status: 'failed', reason: err.message }]);
+    } finally {
+      setRunningActionId(null);
+    }
+  }
+
   // Load save state from URL query param on mount
   useEffect(() => {
     if (saveLoadedRef.current) return;
@@ -3615,6 +3649,11 @@ export default function GameTable({ room = null }) {
             try { parsedGrids = JSON.parse(setup.grid_data); } catch {}
           }
           setGrids(parsedGrids);
+          // M5: Aktionen gehoeren zum Setup, laufen aber erst spaeter - hier
+          // nur merken, nicht ausfuehren.
+          let parsedActions = [];
+          try { parsedActions = JSON.parse(setup.action_data || '[]'); } catch {}
+          setSetupActions(Array.isArray(parsedActions) ? parsedActions : []);
 
           // Execute setup sequence for new games (not savegame loads)
           let parsedSeq = [];
@@ -4839,6 +4878,38 @@ export default function GameTable({ room = null }) {
             </span>
           </div>
         </div>
+
+        {/* M5-Aktionen als eigene Zeile im Fluss derselben Kopfleiste - aus
+            demselben Grund wie Banner und Legende (M2.8): eine Zeile im Fluss
+            kann die Zeile darueber nicht ueberdecken, egal wie hoch sie wird,
+            und sie erbt `data-ui-element` vom Kopfleisten-Container. Links,
+            damit sie dem rechts geoeffneten Kartenschrank nicht in die Quere
+            kommt. Ohne Aktionen steht hier nichts - kein leerer Balken. */}
+        {setupActions.length > 0 && (
+          <div
+            className={`flex justify-start ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}
+            style={{ paddingLeft: isMobileLandscape ? 'max(0.5rem, env(safe-area-inset-left, 0px))' : 'max(0.75rem, env(safe-area-inset-left, 0px))' }}
+          >
+            <div
+              className="pointer-events-auto flex flex-wrap items-center gap-2"
+              data-testid="table-actions"
+              data-ui-element="true"
+            >
+              {setupActions.map(action => (
+                <button
+                  key={action.id}
+                  onClick={() => runSetupAction(action)}
+                  disabled={runningActionId !== null}
+                  data-testid={`table-action-${action.id}`}
+                  data-ui-element="true"
+                  className={`bg-indigo-700/90 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-wait backdrop-blur-sm text-white rounded-lg shadow-xl transition-colors ${isMobileLandscape ? 'px-2 py-1.5 text-xs min-h-[36px]' : 'px-4 py-2 text-sm min-h-[44px]'}`}
+                >
+                  {runningActionId === action.id ? '...' : (action.label || action.id)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Setup-Banner als zweite Zeile derselben Kopfleiste. Es lag vorher
             `fixed top-4 right-4` und beanspruchte damit einen Streifen, dessen

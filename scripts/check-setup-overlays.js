@@ -47,8 +47,11 @@ const VIEWPORTS = [
 // Genau der Schnipsel aus der Abnahme - er läuft unverändert in der
 // Browser-Konsole. `token-legend`/`show-legend-btn` stehen mit in der Liste,
 // weil die Legende an derselben rechten oberen Ecke hängt wie das Banner.
+// `table-actions` (M5) ist eine weitere Zeile derselben Kopfleiste; im
+// Setup-Modus fehlt sie, dann überspringt der Schnipsel sie stillschweigend -
+// geprüft wird sie an einem Tisch, der mit `?setupId=` geladen wurde.
 const PROBE_SNIPPET = `(() => {
-  const ids = ['setup-mode-banner','toggle-card-drawer','zoom-display','pan-display','auto-save-status','zone-toolbar','grid-toolbar','sequence-editor-toggle','floating-toolbar','token-legend','show-legend-btn'];
+  const ids = ['setup-mode-banner','toggle-card-drawer','zoom-display','pan-display','auto-save-status','zone-toolbar','grid-toolbar','sequence-editor-toggle','floating-toolbar','token-legend','show-legend-btn','table-actions'];
   const blocked = {};
   const seen = [];
   for (const i of ids) {

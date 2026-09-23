@@ -20,7 +20,7 @@
  * @param {object}        [options]   – { assets: table_assets rows, rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
-import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone } from './zoneGeometry.js';
+import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { assetToken, assetFace } from './assetToken.js';
 
@@ -57,12 +57,16 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   }
 
   const { assets = [], rng = Math.random } = options || {};
+  // What `reveal_next` bound, for the placeholders in the steps behind it.
+  // Beside the state for the same reason as the log: the state is persisted as
+  // JSON, and a binding smuggled into it would end up in the database.
+  const ctx = { revealed: null };
 
   sequenceData.forEach((step, index) => {
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
-      state = applyStep(state, step, zones, assets, rng, entry);
+      state = applyStep(state, step, zones, assets, rng, entry, ctx);
     } catch (err) {
       entry.status = 'failed';
       entry.reason = err.message;
@@ -76,7 +80,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
 
 /** What a step points at – enough to recognise it in the protocol. */
 function stepTarget(step) {
-  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.targetZoneLabel ?? null;
+  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -142,6 +146,38 @@ function findZone(zones, label) {
   return zones.find(z => norm(z.label) === norm(label)) || null;
 }
 
+// ── Revealing and the names it binds ─────────────────────────────────────────
+
+/**
+ * The objects of a zone in the order its places are handed out, so that "the
+ * first face-down one" means the same thing as "the first place" – the boss bar
+ * is read left to right because that is the order `zoneSlots` lays out.
+ *
+ * With fixed places every object is sorted by the place nearest to it (an
+ * object dragged between two places still belongs to one of them). A zone
+ * without places has no order of its own, so reading order decides: down the
+ * bar for a column, along it for a row – which is exactly where `zoneSlotFor`
+ * puts them without a capacity.
+ */
+function inSlotOrder(zone, objects) {
+  const slots = zoneSlots(zone);
+  const dist2 = (p, o) => (p.x - o.x) ** 2 + (p.y - o.y) ** 2;
+  const place = (o) => (slots ? slots.reduce((best, s, i) => (dist2(s, o) < dist2(slots[best], o) ? i : best), 0) : 0);
+  return objects
+    .map(o => ({ o, k: [place(o), o.y, o.x] }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2])
+    .map(e => e.o);
+}
+
+/** Longest first: "$revealedBase" also starts with "$revealed". */
+const REVEALED = /\$revealedBase|\$revealed/g;
+
+/** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
+function baseName(name) {
+  const i = name.indexOf(': ');
+  return i < 0 ? name : name.slice(i + 2);
+}
+
 /**
  * Split candidate zones into the ones that take one more object of `kind` and
  * the reasons the others do not. `free` is how many more each usable zone
@@ -191,7 +227,7 @@ function fullZones(usable, free, kind) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, allZones, assets, rng, entry) {
+function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
@@ -211,6 +247,16 @@ function applyStep(state, step, allZones, assets, rng, entry) {
   const fail = (reason) => { entry.status = 'failed'; entry.reason = reason; return state; };
 
   const idx = buildStackIndex(state);
+
+  // Placeholders are resolved once, here, so that every step addressing an
+  // asset by name gets them and none of them repeats the substitution. Nothing
+  // bound means unresolved: falling back to the literal "$revealed" would
+  // address whatever asset happens to carry that name, and guessing a boss is
+  // worse than not laying one out.
+  if (typeof step.assetName === 'string' && step.assetName.includes('$revealed')) {
+    if (!ctx.revealed) return skip(`"${step.assetName}": nothing revealed yet`);
+    step = { ...step, assetName: step.assetName.replace(REVEALED, (m) => (m === '$revealed' ? ctx.revealed : baseName(ctx.revealed))) };
+  }
 
   switch (step.type) {
     case 'shuffle': {
@@ -460,6 +506,37 @@ function applyStep(state, step, allZones, assets, rng, entry) {
         return fail(`"${step.assetName}" has no back side; taken off the table instead of leaving it face up`);
       }
       Object.assign(obj, face);
+      return state;
+    }
+
+    // Der Schritt für wiederkehrende Umbauten (Spec 11): welches Objekt an der
+    // Reihe ist, weiß erst der Moment, in dem man es aufdeckt - feste Namen
+    // reichen dafür nicht.
+    case 'reveal_next': {
+      const zone = findZone(zones, step.zoneLabel);
+      if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
+
+      const obj = inSlotOrder(zone, objectsInZone(zone, state.tokens, state.boards)).find(o => o.faceDown);
+      if (!obj) return skip(`nothing face down in zone "${step.zoneLabel}"`);
+
+      if (step.targetZoneLabel) {
+        const target = findZone(zones, step.targetZoneLabel);
+        if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
+        // Same counting as place_asset: moving inside its own zone must not
+        // count the object twice. A full zone skips the whole step - turning it
+        // over and leaving it where it was would be half a move.
+        const here = zoneContains(target, obj.x, obj.y) ? 1 : 0;
+        const taken = occupancy(state, target) - here;
+        const refusal = zoneRejects(target, 'asset', taken);
+        if (refusal) return skip(refusal);
+        const slots = zoneSlots(target);
+        const pos = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(target);
+        obj.x = pos.x;
+        obj.y = pos.y;
+      }
+
+      Object.assign(obj, assetFace(obj, false));
+      ctx.revealed = obj.label || obj.name || null;
       return state;
     }
 

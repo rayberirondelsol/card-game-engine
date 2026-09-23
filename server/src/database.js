@@ -216,6 +216,13 @@ export async function setupDatabase() {
     db.exec("ALTER TABLE setups ADD COLUMN grid_data TEXT DEFAULT '[]'");
     console.log('[DB] Migration: added grid_data column to setups');
   }
+  // M5: die Aktionen eines Setups - benannte Sequenzen, die der Spieler am
+  // Tisch ausloest. Eigene Spalte wie grid_data, aus demselben Grund: eine
+  // Aktion ist keine Aufbau-Sequenz, ein Setup hat beides unabhaengig.
+  if (!setupColumns.includes('action_data')) {
+    db.exec("ALTER TABLE setups ADD COLUMN action_data TEXT DEFAULT '[]'");
+    console.log('[DB] Migration: added action_data column to setups');
+  }
 
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');

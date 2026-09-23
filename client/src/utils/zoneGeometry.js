@@ -107,16 +107,21 @@ export function zoneRejects(zone, kind, occupied = 0) {
  * inside it – and the step protocol would blame a full zone.
  */
 export function countInZone(zone, ...lists) {
+  return objectsInZone(zone, ...lists).length;
+}
+
+/** The objects themselves, same rule – for steps that need one, not a number. */
+export function objectsInZone(zone, ...lists) {
   const anchorId = zone?.anchor?.assetId || null;
-  let n = 0;
+  const found = [];
   for (const list of lists) {
     if (!Array.isArray(list)) continue;
     for (const o of list) {
       if (anchorId && (o?.assetId || o?.id) === anchorId) continue;
-      if (zoneContains(zone, o?.x, o?.y)) n++;
+      if (zoneContains(zone, o?.x, o?.y)) found.push(o);
     }
   }
-  return n;
+  return found;
 }
 
 // ── Slots ────────────────────────────────────────────────────────────────────

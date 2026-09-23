@@ -31,6 +31,7 @@ export const STEP_TYPES = [
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
+  { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -110,6 +111,9 @@ export function defaultStep(type, ctx = {}) {
     case 'lock_asset':
     case 'unlock_asset':
       return { type, assetName: first(names) };
+    case 'reveal_next':
+      // Ohne Zielzone: Aufdecken und Verschieben sind zwei Entscheidungen.
+      return { type, zoneLabel: zone, targetZoneLabel: '' };
     default:
       return { type, stackLabel };
   }
@@ -148,6 +152,10 @@ export function describeStep(step) {
       return `Draw ${step.count ?? 1} from pool ${q(step.pool)} into ${zone}${down(step)}`;
     case 'set_asset_face':
       return `Turn ${q(step.assetName)} ${step.faceDown ? 'face down' : 'face up'}`;
+    case 'reveal_next': {
+      const into = step?.targetZoneLabel ? ` into zone ${q(step.targetZoneLabel)}` : '';
+      return `Reveal the next face-down object in zone ${q(step.zoneLabel)}${into}`;
+    }
     case 'lock_asset': return `Lock ${q(step.assetName)}`;
     case 'unlock_asset': return `Unlock ${q(step.assetName)}`;
     default: return stepTypeLabel(step);
@@ -180,8 +188,16 @@ export function validateStep(step, ctx = {}) {
     else if (!known(stackLabels, step.stackLabel)) problems.push(`stack "${step.stackLabel}" not found`);
   }
   if (fields.has('assetName')) {
+    // Ein Platzhalter ($revealed) steht fuer einen Namen, den erst reveal_next
+    // am Tisch kennt - hier gaebe es dazu nur einen falschen Alarm.
     if (!step?.assetName) problems.push('no asset chosen');
-    else if (!known(names, step.assetName)) problems.push(`asset "${step.assetName}" not found`);
+    else if (!step.assetName.includes('$revealed') && !known(names, step.assetName)) problems.push(`asset "${step.assetName}" not found`);
+  }
+  // reveal_next liest die Zone, aus der aufgedeckt wird - anders als bei
+  // targetZoneLabel ist "keine" hier keine gueltige Wahl.
+  if (fields.has('zoneLabel')) {
+    if (!step?.zoneLabel) problems.push('no zone chosen');
+    else if (!known(zoneLabels, step.zoneLabel)) problems.push(`zone "${step.zoneLabel}" not found`);
   }
   if (fields.has('pool')) {
     if (!step?.pool) problems.push('no pool chosen');

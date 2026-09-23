@@ -303,3 +303,60 @@ test('the complete Townsfolk Tussle setup runs with every step ok', () => {
   assert.ok(state.tokens.find(t => t.label === 'Hauptbrett').locked, 'the board is locked');
   assert.equal(state.cards.filter(c => c.x >= 50 && c.x <= 950 && c.y >= 600 && c.y <= 740).length, 10);
 });
+
+// ── reveal_next (M5) ─────────────────────────────────────────────────────────
+
+test('reveal_next is offered with the two fields its handler reads', () => {
+  const ctx = ctxFixture();
+
+  assert.ok(STEP_TYPES.some(t => t.value === 'reveal_next'), 'reveal_next missing from STEP_TYPES');
+  assert.deepEqual(stepFields('reveal_next'), ['zoneLabel', 'targetZoneLabel']);
+
+  const fresh = defaultStep('reveal_next', ctx);
+  assert.equal(fresh.type, 'reveal_next');
+  assert.equal(fresh.zoneLabel, 'Bosseleiste', 'prefilled with the first zone, like every other zone step');
+  assert.deepEqual(Object.keys(fresh).sort(), ['targetZoneLabel', 'type', 'zoneLabel']);
+
+  const line = describeStep({ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' });
+  assert.ok(!line.includes('_'), `shows the raw type: ${line}`);
+  assert.match(line, /Bosseleiste/);
+  assert.match(line, /Reihenfolge/);
+});
+
+test('validateStep checks zoneLabel too, not only targetZoneLabel', () => {
+  const ctx = ctxFixture();
+
+  assert.deepEqual(validateStep({ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }, ctx), []);
+  assert.equal(validateStep({ type: 'reveal_next', zoneLabel: '' }, ctx).length, 1, 'a reveal without a zone cannot run');
+
+  const gone = validateStep({ type: 'reveal_next', zoneLabel: 'Gelöscht' }, ctx);
+  assert.equal(gone.length, 1);
+  assert.match(gone[0], /Gelöscht/);
+
+  // Ein Platzhalter ist kein Assetname - er wird erst am Tisch aufgelöst.
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Tableau: $revealedBase', x: 0, y: 0 }, ctx), []);
+});
+
+test('a reveal_next built by the editor runs in the executor', () => {
+  const assets = assetFixture();
+  const zones = zoneFixture();
+  const sequence = [
+    { type: 'place_asset', assetName: 'Klaus', targetZoneLabel: 'Bosseleiste', faceDown: true },
+    { type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' },
+  ];
+
+  const offered = new Set(STEP_TYPES.map(t => t.value));
+  for (const step of sequence) {
+    assert.ok(offered.has(step.type), `${step.type} cannot be added in the editor`);
+    const allowed = new Set([...stepFields(step), 'type']);
+    for (const key of Object.keys(step)) {
+      assert.ok(allowed.has(key), `${step.type} has no editor field for "${key}"`);
+    }
+  }
+
+  const { state, log } = executeSequenceWithLog(stateFixture(), sequence, zones, { assets, rng: () => 0.42 });
+  assert.deepEqual(log.map(e => e.status), ['ok', 'ok'], log.map(e => e.reason).join(' | '));
+  const klaus = state.tokens.find(t => t.label === 'Klaus');
+  assert.equal(klaus.faceDown, false);
+  assert.deepEqual([klaus.x, klaus.y], [640, 100], 'auf dem ersten Platz der Reihenfolge-Leiste');
+});
