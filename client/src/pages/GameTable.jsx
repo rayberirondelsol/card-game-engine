@@ -25,6 +25,7 @@ import { menuPlacement } from '../utils/menuPlacement.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
+import { canStartPan } from '../utils/panTarget.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -785,12 +786,9 @@ export default function GameTable({ room = null }) {
     const container = containerRef.current;
 
     function handleMouseDown(e) {
-      // Pan when clicking on canvas or the container background (not on UI elements)
-      const isCanvas = e.target === canvas;
-      const isContainer = e.target === container;
-      const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
-
-      if (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement)) {
+      // M2.13: pan on the background – and on anything that cannot be dragged,
+      // e.g. a locked board filling the screen. One rule, three callers.
+      if (e.button === 1 || (e.button === 0 && canStartPan(e.target, canvas, container))) {
         isPanningRef.current = true;
         panStartRef.current = {
           x: e.clientX,
@@ -3782,15 +3780,14 @@ export default function GameTable({ room = null }) {
     }
 
     const pointer = getPointerPosition(e);
-    const isCanvas = e.target === canvasRef.current;
-    const isContainer = e.target === containerRef.current;
-    const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
-    const isTableCard = e.target.closest && e.target.closest('[data-table-card]');
+    // M2.13: same rule as the native mouse handler above – the background pans,
+    // and so does a locked object, which no drag would pick up anyway.
+    const mayPan = canStartPan(e.target, canvasRef.current, containerRef.current);
 
     // For mouse: check button; for touch: no button check needed
     const isTouchStart = isTouchEvent(e);
-    const isValidMouseStart = !isTouchStart && (e.button === 1 || (e.button === 0 && (isCanvas || isContainer) && !isUIElement && !isTableCard));
-    const isValidTouchStart = isTouchStart && (isCanvas || isContainer) && !isUIElement && !isTableCard;
+    const isValidMouseStart = !isTouchStart && (e.button === 1 || (e.button === 0 && mayPan));
+    const isValidTouchStart = isTouchStart && mayPan;
 
     if (isValidMouseStart || isValidTouchStart) {
       isPanningRef.current = true;
@@ -4120,6 +4117,7 @@ export default function GameTable({ room = null }) {
               data-stack-id={stackId || ''}
               data-stack-size={stackSize}
               data-ui-element="true"
+              data-locked={card.locked ? 'true' : undefined}
               className="absolute select-none group pointer-events-auto"
               style={{
                 left: card.x - cardW / 2,
@@ -4322,6 +4320,7 @@ export default function GameTable({ room = null }) {
           key={board.id}
           data-testid={`board-${board.id}`}
           data-ui-element="true"
+          data-locked={board.locked ? 'true' : undefined}
           className="absolute select-none group pointer-events-auto"
           style={{
             left: board.x - board.width / 2,
@@ -4358,6 +4357,7 @@ export default function GameTable({ room = null }) {
           data-testid={`counter-${counter.id}`}
           data-counter-name={counter.name}
           data-ui-element="true"
+          data-locked={counter.locked ? 'true' : undefined}
           className="absolute z-20 select-none pointer-events-auto"
           style={{
             left: counter.x - 70,
@@ -4405,6 +4405,7 @@ export default function GameTable({ room = null }) {
           data-testid={`die-${die.id}`}
           data-die-type={die.type}
           data-ui-element="true"
+          data-locked={die.locked ? 'true' : undefined}
           className="absolute z-20 select-none pointer-events-auto"
           style={{
             left: die.x - 35,
@@ -4448,6 +4449,7 @@ export default function GameTable({ room = null }) {
           key={die.id}
           data-testid={`custom-die-${die.id}`}
           data-ui-element="true"
+          data-locked={die.locked ? 'true' : undefined}
           className="absolute z-20 select-none pointer-events-auto"
           style={{ left: die.x - 40, top: die.y - 48, cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab' }}
           onMouseDown={(e) => handleObjDragStart(e, 'customDie', die.id)}
@@ -4499,6 +4501,7 @@ export default function GameTable({ room = null }) {
             data-testid={`hit-die-${die.id}`}
             data-die-type={`hit-${die.hitType}`}
             data-ui-element="true"
+            data-locked={die.locked ? 'true' : undefined}
             className="absolute z-20 select-none pointer-events-auto"
             style={{
               left: die.x - 38,
@@ -4563,6 +4566,7 @@ export default function GameTable({ room = null }) {
           data-testid={`note-${note.id}`}
           data-note-id={note.id}
           data-ui-element="true"
+          data-locked={note.locked ? 'true' : undefined}
           className="absolute z-20 select-none group pointer-events-auto"
           style={{
             left: note.x - 80,
@@ -4670,6 +4674,7 @@ export default function GameTable({ room = null }) {
           data-token-label={view.name}
           data-face-down={view.hidden ? 'true' : 'false'}
           data-ui-element="true"
+          data-locked={token.locked ? 'true' : undefined}
           className="absolute z-20 select-none group pointer-events-auto"
           style={{
             left: token.x - Math.floor(tokenW / 2),
@@ -4694,6 +4699,7 @@ export default function GameTable({ room = null }) {
           <div
             key={tf.id}
             data-testid={`textfield-${tf.id}`}
+            data-locked={tf.locked ? 'true' : undefined}
             className={`absolute select-none group pointer-events-auto ${tf.locked ? 'ring-1 ring-yellow-500/40 rounded' : ''}`}
             style={{
               left: tf.x,
