@@ -6115,8 +6115,14 @@ export default function GameTable({ room = null }) {
           ref={contextMenuRef}
           className="fixed z-50"
           style={{
-            left: menuPlace ? menuPlace.left : contextMenu.x,
-            top: menuPlace ? menuPlace.top : contextMenu.y,
+            // Der Messdurchlauf setzt das Menue in die Ecke, nicht auf den
+            // Klickpunkt: am rechten Rand bleiben sonst nur ein paar Pixel
+            // Platz, der Browser bricht die Eintraege um, und gemessen wird
+            // eine Breite, die das Menue danach gar nicht hat (gesehen: 189
+            // statt 510). Der Layout-Effekt laeuft vor dem Paint, die Ecke
+            // sieht also niemand.
+            left: menuPlace ? menuPlace.left : 0,
+            top: menuPlace ? menuPlace.top : 0,
             maxHeight: menuPlace && menuPlace.maxHeight !== null ? menuPlace.maxHeight : undefined,
             overflow: 'auto',
           }}
