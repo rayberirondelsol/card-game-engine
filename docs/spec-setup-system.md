@@ -1254,8 +1254,10 @@ bei den drei Dörflern in M4a.
   auf alten Koordinaten (M3b).
 - **Der Executor bekommt Raster** — `options.grids`, aufgelöst je Schritt gegen
   den Tisch, *wie er ihn vorfindet*, mit `resolveGrids`/`anchorBoxes`, genau wie
-  die Zonen heute. Alle vier Aufrufstellen ziehen mit: Aufbau am Tisch, Aktion
-  am Tisch, Raumstart, Sequenz-Editor (für die Auswahl und die Prüfung).
+  die Zonen heute. Alle **drei** Aufrufstellen ziehen mit: Aufbau am Tisch,
+  Aktion am Tisch, Raumstart. Der Sequenz-Editor ruft den Executor nicht auf -
+  er braucht die Raster nur als `ctx`, und zwar als Objekte statt als Namen:
+  ein Feld zu pruefen verlangt die Geometrie.
 - **`place_stack { category, label, x, y, faceDown }`** — eine Kartenkategorie
   als Nachziehstapel. Das gibt es im Client seit jeher als „+ Stack"; als
   Schritt fehlte es. Damit baut die Aktion das Verhaltensdeck

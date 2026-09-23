@@ -3568,15 +3568,16 @@ export default function GameTable({ room = null }) {
   // M5: eine Aktion des Setups am Tisch ausloesen. Gleiche Maschinerie wie die
   // Aufbau-Sequenz, nur laeuft sie gegen den *aktuellen* Tisch: getGameState
   // liefert genau die Form, die der Executor erwartet und loadGameState wieder
-  // einliest. Die Raster kommen NICHT mit - anders als beim Laden stehen sie
-  // hier bereits im State, loadGameState nimmt dann die vorhandenen.
+  // einliest. Die Raster gehen mit in die `options` (M7/T1): ein Schritt darf
+  // auf ein Rasterfeld zielen, und er loest es gegen den Tisch auf, wie er ihn
+  // vorfindet. `loadGameState` bekommt sie nicht - dort stehen sie schon.
   async function runSetupAction(action) {
     if (runningActionId !== null) return;
     setRunningActionId(action.id);
     try {
       const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
       const assets = assetsRes.ok ? await assetsRes.json() : [];
-      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets });
+      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, grids });
       loadGameState(next);
       const bad = log.filter(e => e.status !== 'ok');
       setSetupIssues(bad.length ? bad : null);
@@ -3667,7 +3668,9 @@ export default function GameTable({ room = null }) {
               // Asset steps (place_asset / draw_assets / ...) draw from the game's table assets.
               const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
               const assets = assetsRes.ok ? await assetsRes.json() : [];
-              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets });
+              // Die Raster wie die Zonen frisch aus dem Setup: `grids` im State
+              // ist an dieser Stelle noch leer (M7/T1).
+              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, grids: parsedGrids });
               stateToLoad = built;
               const bad = log.filter(e => e.status !== 'ok');
               setSetupIssues(bad.length ? bad : null);
@@ -7015,6 +7018,7 @@ export default function GameTable({ room = null }) {
           availableZoneLabels={zones.map(z => z.label).filter(Boolean)}
           availablePools={assetPools(tableAssets)}
           availableAssetNames={assetNames(tableAssets)}
+          availableGrids={grids}
           isOpen={showSequenceEditor}
           onToggle={() => setShowSequenceEditor(prev => !prev)}
         />

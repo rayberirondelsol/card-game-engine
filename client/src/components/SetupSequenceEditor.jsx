@@ -63,6 +63,7 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
   }
 
   const zoneEmptyLabel = step.type === 'place_asset' ? 'Free position (X/Y)' : 'All player zones';
+  const gridLabels = (ctx.grids || []).map(g => g?.label).filter(Boolean);
 
   const render = {
     stackLabel: () => field('Stack',
@@ -113,6 +114,23 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
           number(step.count, 1, 1, n => set({ count: n }))),
 
     spacing: () => field('Spacing', number(step.spacing, 130, 0, n => set({ spacing: n }))),
+
+    // M7/T1: Raster und Feld sind die dritte Art zu sagen, wo etwas hingehoert.
+    // Das Raster kommt aus dem Setup, das Feld schreibt der Autor ("C7") - eine
+    // Auswahl ueber 140 Felder waere unbedienbar, und validateStep meldet ein
+    // Feld, das es auf diesem Raster nicht gibt.
+    gridLabel: () => field('Grid',
+      nameSelect(step.gridLabel, gridLabels, '— no grids in this setup —', v => set({ gridLabel: v }), `step-${index}-grid`)),
+
+    cell: () => field('Field',
+      <input
+        type="text"
+        value={step.cell || ''}
+        onChange={e => set({ cell: e.target.value })}
+        placeholder="e.g. C7"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-cell`}
+      />),
 
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
@@ -223,6 +241,7 @@ export default function SetupSequenceEditor({
   availableZoneLabels = [],
   availablePools = [],
   availableAssetNames = [],
+  availableGrids = [],
   isOpen,
   onToggle,
 }) {
@@ -233,6 +252,9 @@ export default function SetupSequenceEditor({
     zoneLabels: availableZoneLabels,
     pools: availablePools,
     assetNames: availableAssetNames,
+    // Die Raster selbst, nicht nur ihre Namen: die Pruefung eines Feldes
+    // braucht die Geometrie (cellFromLabel), die Auswahl nur den Namen.
+    grids: availableGrids,
   };
 
   function addStep() {

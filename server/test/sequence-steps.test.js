@@ -360,3 +360,80 @@ test('a reveal_next built by the editor runs in the executor', () => {
   assert.equal(klaus.faceDown, false);
   assert.deepEqual([klaus.x, klaus.y], [640, 100], 'auf dem ersten Platz der Reihenfolge-Leiste');
 });
+
+// ── Grid targets (M7, T1) ────────────────────────────────────────────────────
+
+/** The grids of the reference setup: one 10x10 battlefield. */
+function gridFixture() {
+  return [{
+    id: 'g1', label: 'Kampffeld', type: 'square',
+    origin: { x: 0, y: 0 }, cell: 60, cols: 10, rows: 10,
+    labels: { cols: 'alpha', rows: 'numeric' },
+  }];
+}
+
+const gridCtx = () => ({ ...ctxFixture(), grids: gridFixture() });
+
+test('place_asset offers grid and field, and drops x/y once a field is chosen', () => {
+  assert.ok(stepFields('place_asset').includes('gridLabel'));
+  assert.ok(stepFields('place_asset').includes('cell'));
+
+  const onCell = stepFields({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'C7' });
+  assert.ok(!onCell.includes('x') && !onCell.includes('y'), 'the field decides the position, not x/y');
+  assert.ok(onCell.includes('gridLabel') && onCell.includes('cell'));
+
+  // Zone, field and x/y are three exclusive ways of saying where something goes.
+  const zoned = stepFields({ type: 'place_asset', assetName: 'Klaus', targetZoneLabel: 'Bosseleiste' });
+  assert.ok(!zoned.includes('gridLabel') && !zoned.includes('cell'));
+
+  const fresh = defaultStep('place_asset', gridCtx());
+  assert.equal(fresh.gridLabel, '', 'no grid by default, so x/y stay usable');
+  assert.equal(fresh.cell, '');
+});
+
+test('describeStep names grid and field', () => {
+  const line = describeStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'C7' });
+  assert.ok(!line.includes('_'), `shows the raw type: ${line}`);
+  assert.match(line, /Klaus/);
+  assert.match(line, /Kampffeld/);
+  assert.match(line, /C7/);
+});
+
+test('validateStep reports an unknown grid and a field the grid does not have', () => {
+  const ctx = gridCtx();
+
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'C7' }, ctx), []);
+
+  const noGrid = validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Gelöscht', cell: 'C7' }, ctx);
+  assert.equal(noGrid.length, 1);
+  assert.match(noGrid[0], /Gelöscht/);
+
+  const badCell = validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'Z99' }, ctx);
+  assert.equal(badCell.length, 1);
+  assert.match(badCell[0], /Z99/);
+
+  // A field without a grid cannot be resolved either.
+  assert.equal(validateStep({ type: 'place_asset', assetName: 'Klaus', cell: 'C7' }, ctx).length, 1);
+
+  // Without grids in the context nothing is claimed to be wrong (same rule as
+  // for zones and pools: an unloaded list is not an empty one).
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'Z99' }, ctxFixture()), []);
+});
+
+test('a grid step built by the editor runs in the executor', () => {
+  const built = { type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'C7', faceDown: false };
+
+  const allowed = new Set([...stepFields(built), 'type']);
+  for (const key of Object.keys(built)) {
+    assert.ok(allowed.has(key), `place_asset has no editor field for "${key}"`);
+  }
+  assert.deepEqual(validateStep(built, gridCtx()), []);
+
+  const { state, log } = executeSequenceWithLog(stateFixture(), [built], zoneFixture(), {
+    assets: assetFixture(),
+    grids: gridFixture(),
+  });
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  const klaus = state.tokens.find(t => t.label === 'Klaus');
+  assert.deepEqual([klaus.x, klaus.y, klaus.cell], [150, 390, 'C7']);
+});

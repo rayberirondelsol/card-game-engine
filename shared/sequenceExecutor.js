@@ -17,11 +17,12 @@
  * @param {object|string} stateData  – serialized game state (object or JSON string)
  * @param {Array}         sequenceData – array of sequence step objects
  * @param {Array}         zones       – zone objects from the setup (for deal_to_zone)
- * @param {object}        [options]   – { assets: table_assets rows, rng: () => [0,1) }
+ * @param {object}        [options]   – { assets: table_assets rows, grids: grid objects, rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
+import { resolveGrids, cellFromLabel, cellCenter, cellLabel } from './gridGeometry.js';
 import { assetToken, assetFace } from './assetToken.js';
 import { normalizeCounter } from './counters.js';
 
@@ -57,7 +58,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     return { state, log };
   }
 
-  const { assets = [], rng = Math.random } = options || {};
+  const { assets = [], grids = [], rng = Math.random } = options || {};
   // What `reveal_next` bound, for the placeholders in the steps behind it.
   // Beside the state for the same reason as the log: the state is persisted as
   // JSON, and a binding smuggled into it would end up in the database.
@@ -67,7 +68,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
-      state = applyStep(state, step, zones, assets, rng, entry, ctx);
+      state = applyStep(state, step, zones, grids, assets, rng, entry, ctx);
     } catch (err) {
       entry.status = 'failed';
       entry.reason = err.message;
@@ -236,7 +237,7 @@ function fullZones(usable, free, kind) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
+function applyStep(state, step, allZones, allGrids, assets, rng, entry, ctx = {}) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
@@ -249,7 +250,12 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
   // - and a zone that is off by the width of a board is not subtle, but it is
   // also not visible in the protocol. A zone whose anchor is not on the table
   // keeps its saved absolute box (see anchoring.js).
-  const zones = resolveZones(allZones, anchorBoxes(state.boards, state.tokens));
+  // Grids are resolved the same way and for the same reason: a grid printed on
+  // a board that this very sequence has just laid out only sits on its fields
+  // once the board is where it ends up.
+  const boxes = anchorBoxes(state.boards, state.tokens);
+  const zones = resolveZones(allZones, boxes);
+  const grids = resolveGrids(allGrids, boxes);
 
   /** Nothing happened – a precondition was missing. */
   const skip = (reason) => { entry.status = 'skipped'; entry.reason = reason; return state; };
@@ -418,6 +424,11 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
 
       const existing = findPlaced(state, asset, step.assetName);
       let target = null;
+      // What the object remembers about where it stands. Always written, also
+      // as nulls: an object moved into a zone or onto free coordinates that
+      // kept a stale `gridId`/`cell` would be dragged back onto the old field
+      // by `placeOnGrids` on the next load (M3b).
+      let onGrid = { gridId: null, cell: null };
       let noPos = `no position given for "${step.assetName}"`;
 
       if (step.targetZoneLabel) {
@@ -433,6 +444,21 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
           const slots = zoneSlots(zone);
           target = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(zone);
         }
+      } else if (step.gridLabel || step.cell) {
+        // Zone, grid field and x/y are three exclusive ways of saying where
+        // something goes; the field is the middle one and never mixes with the
+        // others. The field name travels with the object, the coordinates only
+        // follow from it.
+        const grid = grids.find(g => norm(g.label) === norm(step.gridLabel));
+        const c = grid && cellFromLabel(grid, step.cell);
+        if (!grid) {
+          noPos = `grid "${step.gridLabel ?? ''}" not found`;
+        } else if (!c) {
+          noPos = `grid "${grid.label}" has no cell "${step.cell ?? ''}"`;
+        } else {
+          target = cellCenter(grid, c.col, c.row);
+          onGrid = { gridId: grid.id, cell: cellLabel(grid, c.col, c.row) };
+        }
       } else if (typeof step.x === 'number' && typeof step.y === 'number') {
         target = { x: step.x, y: step.y };
       }
@@ -442,13 +468,14 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
         if (!target) return skip(noPos);
         existing.x = target.x;
         existing.y = target.y;
+        Object.assign(existing, onGrid);
         return state;
       }
 
       if (!target) return skip(noPos);
       const token = assetToken(asset, target.x, target.y, step.faceDown);
       if (!token) return fail(`"${step.assetName}" has no back side and was not placed face down`);
-      state.tokens.push(token);
+      state.tokens.push(Object.assign(token, onGrid));
       return state;
     }
 

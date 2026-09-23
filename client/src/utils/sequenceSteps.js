@@ -12,6 +12,7 @@
  * it is a promise the setup does not keep.
  */
 import { counterMax } from '../../../shared/counters.js';
+import { cellFromLabel } from '../../../shared/gridGeometry.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -27,7 +28,7 @@ export const STEP_TYPES = [
   { value: 'split', label: 'Split Stack', fields: ['stackLabel', 'count', 'outputLabels', 'spacing'] },
   { value: 'deal_to_zone', label: 'Deal to Zone', fields: ['stackLabel', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'move', label: 'Move Stack', fields: ['stackLabel', 'x', 'y'] },
-  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'x', 'y', 'faceDown'] },
+  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
@@ -53,8 +54,12 @@ export function stepTypeLabel(step) {
 export function stepFields(step) {
   const spec = specOf(step);
   if (!spec) return [];
-  if (spec.value === 'place_asset' && typeof step === 'object' && step?.targetZoneLabel) {
-    return spec.fields.filter(f => f !== 'x' && f !== 'y');
+  // place_asset: zone, grid field and x/y are three exclusive ways of saying
+  // where something goes, so only the chosen one is shown. Offering all three
+  // invites setting an x/y that the zone then silently overrides.
+  if (spec.value === 'place_asset' && typeof step === 'object') {
+    if (step?.targetZoneLabel) return spec.fields.filter(f => !['gridLabel', 'cell', 'x', 'y'].includes(f));
+    if (step?.cell) return spec.fields.filter(f => f !== 'x' && f !== 'y');
   }
   // clear_zone: die Seite gilt nur für Karten, die in einen Stapel
   // zurückgehen. Ohne Stapelziel wäre sie eine Einstellung ohne Wirkung.
@@ -111,7 +116,9 @@ export function defaultStep(type, ctx = {}) {
     case 'place_asset':
       // No zone by default: a board is laid out at a position, and a zone can
       // be picked afterwards. Picking one hides x/y (see stepFields).
-      return { type, assetName: first(names), targetZoneLabel: '', x: 0, y: 0, faceDown: false };
+      // Kein Raster und kein Feld: beides hiesse, x/y auszublenden, und ein
+      // geratenes Feld ist eine Behauptung darueber, wo das Objekt hingehoert.
+      return { type, assetName: first(names), targetZoneLabel: '', gridLabel: '', cell: '', x: 0, y: 0, faceDown: false };
     case 'draw_assets':
       return { type, pool: first(pools), count: 1, targetZoneLabel: zone, faceDown: false };
     case 'set_asset_face':
@@ -164,7 +171,9 @@ export function describeStep(step) {
     case 'place_asset': {
       const where = step.targetZoneLabel
         ? `in zone ${q(step.targetZoneLabel)}`
-        : `at ${step.x ?? 0}, ${step.y ?? 0}`;
+        : step.cell || step.gridLabel
+          ? `on grid ${q(step.gridLabel)} field ${q(step.cell)}`
+          : `at ${step.x ?? 0}, ${step.y ?? 0}`;
       return `Place ${q(step.assetName)} ${where}${down(step)}`;
     }
     case 'draw_assets':
@@ -211,7 +220,7 @@ export function describeStep(step) {
  * @returns {string[]} problems, empty when the step is fine
  */
 export function validateStep(step, ctx = {}) {
-  const { stackLabels, zoneLabels, pools, assetNames: names } = ctx || {};
+  const { stackLabels, zoneLabels, pools, assetNames: names, grids } = ctx || {};
   const fields = new Set(stepFields(step));
   const problems = [];
 
@@ -236,6 +245,18 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('pool')) {
     if (!step?.pool) problems.push('no pool chosen');
     else if (!known(pools, step.pool)) problems.push(`pool "${step.pool}" is empty or unknown`);
+  }
+  // M7/T1: Raster und Feld gehoeren zusammen - ein Feld ohne Raster ist keine
+  // Adresse, und ein Feld, das es auf dem gewaehlten Raster nicht gibt, wird am
+  // Tisch uebersprungen. Beides leer heisst "ueber x/y", das ist gueltig.
+  if (fields.has('cell') && (step?.cell || step?.gridLabel)) {
+    const grid = Array.isArray(grids) && grids.length
+      ? grids.find(g => String(g?.label ?? '').trim() === String(step?.gridLabel ?? '').trim())
+      : undefined;
+    if (!step?.gridLabel) problems.push('no grid chosen for the field');
+    else if (Array.isArray(grids) && grids.length && !grid) problems.push(`grid "${step.gridLabel}" not found`);
+    else if (!step?.cell) problems.push('no field chosen');
+    else if (grid && !cellFromLabel(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
   }
   // An empty zone is a legal choice ("all player zones" / free placement); a
   // named one that no longer exists is not.

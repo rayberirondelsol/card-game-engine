@@ -252,7 +252,9 @@ export async function roomsRoutes(fastify) {
               `SELECT t.*, (SELECT name FROM categories WHERE id = t.category_id) AS category
                FROM table_assets t WHERE t.game_id = ? ORDER BY t.created_at DESC`
             ).all(room.game_id);
-            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets });
+            // Raster wie Zonen in die `options`: `place_asset` darf auf ein
+            // Rasterfeld zielen, und der Raum baut auf wie der Tisch (M7/T1).
+            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, grids });
             // Fehlgeschlagene Schritte brechen den Start nicht ab – sie werden
             // protokolliert, so wie der Tisch sie in `setupIssues` anzeigt.
             for (const e of log) {
