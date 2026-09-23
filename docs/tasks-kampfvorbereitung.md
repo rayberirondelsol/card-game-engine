@@ -313,3 +313,12 @@ von `place_counter`.
   Barry Bluff rechnet sie aus den Doerflern, Ms. Falls hat "3 LEB je Doerfler",
   Patches aendert sie ueber die Kostuem-Mechanik. Siehe `docs/tft-regeln.md` 5.5.
 
+- **`build_scenario` prueft auch den Endkampf-Abschnitt, den es nicht baut.** Die
+  Aufgabe schreibt vor, `validateScenarioData` den **ganzen** Eintrag zu reichen
+  (`{ gridLabel, bosses: { [name]: entry } }`, T5 hat dafuer keinen Filter). Die
+  Folge steht so weder in Spec noch Aufgabe: ein Tippfehler im `final`-Abschnitt
+  laesst **jeden** Kampf gegen diesen Boesewicht scheitern, nicht erst den
+  letzten. So umgesetzt und bewusst behalten - der Fehler faellt damit beim
+  ersten Kampf auf statt beim letzten -, aber T8 sollte es wissen.
+- **`shared/scenarioData.js` stand in der Dateiliste von T6 und brauchte keine
+  Aenderung.** T5 hat die Funktion passend geschnitten; T6 ruft sie nur.

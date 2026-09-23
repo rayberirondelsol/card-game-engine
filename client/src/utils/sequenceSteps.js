@@ -40,6 +40,10 @@ export const STEP_TYPES = [
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
   { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
   { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel'] },
+  // M7/T6: kein `gridLabel` - das Raster steht in den Szenariodaten, nicht am
+  // Schritt. Der Schritt hat genau eine Einstellung: ob der Endkampf-Abschnitt
+  // dazugehoert.
+  { value: 'build_scenario', label: 'Build Scenario', fields: ['final'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -161,6 +165,10 @@ export function defaultStep(type, ctx = {}) {
       // Kein Ziel, keine Seite: clear_grid loescht, und das Raster ist seine
       // einzige Angabe (M7/T2).
       return { type, gridLabel: first((ctx.grids || []).map(g => g?.label).filter(Boolean)) };
+    case 'build_scenario':
+      // „auto" ist die Vorgabe: der Endkampf haengt am letzten Platz der
+      // Leiste, und den weiss erst der Tisch (M7/T6).
+      return { type, final: 'auto' };
     case 'clear_zone':
       // Dasselbe fuer beide Ziele - und ohne `faceDown`: die Seite wird nicht
       // geraten, eine frische Vorgabe laesst jede Karte ihre behalten (M5.1).
@@ -228,6 +236,12 @@ export function describeStep(step) {
       return `Clear zone ${q(step.zoneLabel)} ${into}`;
     }
     case 'clear_grid': return `Clear grid ${q(step.gridLabel)} off the table`;
+    case 'build_scenario': {
+      const when = step?.final === true || step?.final === 'true' ? 'with the final fight section'
+        : step?.final === false || step?.final === 'false' ? 'without the final fight section'
+        : 'with the final fight section only from the last slot of the bar';
+      return `Build the revealed boss's scenario, ${when}`;
+    }
     case 'lock_asset': return `Lock ${q(step.assetName)}`;
     case 'unlock_asset': return `Unlock ${q(step.assetName)}`;
     default: return stepTypeLabel(step);

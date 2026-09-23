@@ -26,6 +26,7 @@ import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneCont
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellFromLabel, cellCenter, cellLabel, cellAt } from './gridGeometry.js';
 import { assetToken, assetFace } from './assetToken.js';
+import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter } from './counters.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
@@ -64,7 +65,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // ihrer Kategorie – genau wie `assets` ihn schon führt. `place_stack`
   // adressiert die Kategorie über diesen Namen; die Kartenzeile selbst kennt
   // nur eine `category_id`, und eine Id ist im Setup keine Adresse.
-  const { assets = [], cards = [], grids = [], rng = Math.random } = options || {};
+  const { assets = [], cards = [], grids = [], scenarioData = {}, rng = Math.random } = options || {};
   // What `reveal_next` bound, for the placeholders in the steps behind it.
   // Beside the state for the same reason as the log: the state is persisted as
   // JSON, and a binding smuggled into it would end up in the database.
@@ -78,7 +79,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
-      state = applyStep(state, step, zones, grids, assets, cards, rng, entry, ctx);
+      state = applyStep(state, step, zones, grids, assets, cards, scenarioData, rng, entry, ctx);
     } catch (err) {
       entry.status = 'failed';
       entry.reason = err.message;
@@ -292,7 +293,7 @@ function fullZones(usable, free, kind) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
-function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, ctx = {}) {
+function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData, rng, entry, ctx = {}) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
   if (!state.tokens) state.tokens = [];
@@ -871,6 +872,88 @@ function applyStep(state, step, allZones, allGrids, assets, cards, rng, entry, c
       state.cards = state.cards.filter(o => !gone.has(o));
       state.tokens = state.tokens.filter(o => !gone.has(o));
       if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
+      return state;
+    }
+
+    // M7/T6: das Szenario des zuletzt aufgedeckten Boesewichts aufbauen.
+    //
+    // Der Schritt hat genau eine Einstellung. Das Raster steht in den Daten,
+    // nicht am Schritt: es gehoert zu den abgetippten Feldnamen, und zwei
+    // Quellen fuer dieselbe Adresse waeren eine Frage danach, welche gewinnt.
+    case 'build_scenario': {
+      const boss = ctx.vars?.revealedBase;
+      // Dieselbe Regel wie bei jedem Platzhalter: nichts gebunden heisst
+      // uebersprungen. Ein Rueckfall auf "irgendeinen" Eintrag waere geraten.
+      if (!boss) return skip('$revealedBase is not bound - nothing has been revealed');
+
+      const bosses = scenarioData?.bosses;
+      // Der Schluessel ist der Basisname, und er wird wie jeder andere Name
+      // hier verglichen: ohne Ruecksicht auf Gross- und Kleinschreibung.
+      const key = bosses && typeof bosses === 'object'
+        ? Object.keys(bosses).find(k => norm(k) === norm(boss))
+        : undefined;
+      if (key === undefined) return skip(`no scenario data for "${boss}"`);
+      const entry = bosses[key];
+
+      // „auto" heisst: Endkampf genau dann, wenn `reveal_next` vom **letzten**
+      // Platz der Leiste genommen hat - nicht vom vierten und nicht aus einer
+      // Rundenzahl. `true`/`false` ueberstimmen das.
+      const useFinal = step.final === true || step.final === 'true' ? true
+        : step.final === false || step.final === 'false' ? false
+        : Boolean(ctx.revealedLast);
+      // `final` ist additiv: derselbe Eintrag, ein zusaetzlicher Abschnitt.
+      const parts = [entry, useFinal ? entry?.final : null].filter(Boolean);
+
+      // Erst pruefen, dann legen. Geprueft wird der **ganze** Eintrag, auch der
+      // Endkampf-Abschnitt, den dieser Aufbau vielleicht gar nicht braucht: ein
+      // Tippfehler dort faellt sonst erst im letzten Kampf der Partie auf, und
+      // dann steht schon alles andere.
+      const problems = validateScenarioData(
+        { gridLabel: scenarioData?.gridLabel, bosses: { [key]: entry } },
+        { assets, grids }
+      );
+      if (problems.length) return fail(problems.join('; '));
+
+      const grid = findGrid(grids, scenarioData?.gridLabel);
+      if (!grid) return fail(`grid "${scenarioData?.gridLabel ?? ''}" not found`);
+
+      // Gebaut wird in eine eigene Liste, gelegt wird erst danach: ein halb
+      // gestelltes Kampffeld ist schlimmer als ein leeres, weil man das leere
+      // sieht. Die Pruefung oben schweigt ohne Asset-Bibliothek ("kann ich
+      // nicht wissen"), darum faengt diese Schleife denselben Fall noch einmal.
+      const tokens = [];
+      const missing = [];
+      for (const part of parts) {
+        for (const t of (Array.isArray(part?.terrain) ? part.terrain : [])) {
+          const asset = findAsset(assets, t?.assetName);
+          if (!asset) { missing.push(`asset "${t?.assetName ?? ''}" not found`); continue; }
+          for (const label of (Array.isArray(t?.cells) ? t.cells : [])) {
+            const c = cellFromLabel(grid, label);
+            if (!c) { missing.push(`grid "${grid.label}" has no field "${label}"`); continue; }
+            // Je Feld ein eigenes Objekt. `place_asset` wuerde das vorhandene
+            // verschieben - drei gleiche Plaettchen waeren dann eines, das
+            // zweimal umzieht. Genau dafuer gibt es diesen Schritt.
+            const { x, y } = cellCenter(grid, c.col, c.row);
+            tokens.push(Object.assign(assetToken(asset, x, y, false), {
+              gridId: grid.id,
+              cell: cellLabel(grid, c.col, c.row),
+            }));
+          }
+        }
+      }
+      if (missing.length) return fail(missing.join('; '));
+      state.tokens.push(...tokens);
+
+      // Die benannten Felder binden - zusaetzlich zu dem, was `reveal_next`
+      // gebunden hat, nicht anstelle davon: der folgende Schritt legt
+      // `$revealed` auf `$B`. Ein String bindet den Schluessel allein, eine
+      // Liste den Schluessel plus Position ab 1.
+      for (const part of parts) {
+        for (const [name, value] of Object.entries(part?.fields || {})) {
+          if (Array.isArray(value)) value.forEach((cell, i) => { ctx.vars[`${name}${i + 1}`] = String(cell).trim(); });
+          else ctx.vars[name] = String(value).trim();
+        }
+      }
       return state;
     }
 

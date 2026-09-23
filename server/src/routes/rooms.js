@@ -238,6 +238,14 @@ export async function roomsRoutes(fastify) {
             grids = JSON.parse(setup.grid_data || '[]');
           } catch {}
 
+          // M7/T6: dieselben Szenariodaten wie am Tisch - sonst baut
+          // `build_scenario` im Raum nichts auf.
+          let scenarioData = {};
+          try {
+            const parsed = JSON.parse(setup.scenario_data || '{}');
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) scenarioData = parsed;
+          } catch {}
+
           // M6: der Raum baut auf wie der Tisch – derselbe Executor aus
           // shared/ und dieselben Eingaben wie in GameTable.jsx. Ohne das
           // startet ein Raum ohne alles, was die Sequenz herstellt.
@@ -261,7 +269,7 @@ export async function roomsRoutes(fastify) {
             ).all(room.game_id);
             // Raster wie Zonen in die `options`: `place_asset` darf auf ein
             // Rasterfeld zielen, und der Raum baut auf wie der Tisch (M7/T1).
-            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, cards, grids });
+            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, cards, grids, scenarioData });
             // Fehlgeschlagene Schritte brechen den Start nicht ab – sie werden
             // protokolliert, so wie der Tisch sie in `setupIssues` anzeigt.
             for (const e of log) {

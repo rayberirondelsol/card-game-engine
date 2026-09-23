@@ -151,6 +151,22 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         data-testid={`step-${index}-cell`}
       />),
 
+    // M7/T6: die eine Einstellung von `build_scenario`. Drei Antworten, nicht
+    // zwei - „auto" ist die haeufigste und steht deshalb oben: derselbe Knopf
+    // baut den Endkampf nur fuer den Boesewicht vom letzten Platz der Leiste.
+    final: () => field('Final fight',
+      <select
+        value={step.final === true || step.final === 'true' ? 'true'
+          : step.final === false || step.final === 'false' ? 'false' : 'auto'}
+        onChange={e => set({ final: e.target.value === 'auto' ? 'auto' : e.target.value === 'true' })}
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-final`}
+      >
+        <option value="auto">Automatic (last slot of the bar)</option>
+        <option value="true">Always</option>
+        <option value="false">Never</option>
+      </select>),
+
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
 

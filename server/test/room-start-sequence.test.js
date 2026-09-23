@@ -224,3 +224,43 @@ test('ein Objekt auf einem Rasterfeld liegt im Raum auf demselben Feld', async (
   // C = dritte Spalte, 7 = siebte Zeile, Feldmitte: 100 + 2*40 + 20 = 200 / 100 + 6*40 + 20 = 360
   assert.deepEqual({ x: token.x, y: token.y }, { x: 200, y: 360 });
 });
+
+// ── Szenariodaten: derselbe Aufbau wie am Tisch ───────────────────────────────
+
+test('der Raum baut das Szenario des aufgedeckten Boesewichts auf', async () => {
+  const gameId = await createGame();
+  addTableAsset(gameId, 'Boesewicht: Klaus', { image_path: '/uploads/klaus.png' });
+  // Verdeckt aufgedeckt werden kann nur, was eine Rueckseite hat.
+  getDb().prepare('UPDATE table_assets SET back_image_path = ? WHERE name = ?')
+    .run('/uploads/back.png', 'Boesewicht: Klaus');
+  addTableAsset(gameId, 'Fetid Furball');
+
+  const setupId = await createSetup(gameId, {
+    state_data: JSON.stringify(stateWithDeck()),
+    zone_data: JSON.stringify([{
+      id: 'z-bar', label: 'Leiste', type: 'table', x: 800, y: 100, width: 200, height: 60,
+      accepts: ['asset'], capacity: 2, layout: 'row',
+    }]),
+    grid_data: JSON.stringify([{
+      id: 'g1', label: 'Kampffeld', type: 'square',
+      origin: { x: 100, y: 100 }, cell: 40, cols: 10, rows: 10,
+      labels: { cols: 'alpha', rows: 'numeric' },
+    }]),
+    scenario_data: JSON.stringify({
+      gridLabel: 'Kampffeld',
+      bosses: { Klaus: { terrain: [{ assetName: 'Fetid Furball', cells: ['C7', 'D7'] }], fields: { B: 'A1' } } },
+    }),
+    sequence_data: JSON.stringify([
+      { type: 'place_asset', assetName: 'Boesewicht: Klaus', targetZoneLabel: 'Leiste', faceDown: true },
+      { type: 'reveal_next', zoneLabel: 'Leiste' },
+      { type: 'build_scenario', final: 'auto' },
+    ]),
+  });
+
+  const { room_code, started } = await startRoom(gameId, setupId);
+  assert.equal(started.statusCode, 200, started.body);
+
+  const tiles = getRoom(room_code).boardState.tokens.filter(t => t.label === 'Fetid Furball');
+  assert.equal(tiles.length, 2, 'ohne die Szenariodaten in den options laege hier nichts');
+  assert.deepEqual(tiles.map(t => t.cell).sort(), ['C7', 'D7']);
+});

@@ -3613,7 +3613,7 @@ export default function GameTable({ room = null }) {
       const assetsRes = await apiFetch(`/api/games/${id}/table-assets`);
       const assets = assetsRes.ok ? await assetsRes.json() : [];
       const cards = await loadCardLibrary();
-      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, cards, grids });
+      const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, cards, grids, scenarioData });
       loadGameState(next);
       const bad = log.filter(e => e.status !== 'ok');
       setSetupIssues(bad.length ? bad : null);
@@ -3692,7 +3692,11 @@ export default function GameTable({ room = null }) {
           let parsedActions = [];
           try { parsedActions = JSON.parse(setup.action_data || '[]'); } catch {}
           setSetupActions(Array.isArray(parsedActions) ? parsedActions : []);
-          setScenarioData(parseScenarioData(setup.scenario_data));
+          // Die Szenariodaten wie die Raster frisch aus dem Setup: `scenarioData`
+          // im State steht erst beim naechsten Rendern, und `build_scenario`
+          // braucht sie jetzt (M7/T6).
+          const parsedScenario = parseScenarioData(setup.scenario_data);
+          setScenarioData(parsedScenario);
 
           // Execute setup sequence for new games (not savegame loads)
           let parsedSeq = [];
@@ -3710,7 +3714,7 @@ export default function GameTable({ room = null }) {
               const cardLibrary = await loadCardLibrary();
               // Die Raster wie die Zonen frisch aus dem Setup: `grids` im State
               // ist an dieser Stelle noch leer (M7/T1).
-              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, cards: cardLibrary, grids: parsedGrids });
+              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, cards: cardLibrary, grids: parsedGrids, scenarioData: parsedScenario });
               stateToLoad = built;
               const bad = log.filter(e => e.status !== 'ok');
               setSetupIssues(bad.length ? bad : null);
