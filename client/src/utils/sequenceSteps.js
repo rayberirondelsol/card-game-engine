@@ -36,6 +36,7 @@ export const STEP_TYPES = [
   { value: 'place_counter', label: 'Place Counter', fields: ['name', 'value', 'max', 'x', 'y'] },
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
   { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
+  { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -136,6 +137,10 @@ export function defaultStep(type, ctx = {}) {
       // Entscheidungen - und ein vorgegebenes Ziel waere beim Abraeumen die
       // falsche Vorgabe, weil "vom Tisch nehmen" der haeufigere Fall ist.
       return { type, zoneLabel: zone, targetZoneLabel: '' };
+    case 'clear_grid':
+      // Kein Ziel, keine Seite: clear_grid loescht, und das Raster ist seine
+      // einzige Angabe (M7/T2).
+      return { type, gridLabel: first((ctx.grids || []).map(g => g?.label).filter(Boolean)) };
     case 'clear_zone':
       // Dasselbe fuer beide Ziele - und ohne `faceDown`: die Seite wird nicht
       // geraten, eine frische Vorgabe laesst jede Karte ihre behalten (M5.1).
@@ -199,6 +204,7 @@ export function describeStep(step) {
         : 'off the table';
       return `Clear zone ${q(step.zoneLabel)} ${into}`;
     }
+    case 'clear_grid': return `Clear grid ${q(step.gridLabel)} off the table`;
     case 'lock_asset': return `Lock ${q(step.assetName)}`;
     case 'unlock_asset': return `Unlock ${q(step.assetName)}`;
     default: return stepTypeLabel(step);
@@ -206,6 +212,9 @@ export function describeStep(step) {
 }
 
 // ── Validation ───────────────────────────────────────────────────────────────
+
+const findGrid = (grids, label) =>
+  (Array.isArray(grids) ? grids : []).find(g => String(g?.label ?? '').trim() === String(label ?? '').trim());
 
 /**
  * What is wrong with this step, given what the setup has. Spec section 9 wants
@@ -250,13 +259,19 @@ export function validateStep(step, ctx = {}) {
   // Adresse, und ein Feld, das es auf dem gewaehlten Raster nicht gibt, wird am
   // Tisch uebersprungen. Beides leer heisst "ueber x/y", das ist gueltig.
   if (fields.has('cell') && (step?.cell || step?.gridLabel)) {
-    const grid = Array.isArray(grids) && grids.length
-      ? grids.find(g => String(g?.label ?? '').trim() === String(step?.gridLabel ?? '').trim())
-      : undefined;
+    const grid = Array.isArray(grids) && grids.length ? findGrid(grids, step?.gridLabel) : undefined;
     if (!step?.gridLabel) problems.push('no grid chosen for the field');
     else if (Array.isArray(grids) && grids.length && !grid) problems.push(`grid "${step.gridLabel}" not found`);
     else if (!step?.cell) problems.push('no field chosen');
     else if (grid && !cellFromLabel(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
+  }
+  // M7/T2: bei `clear_grid` *ist* das Raster die Adresse, nicht eine von dreien
+  // wie bei `place_asset` - "keins" ist hier also keine gueltige Wahl.
+  if (fields.has('gridLabel') && !fields.has('cell')) {
+    if (!step?.gridLabel) problems.push('no grid chosen');
+    else if (Array.isArray(grids) && grids.length && !findGrid(grids, step.gridLabel)) {
+      problems.push(`grid "${step.gridLabel}" not found`);
+    }
   }
   // An empty zone is a legal choice ("all player zones" / free placement); a
   // named one that no longer exists is not.

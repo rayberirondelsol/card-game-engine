@@ -22,7 +22,7 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
-import { resolveGrids, cellFromLabel, cellCenter, cellLabel } from './gridGeometry.js';
+import { resolveGrids, cellFromLabel, cellCenter, cellLabel, cellAt } from './gridGeometry.js';
 import { assetToken, assetFace } from './assetToken.js';
 import { normalizeCounter } from './counters.js';
 
@@ -84,7 +84,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
 function stepTarget(step) {
   // `name` steht am Ende: nur place_counter benutzt es, und der Zähler heißt
   // im Protokoll so, wie er am Tisch heißt.
-  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.name ?? null;
+  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -148,6 +148,12 @@ function occupancy(state, zone) {
 /** The zone a step names, or null. */
 function findZone(zones, label) {
   return zones.find(z => norm(z.label) === norm(label)) || null;
+}
+
+/** The grid a step names, or null. No name is no address, not "the nameless one". */
+function findGrid(grids, label) {
+  if (!label) return null;
+  return grids.find(g => norm(g.label) === norm(label)) || null;
 }
 
 // ── Revealing and the names it binds ─────────────────────────────────────────
@@ -449,7 +455,7 @@ function applyStep(state, step, allZones, allGrids, assets, rng, entry, ctx = {}
         // something goes; the field is the middle one and never mixes with the
         // others. The field name travels with the object, the coordinates only
         // follow from it.
-        const grid = grids.find(g => norm(g.label) === norm(step.gridLabel));
+        const grid = findGrid(grids, step.gridLabel);
         const c = grid && cellFromLabel(grid, step.cell);
         if (!grid) {
           noPos = `grid "${step.gridLabel ?? ''}" not found`;
@@ -686,6 +692,37 @@ function applyStep(state, step, allZones, allGrids, assets, rng, entry, ctx = {}
 
       if (notes.length) return fail([...remarks, ...notes].join('; '));
       if (remarks.length) entry.reason = remarks.join('; ');
+      return state;
+    }
+
+    // M7/T2: das Gegenstueck zu `clear_zone` fuer die Flaeche, auf der gekaempft
+    // wird. Es loescht - was ueberleben soll (der besiegte Boesewicht in die
+    // Trophaeenreihe), wird vorher mit `clear_zone` weggeraeumt.
+    case 'clear_grid': {
+      const grid = findGrid(grids, step.gridLabel);
+      if (!grid) return skip(`grid "${step.gridLabel ?? ''}" not found`);
+
+      // Ueber die Position, nicht ueber `gridId`: auch ein von Hand dorthin
+      // gezogenes Objekt steht auf dem Raster und gehoert weg. `cellAt` ist die
+      // Rechnung dafuer - eine zweite danebenzustellen waere eine zweite,
+      // widersprechende Antwort auf dieselbe Frage.
+      // Das Ankerobjekt bleibt: ein Brett, auf dem ein Raster haengt, steht
+      // nicht *auf* ihm - dieselbe Ausnahme, die `objectsInZone` schon kennt.
+      const anchorId = grid?.anchor?.assetId || null;
+      const isAnchor = (o) => anchorId && (o?.assetId ?? o?.id) === anchorId;
+      const on = [...state.cards, ...state.tokens].filter(o => !isAnchor(o) && cellAt(grid, o?.x, o?.y));
+
+      // Ein leeres Raster zu leeren ist gelungen, nicht gescheitert: der
+      // gewuenschte Zustand liegt schon vor (dieselbe Entscheidung wie bei
+      // `clear_zone`).
+      if (!on.length) return state;
+
+      // Gesperrt heisst gesperrt - siehe den `clear_zone`-Zweig oben.
+      const locked = on.filter(o => o.locked);
+      const gone = new Set(on.filter(o => !o.locked));
+      state.cards = state.cards.filter(o => !gone.has(o));
+      state.tokens = state.tokens.filter(o => !gone.has(o));
+      if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
       return state;
     }
 

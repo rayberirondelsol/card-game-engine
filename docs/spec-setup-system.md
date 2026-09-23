@@ -1271,7 +1271,10 @@ bei den drei Dörflern in M4a.
   Tisch. Das ist das Gegenstück zu `clear_zone` für die Fläche, auf der gekämpft
   wird. Es löscht; was überleben soll (der besiegte Bösewicht in die
   Trophäenreihe), wird **vorher** mit `clear_zone` weggeräumt. Dörflerfiguren
-  dürfen weg: der nächste Kampf legt sie neu.
+  dürfen weg: der nächste Kampf legt sie neu. **Das Ankerobjekt bleibt.** Ein Raster haengt per
+  `anchor.assetId` an einem Brett, und dieses Brett liegt mit seinem Mittelpunkt
+  auf genau diesem Raster - es mitzuloeschen risse die Verankerung von Rastern
+  *und* Zonen heraus. `objectsInZone` kennt dieselbe Ausnahme seit M3c.
 - **Platzhalter gelten in jedem Namensfeld** — `assetName`, `cell`, `category`,
   `label`, `name`. Eine Ersetzung an einer Stelle, für alle Felder, nicht eine
   je Feld.
