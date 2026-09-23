@@ -555,8 +555,12 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
       const zone = findZone(zones, step.zoneLabel);
       if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
 
+      // Eine leere Zone zu leeren ist gelungen, nicht gescheitert: der
+      // gewünschte Zustand liegt schon vor. Anders als bei `reveal_next`, wo
+      // "nichts da" heißt, dass die Absicht nicht erfüllt wurde. Sonst meldet
+      // der erste Kampf einer frischen Partie zwei Fehlalarme.
       const inside = inSlotOrder(zone, objectsInZone(zone, state.cards, state.tokens));
-      if (!inside.length) return skip(`zone "${step.zoneLabel}" is empty`);
+      if (!inside.length) return state;
 
       // Gesperrt heißt gesperrt: `place_asset` und `move` verschieben ein
       // gesperrtes Objekt nicht, also räumt clear_zone es auch nicht weg -

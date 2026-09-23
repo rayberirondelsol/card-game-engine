@@ -144,15 +144,28 @@ test('clear_zone without a target also removes cards, not only tokens', () => {
 
 // ── Übersprungen ─────────────────────────────────────────────────────────────
 
-test('an empty zone and an unknown zone are skipped, the state is untouched', () => {
-  for (const [name, zoneLabel] of [['leere Zone', 'Leer'], ['Zone gibt es nicht', 'Gibt Es Nicht']]) {
-    const before = barState();
-    const { state, log } = executeSequenceWithLog(before, [{ type: 'clear_zone', zoneLabel }], ZONES, opts());
+test('eine leere Zone zu leeren ist gelungen, nicht gescheitert', () => {
+  // Sonst meldet der erste Kampf einer frischen Partie zwei Fehlalarme: dort
+  // ist noch kein Vorgänger abzuräumen. Der gewünschte Zustand liegt vor, also
+  // ist der Schritt in Ordnung - anders als bei `reveal_next`, wo "nichts da"
+  // heißt, dass die Absicht nicht erfüllt wurde.
+  const before = barState();
+  const { state, log } = executeSequenceWithLog(before, [{ type: 'clear_zone', zoneLabel: 'Leer' }], ZONES, opts());
 
-    assert.equal(log[0].status, 'skipped', name);
-    assert.match(log[0].reason, new RegExp(zoneLabel), `${name}: der Grund steht im Protokoll`);
-    assert.deepStrictEqual(state.tokens, before.tokens, `${name}: nichts verändert`);
-  }
+  assert.equal(log[0].status, 'ok');
+  assert.equal(log[0].reason, null, 'kein Grund, es ist ja nichts schiefgegangen');
+  assert.deepStrictEqual(state.tokens, before.tokens, 'nichts verändert');
+});
+
+test('eine Zone, die es nicht gibt, wird uebersprungen - das ist ein Autorenfehler', () => {
+  const before = barState();
+  const { state, log } = executeSequenceWithLog(
+    before, [{ type: 'clear_zone', zoneLabel: 'Gibt Es Nicht' }], ZONES, opts()
+  );
+
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason, /Gibt Es Nicht/, 'der Grund steht im Protokoll');
+  assert.deepStrictEqual(state.tokens, before.tokens, 'nichts verändert');
 });
 
 test('an unknown target zone is skipped and nothing leaves the source', () => {
@@ -282,8 +295,10 @@ test('four runs of "Kampf beginnen" reveal four different bosses, each clearing 
     const res = executeSequenceWithLog(state, action, ZONES, opts());
     state = res.state;
 
-    // Der erste Druck findet nichts zum Abräumen, danach immer.
-    const expected = run === 0 ? ['skipped', 'skipped', 'ok', 'ok', 'ok'] : ['ok', 'ok', 'ok', 'ok', 'ok'];
+    // Jeder Druck meldet fünfmal ok - auch der erste, der noch nichts
+    // abzuräumen findet: eine leere Zone zu leeren ist gelungen. Sonst sähe
+    // der Beginn einer frischen Partie nach zwei Fehlern aus.
+    const expected = ['ok', 'ok', 'ok', 'ok', 'ok'];
     assert.deepEqual(res.log.map(e => e.status), expected, `Durchlauf ${run + 1}: ${res.log.map(e => e.reason).join(' | ')}`);
 
     const onPlatz = state.tokens.filter(t => t.x === 640 && t.y === 140);
@@ -312,7 +327,7 @@ test('four runs of "Kampf beginnen" reveal four different bosses, each clearing 
 
   // Und ein sechster Druck ändert wirklich gar nichts mehr.
   const sixth = executeSequenceWithLog(fifth.state, action, ZONES, opts());
-  assert.deepEqual(sixth.log.map(e => e.status), ['skipped', 'skipped', 'skipped', 'ok', 'skipped']);
+  assert.deepEqual(sixth.log.map(e => e.status), ['ok', 'ok', 'skipped', 'ok', 'skipped']);
   assert.deepStrictEqual(sixth.state, fifth.state);
 });
 
