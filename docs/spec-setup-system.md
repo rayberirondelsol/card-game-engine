@@ -90,6 +90,46 @@ Rendern. Ohne Anker bleibt die Zone absolut wie bisher. Dasselbe gilt für Raste
 (Abschnitt 5 verlangt schon, dass ein Raster „an ein Bild oder einen Tischbereich
 gebunden" ist) — es ist derselbe Mechanismus und wird einmal gebaut, nicht zweimal.
 
+### Nachtrag zu Abschnitt 4: Zonen mit ausdrücklichen Plätzen (`layout: "slots"`)
+
+Beim Nachbau der Beatin'-Leiste aufgefallen. Die sechs aufgedruckten Kreise liegen
+**nicht in einer Spalte**, sie zickzacken: x wechselt zwischen ~210 und ~290, y
+steht ungleichmäßig. Gemessen im Brettbild 3000×2500, Radius ~62:
+
+| Platz | Mitte |
+|---|---|
+| Bösewicht (RUFFIAN) | 225 / 285 |
+| 1 | 302 / 443 |
+| 2 | 228 / 570 |
+| 3 | 200 / 727 |
+| 4 | 282 / 860 |
+| 5 | 220 / 1005 |
+
+`zoneSlots` leitet Plätze bisher **immer** aus dem Layout ab — `row`, `column`,
+`grid`, `stack` verteilen gleichmäßig über die Zonenbox. Ein gedrucktes Feld, das
+nicht in einem Gitter liegt, ist damit nicht modellierbar, und die Token landeten
+in einer geraden Reihe neben den Kreisen.
+
+Das ist keine Eigenheit dieses Bretts: Leisten, die einer Straße folgen, Felder
+um ein Bild herum, jede Wertungsspirale hat dasselbe Problem.
+
+#### Die Regel
+`layout: "slots"` mit `slots: [{ relX, relY }, …]` — jeder Platz als Bruchteil der
+**Zonenbox** (0…1), nicht der Anker-Box. Die Zone hängt ja schon am Brett; ihre
+Box wandert mit, und die Plätze wandern mit der Box. Damit bleibt M3a unberührt.
+
+- Die Anzahl der Plätze ist die Kapazität. Ein abweichendes `capacity` wird von
+  der Platzliste geschlagen — die Plätze *sind* die Plätze.
+- `slots` fehlt oder ist leer → die Zone hat keine Plätze, wie `layout: "free"`.
+  Kein stilles Ausweichen auf eine Spalte.
+- Alles andere bleibt unverändert: Einrasten, Austeilen, `reveal_next` und
+  `clear_zone` gehen alle durch `zoneSlots` und erben die Plätze.
+
+**Abnahme:** Eine Zone mit sechs ausdrücklichen Plätzen legt sechs Objekte genau
+auf diese Punkte; das Verschieben des Bretts nimmt sie mit; ein siebtes Objekt
+wird wegen Kapazität abgelehnt. Die Bösewicht-Token und die Dörfler-Token von
+Townsfolk Tussle liegen sichtbar **in** den aufgedruckten Kreisen.
+
 ## 5. Raster
 
 Ein Setup kann **mehrere** Raster haben, jedes an ein Bild oder einen Tischbereich

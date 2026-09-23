@@ -79,8 +79,25 @@ export function zoneAccepts(zone, kind) {
   return list.includes(kind);
 }
 
-/** Fixed number of places, or null for unlimited. */
+/**
+ * The explicitly listed places of a `layout: 'slots'` zone, or null.
+ * An empty or missing list is no list: the zone has no places, like `free`.
+ */
+function explicitSlots(zone) {
+  const list = zone?.layout === 'slots' ? zone?.slots : null;
+  return Array.isArray(list) && list.length ? list : null;
+}
+
+/**
+ * Fixed number of places, or null for unlimited.
+ *
+ * Explicit places win over `capacity`: the places *are* the places, and a
+ * disagreeing number would make every reader (rejection, dealing, sharing out)
+ * count against a bar that does not exist.
+ */
 export function zoneCapacity(zone) {
+  const explicit = explicitSlots(zone);
+  if (explicit) return explicit.length;
   const c = zone?.capacity;
   return typeof c === 'number' && Number.isFinite(c) && c > 0 ? Math.floor(c) : null;
 }
@@ -160,6 +177,19 @@ function intoShape(zone, p) {
  */
 export function zoneSlots(zone) {
   const layout = zone?.layout;
+
+  // Explicit places: fractions of the zone's OWN box, so they ride along with
+  // the box and anchoring (M3a) needs to know nothing about them. Not pushed
+  // through `intoShape`: that exists to rescue *derived* grid corners from
+  // sticking out of a circle. A measured point is not a guess, and quietly
+  // moving it would hide the author's error instead of showing it.
+  if (layout === 'slots') {
+    const explicit = explicitSlots(zone);
+    if (!explicit) return null;
+    const b = box(zone);
+    return explicit.map(s => ({ x: b.x + num(s?.relX, 0) * b.w, y: b.y + num(s?.relY, 0) * b.h }));
+  }
+
   if (layout === 'stack') return [zoneCenter(zone)];
   if (layout === 'free' || !layout) return null;
 
