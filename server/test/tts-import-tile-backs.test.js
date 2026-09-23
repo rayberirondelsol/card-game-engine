@@ -1,4 +1,5 @@
 // M1b: Kachel-Rueckseiten (CustomImage.ImageSecondaryURL) beim TTS-Import.
+// M1c: Custom_Tile_Stack (Stapel gleicher Plaettchen) samt Stueckzahl (Number -> quantity).
 //
 // Run with: npm test  (node --test, no test framework dependency)
 //
@@ -68,6 +69,13 @@ function tile(nickname, imageUrl, secondary, name = 'Custom_Tile') {
   return { Name: name, Nickname: nickname, Transform: { posX: 0, posZ: 0 }, CustomImage: customImage };
 }
 
+/** Ein Stapel gleicher Plaettchen; `number` landet als Stueckzahl im Objekt. */
+function stack(nickname, imageUrl, number, secondary) {
+  const obj = tile(nickname, imageUrl, secondary, 'Custom_Tile_Stack');
+  if (number !== undefined) obj.Number = number;
+  return obj;
+}
+
 async function multipart(json) {
   const fd = new FormData();
   fd.set('file', new Blob([JSON.stringify(json)], { type: 'application/json' }), 'save.json');
@@ -107,7 +115,7 @@ async function importObjects(gameName, objectStates) {
   const rows = getDb()
     .prepare('SELECT * FROM table_assets WHERE game_id = ?')
     .all(gameId);
-  return { gameId, byName: new Map(rows.map((r) => [r.name, r])) };
+  return { gameId, analyzed: analyze.json(), byName: new Map(rows.map((r) => [r.name, r])) };
 }
 
 /** /uploads/<gameId>/<datei> -> absoluter Pfad im Test-Uploadverzeichnis. */
@@ -177,4 +185,86 @@ test('a failing back-image download still imports the asset with back_image_path
   assert.ok(asset.image_path, 'die Vorderseite muss liegen bleiben');
   assert.ok(existsSync(onDisk(asset.image_path)));
   assert.equal(asset.back_image_path, null);
+});
+
+// --- M1c: Stapel gleicher Plaettchen -----------------------------------------
+
+test('a Custom_Tile_Stack is imported like a tile', async () => {
+  const { byName } = await importObjects('stapel grundfall', [
+    stack('Fetid Furball', `${base}/front-furball.png`, 10),
+  ]);
+
+  const asset = byName.get('Fetid Furball');
+  assert.ok(asset, 'der Stapel wurde gar nicht importiert');
+  assert.equal(asset.type, 'token');
+  assert.ok(existsSync(onDisk(asset.image_path)), `Datei fehlt: ${asset.image_path}`);
+});
+
+test('a Custom_Tile_Stack carries its Number as quantity', async () => {
+  const { byName } = await importObjects('stapel stueckzahl', [
+    stack('Giant Milk Jug', `${base}/front-jug.png`, 5),
+    stack('Wheat Field', `${base}/front-wheat.png`, 7),
+  ]);
+
+  assert.equal(byName.get('Giant Milk Jug').quantity, 5);
+  assert.equal(byName.get('Wheat Field').quantity, 7);
+});
+
+test('a Custom_Tile_Stack with an unusable Number falls back to quantity 1', async () => {
+  const cases = [
+    ['Ohne Number', undefined],
+    ['Number null', null],
+    ['Number 0', 0],
+    ['Number negativ', -3],
+    ['Number Text', 'zehn'],
+    ['Number krumm', 2.5],
+  ];
+  const { byName } = await importObjects(
+    'stapel kaputte zahl',
+    cases.map(([name, number], i) => stack(name, `${base}/front-bad-${i}.png`, number))
+  );
+
+  for (const [name] of cases) {
+    const asset = byName.get(name);
+    assert.ok(asset, `${name} wurde nicht importiert`);
+    assert.equal(asset.quantity, 1, `${name} muss auf 1 zurueckfallen`);
+  }
+});
+
+test('a Custom_Tile_Stack gets its back side like a Custom_Tile (M1b gilt weiter)', async () => {
+  const { byName } = await importObjects('stapel rueckseite', [
+    stack('Stapel mit Rueckseite', `${base}/front-stack-back.png`, 4, `${base}/back-stack.png`),
+  ]);
+
+  const asset = byName.get('Stapel mit Rueckseite');
+  assert.ok(asset);
+  assert.ok(asset.back_image_path, 'back_image_path fehlt');
+  assert.notEqual(asset.back_image_path, asset.image_path);
+  assert.ok(existsSync(onDisk(asset.back_image_path)));
+  assert.equal(asset.quantity, 4);
+});
+
+test('an ordinary Custom_Tile and Custom_Token still import with quantity 1', async () => {
+  const { byName } = await importObjects('einzelstuecke bleiben eins', [
+    tile('Einzelkachel', `${base}/front-single-tile.png`),
+    tile('Einzeltoken', `${base}/front-single-token.png`, undefined, 'Custom_Token'),
+  ]);
+
+  for (const name of ['Einzelkachel', 'Einzeltoken']) {
+    const asset = byName.get(name);
+    assert.ok(asset, `${name} wurde nicht importiert`);
+    assert.equal(asset.quantity, 1);
+  }
+});
+
+test('a Custom_Tile_Stack shows up in the analyze token list', async () => {
+  const { analyzed } = await importObjects('stapel in der analyse', [
+    stack('Analysierter Stapel', `${base}/front-analyze-stack.png`, 5),
+  ]);
+
+  assert.equal(analyzed.tokenCount, 1);
+  assert.ok(
+    analyzed.tokens.some((t) => t.nickname === 'Analysierter Stapel'),
+    'der Stapel fehlt in der Auswahlliste, die die Oberflaeche anbietet'
+  );
 });

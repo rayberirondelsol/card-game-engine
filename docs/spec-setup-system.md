@@ -260,6 +260,29 @@ auch deren Bild ab und trägt es als `back_image_path` ein; Kacheln ohne zweite 
 (oder mit identischer) behalten `back_image_path = NULL`. Für das bestehende Spiel
 werden die fehlenden Rückseiten nachgetragen, ohne die Assets neu anzulegen.
 
+### M1c — Stapel gleicher Plättchen kommen gar nicht an
+Bei der Prüfung „haben wir alle Terrain-Assets?" gefunden. Drei Geländearten aus dem
+Referenz-Mod fehlen vollständig in der Engine: **Fetid Furball, Giant Milk Jug,
+Wheat Field.** Sie liegen dort nicht als `Custom_Tile`, sondern als
+**`Custom_Tile_Stack`** — ein Stapel identischer Plättchen. Der Walker in
+`extractNonCardAssetsFromTTS` kennt `Custom_Token`, `Custom_Tile`, `Figurine_Custom`,
+`Custom_Board` und Würfel; `Custom_Tile_Stack` steht nicht in der Liste, also wird das
+Objekt stillschweigend übergangen.
+
+Dasselbe Muster wie schon dreimal: **eine Vokabelliste hinkt hinterher.** Der Name
+steht sauber im `Nickname`, das Bild in `CustomImage.ImageURL` — es fehlte nur der
+Zweig, der beides abholt.
+
+#### Die Stückzahl gehört dazu
+Ein Stapel ist nicht ein Plättchen. Die Anzahl steht im Feld **`Number`**
+(Fetid Furball 10, Giant Milk Jug 5, Wheat Field 5), und `table_assets` hat längst
+eine Spalte `quantity`, die der Import bisher nie füllt. Ein Szenario, das „10 Fetid
+Furball beiseitelegen" verlangt, braucht die Zahl.
+
+**Abnahme:** Ein `Custom_Tile_Stack` wird als Asset importiert, mit seinem Nickname als
+Name und `quantity` aus `Number`; ohne `Number` gilt 1. Ein gewöhnliches `Custom_Tile`
+bekommt weiterhin `quantity` 1. Rückseiten (M1b) gelten hier genauso.
+
 ### M2 — Zonen mit Form und Einrasten
 Zonen bekommen `shape`, `accepts`, `capacity`, `layout`, `snap`. Editor unterstützt
 Rechteck, Kreis, Hex.

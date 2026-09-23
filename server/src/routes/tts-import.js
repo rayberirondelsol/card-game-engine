@@ -152,7 +152,7 @@ async function downloadBackImage(secondaryUrl, gameUploadsDir, gameId) {
 
 /**
  * Parse a TTS JSON save file and extract non-card image assets
- * (Custom_Token, Custom_Tile, Figurine_Custom, Custom_Board)
+ * (Custom_Token, Custom_Tile, Custom_Tile_Stack, Figurine_Custom, Custom_Board)
  */
 function extractNonCardAssetsFromTTS(ttsData) {
   const tokens = [];
@@ -173,10 +173,13 @@ function extractNonCardAssetsFromTTS(ttsData) {
     const scaleX = obj.Transform?.scaleX || 1;
     const scaleZ = obj.Transform?.scaleZ || 1;
     const nickname = obj.Nickname || obj.Description || '';
+    // Ein Stapel (Custom_Tile_Stack) fuehrt seine Stueckzahl in `Number`;
+    // alles andere ist ein Einzelstueck.
+    const quantity = Number.isInteger(obj.Number) && obj.Number > 0 ? obj.Number : 1;
 
-    if (name === 'Custom_Token' || name === 'Custom_Tile') {
+    if (name === 'Custom_Token' || name === 'Custom_Tile' || name === 'Custom_Tile_Stack') {
       if (imageUrl) {
-        tokens.push({ imageUrl, imageSecondaryUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, subtype: 'token' });
+        tokens.push({ imageUrl, imageSecondaryUrl, nickname, ttsX, ttsZ, scaleX, scaleZ, quantity, subtype: 'token' });
       }
     } else if (name === 'Figurine_Custom') {
       if (imageUrl) {
@@ -902,7 +905,7 @@ export async function ttsImportRoutes(fastify) {
       const WORLD_CENTER_Y = 450;
 
       const insertAssetStmt = db.prepare(
-        'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height, back_image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO table_assets (id, game_id, type, name, image_path, source_url, width, height, back_image_path, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       );
 
       const tokensToImport = selectedTokenIndices != null && Array.isArray(selectedTokenIndices)
@@ -945,7 +948,7 @@ export async function ttsImportRoutes(fastify) {
           const clampedSize = Math.max(size, 30);
           const assetId = uuidv4();
           const backPath = await downloadBackImage(asset.imageSecondaryUrl, gameUploadsDir, id);
-          insertAssetStmt.run(assetId, id, 'token', asset.nickname || '', relPath, asset.imageUrl, clampedSize, clampedSize, backPath);
+          insertAssetStmt.run(assetId, id, 'token', asset.nickname || '', relPath, asset.imageUrl, clampedSize, clampedSize, backPath, asset.quantity || 1);
           importedTokens.push({
             id: assetId,
             shape: 'image',
@@ -1003,7 +1006,7 @@ export async function ttsImportRoutes(fastify) {
           const boardHeight = Math.round((metadata.height || 300) * Math.min(1, 600 / (metadata.width || 400)));
           const assetId = uuidv4();
           const backPath = await downloadBackImage(asset.imageSecondaryUrl, gameUploadsDir, id);
-          insertAssetStmt.run(assetId, id, 'board', asset.nickname || 'Board', relPath, asset.imageUrl, boardWidth, boardHeight, backPath);
+          insertAssetStmt.run(assetId, id, 'board', asset.nickname || 'Board', relPath, asset.imageUrl, boardWidth, boardHeight, backPath, 1);
           importedBoards.push({
             id: assetId,
             imageUrl: relPath,
