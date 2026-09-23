@@ -944,3 +944,47 @@ und unterscheiden sich je Dörfler. Ein Zufallszug kann sie nicht kennen.
 Darum: drei `place_asset`-Schritte mit Namen statt eines `draw_assets`. Wer eine
 andere Besetzung will, tauscht die drei Namen im Sequenz-Editor. Damit sind auch
 die zwölf Attributzähler mit ihren richtigen Startwerten schreibbar.
+
+### M6 — Der Aufbau gilt auch im Raum
+Beim Bau von M4a aufgefallen: **ein Mehrspielerraum führt die Aufbau-Sequenz gar
+nicht aus.** `POST /api/rooms/:code/start` lädt aus dem Setup nur `state_data`,
+`zone_data` und `grid_data` in den Raum — `sequence_data` wird nie angefasst. Die
+Sequenz läuft ausschließlich im Client, in `GameTable.jsx`.
+
+Für Townsfolk Tussle heißt das: ein Raum startet mit dem, was von Hand im Setup
+gespeichert wurde — ohne die vier verdeckten Bösewichte, ohne Dörfler, ohne die
+zehn Ladenkarten, ohne die sechs Heldentaten, ohne die dreizehn Zähler. Das
+betrifft **jeden** Schritttyp, nicht nur die zuletzt gebauten. Am Hotseat-Tisch
+ist derselbe Aufbau vollständig.
+
+#### Die Regel
+**Der Raum baut auf wie der Tisch.** `POST /api/rooms/:code/start` führt die
+Sequenz des Setups aus, bevor der Zustand verteilt wird — mit demselben Executor
+und denselben Eingaben wie der Client: `state_data` als Ausgangszustand,
+`sequence_data` als Schritte, `zone_data` als Zonen und die Tisch-Assets des
+Spiels. Erst danach laufen die Starthände (`dealStartingHands`), wie bisher.
+
+**Es gibt genau einen Executor.** Der Aufbau darf nicht an zwei Stellen
+nachgebaut werden — dieses Repo hat mit auseinanderdriftenden Schichten schon
+genug Zeit verloren (`docs/audit-dead-controls.md`). `sequenceExecutor.js` und
+das, was es zieht (`zoneGeometry`, `anchoring`, `assetToken`, `counters`), sind
+reine Module ohne Abhängigkeiten und ohne Browser-Globals. Sie ziehen nach
+`shared/` im Wurzelverzeichnis; Client und Server importieren **dieselbe** Datei.
+Kopieren ist ausgeschlossen.
+
+Damit relative Importpfade in der Entwicklung und im Container identisch sind,
+bilden die Images die Verzeichnisstruktur des Repos ab: `shared/` liegt neben
+`server/` bzw. `client/`, nicht darin. Ein Pfad, der lokal stimmt und im Container
+ins Leere zeigt, ist schlimmer als gar kein geteiltes Modul.
+
+**Fehlgeschlagene Schritte brechen den Start nicht ab.** Sie werden serverseitig
+protokolliert (Schritt und Grund), so wie der Tisch sie in `setupIssues` anzeigt.
+Ein Raum, der wegen eines einzelnen Schritts gar nicht erst startet, hilft
+niemandem.
+
+**Abnahme:** Ein Raum, der aus dem TFT-Setup gestartet wird, enthält dieselben
+Objekte wie der Hotseat-Tisch aus demselben Setup — vier verdeckte
+Bösewicht-Token, drei Dörfler auf der Buyin'-Leiste, drei Dörfler-Tableaus, zehn
+Karten in der Nachschub-Auslage, sechs offene Heldentaten und dreizehn Zähler mit
+ihren Startwerten. Alle Spieler im Raum sehen denselben Zustand. Ein Setup ohne
+Sequenz verhält sich unverändert.
