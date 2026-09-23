@@ -381,6 +381,41 @@ mit Cursor im Namensfeld schließt Escape den Dialog, und das Feld ist beim näc
 Öffnen leer. Sind mehrere Schichten offen, schließt ein Druck nur die oberste. Ist
 keine offen, passiert nichts.
 
+### M2.11 — Löschen gehört ins Kontextmenü, auch auf Touch
+**Gemessener Datenverlust:** Ein Dörfler-Token wird bei 66 % Zoom 30×30 px groß, sein
+Löschen-Kreuz ist 44×44 px (`w-11 h-11`) und liegt bei `-top-1 -right-1` — es
+**überdeckt das ganze Token samt Mittelpunkt**. Ein Zug am Token beginnt den Drag
+(mousedown blubbert zum Wrapper), und beim Loslassen feuert auf dem Kreuz ein
+`click`. `preventDefault()` auf mousedown verhindert das nicht.
+
+Live nachgestellt: Token „Granny" um 150 px gezogen → **gelöscht**, 10 Objekte
+wurden 9. Wer eine kleine Figur verschieben will, verliert sie.
+
+Das Kreuz haben `board`, `counter`, `note` und `token`. **Karten haben keines** —
+die löscht man seit jeher über das Kontextmenü. Das Kreuz ist also der Ausreißer.
+
+#### Die Entscheidung
+**Das Kreuz verschwindet. Löschen gibt es nur noch im Kontextmenü**, wie bei Karten.
+Das ist keine Reparatur des Knopfes, sondern seine Abschaffung: ein zweiter,
+gefährlicher Weg zu einer Aktion, die es schon gibt.
+
+Damit das auf Touch nicht ins Leere läuft — dort gibt es keinen Rechtsklick —
+**öffnet ein Langdruck auf ein Objekt das Kontextmenü** an der Berührstelle.
+Dieselbe Verzögerung wie beim vorhandenen Karten-Langdruck
+(`LONG_PRESS_PREVIEW_DELAY`, 500 ms); wandert der Finger, ist es ein Zug und der
+Langdruck wird abgebrochen. Karten behalten ihren Langdruck-Vorschau, sie sind
+nicht betroffen.
+
+#### Folge, die mitgeprüft werden muss
+Wenn das Kreuz weg ist, ist das Kontextmenü der **einzige** Weg zum Löschen. Ein
+Objekttyp, der im `Delete`-Zweig des Menüs fehlt, wäre damit unlöschbar — genau das
+Muster aus `docs/audit-dead-controls.md` (dort stand `customDie` schon einmal nicht
+in der Liste). Die Typliste gehört deshalb an eine Stelle und unter einen Test.
+
+**Abnahme:** Ein 30 px großes Token lässt sich ziehen und überlebt das; kein Objekt
+trägt noch ein Kreuz; ein Langdruck auf ein Token öffnet das Kontextmenü mit
+`Delete`; jeder Objekttyp, den der Tisch zeichnet, hat dort einen Löschen-Zweig.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.

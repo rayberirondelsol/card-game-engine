@@ -23,6 +23,7 @@ import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement } from '../utils/menuPlacement.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
+import { objectLists, objectDeleters } from '../utils/objectTypes.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -554,6 +555,11 @@ export default function GameTable({ room = null }) {
   const longPressPreviewTimerRef = useRef(null);
   const longPressPreviewTouchPosRef = useRef({ x: 0, y: 0 }); // initial touch position to detect movement
   const LONG_PRESS_PREVIEW_DELAY = 500; // milliseconds for long-press to trigger preview
+  // M2.11: Langdruck auf ein Tisch-Objekt öffnet das Kontextmenü (auf Touch gibt
+  // es keinen Rechtsklick, und das Löschen-Kreuz ist abgeschafft). Eigene Refs,
+  // damit der Karten-Langdruck oben unberührt bleibt.
+  const longPressMenuTimerRef = useRef(null);
+  const longPressMenuTouchPosRef = useRef({ x: 0, y: 0 });
 
   // Hand-to-table drag state
   const [draggingFromHand, setDraggingFromHand] = useState(null); // handId of card being dragged from hand to table
@@ -1915,6 +1921,17 @@ export default function GameTable({ room = null }) {
     setHitDice(prev => prev.filter(d => d.id !== dieId));
   }
 
+  // M2.11: eine Quelle für "welche Objekttypen gibt es" – Nachschlagen beim
+  // Ziehen, Sperren und Löschen hängen alle hier dran.
+  const objLists = objectLists({
+    counters, dice, customDice: customDiceOnTable, hitDice,
+    notes, tokens, boards, textFields,
+  });
+  const objDeleters = objectDeleters({
+    deleteCounter, deleteDie, deleteCustomDie: deleteCustomDieFromTable, deleteHitDie,
+    deleteNote, deleteToken, deleteBoard, deleteTextField,
+  });
+
   // Drag handlers for floating objects (counters, dice, hitDice, notes, tokens, textFields)
   function handleObjDragStart(e, objType, objId) {
     // Only start drag on left mouse button
@@ -1927,22 +1944,34 @@ export default function GameTable({ room = null }) {
       e.preventDefault();
     }
 
-    let obj;
-    if (objType === 'counter') obj = counters.find(c => c.id === objId);
-    else if (objType === 'die') obj = dice.find(d => d.id === objId);
-    else if (objType === 'customDie') obj = customDiceOnTable.find(d => d.id === objId);
-    else if (objType === 'hitDie') obj = hitDice.find(d => d.id === objId);
-    else if (objType === 'note') obj = notes.find(n => n.id === objId);
-    else if (objType === 'token') obj = tokens.find(t => t.id === objId);
-    else if (objType === 'board') obj = boards.find(b => b.id === objId);
-    else if (objType === 'textField') obj = textFields.find(tf => tf.id === objId);
+    const obj = (objLists[objType] || []).find(o => o.id === objId);
     if (!obj) return;
+
+    // Get unified pointer position (convert to world coords for offset)
+    const pointer = getPointerPosition(e);
+
+    // M2.11: Langdruck öffnet das Kontextmenü – auch auf einem gesperrten
+    // Objekt, sonst gäbe es auf Touch keinen Weg zum Entsperren.
+    if (isTouchEvent(e)) {
+      clearTimeout(longPressMenuTimerRef.current);
+      longPressMenuTouchPosRef.current = { x: pointer.clientX, y: pointer.clientY };
+      longPressMenuTimerRef.current = setTimeout(() => {
+        longPressMenuTimerRef.current = null;
+        triggerHaptic('longPress');
+        // Langdruck ist kein Zug: den angefangenen Drag abbrechen, sonst
+        // schöbe der nächste touchmove das Objekt unter dem Menü weg.
+        setDraggingObj(null);
+        setContextMenu({
+          x: longPressMenuTouchPosRef.current.x,
+          y: longPressMenuTouchPosRef.current.y,
+          objType, objId, cardTableId: null, stackId: null,
+        });
+      }, LONG_PRESS_PREVIEW_DELAY);
+    }
 
     // Don't drag locked objects
     if (obj.locked) return;
 
-    // Get unified pointer position (convert to world coords for offset)
-    const pointer = getPointerPosition(e);
     const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
 
     dragOffsetRef.current = {
@@ -2223,6 +2252,16 @@ export default function GameTable({ room = null }) {
 
     const pointer = getPointerPosition(e);
 
+    // M2.11: wandert der Finger, ist es ein Zug – kein Langdruck.
+    if (longPressMenuTimerRef.current) {
+      const dx = Math.abs(pointer.clientX - longPressMenuTouchPosRef.current.x);
+      const dy = Math.abs(pointer.clientY - longPressMenuTouchPosRef.current.y);
+      if (dx > 8 || dy > 8) {
+        clearTimeout(longPressMenuTimerRef.current);
+        longPressMenuTimerRef.current = null;
+      }
+    }
+
     // Handle panning via React events as well (for better Playwright compatibility)
     if (isPanningRef.current) {
       const dx = pointer.clientX - panStartRef.current.x;
@@ -2337,6 +2376,10 @@ export default function GameTable({ room = null }) {
   function handleGlobalTouchEnd(e) {
     const remainingTouches = e.touches ? e.touches.length : 0;
 
+    // M2.11: Finger weg vor Ablauf der Zeit → kein Kontextmenü.
+    clearTimeout(longPressMenuTimerRef.current);
+    longPressMenuTimerRef.current = null;
+
     // Clean up pinch state when fingers are lifted
     if (isPinchingRef.current && remainingTouches < 2) {
       isPinchingRef.current = false;
@@ -2377,6 +2420,10 @@ export default function GameTable({ room = null }) {
       longPressPreviewTimerRef.current = null;
     }
     setLongPressPreviewCard(null);
+
+    // 0b. M2.11: Objekt-Langdruck (Kontextmenü)
+    clearTimeout(longPressMenuTimerRef.current);
+    longPressMenuTimerRef.current = null;
 
     // 1. Clear press-hold timer
     if (pressHoldTimerRef.current) {
@@ -4265,14 +4312,6 @@ export default function GameTable({ room = null }) {
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             draggable={false}
           />
-          {/* Delete button on hover */}
-          <button
-            onClick={(e) => { e.stopPropagation(); deleteBoard(board.id); }}
-            data-testid={`board-delete-${board.id}`}
-            className="absolute -top-1 -right-1 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            &times;
-          </button>
           {/* Board name label */}
           {view.name && (
             <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs text-center py-0.5 truncate px-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -4326,13 +4365,6 @@ export default function GameTable({ room = null }) {
                 +
               </button>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteCounter(counter.id); }}
-              data-testid={`counter-delete-${counter.id}`}
-              className="absolute -top-2 -right-2 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center transition-colors"
-            >
-              &times;
-            </button>
           </div>
         </div>
       ))}
@@ -4376,13 +4408,6 @@ export default function GameTable({ room = null }) {
               >
                 {die.rolling ? '...' : 'Roll'}
               </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteDie(die.id); }}
-                data-testid={`die-delete-${die.id}`}
-                className="w-11 h-11 rounded bg-red-600 hover:bg-red-500 text-white text-base flex items-center justify-center transition-colors"
-              >
-                &times;
-              </button>
             </div>
           </div>
         </div>
@@ -4421,12 +4446,6 @@ export default function GameTable({ room = null }) {
                 className="flex-1 h-8 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
               >
                 {die.rolling ? '...' : 'Roll'}
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteCustomDieFromTable(die.id); }}
-                className="w-8 h-8 rounded bg-red-600 hover:bg-red-500 text-white text-sm flex items-center justify-center transition-colors"
-              >
-                &times;
               </button>
             </div>
           </div>
@@ -4502,16 +4521,6 @@ export default function GameTable({ room = null }) {
                 >
                   {die.rolling ? '...' : 'Roll'}
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteHitDie(die.id); }}
-                  data-testid={`hit-die-delete-${die.id}`}
-                  className="w-10 h-10 rounded text-white text-base flex items-center justify-center transition-colors"
-                  style={{ background: 'rgba(0,0,0,0.35)' }}
-                  onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.7)'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.35)'; }}
-                >
-                  &times;
-                </button>
               </div>
             </div>
           </div>
@@ -4551,14 +4560,6 @@ export default function GameTable({ room = null }) {
         >
           <div className="bg-amber-100 rounded-lg border border-amber-300 shadow-lg min-w-[160px] max-w-[200px] relative"
                style={{ boxShadow: '2px 3px 8px rgba(0,0,0,0.2)' }}>
-            {/* Delete button */}
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
-              data-testid={`note-delete-${note.id}`}
-              className="absolute -top-2 -right-2 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            >
-              &times;
-            </button>
             {/* Edit button */}
             {editingNoteId !== note.id && (
               <button
@@ -4651,14 +4652,6 @@ export default function GameTable({ room = null }) {
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
           <TokenShape shape={token.shape} color={token.color} size={tokenW} width={tokenW} height={tokenH} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} />
-          {/* Delete button on hover */}
-          <button
-            onClick={(e) => { e.stopPropagation(); deleteToken(token.id); }}
-            data-testid={`token-delete-${token.id}`}
-            className="absolute -top-1 -right-1 w-11 h-11 rounded-full bg-red-500 hover:bg-red-400 text-white text-base flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            &times;
-          </button>
           {/* Attached indicator */}
           {token.attachedTo && (
             <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />
@@ -6409,8 +6402,7 @@ export default function GameTable({ room = null }) {
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   {(() => {
-                    const lists = { counter: counters, die: dice, customDie: customDiceOnTable, hitDie: hitDice, note: notes, token: tokens, board: boards, textField: textFields };
-                    const obj = (lists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
+                    const obj = (objLists[contextMenu.objType] || []).find(o => o.id === contextMenu.objId);
                     return obj?.locked ? '\u{1F513} Unlock' : '\u{1F512} Lock';
                   })()}
                 </button>
@@ -6457,15 +6449,10 @@ export default function GameTable({ room = null }) {
                 )}
                 <button
                   onClick={() => {
+                    // M2.11: einziger Löschweg. Die Tabelle steht in
+                    // utils/objectTypes.js und ist dort unter Test.
                     const { objType, objId } = contextMenu;
-                    if (objType === 'counter') setCounters(prev => prev.filter(c => c.id !== objId));
-                    else if (objType === 'die') setDice(prev => prev.filter(d => d.id !== objId));
-                    else if (objType === 'customDie') deleteCustomDieFromTable(objId);
-                    else if (objType === 'hitDie') setHitDice(prev => prev.filter(d => d.id !== objId));
-                    else if (objType === 'note') deleteNote(objId);
-                    else if (objType === 'token') { setTokens(prev => prev.filter(t => t.id !== objId)); if (room) room.sendAction({ type: 'token_delete', token_id: objId }); }
-                    else if (objType === 'board') setBoards(prev => prev.filter(b => b.id !== objId));
-                    else if (objType === 'textField') deleteTextField(objId);
+                    objDeleters[objType]?.(objId);
                     setContextMenu(null);
                   }}
                   className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
