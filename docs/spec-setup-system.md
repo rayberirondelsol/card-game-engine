@@ -341,6 +341,46 @@ Ein kleiner Rand zum Fensterrand bleibt frei, und die Safe-Area-Insets zählen m
 Bildspalte zeigen ein Menü, dessen letzter Eintrag anklickbar ist — geprüft wie
 in M2.8 über `document.elementFromPoint` auf den Mittelpunkt jedes Eintrags.
 
+### M2.10 — Escape schließt die oberste Schicht
+Beim Prüfen von M2.9 aufgefallen: **Escape schließt das Kontextmenü nicht.** Es geht
+nur über „Close" oder einen Klick daneben. Das kostete mich beim Messen einen
+Fehlschluss — fünf Sonden lieferten dieselbe Menü-Box, weil das Menü nie neu aufging.
+
+Escape ist im ganzen Spieltisch nur an zwei Stellen verdrahtet: im Notiz-Textfeld
+und im Zoneneditor (Zeichnen abbrechen). **Keine** der dreizehn Schichten reagiert
+darauf — acht Modale, das Kontextmenü, der Kartenschrank, die Kürzelübersicht, die
+Hintergrundauswahl, der Textfeld-Editor.
+
+#### Die Regel
+Escape schließt **genau eine** Schicht: die oberste offene. Die Reihenfolge ist eine
+Liste, nicht eine Kette von `if`s — die Liste ist zugleich die Dokumentation, was
+Escape überhaupt anfasst:
+
+1. Kontextmenü
+2. die acht Modale (Split, Speichern, Setup-Speichern, Zähler, Würfel, Notiz,
+   Token, Textfeld)
+3. der Textfeld-Editor
+4. Kürzelübersicht
+5. Hintergrundauswahl
+6. Kartenschrank
+
+**Nicht angefasst:** Token-Legende, Werkzeugleiste und Sequenz-Editor. Das sind
+Flächen, die man ein- und ausschaltet und auf denen man arbeitet, keine Schichten,
+die einem eine Entscheidung abverlangen. Und schon gar nicht der Setup-Modus selbst.
+
+#### Zwei Dinge, die leicht schiefgehen
+- **Modale müssen über ihre `dismiss*`-Funktion geschlossen werden**, nicht durch
+  Umlegen des Booleans. Die acht Funktionen setzen zusätzlich die Formularfelder
+  zurück; ohne sie steht beim nächsten Öffnen der alte Text noch da.
+- **Die Prüfung muss vor dem Eingabefeld-Ausstieg laufen.** Der globale
+  `handleKeyDown` steigt bei `INPUT`/`TEXTAREA` sofort aus. Genau dort steht aber der
+  Cursor, wenn ein Modal offen ist — Escape käme also nie an.
+
+**Abnahme:** Bei offenem Kontextmenü schließt Escape es. Bei offenem Speichern-Dialog
+mit Cursor im Namensfeld schließt Escape den Dialog, und das Feld ist beim nächsten
+Öffnen leer. Sind mehrere Schichten offen, schließt ein Druck nur die oberste. Ist
+keine offen, passiert nichts.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.

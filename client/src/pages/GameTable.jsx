@@ -22,6 +22,7 @@ import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo,
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement } from '../utils/menuPlacement.js';
+import { escapeTarget } from '../utils/escapeLayers.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -866,6 +867,38 @@ export default function GameTable({ room = null }) {
         setAltKeyHeld(true);
       }
 
+      // M2.10: Escape schließt die oberste offene Schicht. Muss VOR dem
+      // Eingabefeld-Ausstieg laufen — bei offenem Modal steht der Cursor genau
+      // dort, Escape käme sonst nie an.
+      if (e.key === 'Escape') {
+        const target = escapeTarget({
+          contextMenu, splitModal: showSplitModal, saveModal: showSaveModal,
+          setupSaveModal: showSetupSaveModal, counterModal: showCounterModal,
+          diceModal: showDiceModal, noteModal: showNoteModal,
+          tokenModal: showTokenModal, textFieldModal: showTextFieldModal,
+          editingTextField: editingTextFieldId, shortcuts: showShortcuts,
+          bgPicker: showBgPicker, cardDrawer: showCardDrawer,
+        });
+        if (!target) return; // keine Schicht offen: Escape nicht schlucken
+        e.preventDefault();
+        switch (target) {
+          case 'contextMenu': setContextMenu(null); break;
+          case 'splitModal': dismissSplitModal(); break;
+          case 'saveModal': dismissSaveModal(); break;
+          case 'setupSaveModal': dismissSetupSaveModal(); break;
+          case 'counterModal': dismissCounterModal(); break;
+          case 'diceModal': dismissDiceModal(); break;
+          case 'noteModal': dismissNoteModal(); break;
+          case 'tokenModal': dismissTokenModal(); break;
+          case 'textFieldModal': dismissTextFieldModal(); break;
+          case 'editingTextField': setEditingTextFieldId(null); break;
+          case 'shortcuts': setShowShortcuts(false); break;
+          case 'bgPicker': setShowBgPicker(false); break;
+          case 'cardDrawer': setShowCardDrawer(false); break;
+        }
+        return;
+      }
+
       // Don't trigger shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -993,7 +1026,11 @@ export default function GameTable({ room = null }) {
         clearTimeout(numberKeyTimeoutRef.current);
       }
     };
-  }, [selectedCards, tableCards, hoveredTableCard]);
+  }, [selectedCards, tableCards, hoveredTableCard,
+      // M2.10: der Handler liest den Zustand direkt, er wird bei Änderung neu registriert
+      contextMenu, showSplitModal, showSaveModal, showSetupSaveModal, showCounterModal,
+      showDiceModal, showNoteModal, showTokenModal, showTextFieldModal,
+      editingTextFieldId, showShortcuts, showBgPicker, showCardDrawer]);
 
   // ===== CARD FUNCTIONS =====
 
