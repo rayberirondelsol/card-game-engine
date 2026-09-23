@@ -819,3 +819,92 @@ man es überhaupt abräumen kann:
 legt jedes Mal das passende Tableau hin und räumt das vorige weg. Der fünfte
 Druck meldet im Protokoll, dass nichts mehr aufzudecken ist — und ändert sonst
 nichts.
+
+### M2.13 — Ein gesperrtes Objekt schluckt den Zug nicht
+Beim Nachspielen einer TFT-Partie am echten Tisch gefunden: sobald der Hauptplan
+den Bildschirm füllt, lässt sich der Tisch **nicht mehr schieben**. Man sitzt
+fest und kommt nur über einen schmalen freien Rand weiter — bei einem Brett von
+1200×1250 Einheiten ist dieser Rand oft gar nicht da.
+
+Zwei Prüfungen greifen ineinander und lassen zusammen nichts übrig:
+
+1. Das Pannen startet nur, wenn der Zug auf der Leinwand oder dem Container
+   beginnt (`e.target === canvas || e.target === container`) und **nicht** auf
+   `[data-ui-element]`. Boards und Tokens tragen aber selbst
+   `data-ui-element="true"` — für den Pan-Check sind sie also Bedienoberfläche.
+2. Das Ziehen des Objekts bricht bei `if (obj.locked) return;` sofort ab.
+
+Ein Druck auf ein gesperrtes Objekt fällt damit durch beide Netze. Das Schloss
+soll das Objekt gegen Verschieben schützen, nicht den Tisch lahmlegen.
+
+#### Die Regel
+**Ein Druck auf ein Objekt, das sich nicht ziehen lässt, pant den Tisch.**
+
+Jedes gesperrte Tischobjekt — Board, Token, Karte, Würfel, Notiz, Textfeld —
+trägt im DOM `data-locked="true"`. Der Pan-Check nimmt einen solchen Treffer an,
+und zwar **vor** der `data-ui-element`-Abweisung:
+
+```
+pannbar = gesperrtesObjekt ODER ((Leinwand ODER Container) UND keine Bedienoberfläche UND keine Tischkarte)
+```
+
+Die Entscheidung steckt in einer eigenen Funktion, damit sie geprüft werden kann
+und nicht dreimal nebeneinander steht — die Mausvariante, die Zeigervariante und
+die Touchvariante fragen dieselbe Stelle.
+
+**Bewusst nicht gemacht:** gesperrte Objekte auf `pointer-events: none` setzen.
+Das Kontextmenü ist der einzige Weg, ein Objekt wieder zu entsperren; wer es
+unklickbar macht, sperrt es für immer. Rechtsklick und Kontextmenü bleiben
+unverändert.
+
+**Abnahme:** Bei gesperrtem Hauptplan, der das Sichtfeld füllt, schiebt ein Zug
+auf dem Brett den Tisch. Rechtsklick auf dasselbe Brett öffnet weiterhin das
+Kontextmenü. Ein **nicht** gesperrtes Board lässt sich weiterhin ziehen und pant
+nicht. Ein Zug auf der Werkzeugleiste oder in einem Dialog pant weiterhin nicht.
+
+### M5.1 — `clear_zone` legt Karten in einen Stapel zurück
+`clear_zone` kennt heute zwei Ziele: mit `targetZoneLabel` wandern die Objekte in
+eine andere Zone, ohne Ziel werden sie **gelöscht**. Für den Phasenwechsel in TFT
+fehlt das dritte: die Regel verlangt, die Ladenauslage *unter den Nachschubstapel*
+zu legen, nicht sie aus dem Spiel zu nehmen.
+
+#### Die Regel
+`clear_zone` bekommt das Feld `targetStackLabel`. Ist es gesetzt, wandern die
+Karten der Zone **unter** den genannten Stapel, in der Reihenfolge, in der sie in
+der Zone lagen.
+
+- Nur Karten können in einen Stapel zurück. Tokens und Assets in derselben Zone
+  bleiben liegen und stehen mit Namen im Protokoll — wie heute schon bei einer
+  vollen Zielzone.
+- Gesperrte Objekte bleiben unangetastet, unverändert zur heutigen Regel.
+- `faceDown` am Schritt setzt die Seite der zurückgelegten Karten. Fehlt es,
+  behält jede Karte ihre Seite. Geraten wird nicht.
+- `targetZoneLabel` und `targetStackLabel` schließen einander aus; sind beide
+  gesetzt, gilt die Zone und der Schritt vermerkt es im Protokoll.
+
+**Abnahme:** Zehn Karten liegen in der Nachschub-Auslage, der Nachschubstapel hat
+123. Nach `clear_zone` mit `targetStackLabel: "Nachschub (Tante Emma)"` und
+`faceDown: true` ist die Zone leer, der Stapel hat 133, die zehn Karten liegen
+unten und verdeckt. Keine Karte ist verschwunden.
+
+#### Nachtrag: drei Regelfehler im TFT-Aufbau
+Gegen die beiden Regelvideos geprüft (Genus Solo, S01E01/E02) — der gespeicherte
+Aufbau weicht an drei Stellen von der Solo-Regel ab. Das sind Daten, kein Code:
+
+1. **Heldentaten.** Der Aufbau teilt drei Karten an jede der drei Handzonen — das
+   ist die *reguläre* Variante mit verdeckten, persönlichen Heldentaten. Solo
+   liegen **sechs gemeinsame Heldentaten offen** aus, für alle zugänglich. Die
+   drei `deal_to_zone`-Schritte werden zu einem: sechs Karten offen in eine neue
+   Zone „Heldentaten-Auslage".
+2. **Phasenwechsel.** Vor dem Drehen des Dorf-Boards wird die Ladenauslage
+   abgeräumt. Die Aktion „Kampf beginnen" dreht bisher nur; die zehn Karten
+   liegen danach auf der Kampfseite. Ein `clear_zone` nach M5.1 davor.
+3. **Dorfereignis.** Schritt 2 der Dorfphase — jeder Dörfler zieht ein Ereignis,
+   in der Reihenfolge von unten nach oben — fehlt ganz. Das Deck wird gemischt
+   und dann nie gezogen. Eine eigene Aktion „Dorfereignis ziehen" teilt je eine
+   Karte an die drei Handzonen aus, die durch (1) frei geworden sind.
+
+**Nicht Teil davon** und weiterhin offen: der gemeinsame Münzpool (30 zu Beginn,
+und *alles* später gewonnene Geld geht in denselben Topf), die abgeleiteten
+Bosswerte (Leben = Summe der Maximalleben + 3, Bewegung = höchste + 1) und die
+Attributleisten je Dörfler. Das sind Anzeigen und Zähler, keine Sequenzschritte.
