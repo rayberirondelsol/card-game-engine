@@ -988,3 +988,37 @@ Bösewicht-Token, drei Dörfler auf der Buyin'-Leiste, drei Dörfler-Tableaus, z
 Karten in der Nachschub-Auslage, sechs offene Heldentaten und dreizehn Zähler mit
 ihren Startwerten. Alle Spieler im Raum sehen denselben Zustand. Ein Setup ohne
 Sequenz verhält sich unverändert.
+
+#### Nachtrag: der Raum-WebSocket zeigt auf einen Port, den es öffentlich nicht gibt
+Bei der Abnahme von M6 am laufenden System gefunden. Ein Raum baut serverseitig
+jetzt richtig auf — aber der Tisch blieb leer, und zwar aus einem ganz anderen
+Grund: der Client verbindet nach `wss://<host>:3001/ws/rooms/…`.
+
+`useGameRoom.js` setzt den Port fest auf `VITE_SERVER_PORT || '3001'`. Im
+Betrieb liegt das Backend hinter nginx; öffentlich erreichbar sind nur 80/443,
+und `location /ws/` proxyt bereits korrekt auf `backend:3001`. Der Port 3001 ist
+lediglich im LAN veröffentlicht. Über die Domain scheitert die Verbindung darum
+immer — **Mehrspieler war öffentlich nie benutzbar**, unabhängig vom Aufbau.
+
+Der HTTP-Pfad macht es längst richtig: `apiFetch` ruft **relativ** auf (`/api/…`),
+gleiche Herkunft, nginx verteilt. Es gibt keinen Grund, warum der WebSocket eine
+zweite Regel haben sollte.
+
+#### Die Regel
+**Der Raum-WebSocket benutzt dieselbe Herkunft wie die Seite** — Protokoll aus
+`window.location` (`https:` → `wss`), Host samt etwaigem Port aus
+`window.location.host`, Pfad `/ws/rooms/<code>`. Kein fester Port, keine eigene
+Umgebungsvariable; `VITE_SERVER_PORT` entfällt ersatzlos.
+
+Damit das in der Entwicklung genauso gilt, proxyt Vite `/ws` mit `ws: true` auf
+den Backend-Port — so wie es `/api` und `/uploads` schon tut. Eine Regel für
+beide Umgebungen statt einer Sonderbehandlung je Umgebung.
+
+Die Bildung der Adresse liegt in einer eigenen reinen Funktion, damit sie geprüft
+werden kann; `useGameRoom` ruft sie nur auf.
+
+**Abnahme:** Auf `https://gaming.benjathi.de` verbindet ein Raum nach
+`wss://gaming.benjathi.de/ws/rooms/<code>` und der Tisch zeigt den Zustand, den
+der Server beim Start gebaut hat. Unter `http://localhost:5173` verbindet er nach
+`ws://localhost:5173/ws/rooms/<code>` und Vite reicht durch. Code und Spieler-ID
+werden für die Adresse kodiert.

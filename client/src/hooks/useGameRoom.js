@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { roomSocketUrl } from '../utils/roomSocketUrl.js';
 
-const WS_URL = (code, playerId) => {
-  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = window.location.hostname;
-  const port = import.meta.env.VITE_SERVER_PORT || '3001';
-  return `${proto}://${host}:${port}/ws/rooms/${code}?player_id=${playerId}`;
-};
+// M6-Nachtrag: gleiche Herkunft wie die Seite, kein fester Port — die Regel
+// steht in roomSocketUrl.js und wird aus server/test/ geprueft.
+const WS_URL = (code, playerId) => roomSocketUrl(window.location, code, playerId);
 
 // Matches WS_SUBPROTOCOL in server/src/websocket/roomWs.js. A browser cannot set
 // headers on a WebSocket, so the session token rides along as a second
