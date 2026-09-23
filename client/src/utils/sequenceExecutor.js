@@ -372,19 +372,21 @@ function applyStep(state, step, allZones, assets, rng, entry, ctx = {}) {
           // Fixed places seat the card on the next free one; a zone without
           // them keeps the old behaviour and drops every card on its centre.
           const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneCenter(zone);
-          state.cards.push({
+          // Die ausgeteilte Karte ist die Quellkarte – sie unterscheidet sich
+          // nur in Position, Seite und Stapelzugehoerigkeit. Eine feste
+          // Feldliste verlor hier `width`/`height` (Spec: Nachtrag zu M2.12).
+          const dealtCard = {
+            ...card,
             tableId: card.tableId || crypto.randomUUID(),
-            cardId: card.cardId,
-            name: card.name,
-            image_path: card.image_path,
             card_back_id: card.card_back_id || null,
             x: pos.x,
             y: pos.y,
-            zIndex: card.zIndex,
             faceDown,
             rotation: card.rotation || 0,
             face_up: !faceDown,
-          });
+          };
+          delete dealtCard.inStack; // die Karte hat den Stapel gerade verlassen
+          state.cards.push(dealtCard);
           dealt.push(card);
         });
       }

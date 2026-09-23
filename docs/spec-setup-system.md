@@ -521,6 +521,24 @@ Platz; eine 744×1039-Karte unverändert 100×140; eine 1039×744-Karte unverän
 140×100; eine Karte ohne Maße 100×140. Das gilt für lose Karten, für Karten im
 Stapel und für die Handkarten.
 
+#### Nachtrag: `deal_to_zone` verlor die Kartenmaße
+Beim Nachprüfen am echten Tisch fiel auf, dass M2.12 für **ausgeteilte** Karten nicht
+griff: die zehn Nachschub- und neun Heldentaten-Karten lagen weiter im Hochformat,
+obwohl sie quadratisch sind.
+
+Ursache ist nicht die Anzeige, sondern der Schritt: `deal_to_zone` baut die Karte aus
+einer **festen Feldliste** neu auf, und `width`/`height` stehen nicht darin. Die
+Quellkarte im Stapel hat sie, die ausgeteilte Kopie nicht — und ohne Maße fällt
+`getCardDims` auf den Standardrahmen zurück.
+
+Von den neun Stellen, die im Client eine Tischkarte bauen, ist dies die einzige, die
+Felder verliert; die übrigen acht führen `width`/`height` mit. Eine Feldliste, die
+hinter dem Objekt zurückbleibt — dasselbe Muster wie bei den Vokabellisten.
+
+**Abnahme:** Eine quadratische Karte, die über `deal_to_zone` in eine Zone ausgeteilt
+wird, behält ihre Maße und liegt am Tisch quadratisch. Die Kopie unterscheidet sich von
+der Quellkarte nur noch in Position, Seite und Stapelzugehörigkeit.
+
 ### M3a — Verankerung
 Zonen können optional an ein Asset gebunden werden (Abschnitt 4) und folgen ihm dann
 in Lage und Größe. Ohne Anker bleibt alles absolut wie bisher.
