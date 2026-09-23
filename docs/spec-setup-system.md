@@ -908,3 +908,39 @@ Aufbau weicht an drei Stellen von der Solo-Regel ab. Das sind Daten, kein Code:
 und *alles* später gewonnene Geld geht in denselben Topf), die abgeleiteten
 Bosswerte (Leben = Summe der Maximalleben + 3, Bewegung = höchste + 1) und die
 Attributleisten je Dörfler. Das sind Anzeigen und Zähler, keine Sequenzschritte.
+
+### M4a — Zähler gehören in den Aufbau
+Zwei Dinge, die eine TFT-Partie ständig braucht, kann der Aufbau nicht herstellen:
+der **gemeinsame Münzvorrat** und die **Attributleisten** der Dörfler. Beides sind
+Zahlen, die sich im Spiel ändern — also Zähler. Die Engine hat Zähler
+(`state.counters`, Knopf „Counter"), aber das Schrittvokabular kennt sie nicht:
+man muss nach jedem Aufbau dreizehn Stück von Hand anlegen und beschriften.
+
+#### Die Regel
+**Neuer Schritt `place_counter`** mit `name`, `value`, `max`, `x`, `y`. Er legt
+genau einen Zähler an der genannten Stelle ab. `value` ist der Startwert, `name`
+die Beschriftung.
+
+**Zähler bekommen ein optionales `max`.** Am Tisch steht dann `2 / 3`. Das ist
+nicht Zierrat, sondern eine Regel: in Townsfolk Tussle liegt neben dem Lebensstein
+ein **roter Marker auf dem Höchstwert**, über den Heilung nicht hinausgeht — und
+der Höchstwert kann im Spiel steigen. Ohne `max` bräuchte jede Lebensleiste einen
+zweiten Zähler daneben. Fehlt `max`, verhält sich der Zähler wie bisher und zeigt
+nur seinen Wert; eine Obergrenze wird **nicht** erzwungen, sie wird angezeigt —
+Regeln durchsetzen ist nicht Aufgabe des Tisches.
+
+**Abnahme:** Ein Aufbau mit `place_counter` legt den Zähler mit Name, Startwert und
+Position an; er lässt sich danach wie jeder andere Zähler hoch- und runterzählen,
+verschieben, sperren und überlebt Speichern und Laden. Mit `max` zeigt er
+`Wert / max`, ohne `max` nur den Wert.
+
+#### Nachtrag: die Dörfler werden gewählt, nicht gezogen
+Der gespeicherte TFT-Aufbau zieht drei Dörfler **zufällig** (`draw_assets` aus dem
+Vorrat „Dörfler"). Die Regel sagt etwas anderes: *jeder Spieler wählt* seinen
+Dörfler (E01 12:02). Das war bisher eine bequeme Abweichung — jetzt ist sie auch
+hinderlich, denn die Startwerte der Attributleisten stehen auf dem Dörfler-Tableau
+und unterscheiden sich je Dörfler. Ein Zufallszug kann sie nicht kennen.
+
+Darum: drei `place_asset`-Schritte mit Namen statt eines `draw_assets`. Wer eine
+andere Besetzung will, tauscht die drei Namen im Sequenz-Editor. Damit sind auch
+die zwölf Attributzähler mit ihren richtigen Startwerten schreibbar.
