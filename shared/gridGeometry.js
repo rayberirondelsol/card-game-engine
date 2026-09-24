@@ -438,6 +438,27 @@ export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = nul
 }
 
 /**
+ * Hat dieses Stueck seinen Rasterplatz verloren? (M10.10)
+ *
+ * Der Befund der dritten Partie: eine Figur wurde ueber die unterste
+ * Rasterzeile hinaus auf den aufgedruckten TERRAIN-Streifen gezogen, blieb
+ * dort frei stehen und **sah aus wie gesetzt**. Beiseitelegen muss moeglich
+ * bleiben – am Tisch legt man auch etwas an den Rand. Falsch war nur, dass es
+ * still geschah.
+ *
+ * Gerechnet wird hier nichts. `snapInto` beantwortet die Frage bereits, und
+ * zwar ausdruecklich: `snapped` sagt "ein Platz oder ein Feld hat diesen Wurf
+ * beansprucht", nicht "der Punkt hat sich bewegt". Fehlt die Antwort ganz, ist
+ * das dieselbe Aussage wie `snapped: false` – niemand hat ihn beansprucht.
+ *
+ * Steht neben `snapInto`, weil sie deren Antwort liest: eine zweite Stelle,
+ * die `snapped` auswertet, waere eine zweite Lesart derselben Auskunft.
+ */
+export function offGrid(obj, hit) {
+  return !!(obj?.gridId || obj?.cell) && !hit?.snapped;
+}
+
+/**
  * Die Adressfelder, die eine Bewegungsnachricht mitbringt – und nur die, die
  * wirklich drinstehen (M7.1/G5).
  *
@@ -455,7 +476,11 @@ export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = nul
  * Steht hier, weil Server (Raumzustand) und Client (Tisch) dieselbe Antwort
  * brauchen; zwei Listen waeren zwei Antworten.
  */
-const ADDRESS_FIELDS = ['gridId', 'cell', 'width', 'height'];
+// `offGrid` ist die Aussage *ueber* die Adresse (M10.10): "hat keine mehr, und
+// das ist gemeint". Sie gehoert damit in dieselbe Liste - eine zweite daneben
+// liesse Tisch und Raum Verschiedenes sagen, und das Weglassen bleibt auch hier
+// das Weglassen: ein aelterer Client loescht keine vorhandene Marke.
+const ADDRESS_FIELDS = ['gridId', 'cell', 'width', 'height', 'offGrid'];
 
 export function gridAddress(payload) {
   const out = {};

@@ -51,3 +51,34 @@ export function menuPlacement({
   const usableHeight = Math.max(0, maxBottom - minTop);
   return { left, top, maxHeight: height > usableHeight ? usableHeight : null };
 }
+
+/**
+ * Schliesst dieser Zeigerdruck das offene Kontextmenue? (Spec M10.12)
+ *
+ * Bis hierher tat das ein Klickfaenger: ein `fixed inset-0 z-40` unter dem
+ * Menue, seit dem allerersten Wurf des Spieltisches. Er lag ueber **allem**,
+ * also auch ueber jedem Tischobjekt. Bei offenem Menue traf jeder Zeiger ihn
+ * und nichts sonst: der Rechtsklick auf ein anderes Objekt kam dort nie an
+ * (das native Browsermenue erschien statt unserem), und auf Berührung startete
+ * `handleObjDragStart` nicht, also auch der Langdruck-Zeitgeber aus M2.11
+ * nicht. Aus Spielersicht schaltete das Menue um: erster Rechtsklick schliesst,
+ * zweiter oeffnet.
+ *
+ * Die Regel der Spec – "ein Rechtsklick oeffnet das Menue, auch wenn schon
+ * eines offen ist" – braucht deshalb keine neue Faehigkeit, sondern den Weg
+ * zurueck zum Objekt. Geschlossen wird am `document` statt mit einer Flaeche
+ * davor, und `pointerdown` deckt Maus und Finger in einem ab: es laeuft vor
+ * `contextmenu`, `mousedown` und `touchstart`, das alte Menue ist also weg,
+ * bevor der Handler des Objekts das neue setzt.
+ *
+ * Die eine Ausnahme ist der Druck **im** Menue. Den erledigt der Eintrag
+ * selbst; wer hier schloesse, nähme ihm den Knopf unter dem Finger weg, bevor
+ * sein `click` kommt, und die Tat fiele aus.
+ *
+ * @param {EventTarget|null} target  das Ziel des Zeigerereignisses
+ * @param {Node|null} menuEl  das gerenderte Menue, oder null
+ */
+export function closesMenu(target, menuEl) {
+  if (!target || !menuEl) return true;
+  return !(target === menuEl || (typeof menuEl.contains === 'function' && menuEl.contains(target)));
+}

@@ -11,7 +11,7 @@ import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/zoneGeometry.js';
-import { resolveGrids, snapInto, placeOnGrids, gridAddress } from '../../../shared/gridGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
@@ -22,7 +22,7 @@ import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
-import { menuPlacement } from '../utils/menuPlacement.js';
+import { menuPlacement, closesMenu } from '../utils/menuPlacement.js';
 import { revealZones, revealPlan } from '../utils/revealToZone.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
@@ -656,6 +656,22 @@ export default function GameTable({ room = null }) {
         insets: { top: inset('top'), right: inset('right'), bottom: inset('bottom'), left: inset('left') },
       }),
     });
+  }, [contextMenu]);
+
+  // M10.12: Das offene Menue schliesst beim naechsten Zeigerdruck daneben -
+  // am `document`, nicht mit einer Flaeche davor. `pointerdown` deckt Maus und
+  // Finger in einem ab und laeuft vor `contextmenu`/`mousedown`/`touchstart`:
+  // der Rechtsklick auf ein anderes Objekt schliesst also das alte Menue und
+  // oeffnet gleich darauf dessen eigenes, und der Langdruck auf Touch
+  // (M2.11) bekommt seinen `touchstart` zurueck. Escape bleibt, wo es war
+  // (M2.10, `escapeLayers`).
+  useEffect(() => {
+    if (!contextMenu) return;
+    function onPointerDown(e) {
+      if (closesMenu(e.target, contextMenuRef.current)) setContextMenu(null);
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [contextMenu]);
 
   // Number key draw state (TTS-style: press 1-9 or multi-digit like '10' to draw from stack)
@@ -2333,7 +2349,9 @@ export default function GameTable({ room = null }) {
         const snap = findNearestCardCorner(token.x, token.y);
         let moved = null;
         if (snap) {
-          moved = { x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner, gridId: null, cell: null };
+          // An einer Karte zu haengen ist eine Stelle, keine verlorene: die
+          // Marke aus M10.10 geht dabei weg.
+          moved = { x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner, gridId: null, cell: null, offGrid: false };
         } else {
           const dropZone = zoneAt(tableZones, token.x, token.y);
           const taken = dropZone
@@ -2357,11 +2375,17 @@ export default function GameTable({ room = null }) {
             // Ergebnisses – der Rest (x, y, gridId, cell und bei einem Bereich
             // dessen Masse) ist, was am Token gilt und in den Raum geht.
             const { snapped, ...place } = hit;
-            moved = place;
-          } else if (token.gridId || token.cell) {
+            // M10.10: eingerastet ist gesetzt – eine alte Marke gilt nicht mehr.
+            moved = { ...place, offGrid: false };
+          } else if (offGrid(token, hit)) {
             // Dragged off the grid: the field it names is no longer where it
             // is, and a stale field would teleport it on the next load.
-            moved = { gridId: null, cell: null };
+            //
+            // M10.10: und das darf nicht still geschehen. Das Stueck merkt
+            // sich, dass es seinen Platz verloren hat, und traegt es sichtbar
+            // – zurueckspringen oder am Rand einrasten schied aus, beides
+            // naehme dem Spieler das Beiseitelegen.
+            moved = { gridId: null, cell: null, offGrid: true };
           }
         }
         if (moved) setTokens(prev => prev.map(t => (t.id === draggingObj.id ? { ...t, ...moved } : t)));
@@ -2392,6 +2416,8 @@ export default function GameTable({ room = null }) {
         if (obj) room.sendAction({
           type: 'token_move', token_id: objId, x: obj.x, y: obj.y,
           gridId: obj.gridId ?? null, cell: obj.cell ?? null,
+          // M10.10: die Marke gehoert zur Adresse und geht denselben Weg.
+          offGrid: !!obj.offGrid,
           // Nur ein Bereich bringt nachgerechnete Masse mit; ein Einzelfeld
           // behaelt die Groesse seines Assets, und ein Zug, der keine schickt,
           // darf die vorhandenen nicht ueberschreiben.
@@ -3231,6 +3257,10 @@ export default function GameTable({ room = null }) {
         // stop meaning "C7" as soon as the board they belong to has moved.
         gridId: t.gridId || null,
         cell: t.cell || null,
+        // M10.10: "hat seinen Rasterplatz verloren". Muss in die Feldliste,
+        // sonst ueberlebt die Marke das naechste Speichern nicht - und genau
+        // spaeter faellt der Feldversatz auf, nicht im Moment des Zugs.
+        offGrid: t.offGrid || false,
         // set by the setup sequence's asset steps (place_asset / draw_assets)
         assetId: t.assetId || null,
         faceDown: t.faceDown || false,
@@ -3842,6 +3872,10 @@ export default function GameTable({ room = null }) {
         rotation: t.rotation || 0,
         gridId: t.gridId || null,
         cell: t.cell || null,
+        // M10.10: die Marke muss durch beide Feldlisten, sonst ueberlebt sie
+        // das Speichern nicht - und spaeter faellt der Feldversatz auf, nicht
+        // im Moment des Zugs.
+        offGrid: t.offGrid || false,
         assetId: t.assetId || null,
         faceDown: t.faceDown || false,
         frontImageUrl: t.frontImageUrl || null,
@@ -5156,10 +5190,16 @@ export default function GameTable({ room = null }) {
           data-face-down={view.hidden ? 'true' : 'false'}
           data-ui-element="true"
           data-locked={token.locked ? 'true' : undefined}
+          data-off-grid={token.offGrid ? 'true' : undefined}
           className="absolute select-none group pointer-events-auto"
           style={{
             left: token.x - Math.floor(tokenW / 2),
             top: token.y - Math.floor(tokenH / 2),
+            // M10.10: vom Raster gezogen und dort liegengeblieben. Der
+            // gestrichelte Rand ist die ganze Abhilfe - das Stueck bleibt, wo
+            // es hingelegt wurde, sieht aber nicht mehr aus wie gesetzt.
+            outline: token.offGrid ? '2px dashed #fbbf24' : undefined,
+            outlineOffset: token.offGrid ? '3px' : undefined,
             // M8.2/M9.1: das groessere Stueck liegt darunter. Kein z-20 mehr in
             // der Klassenliste - sonst stuenden zwei Werte an einem Element.
             zIndex: layerZ(`token:${token.id}`),
@@ -7323,13 +7363,9 @@ export default function GameTable({ room = null }) {
         </div>
       )}
 
-      {/* Click handler to close context menu */}
-      {contextMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setContextMenu(null)}
-        />
-      )}
+      {/* M10.12: Der Klickfaenger, der hier stand, ist weg. Geschlossen wird
+          am `document` (siehe `closesMenu`) - eine Flaeche ueber dem Tisch
+          nahm dem naechsten Rechtsklick und dem Langdruck ihr Ziel. */}
 
       {/* Player Hand Area - bottom of screen, auto-hides when empty */}
       {/* In landscape mobile: reduced height, collapsible via toggle */}

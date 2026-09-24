@@ -7,7 +7,7 @@
  * were never bound to an element. Pure functions here, DOM there.
  */
 
-import { zoneCenter } from '../../../shared/zoneGeometry.js';
+import { zoneCenter, zoneSlots } from '../../../shared/zoneGeometry.js';
 
 /** Below this, a drag is a slip of the hand, not a zone. World units. */
 export const MIN_ZONE_SIZE = 40;
@@ -216,4 +216,33 @@ export function parseSlotLabels(text) {
 /** Der Weg zurück ins Eingabefeld. */
 export function slotLabelsText(zone) {
   return Array.isArray(zone?.slotLabels) ? zone.slotLabels.join(', ') : '';
+}
+
+/**
+ * Was der Editor zu den Plaetzen einer Zone zu sagen hat, oder `null`
+ * (Spec M10.11).
+ *
+ * Der Befund der dritten Partie: eine Karte, die in die `Nachschub-Auslage`
+ * zurueckgelegt wurde, blieb zwischen zwei Plaetzen liegen und ueberlappte den
+ * Nachbarn - obwohl die Zone Kapazitaet 10 und Anordnung `grid` hat, also
+ * feste Plaetze. Die Belegungsrechnung war es nicht (M9.4/H2 hat sie laengst
+ * behoben, geprueft in `zone-places-hint.test.js`); es war der Schalter
+ * daneben.
+ *
+ * `snap` ist naemlich die einzige Stelle, an der Aufbau und Handzug
+ * auseinandergehen: `zoneSlotFor` (Aufbau) fragt ihn **nicht**, `snapInto`
+ * (Handzug) fragt ihn. Eine Zone ohne `snap` legt ihre zehn Karten darum
+ * sauber aus und nimmt keine wieder an - und genau diese Haelfte war stumm.
+ * Die andere mahnt der Editor seit jeher an ("Set a capacity to get fixed
+ * places").
+ *
+ * Nur ein Satz fuer den Autor, keine Regel: eine Zone ohne `snap` ist eine
+ * gueltige Zone, und das Verhalten still zu aendern hiesse, jedem vorhandenen
+ * Aufbau etwas anderes beizubringen als er gespeichert hat.
+ */
+export function zonePlacesHint(zone) {
+  if (!zone || zone.snap) return null;
+  return zoneSlots(zone)?.length
+    ? 'This zone has fixed places, but snap is off: the setup sequence uses them, a card dropped by hand does not.'
+    : null;
 }

@@ -2975,3 +2975,54 @@ daraus vier Felder ableiten, weil das Asset 100×100 groß war; jetzt trifft der
 Eintrag zu, wie er dasteht. Die Ableitung aus M7.2/M7.3 bleibt unverändert und
 wird hier schlicht nicht mehr gebraucht — sie trägt weiterhin den Bösewicht und
 jedes Geländeteil.
+
+### M10.10 — Das Raster hält die Figuren nicht
+
+**Befund.** Beim Zurückziehen wurde eine Figur über die unterste Rasterzeile
+hinausgezogen, auf den aufgedruckten TERRAIN-Streifen. Dort rastet nichts mehr
+ein, die Figur bleibt frei stehen — und **das fällt erst auf, wenn man
+Feldabstände nachrechnet**. Der Spieler hat die drei Figuren einmal von Hand
+zurückgesetzt.
+
+Ein Stück außerhalb des Rasters abzulegen muss möglich bleiben — man legt auch
+am Tisch etwas beiseite. Falsch ist nur, dass es **aussieht wie gesetzt**.
+
+**Regel.** Ein Stück, das seinen Rasterplatz verliert, ist als solches
+erkennbar. Ob es zurückspringt, am Rand einrastet oder sichtbar markiert wird,
+entscheidet, wer es umsetzt — **still darf es nicht sein.**
+
+**Abnahme.**
+1. Eine Figur, die knapp über den Rasterrand gezogen wird, ist danach als
+   „nicht auf dem Raster" erkennbar.
+2. Eine Figur, die auf ein Rasterfeld gezogen wird, verhält sich unverändert.
+3. Ein Stück, das nie auf dem Raster war, verhält sich unverändert.
+
+### M10.11 — Die Ladenauslage rastet beim Zurücklegen nicht ein
+
+**Befund.** Eine Karte, die zurück in die `Nachschub-Auslage` gelegt wurde,
+blieb **zwischen zwei Plätzen** liegen und überlappte den Nachbarn. Die Zone
+hat Kapazität 10 und Anordnung `grid`, also feste Plätze.
+
+Verdacht, nicht geprüft: M9.4 hat einen verwandten Fehler gefunden — ein
+Stapel in der Zielzone wurde als fünfzehn Belegungen gezählt. Wer das umsetzt,
+sieht zuerst nach, ob hier dasselbe vorliegt, statt eine zweite Rechnung
+danebenzustellen.
+
+**Abnahme.**
+1. Eine in die Ladenauslage gelegte Karte sitzt auf einem der zehn Plätze.
+2. Ist ein Platz besetzt, nimmt sie den nächsten freien.
+3. Sind alle zehn besetzt, wird sie abgewiesen, mit Grund.
+
+### M10.12 — Der erste Rechtsklick öffnet nicht immer das Menü
+
+**Befund.** Das Kontextmenü **schaltet um**, statt zu öffnen: nach einem
+vorangegangenen Klick woanders braucht es zwei Rechtsklicks. Reproduzierbar.
+
+**Regel.** Ein Rechtsklick öffnet das Menü an der geklickten Stelle — auch
+dann, wenn schon eines offen ist. Geschlossen wird es mit Escape, einem
+Linksklick daneben oder der Wahl eines Eintrags.
+
+**Abnahme.**
+1. Ein Rechtsklick öffnet das Menü, gleich was vorher war.
+2. Ein Rechtsklick auf ein anderes Objekt zeigt dessen Menü, nicht das alte.
+3. Escape schließt es weiterhin (M2.10).

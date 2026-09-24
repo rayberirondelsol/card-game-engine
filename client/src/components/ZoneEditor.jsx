@@ -5,7 +5,7 @@ import { zoneSlots } from '../../../shared/zoneGeometry.js';
 import {
   screenToWorld, rectFromPoints, isDrawable, createZone,
   panelSide, moveZone, resizeZone, RESIZE_HANDLES, handleAnchor,
-  parseSlotLabels, slotLabelsText,
+  parseSlotLabels, slotLabelsText, zonePlacesHint,
 } from '../utils/zoneDraft';
 import { setAnchor } from '../../../shared/anchoring.js';
 
@@ -577,6 +577,11 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
               />
             </button>
           </div>
+          {/* M10.11: die andere Haelfte der Kapazitaetswarnung - Plaetze, die
+              nur der Aufbau benutzt, weil der Handzug `snap` fragt. */}
+          {zonePlacesHint(selectedZone) && (
+            <p className="text-[10px] text-amber-400 -mt-2">{zonePlacesHint(selectedZone)}</p>
+          )}
           <div className="flex items-center justify-between">
             <label className="text-xs text-gray-400">Exclusive (only owner may act)</label>
             <button

@@ -116,3 +116,63 @@ test('degenerate input gives sane numbers, never NaN or a negative size', () => 
   assert.deepEqual(tiny, { left: 8, top: 8, maxHeight: 0 });
   for (const v of Object.values(tiny)) assert.ok(Number.isFinite(v), `NaN in ${JSON.stringify(tiny)}`);
 });
+
+// ── M10.12 / C2: der Rechtsklick kommt am eigenen Menue vorbei ───────────────
+//
+// Der Befund: das Kontextmenue schien umzuschalten – nach einem Klick woanders
+// brauchte es zwei Rechtsklicks. Umgeschaltet hat nie jemand; die elf
+// `onContextMenu`-Handler setzen alle nur. Geschluckt hat der Klickfaenger,
+// ein `fixed inset-0 z-40` unter dem Menue, der bei offenem Menue **jeden**
+// Zeiger abfing: das Objekt bekam seinen Rechtsklick nie, der Finger seinen
+// `touchstart` nie (Langdruck-Menue M2.11), und geschlossen wurde trotzdem.
+//
+// Statt des Faengers entscheidet jetzt diese Frage am `document`. Sie steht
+// hier, weil das Kontextmenue schon diesem Modul gehoert – eine zweite Stelle
+// mit einer zweiten Lesart von "im Menue" waere der Fehler von vorhin.
+
+const { closesMenu } = await import('../../client/src/utils/menuPlacement.js');
+
+/** Ein Knoten mit genau so viel DOM, wie die Frage braucht. */
+function node(children = []) {
+  const self = {
+    children,
+    contains: (t) => t === self || children.some(c => c === t || c.contains?.(t)),
+  };
+  return self;
+}
+
+test('M10.12 Abnahme 1: ein Druck neben dem Menue schliesst es – gleich was vorher war', () => {
+  const eintrag = node();
+  const menu = node([eintrag]);
+  const karte = node();
+  assert.equal(closesMenu(karte, menu), true);
+});
+
+test('M10.12 Abnahme 2: der Druck auf ein anderes Objekt kommt durch, statt nur zu schliessen', () => {
+  // Die Umkehrung des Faengers: das Ziel ist das Objekt, nicht das Menue.
+  // Geschlossen wird, geoeffnet wird vom Handler des Objekts – beides im
+  // selben Zeigerereignis, `pointerdown` laeuft vor `contextmenu`.
+  const menu = node();
+  const anderesObjekt = node();
+  assert.equal(closesMenu(anderesObjekt, menu), true);
+});
+
+test('ein Druck IM Menue schliesst es nicht – sonst fraesse das Schliessen den Eintrag', () => {
+  const eintrag = node();
+  const menu = node([eintrag]);
+  assert.equal(closesMenu(eintrag, menu), false);
+  assert.equal(closesMenu(menu, menu), false);
+});
+
+test('tief verschachtelte Eintraege zaehlen auch als "im Menue"', () => {
+  const icon = node();
+  const knopf = node([icon]);
+  const menu = node([node([knopf])]);
+  assert.equal(closesMenu(icon, menu), false);
+});
+
+test('ohne Menue und ohne Ziel bleibt es beim Schliessen', () => {
+  assert.equal(closesMenu(node(), null), true, 'kein gemessenes Menue: nichts zu verschonen');
+  assert.equal(closesMenu(null, node()), true);
+  assert.equal(closesMenu(null, null), true);
+});
