@@ -988,6 +988,93 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (missing.length) return fail(missing.join('; '));
       state.tokens.push(...tokens);
 
+      // M8.3: je Gelaendeteil **eine** Karte, in die Reihe unter dem Hauptplan.
+      //
+      // Der Zonenname steht in den Daten, nicht im Code - genau wie das Raster
+      // (M7): "Gelaendekarten" ist ein Townsfolk-Tussle-Begriff, und der Code
+      // weiss nichts ueber Townsfolk Tussle. Ohne `cardZoneLabel` liegt keine
+      // Karte, und die vorhandenen Szenarien laufen unveraendert weiter.
+      //
+      // Anders als beim Gelaende gilt hier **nicht** "erst pruefen, dann
+      // legen": das Gelaende liegt schon. Eine fehlende Karte ist auch kein
+      // Halbaufbau, sondern ein bekannter Normalfall (die Bundo-Koenigin hat
+      // keine) - ein Abbruch dafuer liesse das ganze Kampffeld leer.
+      const notes = [];
+      const cardZone = String(scenarioData?.cardZoneLabel ?? '').trim();
+      if (cardZone) {
+        // Entdoppelt nach Assetname: zwei Holzzaeune auf dem Brett sind zwei
+        // Plaettchen und *eine* Karte. Das gilt fuer zwei Felder eines
+        // Eintrags genauso wie fuer zwei Eintraege desselben Zauns (zwei
+        // Ausrichtungen, M7.1). Reihenfolge bleibt die der Szenariodaten.
+        const wanted = [...new Map(parts
+          .flatMap(p => (Array.isArray(p?.terrain) ? p.terrain : []))
+          .map(t => [norm(t?.assetName), String(t?.assetName ?? '').trim()])).values()];
+
+        // Der Namensvergleich ist die ganze Zuordnung - dafuer tragen die
+        // Karten seit M8.3 den Namen ihres Gelaendeteils. Kein
+        // Aehnlichkeitsrechner: einer, der "SCHROTKARRE" auf "Schrottkarre"
+        // zieht, zieht beim naechsten Deck etwas Falsches.
+        // Ein Teil mit zwei Seiten heisst `Vorderseite / Rueckseite`, die Karte
+        // traegt nur den vorderen Namen. Erst exakt vergleichen, dann gegen den
+        // Teil vor dem Schraegstrich - zwei Versuche, kein dritter und kein
+        // Aehnlichkeitsrechner.
+        //
+        // Der **vordere** Teil, nicht irgendeiner: dieser Schritt legt Gelaende
+        // mit `assetToken(asset, x, y, false)` hin, also immer offen, und der
+        // Gelaendeeintrag kennt keine Seite. Was daliegt, ist die Vorderseite.
+        // Bei einem Teil, dessen Seiten zwei verschiedene Gelaende sind
+        // ("Doofster-Glocke / Kochtopf"), waere die zweite Karte die Regel zu
+        // einem Gelaende, das gar nicht auf dem Tisch liegt - schlimmer als
+        // keine Karte, weil eine falsche gelesen wird.
+        const front = (name) => (name.includes("/") ? name.slice(0, name.indexOf("/")).trim() : null);
+
+        // Entdoppelt ein zweites Mal, nun nach *Karte*: erst der Schraegstrich
+        // macht moeglich, dass zwei verschieden benannte Teile auf dieselbe
+        // Karte zeigen. Dieselbe Regel wie bei zwei Holzzaeunen.
+        const found = [];
+        for (const name of wanted) {
+          const card = cards.find(c => norm(c.name) === norm(name))
+            || (front(name) ? cards.find(c => norm(c.name) === norm(front(name))) : null);
+          if (!card) notes.push(`no terrain card named "${name}"`);
+          else if (!found.includes(card)) found.push(card);
+        }
+
+        const zone = findZone(zones, cardZone);
+        if (!zone) notes.push(`zone "${cardZone}" not found`);
+        else if (found.length) {
+          // Dieselbe Rechnung wie bei `draw_assets`: die Zone sagt, ob sie
+          // Karten nimmt und wie viele, und verteilt sie der Reihe nach.
+          const { usable, free, occupied, problems } = zoneRoom(state, [zone], 'card');
+          if (!usable.length) notes.push(...problems);
+          else {
+            const { groups, leftovers } = shareOut(found, usable, free);
+            const group = groups.get(zone);
+            const slots = zoneSlots(zone);
+            const start = occupied.get(zone);
+            group.forEach((card, i) => {
+              const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneSlot(zone, i, group.length);
+              // Per Spread aus der Bibliothekszeile, nicht ueber eine
+              // aufgezaehlte Feldliste - die hat hier schon zweimal
+              // `width`/`height` verschluckt (Nachtrag zu M2.12, M4a).
+              state.cards.push({
+                ...card,
+                tableId: crypto.randomUUID(),
+                cardId: card.id,
+                x: pos.x,
+                y: pos.y,
+                zIndex: start + i + 1,
+                faceDown: false,
+                face_up: true,
+                rotation: 0,
+              });
+            });
+            if (leftovers.length) {
+              notes.push(`${leftovers.length} of ${found.length} terrain cards not placed: ${fullZones(usable, free, 'card').join('; ')}`);
+            }
+          }
+        }
+      }
+
       // Die benannten Felder binden - zusaetzlich zu dem, was `reveal_next`
       // gebunden hat, nicht anstelle davon: der folgende Schritt legt
       // `$revealed` auf `$B`. Ein String bindet den Schluessel allein, eine
@@ -998,7 +1085,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           else ctx.vars[name] = String(value).trim();
         }
       }
-      return state;
+      // Die Platzhalter binden auch dann, wenn eine Gelaendekarte fehlte: der
+      // Boesewicht kommt trotzdem auf sein Feld.
+      return notes.length ? fail(notes.join('; ')) : state;
     }
 
     // M4a: ein Zähler ist kein Asset – er hat kein Bild und keinen Vorrat, nur
