@@ -111,6 +111,32 @@ anklickbar. Wenn nicht, ist das ein Befund.
 ruf **nicht** `/play/<id>` auf, um neu zu laden — diese Adresse öffnet einen
 leeren Tisch.
 
+**Schwenken geht von überall** — mittlere Maustaste, oder der Knopf „Pan" in
+der Werkzeugleiste (auch für Trackpads und Tastfelder).
+
+**Ansichten.** Der Knopf „Views" springt die Kamera auf eine gespeicherte
+Stelle. Damit wechselst du zwischen Schlachtfeld und Dörflerbereich, statt zu
+zoomen und zu schwenken.
+
+**Die Werkzeugleiste lässt sich einklappen** (Chevron), falls sie über etwas
+liegt.
+
+**Zwei Karten stapeln:** die eine über die andere ziehen und **~600 ms halten**,
+bis sie aufleuchtet, dann loslassen. Auf Berührung derselbe Griff, dazu „Stack
+with card below" im Langdruck-Menü. Ein gewöhnliches Ablegen verschmilzt
+**nicht** — das war Absicht, seit eine aufgedeckte Aktionskarte still in den
+Nachziehstapel zurückrutschte.
+
+**Ein Stück, das seinen Rasterplatz verliert**, bekommt einen gestrichelten
+Rand. Beiseitelegen bleibt erlaubt, es ist nur nicht mehr still.
+
+**Der Zoom folgt dem Mauszeiger.** Zum Lesen einer Karte: ALT halten, oder
+„Enlarge" im Kartenmenü.
+
+**Zonen können an eine Seite ihres Ankers gebunden sein.** Zeigt das
+Zusatz-Brett die Dorfphase, gilt die Ladenauslage; zeigt es die Kampfphase,
+gelten ACTION und DISCARD. Beide liegen auf derselben Fläche.
+
 **Grundflächen.** Der Bösewicht belegt **2×2**, ein Dörfler **1×1** — wie im
 echten Spiel (§5.10). Die Dörfler sind runde Token in Draufsicht, keine
 Figuren; sie rasten auf einzelne Rasterfelder ein. Reichweiten und
