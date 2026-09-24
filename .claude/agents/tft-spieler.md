@@ -49,8 +49,9 @@ Kampf beginnen  →  spielen  →  Dorfphase beginnen  →  Dorfereignis ziehen 
 **„Dorfphase beginnen" ist ab Runde 2 Pflicht.** Sie räumt das
 Bösewichtmaterial ab, setzt alle Attribute zurück, zahlt sechs Münzen je
 Dörfler, dreht die Leiste, wendet das Brett und füllt Heldentaten und Laden
-auf. Wer sie überspringt, bekommt beim nächsten Kampf
-`zone "Bösewicht-Platz" is full`. Das ist gewollt, kein Fehler.
+auf. Wer sie überspringt, bekommt beim nächsten Kampf **„Erst die Dorfphase
+beginnen — der vorige Kampf steht noch."**, und es passiert **nichts**. Das ist
+gewollt, kein Fehler.
 
 Ein Aufbau wird von der **Detailseite des Spiels** gestartet, nicht vom Tisch.
 Der Setup-Editor liegt hinter `?mode=setup` — zum Spielen brauchst du ihn
