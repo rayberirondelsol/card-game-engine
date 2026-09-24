@@ -382,3 +382,47 @@ test('ein Bereich in den Szenariodaten des Raums scheitert, bevor das erste Obje
   const tiles = getRoom(room_code).boardState.tokens.filter(t => t.label === 'Holzzaun');
   assert.equal(tiles.length, 0, 'kein einziges Objekt gelegt – auch im Raum gilt „erst pruefen, dann legen"');
 });
+
+// ── M8.11/E5: der Raum baut den Dauerstapel aus mehreren Kategorien ──────────
+//
+// Es gibt genau einen Executor, und die Mehr-Kategorien-Logik steckt in ihm.
+// Geprueft wird hier trotzdem der Weg: der Raum liest die Kartenbibliothek
+// ueber eigenes SQL (Kategorie als *Name* je Zeile), und ohne diesen Namen
+// waere die Liste im Schritt unadressierbar.
+
+/** Eine Kartenkategorie mit n Karten direkt in die DB. */
+function addCards(gameId, categoryName, prefix, n) {
+  const catId = randomUUID();
+  getDb().prepare('INSERT INTO categories (id, game_id, name) VALUES (?, ?, ?)')
+    .run(catId, gameId, categoryName);
+  for (let i = 0; i < n; i++) {
+    getDb().prepare(
+      'INSERT INTO cards (id, game_id, category_id, name, image_path, width, height) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(randomUUID(), gameId, catId, `${prefix}${i + 1}`, `/uploads/${prefix}${i}.png`, 300, 420);
+  }
+}
+
+test('ein place_stack mit zwei Kategorien baut den Stapel auch im Raum', async () => {
+  const gameId = await createGame();
+  addCards(gameId, 'Dorf-Ereignisse', 'h', 3);
+  addCards(gameId, 'Dorf-Ereignisse (Üble Nachbarn)', 'n', 2);
+
+  const setupId = await createSetup(gameId, {
+    state_data: JSON.stringify({ cards: [], stacks: [], tokens: [], boards: [], counters: [] }),
+    sequence_data: JSON.stringify([{
+      type: 'place_stack',
+      category: ['Dorf-Ereignisse', 'Dorf-Ereignisse (Üble Nachbarn)', 'Gibt es nicht'],
+      label: 'Dorf-Ereignisse',
+      x: 100, y: 200, faceDown: true,
+    }]),
+  });
+
+  const { room_code, started } = await startRoom(gameId, setupId);
+  assert.equal(started.statusCode, 200, started.body);
+
+  const stacks = getRoom(room_code).boardState.stacks;
+  assert.equal(stacks.length, 1);
+  assert.equal(stacks[0].label, 'Dorf-Ereignisse');
+  assert.equal(stacks[0].cards.length, 5, 'beide Kategorien, die dritte ist leer und kein Abbruch');
+  assert.ok(stacks[0].cards.every(c => c.faceDown), 'ein Nachziehstapel liegt verdeckt');
+});

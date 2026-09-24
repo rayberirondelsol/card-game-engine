@@ -81,6 +81,16 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     : 'All player zones';
   const gridLabels = (ctx.grids || []).map(g => g?.label).filter(Boolean);
 
+  // M8.11/E3: die Kategorienliste als Zeilen und zurück. Leere Zeilen bleiben
+  // beim Tippen stehen - würde man sie sofort wegwerfen, fräße das Feld die
+  // Eingabetaste; gelesen werden sie ohnehin nicht (`categoryList`). Eine
+  // einzelne Zeile bleibt ein String: so sehen alle vorhandenen Schritte
+  // hinterher aus wie vorher, und ein Array entsteht nur, wo es nötig ist.
+  const categoryLines = Array.isArray(step.category)
+    ? step.category.map(c => String(c ?? ''))
+    : [String(step.category ?? '')];
+  const linesToCategory = (lines) => (lines.length > 1 ? lines : (lines[0] || ''));
+
   const render = {
     stackLabel: () => field('Stack',
       nameSelect(step.stackLabel, ctx.stackLabels, '— no named stacks —', v => set({ stackLabel: v }), `step-${index}-stack`)),
@@ -105,10 +115,41 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     pool: () => field('Pool',
       nameSelect(step.pool, ctx.pools, '— no asset categories —', v => set({ pool: v }), `step-${index}-pool`)),
 
-    // M7/T3: `place_stack` baut aus einer *Karten*kategorie einen Nachziehstapel
+    // M7/T3: `place_stack` baut aus *Karten*kategorien einen Nachziehstapel
     // - dieselbe Auswahl wie „+ Stack" in der Kartenablage, nur als Schritt.
-    category: () => field('Cards',
-      nameSelect(step.category, ctx.cardCategories, '— no card categories —', v => set({ category: v }), `step-${index}-card-category`)),
+    //
+    // M8.11/E3: **eine Kategorie je Zeile**. Der Zeilenumbruch ist das
+    // Trennzeichen, das in einem Kategorienamen nicht vorkommen kann; ein
+    // Komma kann es (die Namen sind frei getippte Prosa aus `categories`).
+    // Die Auswahlliste darunter hängt einen bekannten Namen als Zeile an -
+    // so muss ihn niemand abtippen, und genau das ist der Schutz vor dem
+    // Tippfehler, den Regel 2 am Tisch nur noch ins Protokoll schreibt.
+    // Nebenbei wird ein Platzhalter (`Aktionen: $revealedBase`) damit
+    // überhaupt erst eintippbar; über die Auswahlliste war er es nie.
+    category: () => field('Cards', (
+      <div className="flex-1 space-y-1">
+        <textarea
+          rows={Math.max(2, categoryLines.length)}
+          value={categoryLines.join('\n')}
+          onChange={e => set({ category: linesToCategory(e.target.value.split('\n')) })}
+          placeholder="one card category per line"
+          className={`w-full ${INPUT}`}
+          data-testid={`step-${index}-card-category`}
+        />
+        <select
+          value=""
+          onChange={e => {
+            if (!e.target.value) return;
+            set({ category: linesToCategory([...categoryLines.filter(l => l.trim()), e.target.value]) });
+          }}
+          className={`w-full ${INPUT}`}
+          data-testid={`step-${index}-card-category-add`}
+        >
+          <option value="">{ctx.cardCategories.length ? '+ add category' : '— no card categories —'}</option>
+          {ctx.cardCategories.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    )),
 
     // Der feste Name neben der variablen Kategorie: die Kategorie heißt je
     // Bösewicht anders, der Stapel immer gleich - nur so findet `remove_stack`

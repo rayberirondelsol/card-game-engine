@@ -14,7 +14,7 @@
 import { counterMax, counterValueForm } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
-import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
+import { hasPlaceholder, categoryList } from '../../../shared/sequenceExecutor.js';
 import { findCardByName } from '../../../shared/cardSearch.js';
 
 /**
@@ -240,7 +240,12 @@ export function describeStep(step) {
     case 'move': return `Move ${q(step.stackLabel)} to ${step.x ?? 0}, ${step.y ?? 0}`;
     case 'place_stack': {
       const where = step?.targetZoneLabel ? `in zone ${q(step.targetZoneLabel)}` : `at ${step.x ?? 0}, ${step.y ?? 0}`;
-      return `Place card category ${q(step.category)} as stack ${q(step.label)} ${where}${down(step)}`;
+      // M8.11/E2: die Kategorien stehen einzeln da. Eine zusammengeklebte
+      // Zeile („A,B") liest sich wie *ein* Name mit Komma - und genau den
+      // Unterschied soll die Zeile zeigen.
+      const cats = categoryList(step?.category);
+      const what = cats.length ? cats.map(c => `"${c}"`).join(' + ') : '(none)';
+      return `Place card categor${cats.length > 1 ? 'ies' : 'y'} ${what} as stack ${q(step.label)} ${where}${down(step)}`;
     }
     case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
     case 'place_card': return `Place the card named ${q(step.cardName)} in ${zone}`;
@@ -356,9 +361,18 @@ export function validateStep(step, ctx = {}) {
   // M7/T3: `place_stack` liest eine *Karten*kategorie – dieselbe Idee wie der
   // Pool bei `draw_assets`, nur die andere Bibliothek. Der Stapelname daneben
   // ist Pflicht: ohne ihn findet `remove_stack` den Stapel nie wieder.
+  // M8.11/E2: die Kategorie ist eine **Liste**, und jeder Eintrag wird einzeln
+  // geprüft. Hier ist die einzige Stelle, die einen Tippfehler von einer
+  // absichtlich weggelassenen Erweiterung unterscheiden kann: der Executor
+  // sieht nur die Kartenbibliothek, für ihn sind „gibt es nicht" und „hat
+  // keine Karten" dasselbe. Der Tippfehler wird hier gemacht und gehört hier
+  // gemeldet - am Tisch ist er nach Regel 2 nur noch eine Zeile im Protokoll.
   if (fields.has('category')) {
-    if (!step?.category) problems.push('no card category chosen');
-    else if (!hasPlaceholder(step.category) && !known(cardCategories, step.category)) problems.push(`card category "${step.category}" is empty or unknown`);
+    const cats = categoryList(step?.category);
+    if (!cats.length) problems.push('no card category chosen');
+    for (const cat of cats) {
+      if (!hasPlaceholder(cat) && !known(cardCategories, cat)) problems.push(`card category "${cat}" is empty or unknown`);
+    }
   }
   if (fields.has('label') && !String(step?.label ?? '').trim()) problems.push('no stack name given');
   // M8.8/A3: der Name wird hier gegen die Kartenzeilen gehalten, nicht erst am

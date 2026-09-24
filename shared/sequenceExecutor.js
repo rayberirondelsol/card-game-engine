@@ -99,7 +99,10 @@ function stepTarget(step) {
   // `category` vor `label`: wie bei jedem anderen Schritt steht im Protokoll,
   // *woraus* er baut (place_stack liest eine Kartenkategorie), nicht was dabei
   // herauskommt. `label` bleibt als Rückfall, damit die Zeile nie namenlos ist.
-  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.category ?? step?.label ?? step?.name ?? null;
+  // `category` kann eine Liste sein (M8.11/E1) - dann steht sie lesbar
+  // getrennt da statt als aneinandergeklebte Zeichenkette.
+  const category = Array.isArray(step?.category) ? step.category.join(' + ') : step?.category;
+  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? category ?? step?.label ?? step?.name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -145,6 +148,37 @@ function topZIndex(state) {
 // ── Asset helpers ─────────────────────────────────────────────────────────────
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
+
+/**
+ * M8.11/E1: die Kategorien eines `place_stack`, immer als Liste.
+ *
+ * Ein Deck aus mehreren Sätzen ist in diesem Spiel der Normalfall - das
+ * Ereignisdeck sind `Dorf-Ereignisse` (100) plus `Dorf-Ereignisse (Üble
+ * Nachbarn)` (5). Ein **String bleibt die Kurzform für die einelementige
+ * Liste**: jeder vorhandene Schritt ist einer, einschließlich
+ * `"Aktionen: $revealedBase"`, und keiner davon wird angefasst.
+ *
+ * Kein Komma als Trennzeichen im Text: ein Kategoriename ist frei getippte
+ * Prosa aus der Tabelle `categories` und darf ein Komma enthalten. Ein
+ * Trennzeichen, das im Wert vorkommen darf, macht genau die Namen
+ * unadressierbar, die es enthalten - und still, weil ein unbekannter Name nach
+ * Regel 2 nur im Protokoll landet.
+ *
+ * Doppelte fallen raus: dieselbe Kategorie zweimal genannt legte ihre Karten
+ * sonst zweimal in den Stapel, und im verdeckten Ereignisdeck sieht das
+ * niemand.
+ */
+export function categoryList(category) {
+  const raw = Array.isArray(category) ? category : [category];
+  const out = [], seen = new Set();
+  for (const c of raw) {
+    const name = String(c ?? '').trim();
+    if (!name || seen.has(norm(name))) continue;
+    seen.add(norm(name));
+    out.push(name);
+  }
+  return out;
+}
 
 /** Look up a table_asset row by its name. */
 function findAsset(assets, name) {
@@ -346,17 +380,25 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
   // unresolved: falling back to the literal "$revealed" would address whatever
   // asset happens to carry that name, and guessing a boss is worse than not
   // laying one out.
+  // Ein Listenfeld (`category` seit M8.11/E1) wird je Eintrag ersetzt.
+  // `hasPlaceholder` prüft auf Zeichenkette, ein Array fiele sonst durch den
+  // Rost - und aus ["Aktionen: $revealedBase"] würde wortwörtlich nach dem
+  // Dollarzeichen gesucht, ohne dass irgendwo "is not bound" stünde.
   for (const field of NAME_FIELDS) {
     const raw = step[field];
-    if (!hasPlaceholder(raw)) continue;
-    let missing = null;
-    const filled = raw.replace(PLACEHOLDER, (m) => {
-      const value = ctx.vars[m.slice(1)];
-      if (value === undefined) { missing = missing || m; return m; }
-      return value;
+    const parts = Array.isArray(raw) ? raw : [raw];
+    if (!parts.some(hasPlaceholder)) continue;
+    let missing = null, missingIn = null;
+    const filled = parts.map(part => {
+      if (!hasPlaceholder(part)) return part;
+      return part.replace(PLACEHOLDER, (m) => {
+        const value = ctx.vars[m.slice(1)];
+        if (value === undefined) { missing = missing || m; missingIn = missingIn ?? part; return m; }
+        return value;
+      });
     });
-    if (missing) return skip(`"${raw}": ${missing} is not bound`);
-    step = { ...step, [field]: filled };
+    if (missing) return skip(`"${missingIn}": ${missing} is not bound`);
+    step = { ...step, [field]: Array.isArray(raw) ? filled : filled[0] };
   }
 
   switch (step.type) {
@@ -450,8 +492,22 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (!label) return skip('no stack name given');
       if (idx.get(label)) return skip(`stack "${label}" is already on the table`);
 
-      const inCategory = cards.filter(c => norm(c.category) === norm(step.category));
-      if (!inCategory.length) return skip(`category "${step.category ?? ''}" is empty or unknown`);
+      // M8.11/E1: mehrere Kategorien, in der Reihenfolge der Angabe. Eine
+      // leere darunter ist **kein Abbruch**, solange eine andere liefert -
+      // sonst müsste man jeden Schritt umschreiben, um eine Erweiterung
+      // wegzulassen. Sie landet im Protokoll (Regel 2). Erst wenn *alle* leer
+      // sind, bleibt es beim bisherigen Übersprungen-mit-Grund (Regel 3).
+      const wanted = categoryList(step.category);
+      if (!wanted.length) return skip('no card category given');
+
+      const inCategory = [], nothing = [];
+      for (const name of wanted) {
+        const hits = cards.filter(c => norm(c.category) === norm(name));
+        if (hits.length) inCategory.push(...hits);
+        else nothing.push(name);
+      }
+      const missed = nothing.map(n => `"${n}"`).join(', ');
+      if (!inCategory.length) return skip(`category ${missed} is empty or unknown`);
 
       // R3/M7.5: eine Zone ist die zweite Art zu sagen, wo der Stapel hingehört
       // - dieselbe Ausschließlichkeit wie bei `place_asset`. Das Aktionsdeck
@@ -504,6 +560,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         card_ids: stackCards.map(c => c.cardId),
         table_ids: stackCards.map(c => c.tableId),
       });
+      // Regel 2: der Stapel steht, aber es gehört gesagt, was gefehlt hat -
+      // wie beim `place_card`, der in einen Dublettenstapel greift.
+      if (nothing.length) entry.reason = `category ${missed} is empty or unknown`;
       return state;
     }
 

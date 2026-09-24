@@ -2388,3 +2388,53 @@ und steht hier ausdrücklich als offener Punkt.
 5. Ein von Hand gezogener Marker rastet auf das nächste Feld ein.
 6. Ein Marker auf der Accuracy-Leiste bei Wert −1 liegt vier Felder über dem
    untersten.
+
+### M8.11 — Der Aufbau muss seine Dauerstapel selbst bauen
+
+**Befund, aus einem Unfall gelernt.** Die drei Dauerstapel — `Dorf-Ereignisse`,
+`Heldentaten`, `Nachschub (Tante Emma)` — lagen seit jeher von Hand auf dem
+Tisch. Die Aufbausequenz **mischt** sie nur; angelegt hat sie nie jemand. Am
+24.09. hat ein offener Browser-Tab einen leeren Tisch gespeichert, und damit
+waren alle drei weg. Der Aufbau war nicht mehr startbar: neun Schritte
+scheiterten an „stack not found", und es gab keinen Weg zurück außer von Hand.
+
+Ein Aufbau, der eine Voraussetzung braucht, die er nicht selbst herstellt, ist
+kein Aufbau.
+
+**Was dafür fehlt.** `place_stack` baut aus **einer** Kategorie
+(`norm(c.category) === norm(step.category)`). Das Ereignisdeck besteht aus
+zweien: `Dorf-Ereignisse` (100) und `Dorf-Ereignisse (Üble Nachbarn)` (5). Ein
+Deck aus mehreren Sätzen ist in diesem Spiel der Normalfall, nicht die
+Ausnahme — jede Erweiterung legt Karten in dieselben Stapel.
+
+**Regel.**
+
+1. `place_stack` nimmt **mehrere** Kategorien. Die Reihenfolge der Angabe ist
+   die Reihenfolge im Stapel; gemischt wird wie bisher mit einem eigenen
+   Schritt.
+2. Eine Kategorie, die es nicht gibt oder die leer ist, ist **kein Abbruch**,
+   solange mindestens eine andere Karten liefert — sonst könnte man keine
+   Erweiterung weglassen, ohne jeden Schritt umzuschreiben. Sie landet im
+   Protokoll.
+3. Sind **alle** genannten Kategorien leer, bleibt es beim bisherigen
+   Verhalten: übersprungen, mit Grund.
+
+**Die Solo-Regel wird damit zu einer Kategorie.** §2.2 verlangt, die geheimen
+Dorf-Ereignisse vor Partiebeginn auszusortieren. Statt einer Sonderregel im
+Code bekommen die 25 Karten mit dem roten **GEHEIM!**-Balken die eigene
+Kategorie `Dorf-Ereignisse (geheim)`. Wer solo spielt, nennt sie im
+`place_stack` nicht; wer zu mehreren spielt, nennt sie mit. Der Executor weiß
+weiterhin nichts über Townsfolk Tussle.
+
+Erkannt wurden sie am Bild: ein durchgehendes rotes Band über den oberen zwei
+Prozent der Karte. 25 von 105 Ereigniskarten tragen es, alle anderen messen
+null. Vier davon sind einzeln nachgesehen.
+
+**Abnahme.**
+1. `place_stack` mit zwei Kategorien legt einen Stapel aus allen Karten beider.
+2. Mit einer unbekannten und einer gefüllten Kategorie entsteht der Stapel aus
+   der gefüllten, und die unbekannte steht im Protokoll.
+3. Mit nur unbekannten Kategorien entsteht kein Stapel, mit Grund.
+4. Eine einzelne Kategorie verhält sich unverändert — alle vorhandenen
+   `place_stack`-Schritte laufen weiter.
+5. Der Aufbau baut die drei Dauerstapel selbst; ein leerer Tisch genügt ihm.
