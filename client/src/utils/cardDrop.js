@@ -34,7 +34,7 @@
  * `server/test/card-drop.test.js`.
  */
 
-import { CARD_WIDTH, CARD_HEIGHT } from './cardDims.js';
+import { CARD_WIDTH, CARD_HEIGHT, getCardDims } from './cardDims.js';
 
 /**
  * Der Stapel, auf dem `point` liegt.
@@ -71,4 +71,50 @@ export function stackAt(point, stacks) {
   }
 
   return best && best.id;
+}
+
+/**
+ * Die Kandidatenlisten fuer `stackAt` (Spec M10.9, Aufgabe U6).
+ *
+ * `stackCandidates` stand als `dropCandidates` in `GameTable.jsx` und war
+ * damit ungeprueft. `looseCandidates` ist die Schwester fuer lose Karten: seit
+ * M10.4 gruendet ein Ablegen keinen Stapel mehr, und der **absichtliche** Weg –
+ * beim Ablegen halten, oder der Eintrag im Kartenmenue – fragt dieselbe Frage
+ * wie das Beitreten zu einem Stapel. Eine zweite Geometrie waere eine zweite
+ * Antwort; beide Listen gehen darum in dasselbe `stackAt`.
+ */
+
+/** Die Menge der ausgeschlossenen Karten, aus Set, Array oder nichts. */
+function excluded(ids) {
+  if (ids instanceof Set) return ids;
+  return new Set(Array.isArray(ids) ? ids : []);
+}
+
+/**
+ * Je Stapel ein Eintrag, mit Stelle und Anzeigemassen seiner Karten. Der
+ * eigene Stapel ist nie dabei.
+ */
+export function stackCandidates(cards, ownStackId) {
+  const seen = new Map();
+  for (const c of Array.isArray(cards) ? cards : []) {
+    if (!c?.inStack || c.inStack === ownStackId || seen.has(c.inStack)) continue;
+    const { w, h } = getCardDims(c);
+    seen.set(c.inStack, { id: c.inStack, x: c.x, y: c.y, w, h });
+  }
+  return [...seen.values()];
+}
+
+/**
+ * Je lose Karte ein Eintrag. Karten in einem Stapel gehoeren in
+ * `stackCandidates`, die gezogene und ihre Mitgezogenen stehen in `excludeIds`.
+ */
+export function looseCandidates(cards, excludeIds) {
+  const skip = excluded(excludeIds);
+  const out = [];
+  for (const c of Array.isArray(cards) ? cards : []) {
+    if (!c || c.inStack || skip.has(c.tableId)) continue;
+    const { w, h } = getCardDims(c);
+    out.push({ id: c.tableId, x: c.x, y: c.y, w, h });
+  }
+  return out;
 }

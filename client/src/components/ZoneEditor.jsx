@@ -591,15 +591,15 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
               />
             </button>
           </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Camera Start Position</label>
-            <button
-              type="button"
-              className="w-full px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded"
-            >
-              Save Current View
-            </button>
-          </div>
+          {/* M10.6/U4: "Save Current View" stand hier ohne Handler
+              (audit-dead-controls Fund 2) und ist weg. Die Zone ist nicht der
+              Traeger einer Ansicht: `createZone` setzt `cameraX/Y/Zoom` bei
+              *jeder* Zone auf die Rechteckmitte, es gibt also keine Zone ohne
+              Ansicht, und die Auswahl haette die vierzig Eintraege, die M10.6
+              Regel 3 ausdruecklich verbietet. Benannte Ansichten liegen jetzt
+              am Spielstand und werden am Tisch angelegt, wo sie gebraucht
+              werden – der Setup-Editor ist waehrend der Partie gar nicht
+              erreichbar. Siehe `client/src/utils/tableViews.js`. */}
           <button
             type="button"
             onClick={() => deleteZone(selectedZone.id)}

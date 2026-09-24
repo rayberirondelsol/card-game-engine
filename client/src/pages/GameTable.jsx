@@ -32,7 +32,8 @@ import { canStartPan } from '../utils/panTarget.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { stackAt } from '../utils/cardDrop.js';
+import { stackAt, stackCandidates, looseCandidates } from '../utils/cardDrop.js';
+import { normalizeViews, putView, removeView, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, ZOOM_MIN, ZOOM_MAX } from '../utils/cameraZoom.js';
@@ -381,8 +382,20 @@ export default function GameTable({ room = null }) {
   const [error, setError] = useState(null);
   const [background, setBackground] = useState('felt');
   const [showBgPicker, setShowBgPicker] = useState(false);
+  // M10.8/U5: die Leiste lag zweimal ueber einem Lebenszaehler, und der Spieler
+  // musste den ganzen Tisch schwenken, um an ein Minuszeichen zu kommen. Der
+  // Zustand gab es seit jeher, der Setter wurde nie gerufen
+  // (audit-dead-controls Fund 6). Bewusst nicht gespeichert: die Regel erlaubt
+  // es ("ueberlebt einen Neuaufbau nicht zwingend"), und alles andere waere die
+  // Frage "je Spiel oder je Geraet?", die niemand gestellt hat.
   const [showToolbar, setShowToolbar] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  // M10.7/U2: der Schwenkmodus – der Weg zum Schwenken ohne mittlere Maustaste,
+  // also auf Tastfeld und Trackpad. Begruendung in `panTarget.js`.
+  const [panMode, setPanMode] = useState(false);
+  // M10.6/U4: die benannten Ansichten dieses Spielstands.
+  const [views, setViews] = useState([]);
+  const [showViews, setShowViews] = useState(false);
 
   // Save state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -434,6 +447,9 @@ export default function GameTable({ room = null }) {
   const cameraRef = useRef({ x: 0, y: 0, zoom: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
+  // Die nativen Horcher haengen in einem `useEffect` und sehen `panMode` nicht.
+  const panModeRef = useRef(false);
+  panModeRef.current = panMode;
   const isPinchingRef = useRef(false);
   const pinchStartDistanceRef = useRef(0);
   const pinchStartZoomRef = useRef(1);
@@ -477,13 +493,9 @@ export default function GameTable({ room = null }) {
    * Eingabe fuer `stackAt`. Der eigene Stapel ist nie dabei.
    */
   function dropCandidates(ownStackId) {
-    const seen = new Map();
-    for (const c of tableCards) {
-      if (!c.inStack || c.inStack === ownStackId || seen.has(c.inStack)) continue;
-      const { w, h } = getCardDims(c);
-      seen.set(c.inStack, { id: c.inStack, x: c.x, y: c.y, w, h });
-    }
-    return [...seen.values()];
+    // M10.9/U6: die Liste steht jetzt in `cardDrop.js`, neben `stackAt` und
+    // neben der Schwesterliste fuer lose Karten – hier war sie ungeprueft.
+    return stackCandidates(tableCards, ownStackId);
   }
 
   // Game objects state (counters, dice, hitDice, notes, tokens, textFields)
@@ -567,6 +579,11 @@ export default function GameTable({ room = null }) {
   ]), [tokens, tableCards, counters, notes, textFields, customDiceOnTable, hitDice, dice]);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
   const [stackDropTarget, setStackDropTarget] = useState(null); // stackId of stack being targeted for drop
+  // M10.9/U7: die **lose** Karte, auf der die gezogene liegenbleibt, wenn man
+  // beim Ablegen haelt. Was leuchtet, ist was passiert – beim Loslassen wird
+  // nicht noch einmal die Uhr befragt.
+  const [mergeTarget, setMergeTarget] = useState(null);
+  const mergeHoldRef = useRef({ x: 0, y: 0, timer: null });
   const [stackNames, setStackNames] = useState({}); // stackId → name for named stacks
   const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // mouse position for hover preview
@@ -675,6 +692,15 @@ export default function GameTable({ room = null }) {
   const longPressPreviewTimerRef = useRef(null);
   const longPressPreviewTouchPosRef = useRef({ x: 0, y: 0 }); // initial touch position to detect movement
   const LONG_PRESS_PREVIEW_DELAY = 500; // milliseconds for long-press to trigger preview
+  // M10.9/U7: so lange muss der Zeiger ueber einer losen Karte stehen, damit
+  // sie zum Stapelziel wird.
+  //
+  // **Ja, wieder ein Langdruck** – aber am anderen Ende des Zuges. M9.4 hat
+  // ihn gestrichen, weil er am *Anfang* sass: wer einen Stapel nur verschieben
+  // wollte, der alltaegliche Griff, musste eine halbe Sekunde warten, bevor
+  // ueberhaupt etwas geschah. Hier zahlt nur, wer stapeln will; wer gewoehnlich
+  // ablegt, laesst los und zahlt nichts. Der teure Weg ist jetzt der seltene.
+  const MERGE_HOLD_DELAY = 600; // milliseconds
   // M2.11: Langdruck auf ein Tisch-Objekt öffnet das Kontextmenü (auf Touch gibt
   // es keinen Rechtsklick, und das Löschen-Kreuz ist abgeschafft). Eigene Refs,
   // damit der Karten-Langdruck oben unberührt bleibt.
@@ -918,7 +944,15 @@ export default function GameTable({ room = null }) {
     function handleMouseDown(e) {
       // M2.13: pan on the background – and on anything that cannot be dragged,
       // e.g. a locked board filling the screen. One rule, three callers.
-      if (e.button === 1 || (e.button === 0 && canStartPan(e.target, canvas, container))) {
+      //
+      // M10.7/U1: die Tastennummer und der Schwenkmodus stehen jetzt **in**
+      // `canStartPan`. `e.button === 1` stand hier und in `handleGlobalStart`
+      // daneben – zwei Antworten auf dieselbe Frage, und der Modus waere die
+      // dritte gewesen.
+      if (canStartPan(e.target, canvas, container, { button: e.button, panMode: panModeRef.current })) {
+        // Ohne das startet Windows bei der mittleren Taste die
+        // Bildlauf-Automatik samt eigenem Zeiger.
+        if (e.button === 1) e.preventDefault();
         isPanningRef.current = true;
         panStartRef.current = {
           x: e.clientX,
@@ -1283,6 +1317,9 @@ export default function GameTable({ room = null }) {
   function handleCardDragStart(e, tableId) {
     // Only start drag on left mouse button (button 0) - ignore right-click (button 2)
     if (!isTouchEvent(e) && e.button !== 0) return;
+    // M10.7/U2: im Schwenkmodus zieht nichts. Sonst zoege ein Zug auf einer
+    // Karte die Karte **und** den Tisch.
+    if (panModeRef.current) return;
 
     // For touch events: delay drag start to detect taps vs holds
     if (isTouchEvent(e)) {
@@ -1503,6 +1540,30 @@ export default function GameTable({ room = null }) {
       card ? stackAt({ x: snapX, y: snapY }, dropCandidates(card.inStack)) : null,
     );
 
+    // M10.9/U7: Halten beim Ablegen. Der Zeitgeber wird bei **jeder** echten
+    // Bewegung neu gestellt; er laeuft also nur ab, wenn der Zeiger steht.
+    // Keine Uhr beim Loslassen – die Hervorhebung *ist* die Bedingung.
+    // Nur fuer eine lose Karte: einem Stapel tritt man wie bisher sofort bei.
+    const held = mergeHoldRef.current;
+    if (Math.abs(pointer.clientX - held.x) > 3 || Math.abs(pointer.clientY - held.y) > 3) {
+      held.x = pointer.clientX;
+      held.y = pointer.clientY;
+      clearTimeout(held.timer);
+      held.timer = null;
+      setMergeTarget(null);
+      if (card && !card.inStack) {
+        // Die Mitgezogenen einer Mehrfachauswahl sind kein Ziel fuer sich.
+        const moving = new Set(selectedCards.has(draggingCard) ? selectedCards : [draggingCard]);
+        moving.add(draggingCard);
+        const at = { x: snapX, y: snapY };
+        const cards = tableCards;
+        held.timer = setTimeout(() => {
+          held.timer = null;
+          setMergeTarget(stackAt(at, looseCandidates(cards, moving)));
+        }, MERGE_HOLD_DELAY);
+      }
+    }
+
     // Move the card (and all cards in the same stack or multi-selection)
     const dx = newX - card.x;
     const dy = newY - card.y;
@@ -1546,6 +1607,13 @@ export default function GameTable({ room = null }) {
 
   // Handle card drag end - snap to grid and detect drop on stack
   function handleCardDragEnd() {
+    // M10.9/U7: der Haltezeitgeber endet mit dem Zug, egal welcher der Ausgaenge
+    // unten genommen wird. `mergeTarget` selbst steht als Wert dieses Renders
+    // fest und wird davon nicht leer – das Leeren gilt dem naechsten Zug.
+    clearTimeout(mergeHoldRef.current.timer);
+    mergeHoldRef.current.timer = null;
+    setMergeTarget(null);
+
     // Clear long-press preview timer (Feature #58)
     if (longPressPreviewTimerRef.current) {
       clearTimeout(longPressPreviewTimerRef.current);
@@ -1674,6 +1742,31 @@ export default function GameTable({ room = null }) {
       return;
     }
 
+    // M10.9/U7: kein Stapel, aber eine lose Karte, ueber der lange genug
+    // gehalten wurde – das ist der absichtliche Weg, den M10.4 offengelassen
+    // hat. Gestapelt wird an der Stelle der **liegenden** Karte: sie ist die,
+    // die sich nicht bewegt hat.
+    //
+    // Das Halten sagt die **Absicht**, die endgueltige Stelle sagt die
+    // **Geometrie** – dieselbe Trennung wie in M10.4/J3. Die Vorschau rechnet
+    // mit dem Rasterpunkt, ein Zonenplatz kann die Karte danach noch
+    // verschieben; wer dann nicht mehr auf der anderen Karte liegt, stapelt
+    // auch nicht. Genau andersherum fiel in der dritten Partie eine aufgedeckte
+    // Karte von der `Ablage` in den Nachziehstapel.
+    if (mergeTarget && !card.inStack && mergeTarget !== draggingCard
+        && stackAt({ x: finalX, y: finalY },
+                   looseCandidates(tableCards, new Set([draggingCard]))) === mergeTarget) {
+      const below = tableCards.find(c => c.tableId === mergeTarget);
+      if (below && !below.inStack) {
+        stackCards([mergeTarget, draggingCard], { x: below.x, y: below.y });
+        triggerHaptic('drop');
+        setDraggingCard(null);
+        setGridHighlight(null);
+        setStackDropTarget(null);
+        return;
+      }
+    }
+
     // No stack merge - always snap to grid on release
     const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
     const snapDx = finalX - card.x;
@@ -1726,35 +1819,62 @@ export default function GameTable({ room = null }) {
     setStackDropTarget(null);
   }
 
+  /**
+   * Aus mehreren Karten einen Stapel machen (M10.9/U7).
+   *
+   * Der Kern hinter `G` **und** hinter dem Halten beim Ablegen und dem Eintrag
+   * im Kartenmenue. Drei Wege, eine Tat – sonst stuenden drei Fassungen des
+   * Stapelbaus nebeneinander, und die naechste Aenderung erwischte zwei davon.
+   *
+   * Die Reihenfolge von `ids` ist die Reihenfolge im Stapel: der letzte liegt
+   * oben.
+   */
+  function stackCards(ids, at) {
+    const wanted = ids.filter(id => tableCards.some(c => c.tableId === id));
+    if (wanted.length < 2) return null;
+
+    const stackId = crypto.randomUUID();
+    const cardsToStack = tableCards.filter(c => wanted.includes(c.tableId));
+    const x = at ? at.x : cardsToStack.reduce((s, c) => s + c.x, 0) / cardsToStack.length;
+    const y = at ? at.y : cardsToStack.reduce((s, c) => s + c.y, 0) / cardsToStack.length;
+
+    const newZ = maxZIndex + 1;
+    setMaxZIndex(newZ + wanted.length);
+
+    setTableCards(prev => prev.map(c => {
+      if (!wanted.includes(c.tableId)) return c;
+      return {
+        ...c,
+        x,
+        y,
+        inStack: stackId,
+        zIndex: newZ + wanted.indexOf(c.tableId),
+        // Eine gestapelte Karte sitzt auf keinem eigenen Rasterfeld mehr –
+        // sonst zoege `placeOnGrids` den Stapel beim naechsten Laden
+        // auseinander. Dieselbe Zeile steht im Beitritts-Zweig von
+        // `handleCardDragEnd`, sie fehlte nur hier.
+        gridId: null,
+        cell: null,
+      };
+    }));
+    return stackId;
+  }
+
+  /**
+   * Die lose Karte unter einer losen Karte (M10.9/U7) – die Frage, die der
+   * Menueeintrag stellt. Dieselbe Geometrie wie das Halten beim Ablegen und
+   * wie der Beitritt zu einem Stapel: `stackAt`.
+   */
+  function cardBelow(tableId) {
+    const card = tableCards.find(c => c.tableId === tableId);
+    if (!card || card.inStack) return null;
+    return stackAt({ x: card.x, y: card.y }, looseCandidates(tableCards, new Set([tableId])));
+  }
+
   // Group selected cards into a stack
   function groupSelectedCards() {
     if (selectedCards.size < 2) return;
-    const stackId = crypto.randomUUID();
-    const selectedArray = Array.from(selectedCards);
-
-    // Find the average position for the stack
-    let sumX = 0, sumY = 0, count = 0;
-    const cardsToStack = tableCards.filter(c => selectedCards.has(c.tableId));
-    cardsToStack.forEach(c => { sumX += c.x; sumY += c.y; count++; });
-    const avgX = sumX / count;
-    const avgY = sumY / count;
-
-    // Update cards to be in the stack, stacked at the same position
-    const newZ = maxZIndex + 1;
-    setMaxZIndex(newZ + count);
-
-    setTableCards(prev => prev.map(c => {
-      if (!selectedCards.has(c.tableId)) return c;
-      const idx = selectedArray.indexOf(c.tableId);
-      return {
-        ...c,
-        x: avgX,
-        y: avgY,
-        inStack: stackId,
-        zIndex: newZ + idx,
-      };
-    }));
-
+    stackCards(Array.from(selectedCards), null);
     setSelectedCards(new Set());
   }
 
@@ -2049,6 +2169,8 @@ export default function GameTable({ room = null }) {
   function handleObjDragStart(e, objType, objId) {
     // Only start drag on left mouse button
     if (!isTouchEvent(e) && e.button !== 0) return;
+    // M10.7/U2: im Schwenkmodus zieht nichts – siehe handleCardDragStart.
+    if (panModeRef.current) return;
 
     // Prevent default for touch events
     if (isTouchEvent(e)) {
@@ -2608,6 +2730,10 @@ export default function GameTable({ room = null }) {
       setDraggingCard(null);
       setGridHighlight(null);
       setStackDropTarget(null);
+      // M10.9/U7: ein abgebrochener Zug stapelt nichts.
+      clearTimeout(mergeHoldRef.current.timer);
+      mergeHoldRef.current.timer = null;
+      setMergeTarget(null);
     }
 
     // 4. Cancel object drag
@@ -2940,6 +3066,35 @@ export default function GameTable({ room = null }) {
   // ===== SAVE/LOAD FUNCTIONS =====
 
   // Serialize the entire game state into a JSON-friendly object
+  // ─── M10.6/U4: benannte Ansichten ────────────────────────────────────────
+  //
+  // Der Befund: bei spielbarem Zoom liegen die zwoelf Attributzaehler der drei
+  // Doerfler mehrere hundert Pixel unterhalb des Bildes; ein Kampf kostete
+  // etwa fuenfzehn Ausfluege. Die Spec verweist auf `cameraX/Y/Zoom` an der
+  // Zone – die aber jede Zone hat und die niemand entschieden hat. Warum das
+  // der falsche Traeger ist, steht in `client/src/utils/tableViews.js`.
+
+  /** Die Kamera auf eine gespeicherte Ansicht setzen. */
+  function goToView(view) {
+    const camera = cameraRef.current;
+    camera.x = view.x;
+    camera.y = view.y;
+    camera.zoom = view.zoom;
+    setZoomDisplay(Math.round(camera.zoom * 100));
+    setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
+    renderCanvas();
+    setShowViews(false);
+  }
+
+  /** Was man gerade sieht, unter einem Namen ablegen. */
+  function saveCurrentView() {
+    // `prompt` statt eines eigenen Dialogs: er geht auf Maus und auf Tastfeld,
+    // und ein Dialog fuer ein Textfeld waere der teurere Weg zum selben Wort.
+    const label = window.prompt('Name der Ansicht (z. B. "Schlachtfeld")');
+    if (label === null) return;
+    setViews(prev => putView(prev, label, cameraRef.current));
+  }
+
   function getGameState() {
     const camera = cameraRef.current;
     // Separate stacked cards: identify unique stacks
@@ -3103,6 +3258,11 @@ export default function GameTable({ room = null }) {
       })),
       stackNames: stackNames,
       maxZIndex: maxZIndex,
+      // M10.6/U4: die benannten Ansichten reisen im Spielstand mit – dort, wo
+      // `camera`, `background` und `stackNames` schon stehen. `state_data` ist
+      // beim Server ein undurchsichtiger JSON-Text, also kostet das keine
+      // Migration. **Nicht** an der Zone, Begruendung in `tableViews.js`.
+      views,
     };
   }
 
@@ -3495,6 +3655,10 @@ export default function GameTable({ room = null }) {
     if (state.background && TABLE_BACKGROUNDS[state.background]) {
       setBackground(state.background);
     }
+
+    // M10.6/U4: die benannten Ansichten. Ueber `normalizeViews`, weil ein
+    // Spielstand alles enthalten kann – auch einen aelteren ohne das Feld.
+    setViews(normalizeViews(state.views));
 
     // Restore loose cards
     const restoredCards = [];
@@ -4037,14 +4201,17 @@ export default function GameTable({ room = null }) {
     const pointer = getPointerPosition(e);
     // M2.13: same rule as the native mouse handler above – the background pans,
     // and so does a locked object, which no drag would pick up anyway.
-    const mayPan = canStartPan(e.target, canvasRef.current, containerRef.current);
-
-    // For mouse: check button; for touch: no button check needed
+    // M10.7/U1: dazu die mittlere Maustaste und der Schwenkmodus, in derselben
+    // Funktion statt daneben. Eine Beruehrung hat keine Taste und bekommt die
+    // Vorgabe 0.
     const isTouchStart = isTouchEvent(e);
-    const isValidMouseStart = !isTouchStart && (e.button === 1 || (e.button === 0 && mayPan));
-    const isValidTouchStart = isTouchStart && mayPan;
+    const mayPan = canStartPan(e.target, canvasRef.current, containerRef.current, {
+      button: isTouchStart ? 0 : e.button,
+      panMode: panModeRef.current,
+    });
 
-    if (isValidMouseStart || isValidTouchStart) {
+    if (mayPan) {
+      if (!isTouchStart && e.button === 1) e.preventDefault();
       isPanningRef.current = true;
       panStartRef.current = {
         x: pointer.clientX,
@@ -4353,7 +4520,16 @@ export default function GameTable({ room = null }) {
           const isDragging = draggingCard === card.tableId;
           const isSelected = selectedCards.has(card.tableId);
           const isStack = stackSize > 1;
-          const isDropTarget = stackDropTarget === stackId; // Highlight if this stack is a drop target
+          // Highlight if this stack is a drop target – oder, seit M10.9/U7, wenn
+          // diese lose Karte das Ziel des Haltens ist.
+          //
+          // `stackDropTarget === stackId` allein war falsch: lose Karten werden
+          // mit `stackId === null` gezeichnet, und `stackDropTarget` ist null,
+          // solange nichts gezogen wird. Jede lose Karte lag also dauerhaft im
+          // gruenen Leuchten und um 5 % vergroessert da – und genau dieses
+          // Leuchten ist jetzt eine Aussage.
+          const isDropTarget = (stackId !== null && stackDropTarget === stackId)
+            || mergeTarget === card.tableId;
           const { w: cardW, h: cardH } = getCardDims(card);
           // Spec section 6: a face-down card keeps its name to itself. The front
           // face stays mounted for the flip animation, so its alt text and name
@@ -5768,6 +5944,43 @@ export default function GameTable({ room = null }) {
               {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Table</span>}
             </button>
 
+            {/* M10.7/U2: der Schwenkmodus. Die mittlere Maustaste gibt es auf
+                einem Tastfeld und auf vielen Trackpads nicht; zwei Finger sind
+                schon doppelt belegt (Kneifzoom, Drehen bei gezogener Karte).
+                Ein Modus kollidiert mit keiner Geste und ist weniger Code. */}
+            <button
+              onClick={() => setPanMode(prev => !prev)}
+              data-testid="toolbar-pan-btn"
+              className={`flex flex-col items-center gap-0.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'} ${panMode ? 'bg-blue-600/80 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
+              title="Pan mode – drag anywhere to move the table (middle mouse button does the same)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" />
+                <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" />
+                <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" />
+                <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+              </svg>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Pan</span>}
+            </button>
+
+            {/* M10.6/U4: benannte Ansichten. Der Knopf steht am Tisch und nicht
+                im Setup-Editor, weil der Befund aus der Partie stammt. */}
+            <button
+              onClick={() => setShowViews(prev => !prev)}
+              data-testid="toolbar-views-btn"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-4 py-3'}`}
+              title="Saved views"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Views</span>}
+            </button>
+
             {/* Shortcuts help */}
             <button
               onClick={() => setShowShortcuts(prev => !prev)}
@@ -5820,6 +6033,93 @@ export default function GameTable({ room = null }) {
                 {!isMobileLandscape && <span className="sm:text-[10px] text-xs">Setup</span>}
               </button>
             )}
+
+            {/* M10.8/U5: einklappen. Ein Lebenszaehler lag zweimal unter der
+                Leiste, und der Spieler musste den ganzen Tisch schwenken, um an
+                ein Minuszeichen zu kommen. */}
+            <button
+              onClick={() => setShowToolbar(false)}
+              data-testid="toolbar-collapse-btn"
+              className={`flex flex-col items-center gap-0.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] ${isMobileLandscape ? 'px-2 py-1.5' : 'px-3 py-3'}`}
+              title="Hide toolbar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width={isMobileLandscape ? 18 : 20} height={isMobileLandscape ? 18 : 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isMobileLandscape
+                  ? <polyline points="15,18 9,12 15,6" />
+                  : <polyline points="6,9 12,15 18,9" />}
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* M10.8/U5 Abnahme 3: eingeklappt bleibt ein sichtbarer Weg zurueck.
+          Ausserhalb des `showToolbar`-Zweigs, sonst verschwaende er mit der
+          Leiste; 44 Pixel wie jeder andere Knopf, damit ein Finger ihn trifft. */}
+      {!showToolbar && (
+        <button
+          onClick={() => setShowToolbar(true)}
+          data-testid="toolbar-show-btn"
+          data-ui-element="true"
+          className={`absolute z-30 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white/70 hover:text-white shadow-2xl ${
+            isMobileLandscape ? 'top-1/2 -translate-y-1/2 left-0' : 'left-1/2 -translate-x-1/2'
+          }`}
+          style={isMobileLandscape
+            ? { left: 'env(safe-area-inset-left, 0px)' }
+            : { bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }
+          }
+          title="Show toolbar"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {isMobileLandscape
+              ? <polyline points="9,18 15,12 9,6" />
+              : <polyline points="18,15 12,9 6,15" />}
+          </svg>
+        </button>
+      )}
+
+      {/* M10.6/U4: die Auswahl der Ansichten. Leer, solange nichts gespeichert
+          ist – Abnahme 3 und 4 fallen damit zusammen. */}
+      {showViews && showToolbar && (
+        <div
+          className={`absolute z-40 ${isMobileLandscape ? 'top-1/2 -translate-y-1/2 left-16' : 'left-1/2 -translate-x-1/2'}`}
+          style={isMobileLandscape ? {} : { bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+          data-testid="views-picker"
+          data-ui-element="true"
+        >
+          <div className="bg-black/80 backdrop-blur-md rounded-xl p-3 shadow-2xl border border-white/10 min-w-[220px]">
+            <div className="text-white/60 text-xs mb-2 font-medium">Saved Views</div>
+            {views.length === 0 && (
+              <div className="text-white/40 text-xs mb-2">Noch keine Ansicht gespeichert.</div>
+            )}
+            {views.map(v => (
+              <div key={v.label} className="flex items-center gap-1">
+                <button
+                  onClick={() => goToView(v)}
+                  data-testid={`view-go-${v.label}`}
+                  className="flex-1 text-left px-3 py-2 min-h-[44px] text-sm text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  {v.label}
+                  <span className="ml-2 text-xs text-white/40">{Math.round(v.zoom * 100)}%</span>
+                </button>
+                <button
+                  onClick={() => setViews(prev => removeView(prev, v.label))}
+                  data-testid={`view-del-${v.label}`}
+                  className="px-3 py-2 min-h-[44px] text-white/40 hover:text-red-300 transition-colors"
+                  title="Delete view"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={saveCurrentView}
+              disabled={views.length >= MAX_VIEWS}
+              data-testid="view-save-btn"
+              className="w-full mt-2 px-3 py-2 min-h-[44px] text-sm text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/30 rounded-lg transition-colors disabled:opacity-40"
+            >
+              Save current view
+            </button>
           </div>
         </div>
       )}
@@ -6593,6 +6893,15 @@ export default function GameTable({ room = null }) {
                 ['?', 'Toggle this help overlay'],
                 ['Scroll', 'Zoom in/out'],
                 ['Drag empty table', 'Pan the table'],
+                /* M10.7: die mittlere Taste pant seit jeher von jeder Stelle
+                   aus – sie stand nur nicht hier, und der Spieler hat statt
+                   dessen leere Flaechen gesucht. Der Knopf daneben ist der Weg
+                   fuer Tastfeld und Trackpad, die keine mittlere Taste haben. */
+                ['Middle-drag', 'Pan the table from anywhere, even over an object'],
+                ['Pan button', 'Same without a middle mouse button (toolbar, works on touch)'],
+                /* M10.9: der absichtliche Weg zurueck zum Stapeln, den M10.4
+                   offengelassen hat – auf Maus und Finger derselbe. */
+                ['Hold on drop', 'Hold a dragged card over another one until it lights up, then release: both become a stack'],
                 /* M9.4: der Zug am Stapel verschiebt ihn - ohne Wartezeit und
                    ohne dass eine Karte hängenbleibt. Abheben steht daneben. */
                 ['Drag a stack', 'Move the whole stack (take one card off via the context menu)'],
@@ -6711,6 +7020,27 @@ export default function GameTable({ room = null }) {
                 >
                   Pick Up to Hand
                 </button>
+
+                {/* M10.9 Regel 4: der Weg steht im Menue. Auf Beruehrung oeffnet
+                    es der Langdruck – das ist der Weg zum Stapeln ohne Tastatur
+                    und ohne Zeitdruck. Nur sichtbar, wenn wirklich eine lose
+                    Karte darunter liegt; sonst waere es ein Knopf, der nichts
+                    tut (audit-dead-controls, das Muster dieses ganzen Kapitels). */}
+                {cardBelow(contextMenu.cardTableId) && (
+                  <button
+                    onClick={() => {
+                      const below = cardBelow(contextMenu.cardTableId);
+                      if (below) stackCards([below, contextMenu.cardTableId], null);
+                      setSelectedCards(new Set());
+                      setContextMenu(null);
+                    }}
+                    data-testid="context-stack-with-below"
+                    className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    <span>Stack with card below</span>
+                    <span className="ml-auto text-xs text-slate-500">hold</span>
+                  </button>
+                )}
 
                 {/* Stack-specific actions */}
                 {contextMenu.stackId && (

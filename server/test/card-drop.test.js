@@ -68,3 +68,78 @@ test('J3: die Karte auf der Ablage faellt nicht in den Nachziehstapel daneben', 
   // Wer wirklich auf den Stapel legt, rastet auf dessen Stelle ein.
   assert.equal(stackAt({ x: 400, y: 300 }, [deck]), 'verhalten');
 });
+
+// ─── M10.9 / U6: die beiden Kandidatenlisten ────────────────────────────────
+//
+// `dropCandidates` stand als Funktion in `GameTable.jsx` und war damit
+// ungeprueft. Sie zieht hierher um und bekommt eine Schwester fuer die losen
+// Karten – beide fuettern dasselbe `stackAt`. "Liegt die Karte auf der
+// anderen?" ist dieselbe Frage wie "liegt sie auf dem Stapel?"; eine zweite
+// Geometrie waere eine zweite Antwort.
+//
+// Aufgaben: docs/tasks-ergonomie.md, U6.
+
+const { stackCandidates, looseCandidates } = await import('../../client/src/utils/cardDrop.js');
+
+/** Eine Tischkarte, so wie `tableCards` sie fuehrt. */
+function card(tableId, x, y, extra = {}) {
+  return { tableId, x, y, inStack: null, ...extra };
+}
+
+test('U6 Abnahme 1: zwei Karten desselben Stapels geben einen Kandidaten', () => {
+  const cards = [
+    card('a', 400, 300, { inStack: 's1' }),
+    card('b', 400, 300, { inStack: 's1' }),
+  ];
+  assert.deepEqual(stackCandidates(cards, null), [{ id: 's1', x: 400, y: 300, w: 100, h: 140 }]);
+});
+
+test('U6 Abnahme 2: der eigene Stapel ist nie Kandidat', () => {
+  const cards = [
+    card('a', 400, 300, { inStack: 's1' }),
+    card('b', 800, 300, { inStack: 's2' }),
+  ];
+  assert.deepEqual(stackCandidates(cards, 's1').map(c => c.id), ['s2']);
+});
+
+test('U6: lose Karten sind keine Stapelkandidaten', () => {
+  assert.deepEqual(stackCandidates([card('a', 400, 300)], null), []);
+});
+
+test('U6 Abnahme 3: eine Karte in einem Stapel ist kein loser Kandidat', () => {
+  const cards = [card('a', 400, 300, { inStack: 's1' }), card('b', 500, 300)];
+  assert.deepEqual(looseCandidates(cards, new Set()).map(c => c.id), ['b']);
+});
+
+test('U6 Abnahme 2: ausgeschlossene Karten sind keine Kandidaten', () => {
+  const cards = [card('a', 400, 300), card('b', 500, 300), card('c', 600, 300)];
+  assert.deepEqual(looseCandidates(cards, new Set(['a', 'c'])).map(c => c.id), ['b']);
+  // Ein Array tut es auch – der Aufrufer haelt die Auswahl mal so, mal so.
+  assert.deepEqual(looseCandidates(cards, ['b']).map(c => c.id), ['a', 'c']);
+});
+
+test('U6 Abnahme 4: Karten ohne Masse bekommen die Tischmasse 100 x 140', () => {
+  assert.deepEqual(looseCandidates([card('a', 10, 20)], new Set()), [
+    { id: 'a', x: 10, y: 20, w: 100, h: 140 },
+  ]);
+});
+
+test('U6 Abnahme 4: eine Querformat-Karte bringt ihre eigenen Masse mit', () => {
+  const [hit] = looseCandidates([card('a', 0, 0, { width: 200, height: 100 })], new Set());
+  assert.equal(hit.w, 140);
+  assert.equal(hit.h, 70);
+});
+
+test('U6 Abnahme 5: nichts Lesbares gibt [] und wirft nicht', () => {
+  assert.deepEqual(stackCandidates(null, null), []);
+  assert.deepEqual(stackCandidates(undefined, 's1'), []);
+  assert.deepEqual(looseCandidates(null, null), []);
+  assert.deepEqual(looseCandidates([card('a', 1, 2)], null).map(c => c.id), ['a']);
+});
+
+test('U6: die Kandidaten passen in stackAt – eine Karte auf der anderen trifft', () => {
+  const cards = [card('a', 400, 300), card('b', 480, 300)];
+  assert.equal(stackAt({ x: 400, y: 300 }, looseCandidates(cards, new Set(['b']))), 'a');
+  // Das Nachbarfeld (80 px) trifft nicht, genau wie bei einem Stapel.
+  assert.equal(stackAt({ x: 320, y: 300 }, looseCandidates(cards, new Set(['b']))), null);
+});

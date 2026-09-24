@@ -39,6 +39,14 @@ Die Schaltfläche „Save Current View" (`ZoneEditor.jsx`) hat zusätzlich kein 
 Selbst mit Handler passierte nichts: es gibt keinen Konsumenten, der eine Kamera auf
 eine Zone setzt. Der fehlende Handler ist die Spitze, nicht das Problem.
 
+**Erledigt in M10.6** (`docs/tasks-ergonomie.md`, U3/U4) — aber **nicht durch
+Wiederbeleben**. Die Felder sind gar keine gespeicherte Ansicht: `createZone`
+setzt sie bei *jeder* Zone auf die Rechteckmitte, es gibt also keine Zone ohne
+Kamera, und eine Auswahl daraus haette die vierzig Eintraege, die M10.6 Regel 3
+ausdruecklich verbietet. Benannte Ansichten liegen jetzt am **Spielstand**
+(`state_data.views`) und werden am Tisch angelegt; die Schaltflaeche ohne
+Handler ist entfernt, die Zonenfelder bleiben tot und harmlos liegen.
+
 ### 3. Kontextmenü kennt `customDie` nicht
 Beim Rechtsklick auf einen Custom-Würfel wird `objType: 'customDie'` gesetzt, aber die
 Objektliste im JSX und die Delete-Kette haben keinen solchen Zweig. Der Sperren-Knopf
@@ -67,7 +75,10 @@ Abmelden-Knopf** in der Oberfläche. Eine Sitzung lässt sich nicht beenden.
   **Mit echtem Nebeneffekt:** `createHitDie` schließt das tote Modal statt des
   Würfel-Modals, aus dem es aufgerufen wird → nach dem Platzieren eines Hit-Würfels
   bleibt das Würfel-Modal offen.
-- `showToolbar` — `useState(true)`, Setter nie aufgerufen; es gibt kein Ausblenden
+- ~~`showToolbar` — `useState(true)`, Setter nie aufgerufen; es gibt kein
+  Ausblenden~~ — **behoben in M10.8** (`docs/tasks-ergonomie.md`, U5): der
+  Zustand war richtig, es fehlte nur der Aufrufer. Einklappen in der Leiste,
+  Ausklappen ueber einen Griff ausserhalb.
 - `useSwipeGesture.js` (253 Zeilen, drei Hooks) — kein Import; `GameTable` und
   `SwipeModal` haben je eigene Touch-Logik
 - `touchUtils.js` — sieben exportierte Helfer ohne Aufrufer

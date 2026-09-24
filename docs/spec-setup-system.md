@@ -2785,3 +2785,175 @@ nie deckungsgleich auf einem anderen.
    Bild-Token, Notiz) und wurden mitgenommen — die Regel sagt „ein neu
    angelegtes Ding". `playCardFromHand` bleibt, weil Abnahme 3 Karten
    ausdrücklich unter Bestandsschutz stellt.
+
+### M10.6 — Zähler und Schlachtfeld sind nie gleichzeitig bedienbar
+
+**Befund.** Bei einem Zoom, bei dem man Figuren auf Felder ziehen kann (ab
+etwa 45 %), liegen die zwölf Attributzähler der drei Dörfler mehrere hundert
+Pixel **unterhalb des Bildausschnitts**. Jeder einzelne Schadenspunkt kostet:
+herauszoomen, hinschwenken, Wert setzen, zurückschwenken, hineinzoomen. In
+einem einzigen Kampf waren das etwa **fünfzehn solcher Ausflüge**. Erst bei
+rund 30 % passen Brett und Zähler zusammen ins Bild — da ist ein Rasterfeld
+fünfzehn Pixel groß, und das Greifen von Figuren wird unmöglich.
+
+Die Ursache ist die Aufstellung: der Hauptplan liegt zwischen y 60 und 1060,
+der Dörflerbereich zwischen 1400 und 1800. **Achtzehnhundert Welteinheiten
+auseinander** — bei spielbarem Zoom passt das nie zusammen.
+
+**Das Werkzeug dafür liegt fertig und tot im Code.** Jede Zone trägt
+`cameraX`, `cameraY` und `cameraZoom`; geschrieben werden sie an drei Stellen
+(`zoneDraft.js` bei `createZone` und bei jedem Verschieben, `ZoneEditor.jsx`
+bei den Voreinstellungen), **gelesen nirgends**. Die Schaltfläche „Save Current
+View" hat zusätzlich keinen Handler. Das ist Fund 2 in
+`docs/audit-dead-controls.md`.
+
+**Regel.**
+1. Eine Zone, die eine Ansicht trägt, ist anspringbar: ein Griff setzt die
+   Kamera darauf.
+2. „Save Current View" schreibt die aktuelle Kamera in die Zone.
+3. Zonen **ohne** Ansicht erscheinen nicht in der Auswahl — vierzig Einträge
+   wären schlimmer als das Problem.
+
+**Abnahme.**
+1. Eine Zone mit gespeicherter Ansicht lässt sich anspringen; Kamera und Zoom
+   stimmen danach mit dem Gespeicherten überein.
+2. „Save Current View" schreibt, was man sieht, und ein Anspringen danach
+   stellt es wieder her.
+3. Zonen ohne Ansicht stehen nicht in der Auswahl.
+4. Ohne gespeicherte Ansicht verhält sich alles wie bisher.
+
+### M10.7 — Schwenken geht nur über leerer Tischfläche
+
+**Befund.** Beginnt der Zug auf irgendeinem Objekt, wird **das Objekt**
+gezogen statt des Tisches. Auf dem gefüllten Tisch wurden dadurch mehrfach
+versehentlich Decks und Heldentaten verschoben; einmal landete ein Zug auf
+einer Zone und quittierte mit `zone "Bösewicht-Tableau" does not accept cards`.
+Der Spieler musste regelmäßig erst einen garantiert leeren Punkt **suchen**,
+bevor er schwenken konnte.
+
+M2.13 hat dafür bereits die halbe Antwort: über einem **gesperrten** Objekt
+schwenkt man. Auf einem Tisch mit vierzig Zonen, zwanzig Geländeteilen und
+sechs Stapeln reicht das nicht.
+
+**Regel.** Es gibt einen Weg, von **jeder** Stelle aus zu schwenken — über
+eine Taste, die man hält, oder eine zweite Maustaste. Welcher, entscheidet,
+wer es umsetzt, und begründet es; die mittlere Maustaste ist die gewohnte.
+
+**Abnahme.**
+1. Von einer Stelle über einem Objekt aus lässt sich schwenken, ohne das
+   Objekt zu bewegen.
+2. Ohne den gewählten Zusatz verhält sich das Ziehen unverändert.
+3. M2.13 bleibt: über einem gesperrten Objekt schwenkt man weiterhin ohne
+   Zusatz.
+
+### M10.8 — Die Werkzeugleiste liegt über dem Tisch
+
+**Befund.** Ein Lebenszähler lag zweimal unter der Werkzeugleiste; der Spieler
+musste den ganzen Tisch schwenken, um an ein Minuszeichen zu kommen. Die
+Leiste lässt sich nicht wegklappen.
+
+**Regel.** Die Werkzeugleiste lässt sich einklappen und wieder ausklappen. Der
+Zustand überlebt einen Neuaufbau der Seite nicht zwingend — wichtig ist, dass
+man sie loswird, wenn sie im Weg ist.
+
+**Abnahme.**
+1. Die Leiste lässt sich einklappen; darunterliegende Dinge werden bedienbar.
+2. Sie lässt sich wieder ausklappen.
+3. Eingeklappt bleibt ein sichtbarer Weg, sie zurückzuholen.
+
+### M10.9 — Stapeln geht nur noch mit der Tastatur
+
+**Befund, und er ist ein Rückschritt aus M10.4.** Seit dort das Verschmelzen
+beim Ablegen abgeschafft wurde, führt der einzige Weg, zwei lose Karten zu
+stapeln, über die Taste `G`. Drei Handgriffe statt einem: beide auswählen,
+dann `G`.
+
+**Auf einem Tastfeld gibt es kein `G`.** Die Engine ist ansonsten voll
+berührungsfähig — neunzehn Berührungshandler, Langdruck-Vorschau,
+Langdruck-Menü, Doppeltipp. Stapeln ist dort seit M10.4 **gar nicht mehr
+möglich**.
+
+M10.4 war trotzdem richtig: das stille Verschmelzen hat eine aufgedeckte
+Aktionskarte in den Nachziehstapel zurückrutschen lassen. Was fehlt, ist nicht
+die Rücknahme, sondern der **absichtliche** Weg — und zwar auf beiden
+Bedienarten.
+
+**Regel.**
+1. Zwei Karten zu stapeln geht mit **Maus und Tastatur** in einem Handgriff.
+2. Dasselbe geht auf einem **Tastfeld**, ohne Tastatur.
+3. Beide Wege sind **absichtlich** — ein beiläufiges Ablegen verschmilzt
+   weiterhin nicht (M10.4 bleibt).
+4. Der Weg ist auffindbar: die Tastenkürzel-Hilfe nennt ihn, und wo es ein
+   Menü gibt, steht er darin.
+
+**Wer das umsetzt, benennt beide Gesten und begründet sie.** Die vorhandenen
+Bausteine: `G` für die Auswahl, das Langdruck-Menü auf Berührung, der
+Doppeltipp, das Kontextmenü der Karte. Eine neue Geste ist erlaubt, aber
+teurer als eine vorhandene.
+
+**Abnahme.**
+1. Mit Maus und Tastatur ist eine Karte in einem Handgriff auf eine andere
+   gestapelt.
+2. Auf einem Tastfeld geht dasselbe ohne Tastatur.
+3. Ein gewöhnliches Ablegen verschmilzt weiterhin nicht.
+4. Die Tastenkürzel-Hilfe und das Kartenmenü nennen den Weg.
+
+#### Nachtrag zu M10.6–M10.9 (aus der Umsetzung)
+
+Aufgaben und Begründung stehen in `docs/tasks-ergonomie.md`.
+
+1. **M10.6: die Zone ist nicht der Träger, und die Felder sind keine
+   Ansicht.** `createZone` setzt `cameraX`/`cameraY`/`cameraZoom` bei *jeder*
+   Zone auf die Rechteckmitte bei Zoom 1, `moveZone` und das Skalieren halten
+   sie dort. Die Felder sind nie leer — sie tragen keine Entscheidung, sondern
+   eine Zahl, die aus `x/y/width/height` folgt. **Abnahme 3 („Zonen ohne
+   Ansicht stehen nicht in der Auswahl") ist mit ihnen unerfüllbar**, weil es
+   keine Zone ohne Ansicht gibt.
+
+   Dazu: „Schlachtfeld" und „Dörflerbereich" sind keine Zonen; ein Rechteck,
+   das man dafür zöge, wäre am Tisch kein Merkzettel, sondern ein Ablageziel
+   (`zoneAt`, `zoneRejects`, `snapInto`). Und „Save Current View" steht im
+   `ZoneEditor`, den es nur unter `?mode=setup` gibt, während der Befund aus
+   der Partie stammt.
+
+   Gebaut ist deshalb eine kurze Liste benannter Ansichten **am Spielstand**
+   (`state_data.views`, keine Migration — der Server speichert den Stand als
+   Text) und die Bedienung **am Tisch**. Die toten Zonenfelder bleiben, wo sie
+   sind; der Knopf ohne Handler ist entfernt.
+
+2. **M10.7: die mittlere Maustaste war seit jeher verdrahtet.** `e.button === 1`
+   stand in `handleMouseDown` und in `handleGlobalStart`, und beide Zugstarter
+   steigen bei `e.button !== 0` aus — von jeder Stelle aus zu schwenken ging
+   also schon. Es fehlten: die Zeile in der Tastenkürzel-Hilfe, das
+   `preventDefault` gegen die Bildlauf-Automatik, und ein Weg ohne mittlere
+   Taste.
+
+   **Zwei Finger schieden aus**, nicht aus Geschmack: `handleGlobalTouchStart`
+   belegt sie doppelt (Kneifzoom, und mit gezogener Karte Drehen um 90°), und
+   wenn der zweite Finger ankommt, läuft der Zug des ersten schon. Ein
+   Langdruck auf leerer Fläche ebenso — leere Fläche ist gerade das, was der
+   Befund nicht findet. Gewählt ist ein **Schwenkmodus** in der Werkzeugleiste:
+   kollidiert mit keiner Geste, hilft auch dem Trackpad. Tastennummer und Modus
+   stehen jetzt **in** `canStartPan` statt daneben.
+
+3. **M10.8 kostet keinen Zustand.** `showToolbar` gab es seit jeher, nur ohne
+   Aufrufer (`audit-dead-controls.md` Fund 6). Nichts wird gespeichert — die
+   Regel erlaubt es, und „je Spiel oder je Gerät?" ist eine Frage, die niemand
+   gestellt hat.
+
+4. **M10.9 ist wieder ein Langdruck, aber am anderen Ende des Zuges.** M9.4
+   strich ihn, weil er *vor* der ersten Bewegung saß und damit den alltäglichen
+   Griff verteuerte. Das Halten **beim Ablegen** zahlt nur, wer stapeln will.
+   Zwei Bedingungen halten M10.4 aufrecht: die Zielkarte leuchtet auf, bevor
+   man loslässt (nichts passiert stumm), und beim Loslassen wird ein zweites
+   Mal gefragt — diesmal mit der endgültigen Stelle, damit ein Zonenplatz das
+   Stapeln schlägt und nicht umgekehrt (dieselbe Trennung wie M10.4/J3).
+
+   Derselbe Weg im Kartenmenü, das auf Berührung der Langdruck öffnet; auf
+   einem Tastfeld ist das der Weg ohne Zeitdruck.
+
+5. **Nebenbei gefunden:** die Hervorhebung des Ablageziels galt für *jede* lose
+   Karte. `isDropTarget` lautete `stackDropTarget === stackId`, lose Karten
+   werden mit `stackId === null` gezeichnet, und `stackDropTarget` ist null,
+   solange nichts gezogen wird — alle losen Karten lagen dauerhaft im grünen
+   Leuchten und um 5 % vergrößert da.

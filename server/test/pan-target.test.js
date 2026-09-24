@@ -77,3 +77,43 @@ test('missing canvas and container do not turn every press into a pan', () => {
   assert.equal(canStartPan(target(), null, null), false);
   assert.equal(canStartPan(target(UI), undefined, undefined), false);
 });
+
+// ─── M10.7 / U1: eine Antwort auf "darf das schwenken?" ──────────────────────
+//
+// `e.button === 1` stand bisher zweimal *neben* dem Aufruf (nativer Horcher
+// und `handleGlobalStart`), der Schwenkmodus waere die dritte Antwort auf
+// dieselbe Frage gewesen. Beide stehen jetzt drin.
+//
+// Aufgaben: docs/tasks-ergonomie.md, U1.
+
+test('U1: die mittlere Maustaste schwenkt ueber einem Objekt', () => {
+  const board = target(UI);
+  assert.equal(canStartPan(board, canvas, container, { button: 1 }), true);
+});
+
+test('U1: die mittlere Maustaste schwenkt auch ueber einer Tischkarte', () => {
+  assert.equal(canStartPan(target(UI, CARD), canvas, container, { button: 1 }), true);
+});
+
+test('U1: die rechte Maustaste schwenkt nie – auch nicht auf leerer Flaeche', () => {
+  assert.equal(canStartPan(canvas, canvas, container, { button: 2 }), false);
+  assert.equal(canStartPan(target(UI), canvas, container, { button: 2 }), false);
+});
+
+test('U1: der Schwenkmodus schwenkt ueber einem beliebigen Objekt', () => {
+  assert.equal(canStartPan(target(UI), canvas, container, { panMode: true }), true);
+  assert.equal(canStartPan(target(UI, CARD), canvas, container, { panMode: true }), true);
+});
+
+test('U1: der Schwenkmodus faengt auch den Zug an, der nirgends beginnt', () => {
+  // Kein Ziel, kein Container – im Modus schwenkt trotzdem alles. Ein Klick
+  // auf die Werkzeugleiste bleibt dabei ein Klick: der Schwenk ohne Weg
+  // bewegt die Kamera um null.
+  assert.equal(canStartPan(target(), null, null, { panMode: true }), true);
+});
+
+test('U1 Abnahme 4: ohne Optionen antwortet die Funktion wie vorher', () => {
+  assert.equal(canStartPan(canvas, canvas, container, {}), true);
+  assert.equal(canStartPan(target(UI), canvas, container, {}), false);
+  assert.equal(canStartPan(target(LOCKED, UI), canvas, container, {}), true);
+});
