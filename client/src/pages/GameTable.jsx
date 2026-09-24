@@ -31,7 +31,8 @@ import { canStartPan } from '../utils/panTarget.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { tokenLayers } from '../utils/tokenLayer.js';
+import { tableLayers, WIDGET_BOX } from '../utils/tokenLayer.js';
+import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 
 // Table background configurations
@@ -478,9 +479,6 @@ export default function GameTable({ room = null }) {
   // Grids (M3b) go the same way and through the same resolution: `grids` is
   // what was saved, `tableGrids` is where the fields are right now.
   const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors]);
-  // M8.2: je groesser die Grundflaeche, desto weiter hinten. Einmal je
-  // Aenderung der Tokenliste gerechnet, nicht je Token.
-  const tokenZ = useMemo(() => tokenLayers(tokens), [tokens]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -507,6 +505,35 @@ export default function GameTable({ room = null }) {
   const [selectedCards, setSelectedCards] = useState(new Set()); // selected card IDs for grouping
   const cardDragOffsetRef = useRef({ x: 0, y: 0 });
   const [maxZIndex, setMaxZIndex] = useState(1);
+
+  // M8.2/M9.1: je groesser die belegte Flaeche, desto weiter hinten - fuer
+  // **alles**, was auf dem Tisch liegt, nicht nur fuer Token. Ein Brett liegt
+  // unter dem, was darauf liegt, egal ob das eine Karte, ein Wuerfel, ein
+  // Zaehler oder ein Token ist.
+  //
+  // Die Reihenfolge in dieser Liste ist der Tie-Break bei gleicher Flaeche:
+  // Token in DOM-Reihenfolge (wie bisher), Karten nach ihrer eigenen Reihe
+  // `card.zIndex` - damit bleibt die Stapelreihenfolge aus M8.9 erhalten,
+  // obwohl alle Karten eines Decks gleich gross sind.
+  //
+  // `boards` stehen ausdruecklich nicht drin: sie sind das groesste am Tisch
+  // und liegen mit `zIndex: 1` schon ganz hinten. Sie hochzuheben brachte sie
+  // nur ueber die Raster-Ueberlagerung (z-10).
+  const layerZ = useMemo(() => tableLayers([
+    ...tokens.map(t => ({ key: `token:${t.id}`, width: t.width, height: t.height, size: t.size })),
+    ...[...tableCards]
+      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+      .map(c => {
+        const { w, h } = getCardDims(c);
+        return { key: `card:${c.tableId}`, width: w, height: h };
+      }),
+    ...counters.map(c => ({ key: `counter:${c.id}`, ...WIDGET_BOX.counter })),
+    ...notes.map(n => ({ key: `note:${n.id}`, ...WIDGET_BOX.note })),
+    ...textFields.map(tf => ({ key: `textField:${tf.id}`, ...WIDGET_BOX.textField })),
+    ...customDiceOnTable.map(d => ({ key: `customDie:${d.id}`, ...WIDGET_BOX.customDie })),
+    ...hitDice.map(d => ({ key: `hitDie:${d.id}`, ...WIDGET_BOX.hitDie })),
+    ...dice.map(d => ({ key: `die:${d.id}`, ...WIDGET_BOX.die })),
+  ]), [tokens, tableCards, counters, notes, textFields, customDiceOnTable, hitDice, dice]);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
   const [stackDropTarget, setStackDropTarget] = useState(null); // stackId of stack being targeted for drop
   const [stackNames, setStackNames] = useState({}); // stackId → name for named stacks
@@ -3319,14 +3346,17 @@ export default function GameTable({ room = null }) {
   performAutoSaveRef.current = async function performAutoSave() {
     // Disable auto-save in multiplayer mode
     if (room) return;
-    // Only auto-save if there's something on the table
-    if (tableCards.length === 0 && handCards.length === 0 && tokens.length === 0 && counters.length === 0 && dice.length === 0 && notes.length === 0) {
-      return;
-    }
+    // M9.2: ein leerer Tisch schreibt nichts. Die Liste der Objektarten steht
+    // in shared/tableState.js - die handgeschriebene hier kannte `customDice`,
+    // `hitDice`, `textFields` und `boards` nicht, ein Tisch mit nur eigenen
+    // Wuerfeln galt ihr als leer. Durchgesetzt wird die Regel in der Route
+    // (nur sie kennt den gespeicherten Stand); hier wird die sinnlose Anfrage
+    // gespart.
+    const stateData = getGameState();
+    if (isEmptyTableState(stateData)) return;
 
     try {
       setAutoSaveStatus('saving');
-      const stateData = getGameState();
       const res = await apiFetch(`/api/games/${id}/saves/auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3368,8 +3398,10 @@ export default function GameTable({ room = null }) {
         // sendBeacon cannot set an Authorization header, so the guarded API
         // would 401 it. keepalive:true is the fetch equivalent that survives
         // unload (payload cap ~64KB, which a table state stays well under).
+        // M9.2: dieselbe Sperre wie im Intervall daneben. Dieser Pfad hatte
+        // sie nicht - Tisch aufmachen, wieder weg, und der leere Stand stand.
         const stateData = typeof getGameState === 'function' ? getGameState() : null;
-        if (stateData) {
+        if (stateData && !isEmptyTableState(stateData)) {
           apiFetch(`/api/games/${id}/saves/auto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4354,7 +4386,7 @@ export default function GameTable({ room = null }) {
                 top: card.y - cardH / 2,
                 width: cardW,
                 height: cardH + (isStack ? 6 : 0),
-                zIndex: isDragging ? 9999 : card.zIndex,
+                zIndex: isDragging ? 9999 : layerZ(`card:${card.tableId}`),
                 transform: `scale(${isDragging ? 1.1 : isDropTarget ? 1.05 : 1}) rotate(${card.rotation || 0}deg)`,
                 transition: isDragging ? 'transform 0.1s ease, box-shadow 0.1s ease' : 'transform 0.2s ease, box-shadow 0.2s ease',
                 cursor: isDragging ? 'grabbing' : 'grab',
@@ -4588,10 +4620,11 @@ export default function GameTable({ room = null }) {
           data-counter-name={counter.name}
           data-ui-element="true"
           data-locked={counter.locked ? 'true' : undefined}
-          className="absolute z-20 select-none pointer-events-auto"
+          className="absolute select-none pointer-events-auto"
           style={{
             left: counter.x - 70,
             top: counter.y - 40,
+            zIndex: layerZ(`counter:${counter.id}`),
             cursor: draggingObj?.id === counter.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'counter', counter.id)}
@@ -4664,10 +4697,11 @@ export default function GameTable({ room = null }) {
           data-die-type={die.type}
           data-ui-element="true"
           data-locked={die.locked ? 'true' : undefined}
-          className="absolute z-20 select-none pointer-events-auto"
+          className="absolute select-none pointer-events-auto"
           style={{
             left: die.x - 35,
             top: die.y - 35,
+            zIndex: layerZ(`die:${die.id}`),
             cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'die', die.id)}
@@ -4708,8 +4742,8 @@ export default function GameTable({ room = null }) {
           data-testid={`custom-die-${die.id}`}
           data-ui-element="true"
           data-locked={die.locked ? 'true' : undefined}
-          className="absolute z-20 select-none pointer-events-auto"
-          style={{ left: die.x - 40, top: die.y - 48, cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab' }}
+          className="absolute select-none pointer-events-auto"
+          style={{ left: die.x - 40, top: die.y - 48, zIndex: layerZ(`customDie:${die.id}`), cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab' }}
           onMouseDown={(e) => handleObjDragStart(e, 'customDie', die.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'customDie', die.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'customDie', objId: die.id, cardTableId: null, stackId: null }); }}
@@ -4760,10 +4794,11 @@ export default function GameTable({ room = null }) {
             data-die-type={`hit-${die.hitType}`}
             data-ui-element="true"
             data-locked={die.locked ? 'true' : undefined}
-            className="absolute z-20 select-none pointer-events-auto"
+            className="absolute select-none pointer-events-auto"
             style={{
               left: die.x - 38,
               top: die.y - 42,
+              zIndex: layerZ(`hitDie:${die.id}`),
               cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
             }}
             onMouseDown={(e) => handleObjDragStart(e, 'hitDie', die.id)}
@@ -4825,10 +4860,11 @@ export default function GameTable({ room = null }) {
           data-note-id={note.id}
           data-ui-element="true"
           data-locked={note.locked ? 'true' : undefined}
-          className="absolute z-20 select-none group pointer-events-auto"
+          className="absolute select-none group pointer-events-auto"
           style={{
             left: note.x - 80,
             top: note.y - 50,
+            zIndex: layerZ(`note:${note.id}`),
             cursor: draggingObj?.id === note.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => {
@@ -4937,9 +4973,9 @@ export default function GameTable({ room = null }) {
           style={{
             left: token.x - Math.floor(tokenW / 2),
             top: token.y - Math.floor(tokenH / 2),
-            // M8.2: das groessere Stueck liegt darunter. Kein z-20 mehr in der
-            // Klassenliste - sonst stuenden zwei Werte an einem Element.
-            zIndex: tokenZ(token),
+            // M8.2/M9.1: das groessere Stueck liegt darunter. Kein z-20 mehr in
+            // der Klassenliste - sonst stuenden zwei Werte an einem Element.
+            zIndex: layerZ(`token:${token.id}`),
             cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
@@ -4967,7 +5003,7 @@ export default function GameTable({ room = null }) {
               top: tf.y,
               transform: 'translate(-50%, -50%)',
               cursor: tf.locked ? 'default' : 'grab',
-              zIndex: 15,
+              zIndex: layerZ(`textField:${tf.id}`),
             }}
             onMouseDown={(e) => {
               if (e.button !== 0) return;

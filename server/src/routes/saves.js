@@ -1,5 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../database.js';
+// M9.2: dieselbe Antwort auf "liegt hier etwas?" wie am Tisch - shared/ liegt
+// neben server/ und client/.
+import { isEmptyTableState } from '../../../shared/tableState.js';
 
 export async function savesRoutes(fastify) {
   // GET /api/games/:id/saves - List save states for a game
@@ -62,8 +65,20 @@ export async function savesRoutes(fastify) {
 
     // Check if auto-save already exists for this game
     const existing = db.prepare(
-      'SELECT id FROM save_states WHERE game_id = ? AND is_auto_save = 1'
+      'SELECT id, state_data FROM save_states WHERE game_id = ? AND is_auto_save = 1'
     ).get(id);
+
+    // M9.2: ein Tisch, auf dem nichts liegt, ueberschreibt keinen gefuellten
+    // Stand. Die Regel steht hier und nicht im Client, weil nur die Route
+    // beide Seiten kennt - der Client weiss nicht, was gespeichert ist. Engst
+    // moegliche Fassung: leer ueber leer geht durch, der erste Stand eines
+    // Spiels auch, und der ausdrueckliche Befehl (POST .../saves mit Namen)
+    // ist gar nicht betroffen.
+    if (existing && isEmptyTableState(stateJson) && !isEmptyTableState(existing.state_data)) {
+      return reply.status(409).send({
+        error: 'Empty table would overwrite a saved table with objects on it',
+      });
+    }
 
     if (existing) {
       // Update existing auto-save

@@ -2438,3 +2438,167 @@ null. Vier davon sind einzeln nachgesehen.
 4. Eine einzelne Kategorie verhält sich unverändert — alle vorhandenen
    `place_stack`-Schritte laufen weiter.
 5. Der Aufbau baut die drei Dauerstapel selbst; ein leerer Tisch genügt ihm.
+
+## M9 — Befunde aus der zweiten gespielten Solopartie
+
+Elf der zwölf Befunde aus der ersten Partie sind am Tisch bestätigt behoben.
+Der zwölfte — die Zeichenreihenfolge — ist **nur halb** gelöst, und die andere
+Hälfte blockiert mehr als der ursprüngliche Fehler.
+
+### M9.1 — Karten, Würfel und Zähler verschwinden unter den Brettern
+
+**Befund.** M8.2 ordnet **Token untereinander** nach belegter Fläche: Hauptplan
+20, Tableaus 23, Gelände 24–28, Figuren 28, Marker 31/32. Das trägt — eine
+Figur auf einem Geländeteil ist sichtbar und anfassbar, am Tisch nachgewiesen.
+
+**Karten, Würfel und Zähler sind davon nicht erfasst.** Karten bekommen ihren
+`z-index` aus einer eigenen, bei 1 beginnenden Reihe; Würfel und Zähler liegen
+ebenfalls darunter. Jedes Brett überdeckt sie. Nachgewiesen mit
+`document.elementFromPoint` auf der jeweiligen Objektmitte — zurück kommt das
+Brett, nicht das Objekt.
+
+Betroffen ist alles, was man im Kampf ständig anfasst:
+
+| Was | Wo es liegt | Folge |
+|---|---|---|
+| Aktionsdeck des Bösewichts | ACTION-Seite des Zusatz-Bretts | Der Zug des Bösewichts ist nicht ausführbar |
+| Ladenauslage, zehn Karten | Zusatz-Brett, Dorfphasenseite | Tante Emmas Laden ist nicht bedienbar |
+| `Bösewicht: Bewegung` / `Leben` | an den RUFFIAN-Leisten | Die Lebenspunkte sind nicht nachführbar |
+| jeder Würfel | feste Stelle auf dem Hauptplan | **Kein einziger Wurf ist mit der Maus möglich** |
+| neu angelegte Zähler | dieselbe Stelle | unerreichbar, sobald ein Brett dort liegt |
+
+Vier von fünf Dingen, die eine Kampfrunde braucht, sind unsichtbar. Die
+Umwege, die der Spieler gefunden hat, kosten je sechs Griffe.
+
+**Regel.** Die Ordnung aus M8.2 gilt für **alle** Dinge auf dem Tisch, nicht
+nur für Token. Ein Brett liegt unter dem, was darauf liegt — unabhängig davon,
+ob das eine Karte, ein Würfel, ein Zähler oder ein Token ist.
+
+Das ist dieselbe Regel, nicht eine zweite: **je größer die belegte Fläche,
+desto weiter hinten.** Eine Karte, ein Würfel und ein Zähler sind klein und
+liegen deshalb oben. Wer hier eine Sonderregel je Objektart einführt, baut
+genau die zweite Antwort, die M8.2 vermieden hat.
+
+**Abnahme.**
+1. Das Aktionsdeck auf der ACTION-Buchseite ist sichtbar, und ein Rechtsklick
+   darauf öffnet das Menü des **Stapels**, nicht das des Bretts.
+2. Die zehn Ladenkarten auf der Dorfphasenseite sind sichtbar und anklickbar.
+3. Die beiden Bösewicht-Zähler an den RUFFIAN-Leisten lassen sich anklicken.
+4. Ein über die Werkzeugleiste angelegter Würfel liegt sichtbar und lässt sich
+   rollen und ziehen.
+5. Die Ordnung der Token untereinander aus M8.2 bleibt unverändert.
+
+### M9.2 — Ein leerer Tisch überschreibt den gespeicherten Stand
+
+**Befund.** `https://gaming.benjathi.de/play/<gameId>` öffnet einen **leeren**
+Tisch — keine Objekte, keine Aktionsknöpfe — mit „Auto-save: ON". Binnen
+Sekunden ist der einzige Speicherstand leer. Der Knopf „Play Game" auf der
+Detailseite führt an dieselbe Adresse.
+
+Das ist in dieser Sitzung **zweimal** passiert: einmal ist eine laufende Partie
+verlorengegangen, einmal der gesamte Tischbestand samt der drei Dauerstapel.
+Beim zweiten Mal hat es M8.11 ausgelöst — den Aufbau seine Stapel selbst bauen
+zu lassen. Die Ursache selbst ist aber offen.
+
+**Regel.** Ein Tisch, auf dem **nichts** liegt, überschreibt keinen gefüllten
+Speicherstand. Das ist die engst mögliche Fassung und deshalb die richtige: sie
+verhindert genau den beobachteten Fall und steht keiner absichtlichen Leerung
+im Weg, die über einen ausdrücklichen Befehl läuft.
+
+Ob „Play Game" zusätzlich den letzten Stand laden soll, ist eine zweite Frage.
+Sie gehört nicht hierher — erst darf nichts mehr verlorengehen.
+
+**Abnahme.**
+1. Ein Tisch ohne Objekte schreibt keinen Speicherstand, der Objekte enthält.
+2. Ein Tisch mit Objekten speichert wie bisher.
+3. Eine absichtliche Leerung über einen ausdrücklichen Befehl wird gespeichert.
+
+### M9.3 — Ein versehentlicher Kampfaufbau verbrennt einen Bösewicht
+
+**Befund.** „Kampf beginnen" ohne vorherige Dorfphase scheitert — aber erst in
+Schritt 4. Schritt 5 der Sequenz ist `reveal_next`, und der **läuft vorher
+durch**: der nächste Bösewicht wird aufgedeckt und auf den Bösewicht-Platz
+gestellt. Das anschließende „Dorfphase beginnen" räumt ihn als
+Bösewichtmaterial weg. In der gespielten Partie ist **Virginia Fitz auf diese
+Weise ersatzlos aus der Partie verschwunden** — aus drei Kämpfen wurden zwei,
+ohne dass jemand gegen sie gespielt hätte.
+
+Schlimmer: der Schutz greift nur **teilweise**. Gelände, Figuren und Zähler des
+zweiten Bösewichts wurden trotzdem gelegt, zwei Bösewichtfiguren standen
+gleichzeitig auf dem Brett.
+
+Und er meldet etwas anderes als erwartet: nicht `zone "Bösewicht-Platz" is
+full`, sondern `zone "Bösewicht-Tableau" is full (1)`. Der Schutz hängt also am
+Tableau, nicht am Leistenplatz — Zufall, nicht Absicht.
+
+**Die Ursache ist allgemeiner als der Fall.** `executeSequence` führt jeden
+Schritt unabhängig aus; ein gescheiterter Schritt hält die folgenden nicht auf.
+Für den Aufbau eines Kampffeldes ist das falsch: M7 hat dafür innerhalb von
+`build_scenario` „erst prüfen, dann legen" eingeführt, weil ein halb gestelltes
+Kampffeld schlimmer ist als ein leeres. **Für die Aktion als Ganzes gibt es das
+nicht.**
+
+**Regel.**
+
+1. Eine Aktion kann eine Vorbedingung nennen. Ist sie nicht erfüllt, werden
+   **alle** Schritte übersprungen — nicht der erste, der zufällig daran
+   scheitert.
+2. Die Meldung nennt die Bedingung, nicht den Schritt, der als Erster
+   umgefallen ist. „Erst die Dorfphase beginnen" ist eine Auskunft, `zone
+   "Bösewicht-Tableau" is full (1)` ist eine Diagnose.
+3. `executeSequence` wirft weiterhin nie; die übersprungenen Schritte stehen im
+   Protokoll.
+
+**Abnahme.**
+1. „Kampf beginnen" zweimal hintereinander deckt beim zweiten Mal **keinen**
+   Bösewicht auf und legt nichts auf das Brett.
+2. Die Meldung sagt, was zu tun ist.
+3. Nach „Dorfphase beginnen" läuft „Kampf beginnen" unverändert durch.
+4. Der erste Kampf einer Partie ist unverändert.
+
+### M9.4 — Ein Kartenstapel lässt sich nicht verschieben
+
+**Befund.** Jeder Zug an einem Stapel **hebt die oberste Karte ab** und lässt
+den Stapel liegen: aus „Aktionen: Deputy Waggums (15)" wurde (14) plus einer
+losen verdeckten Karte. Dreimal reproduziert. Das Kontextmenü kennt Flip,
+Shuffle, Split, Browse, Draw, Reveal, Lock und Remove — **nichts zum
+Verschieben**.
+
+Einen Stapel an eine andere Stelle zu legen ist die selbstverständlichste
+Handlung an einem Spieltisch. Sie fehlt ganz.
+
+**Regel.** Ein Zug am Stapel verschiebt den Stapel. Die oberste Karte
+abzuheben bleibt möglich, braucht aber eine eigene Geste oder einen eigenen
+Menüeintrag — welche, entscheidet, wer es umsetzt, und begründet es.
+
+**Abnahme.**
+1. Ein Zug am Stapel bewegt ihn samt aller Karten.
+2. Die Zahl der Karten im Stapel ändert sich dabei nicht.
+3. Die oberste Karte abzuheben ist weiterhin möglich.
+4. Ein Stapel in einer Zone rastet wie ein Objekt ein.
+
+### M9.5 — Das Zähler-Eingabefeld frisst Löschtasten
+
+**Befund.** Ein Klick auf den Wert öffnet das Feld mit dem alten Wert und dem
+Cursor am Ende. Nichts ist markiert, **obwohl es markiert aussieht**. Tippen
+hängt an: aus `−2` wurde `−2−3`, dann `−2−3−3`. **`Backspace`, `Entf` und
+`Strg+A` haben keine Wirkung.** `Enter` verwirft eine ungültige Eingabe
+stillschweigend. Nur ein Dreifachklick macht das Feld benutzbar.
+
+Dazu: die Eingabe rechnet **relativ**. `−3` auf einen Wert von `−2` ergibt
+`−5`, nicht `−3`. Das ist gewollt (M8.6 nennt `+21`), steht aber nirgends —
+und zusammen mit der klemmenden Löschtaste ist es eine Falle.
+
+**Regel.**
+1. Das Feld verhält sich wie ein Eingabefeld: Löschtasten und Markieren
+   wirken, und der vorhandene Wert ist beim Öffnen markiert, sodass Tippen ihn
+   ersetzt.
+2. Eine ungültige Eingabe wird nicht stillschweigend verworfen.
+3. Dass `+n` und `−n` **rechnen** und eine nackte Zahl **setzt**, steht am Feld
+   — ein Platzhalter genügt.
+
+**Abnahme.**
+1. Nach dem Öffnen ersetzt Tippen den alten Wert.
+2. `Backspace` löscht ein Zeichen.
+3. `−3` auf `−2` ergibt `−5`, `3` auf `−2` ergibt `3`.
+4. Eine unlesbare Eingabe lässt den Wert unverändert und sagt es.

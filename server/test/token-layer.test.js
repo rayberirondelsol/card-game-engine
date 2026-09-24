@@ -6,63 +6,71 @@
 // liegt, bekommt auch den Zeiger – Trefferflaeche und Zeichenreihenfolge sind
 // derselbe Wert. Geprueft wird deshalb nur die Reihenfolge; ein Browser kommt
 // dafuer nicht ins Spiel (der Client hat keine Testinfrastruktur).
+//
+// M9.1 hat `tokenLayers` (Flaeche → z-index) durch `tableLayers` (Objekt →
+// z-index) ersetzt, damit Karten ihre eigene Reihe als Tie-Break behalten. Die
+// Abnahmen von M8.2 gelten unveraendert weiter und stehen deshalb hier;
+// M9.1 steht in table-layer.test.js.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { tokenLayers, TOKEN_Z_FLOOR } = await import('../../client/src/utils/tokenLayer.js');
+const { tableLayers, TOKEN_Z_FLOOR } = await import('../../client/src/utils/tokenLayer.js');
 
-const figur = { id: 'f', width: 100, height: 100 };
-const gelaende = { id: 'g', width: 300, height: 150 };
-const hauptplan = { id: 'p', width: 1200, height: 1000 };
+const figur = { key: 'f', width: 100, height: 100 };
+const gelaende = { key: 'g', width: 300, height: 150 };
+const hauptplan = { key: 'p', width: 1200, height: 1000 };
 
 test('Abnahme 1+2: die kleinere Figur liegt ueber dem Gelaendeteil', () => {
-  const z = tokenLayers([gelaende, figur]);
-  assert.ok(z(figur) > z(gelaende), `${z(figur)} > ${z(gelaende)}`);
+  const z = tableLayers([gelaende, figur]);
+  assert.ok(z('f') > z('g'), `${z('f')} > ${z('g')}`);
 });
 
-test('Abnahme 4: zwei Stuecke gleicher Groesse bekommen denselben Wert', () => {
-  const a = { id: 'a', width: 142, height: 142 };
-  const b = { id: 'b', width: 142, height: 142 };
-  const z = tokenLayers([a, b, figur]);
-  assert.equal(z(a), z(b));
+test('Abnahme 4: zwei Stuecke gleicher Groesse verhalten sich unveraendert', () => {
+  // Frueher trugen beide denselben Wert und das DOM entschied, wer oben liegt.
+  // Jetzt sagt es die Zahl – und zwar dasselbe: der spaetere im DOM liegt oben.
+  const a = { key: 'a', width: 142, height: 142 };
+  const b = { key: 'b', width: 142, height: 142 };
+  const z = tableLayers([a, b, figur]);
+  assert.ok(z('b') > z('a'), 'der spaetere im DOM liegt oben');
+  assert.ok(z('f') > z('b'), 'die kleinere Figur bleibt ueber beiden');
 });
 
 test('der Hauptplan liegt hinter allem, was auf ihm steht', () => {
-  const z = tokenLayers([figur, hauptplan, gelaende]);
-  assert.ok(z(hauptplan) < z(gelaende));
-  assert.ok(z(gelaende) < z(figur));
+  const z = tableLayers([figur, hauptplan, gelaende]);
+  assert.ok(z('p') < z('g'));
+  assert.ok(z('g') < z('f'));
 });
 
 test('kein Token faellt unter den bisherigen Wert 20', () => {
   assert.equal(TOKEN_Z_FLOOR, 20);
-  const z = tokenLayers([figur, hauptplan, gelaende, { id: 'x', width: 30, height: 30 }]);
-  for (const t of [figur, hauptplan, gelaende]) {
-    assert.ok(z(t) >= TOKEN_Z_FLOOR, `${t.id}: ${z(t)}`);
+  const z = tableLayers([figur, hauptplan, gelaende, { key: 'x', width: 30, height: 30 }]);
+  for (const key of ['f', 'p', 'g', 'x']) {
+    assert.ok(z(key) >= TOKEN_Z_FLOOR, `${key}: ${z(key)}`);
   }
-  assert.equal(z(hauptplan), TOKEN_Z_FLOOR, 'die groesste Flaeche behaelt 20');
+  assert.equal(z('p'), TOKEN_Z_FLOOR, 'die groesste Flaeche behaelt 20');
 });
 
 test('die Flaeche wird wie beim Zeichnen gelesen: width/height, sonst size, sonst 30', () => {
-  const alt = { id: 'alt', size: 60 };            // Spielstand von vor M3c
-  const neu = { id: 'neu', width: 60, height: 60 };
-  const ohne = { id: 'ohne' };                    // 30x30, der Rueckfall im Tisch
-  const z = tokenLayers([alt, neu, ohne]);
-  assert.equal(z(alt), z(neu), 'size und width/height meinen dasselbe');
-  assert.ok(z(ohne) > z(neu), '30x30 ist kleiner als 60x60');
+  const alt = { key: 'alt', size: 60 };            // Spielstand von vor M3c
+  const neu = { key: 'neu', width: 60, height: 60 };
+  const ohne = { key: 'ohne' };                    // 30x30, der Rueckfall im Tisch
+  const z = tableLayers([alt, neu, ohne]);
+  assert.ok(z('neu') > z('alt'), 'size und width/height meinen dasselbe Mass');
+  assert.ok(z('ohne') > z('neu'), '30x30 ist kleiner als 60x60');
 });
 
 test('ein nicht-quadratisches Stueck zaehlt mit seiner Flaeche, nicht mit einer Kante', () => {
   // 600x100 (12x2 Felder) belegt 60 000, die Figur 10 000 – das Band liegt
   // hinten, obwohl es schmaler ist als der Hauptplan.
-  const band = { id: 'b', width: 600, height: 100 };
-  const z = tokenLayers([band, figur]);
-  assert.ok(z(figur) > z(band));
+  const band = { key: 'b', width: 600, height: 100 };
+  const z = tableLayers([band, figur]);
+  assert.ok(z('f') > z('b'));
 });
 
 test('ein unbekanntes Token und eine leere Liste werfen nicht', () => {
-  const z = tokenLayers([]);
-  assert.equal(z({ id: 'unbekannt', width: 50, height: 50 }), TOKEN_Z_FLOOR);
-  assert.equal(tokenLayers(null)(figur), TOKEN_Z_FLOOR);
-  assert.equal(tokenLayers(undefined)(null), TOKEN_Z_FLOOR);
+  const z = tableLayers([]);
+  assert.equal(z('unbekannt'), TOKEN_Z_FLOOR);
+  assert.equal(tableLayers(null)('f'), TOKEN_Z_FLOOR);
+  assert.equal(tableLayers(undefined)(null), TOKEN_Z_FLOOR);
 });
