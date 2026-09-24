@@ -24,7 +24,7 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
-import { resolveGrids, cellFromLabel, cellCenter, cellLabel, cellAt, cellRange, rangeLabel, rangeBox, cellPoint } from './gridGeometry.js';
+import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, cellPoint } from './gridGeometry.js';
 import { assetToken, assetFace } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter } from './counters.js';
@@ -936,16 +936,26 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           const asset = findAsset(assets, t?.assetName);
           if (!asset) { missing.push(`asset "${t?.assetName ?? ''}" not found`); continue; }
           for (const label of (Array.isArray(t?.cells) ? t.cells : [])) {
-            const c = cellFromLabel(grid, label);
-            if (!c) { missing.push(`grid "${grid.label}" has no field "${label}"`); continue; }
+            // Dieselbe Rechnung wie im Raster-Zweig von `place_asset` (M7.1):
+            // `E3:G4` zentriert auf die Mitte der sechs Felder und bekommt
+            // deren Masse, `C7` ist der 1x1-Fall davon und behaelt die Groesse
+            // seines Assets.
+            const r = cellRange(grid, label);
+            if (!r) { missing.push(`grid "${grid.label}" has no field "${label}"`); continue; }
             // Je Feld ein eigenes Objekt. `place_asset` wuerde das vorhandene
             // verschieben - drei gleiche Plaettchen waeren dann eines, das
             // zweimal umzieht. Genau dafuer gibt es diesen Schritt.
-            const { x, y } = cellCenter(grid, c.col, c.row);
-            tokens.push(Object.assign(assetToken(asset, x, y, false), {
+            const { x, y } = cellPoint(grid, label);
+            const token = Object.assign(assetToken(asset, x, y, false), {
               gridId: grid.id,
-              cell: cellLabel(grid, c.col, c.row),
-            }));
+              cell: rangeLabel(grid, r),
+            });
+            if (r.ranged) {
+              const box = rangeBox(grid, r);
+              token.width = box.width;
+              token.height = box.height;
+            }
+            tokens.push(token);
           }
         }
       }

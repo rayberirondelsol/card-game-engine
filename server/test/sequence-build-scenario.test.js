@@ -297,6 +297,10 @@ test('das Schrittvokabular kennt build_scenario', () => {
   // Kein Raster am Schritt: es steht in den Szenariodaten. Zwei Quellen für
   // dieselbe Adresse wären eine Frage danach, welche gewinnt.
   assert.ok(!spec.fields.includes('gridLabel'), 'das Raster kommt aus den Daten, nicht vom Schritt');
+  // Und kein Feld für die Adresse: der Bereich aus M7.1 steht in
+  // `terrain[].cells`, nicht am Schritt. Das Schrittvokabular hat für G2
+  // nichts zu tun – geprüft, nicht geraten.
+  assert.ok(!spec.fields.includes('cell'), 'die Adresse steht in den Szenariodaten, nicht am Schritt');
 
   const fresh = defaultStep('build_scenario');
   assert.equal(fresh.type, 'build_scenario');
@@ -305,4 +309,98 @@ test('das Schrittvokabular kennt build_scenario', () => {
 
   assert.match(describeStep(fresh), /scenario/i);
   assert.match(describeStep({ type: 'build_scenario', final: true }), /final/i);
+});
+
+// ── Feldbereiche (M7.1, G2) ──────────────────────────────────────────────────
+//
+// Ein Geländestück deckt mehrere Felder. `E3:G4` ist die Adresse dafür, und
+// das Stück sitzt auf der Mitte der sechs Felder, nicht auf einer Feldmitte –
+// sonst läge es einen halben Feldversatz daneben. Ein Einzelfeld daneben
+// bleibt Zeichen für Zeichen, was es war.
+
+/** E3:G4 auf dem 10x10-Raster: Spalten 4–6, Zeilen 2–3. */
+const RANGE_BOX = { x: 330, y: 180, width: 180, height: 120 };
+
+test('build_scenario legt einen Bereich über sechs Felder und ein Einzelfeld daneben', () => {
+  const scenario = scenarioFixture();
+  scenario.bosses.Klaus.terrain = [{ assetName: 'Fetid Furball', cells: ['E3:G4', 'J2'] }];
+  delete scenario.bosses.Klaus.final;
+
+  const { state, log } = executeSequenceWithLog(shortGameBar(), [REVEAL, BUILD], ZONES, opts(scenario));
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+
+  const tiles = tilesNamed(state, 'Fetid Furball');
+  assert.equal(tiles.length, 2, 'zwei Einträge, zwei Objekte');
+
+  const ranged = tiles.find(t => t.cell === 'E3:G4');
+  assert.ok(ranged, `der Bereich wird normalisiert gemerkt, nicht als Einzelfeld: ${tiles.map(t => t.cell)}`);
+  assert.deepEqual(
+    { x: ranged.x, y: ranged.y, width: ranged.width, height: ranged.height },
+    RANGE_BOX,
+    'Mitte des Bereichs und Maße des Bereichs'
+  );
+  assert.equal(ranged.gridId, 'g1');
+
+  // Und das Einzelfeld behält die Größe seines Assets.
+  const single = tiles.find(t => t.cell === 'J2');
+  assert.ok(single, 'das Einzelfeld liegt daneben');
+  assert.deepEqual(
+    { x: single.x, y: single.y, width: single.width, height: single.height },
+    { ...center(9, 1), width: 60, height: 60 }
+  );
+});
+
+test('G4:E3 ist derselbe Bereich und wird als E3:G4 gemerkt', () => {
+  const scenario = scenarioFixture();
+  scenario.bosses.Klaus.terrain = [{ assetName: 'Wheat Field', cells: ['G4:E3'] }];
+  delete scenario.bosses.Klaus.final;
+
+  const { state, log } = executeSequenceWithLog(shortGameBar(), [REVEAL, BUILD], ZONES, opts(scenario));
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+  const tile = tilesNamed(state, 'Wheat Field')[0];
+  assert.equal(tile.cell, 'E3:G4');
+  assert.deepEqual({ x: tile.x, y: tile.y, width: tile.width, height: tile.height }, RANGE_BOX);
+});
+
+test('ein Bereich mit einer Ecke außerhalb lässt den Schritt scheitern, bevor das erste Objekt liegt', () => {
+  const broken = scenarioFixture();
+  // Wieder an *dritter* Stelle: ein Schritt, der erst legt und dann prüft,
+  // hätte hier schon zwei Plättchen auf dem Tisch.
+  broken.bosses.Klaus.terrain[0].cells = ['C7', 'D7', 'H9:K9'];
+
+  const start = shortGameBar();
+  const { state, log } = executeSequenceWithLog(start, [REVEAL, BUILD], ZONES, opts(broken));
+
+  assert.deepEqual(statuses(log), ['ok', 'failed'], reasons(log));
+  assert.match(log[1].reason, /H9:K9/);
+  assert.equal(tilesNamed(state, 'Fetid Furball').length, 0, 'kein einziges Objekt gelegt');
+  assert.deepEqual(state, executeSequence(start, [REVEAL], ZONES, opts()));
+});
+
+test('clear_grid räumt den Bereich genauso weg wie das Einzelfeld', () => {
+  const scenario = scenarioFixture();
+  scenario.bosses.Klaus.terrain = [{ assetName: 'Fetid Furball', cells: ['E3:G4', 'J2'] }];
+  delete scenario.bosses.Klaus.final;
+
+  const { state, log } = executeSequenceWithLog(
+    shortGameBar(),
+    [REVEAL, BUILD, { type: 'clear_grid', gridLabel: 'Kampffeld' }],
+    ZONES,
+    opts(scenario)
+  );
+  assert.deepEqual(statuses(log), ['ok', 'ok', 'ok'], reasons(log));
+  assert.equal(tilesNamed(state, 'Fetid Furball').length, 0, 'beide weg – die Mitte eines Bereichs liegt in einem Feld');
+});
+
+test('ein Bereich in fields wird gemeldet, bevor das erste Objekt liegt', () => {
+  const broken = scenarioFixture();
+  broken.bosses.Klaus.fields.B = 'J5:J6';
+
+  const start = shortGameBar();
+  const { state, log } = executeSequenceWithLog(start, [REVEAL, BUILD], ZONES, opts(broken));
+
+  assert.deepEqual(statuses(log), ['ok', 'failed'], reasons(log));
+  assert.match(log[1].reason, /J5:J6/);
+  assert.match(log[1].reason, /range/i, 'die eigene Meldung, nicht "kein solches Feld"');
+  assert.equal(tilesNamed(state, 'Fetid Furball').length, 0, 'kein einziges Objekt gelegt');
 });

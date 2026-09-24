@@ -295,3 +295,86 @@ test('ein Objekt mit Bereichsadresse liegt im Raum auf der Mitte des Bereichs', 
   assert.deepEqual({ x: fig.x, y: fig.y, width: fig.width, height: fig.height },
     { x: 200, y: 360, width: 40, height: 40 });
 });
+
+test('der Raum baut einen Feldbereich aus den Szenariodaten genauso auf wie der Tisch', async () => {
+  const gameId = await createGame();
+  addTableAsset(gameId, 'Boesewicht: Klaus', { image_path: '/uploads/klaus.png' });
+  getDb().prepare('UPDATE table_assets SET back_image_path = ? WHERE name = ?')
+    .run('/uploads/back.png', 'Boesewicht: Klaus');
+  addTableAsset(gameId, 'Holzzaun');
+
+  const setupId = await createSetup(gameId, {
+    state_data: JSON.stringify(stateWithDeck()),
+    zone_data: JSON.stringify([{
+      id: 'z-bar', label: 'Leiste', type: 'table', x: 800, y: 100, width: 200, height: 60,
+      accepts: ['asset'], capacity: 2, layout: 'row',
+    }]),
+    grid_data: JSON.stringify([{
+      id: 'g1', label: 'Kampffeld', type: 'square',
+      origin: { x: 100, y: 100 }, cell: 40, cols: 10, rows: 10,
+      labels: { cols: 'alpha', rows: 'numeric' },
+    }]),
+    // `scenario_data` reicht der Server untypisiert durch – der Bereich steht
+    // in den Daten, nicht am Schritt, und braucht keine Routenaenderung.
+    scenario_data: JSON.stringify({
+      gridLabel: 'Kampffeld',
+      bosses: { Klaus: { terrain: [{ assetName: 'Holzzaun', cells: ['E3:G4', 'J2'] }] } },
+    }),
+    sequence_data: JSON.stringify([
+      { type: 'place_asset', assetName: 'Boesewicht: Klaus', targetZoneLabel: 'Leiste', faceDown: true },
+      { type: 'reveal_next', zoneLabel: 'Leiste' },
+      { type: 'build_scenario', final: 'auto' },
+    ]),
+  });
+
+  const { room_code, started } = await startRoom(gameId, setupId);
+  assert.equal(started.statusCode, 200, started.body);
+
+  const tiles = getRoom(room_code).boardState.tokens.filter(t => t.label === 'Holzzaun');
+  assert.deepEqual(tiles.map(t => t.cell).sort(), ['E3:G4', 'J2']);
+
+  // E3:G4 = Spalten 4–6, Zeilen 2–3: Kasten 260..380 / 180..260.
+  const ranged = tiles.find(t => t.cell === 'E3:G4');
+  assert.deepEqual({ x: ranged.x, y: ranged.y, width: ranged.width, height: ranged.height },
+    { x: 320, y: 220, width: 120, height: 80 });
+
+  // Das Einzelfeld daneben behaelt die Groesse seines Assets.
+  const single = tiles.find(t => t.cell === 'J2');
+  assert.deepEqual({ x: single.x, y: single.y, width: single.width, height: single.height },
+    { x: 480, y: 160, width: 60, height: 60 });
+});
+
+test('ein Bereich in den Szenariodaten des Raums scheitert, bevor das erste Objekt liegt', async () => {
+  const gameId = await createGame();
+  addTableAsset(gameId, 'Boesewicht: Klaus', { image_path: '/uploads/klaus.png' });
+  getDb().prepare('UPDATE table_assets SET back_image_path = ? WHERE name = ?')
+    .run('/uploads/back.png', 'Boesewicht: Klaus');
+  addTableAsset(gameId, 'Holzzaun');
+
+  const setupId = await createSetup(gameId, {
+    state_data: JSON.stringify(stateWithDeck()),
+    zone_data: JSON.stringify([{
+      id: 'z-bar', label: 'Leiste', type: 'table', x: 800, y: 100, width: 200, height: 60,
+      accepts: ['asset'], capacity: 2, layout: 'row',
+    }]),
+    grid_data: JSON.stringify([{
+      id: 'g1', label: 'Kampffeld', type: 'square',
+      origin: { x: 100, y: 100 }, cell: 40, cols: 10, rows: 10,
+      labels: { cols: 'alpha', rows: 'numeric' },
+    }]),
+    scenario_data: JSON.stringify({
+      gridLabel: 'Kampffeld',
+      bosses: { Klaus: { terrain: [{ assetName: 'Holzzaun', cells: ['C7', 'D7', 'H9:K9'] }] } },
+    }),
+    sequence_data: JSON.stringify([
+      { type: 'place_asset', assetName: 'Boesewicht: Klaus', targetZoneLabel: 'Leiste', faceDown: true },
+      { type: 'reveal_next', zoneLabel: 'Leiste' },
+      { type: 'build_scenario', final: 'auto' },
+    ]),
+  });
+
+  const { room_code, started } = await startRoom(gameId, setupId);
+  assert.equal(started.statusCode, 200, started.body, 'der Raum startet trotzdem');
+  const tiles = getRoom(room_code).boardState.tokens.filter(t => t.label === 'Holzzaun');
+  assert.equal(tiles.length, 0, 'kein einziges Objekt gelegt – auch im Raum gilt „erst pruefen, dann legen"');
+});

@@ -22,9 +22,15 @@
  *
  * `final` ist additiv: derselbe Eintrag, ein zusätzlicher Abschnitt, der nur
  * für den Endkampf dazukommt – kein zweites Szenario.
+ *
+ * In `terrain[].cells` darf seit M7.1 ein **Feldbereich** stehen (`"E3:G4"`);
+ * in `fields` nicht: ein Dörfler steht auf einem Feld, und `$B` reist als
+ * Platzhaltertext in ein `place_asset` weiter. Beides wird geprüft, mit je
+ * eigener Meldung – „kein solches Feld" wäre für einen Bereich, den es gibt,
+ * die falsche Auskunft.
  */
 
-import { cellFromLabel } from './gridGeometry.js';
+import { cellFromLabel, cellRange } from './gridGeometry.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 const text = (s) => String(s ?? '').trim();
@@ -61,7 +67,15 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
   if (!label) problems.push('no grid named in the scenario data');
   else if (Array.isArray(grids) && grids.length && !grid) problems.push(`grid "${label}" not found`);
 
-  /** Ein Feldname gegen das Raster – dieselbe Rechnung wie im Editor (T1). */
+  /**
+   * Eine Geländeadresse gegen das Raster – dieselbe Rechnung wie im Editor
+   * (T1) und im Executor. Seit M7.1 darf das ein Feldbereich sein (`E3:G4`);
+   * ein einzelnes Feld ist der 1×1-Fall derselben Rechnung, nicht eine zweite
+   * daneben.
+   */
+  const badRange = (cell) => grid && !cellRange(grid, cell);
+
+  /** Ein einzelner Feldname – für `fields`, wo ein Bereich nichts zu suchen hat. */
   const badCell = (cell) => grid && !cellFromLabel(grid, cell);
 
   const knownAsset = (name) => !Array.isArray(assets) || assets.length === 0
@@ -81,7 +95,7 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
       if (cells.length === 0) { problems.push(`${who}: asset "${asset}" names no field`); continue; }
       for (const cell of cells) {
         if (!text(cell)) problems.push(`${who}: asset "${asset}" has an empty field`);
-        else if (badCell(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (asset "${asset}")`);
+        else if (badRange(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (asset "${asset}")`);
       }
     }
 
@@ -93,6 +107,19 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
       list.forEach((cell, i) => {
         const named = Array.isArray(value) ? `${key}${i + 1}` : key;
         if (!text(cell)) problems.push(`${who}: field ${named} is empty`);
+        // Ein Bereich ist hier kein Feld, das es nicht gibt, sondern die
+        // falsche Sorte Adresse: ein Dörfler steht auf einem Feld (M7.1).
+        //
+        // Und er fällt sonst *nirgends* mehr auf: seit G1 nimmt `place_asset`
+        // einen Bereich an. `J5:K6` als `$B` würde also nicht scheitern,
+        // sondern still gelingen – und den Dörfler dabei auf zwei mal zwei
+        // Felder aufblasen, weil ein Bereich seine Maße mitbringt. Genau
+        // deshalb steht die Meldung hier und nicht im Executor.
+        //
+        // Geprüft wird die Schreibweise, nicht das Raster: ein Doppelpunkt ist
+        // in keinem Benennungsschema ein Feldname (zwei Zahlenachsen trennen
+        // mit `-`). Das gilt darum auch ohne Raster in der Hand.
+        else if (text(cell).includes(':')) problems.push(`${who}: field ${named} names a range "${text(cell)}"; a villager stands on a single field`);
         else if (badCell(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (${named})`);
       });
     }

@@ -40,7 +40,14 @@ after(async () => {
   rmSync(TMP, { recursive: true, force: true });
 });
 
-/** Der Eintrag aus M7, „Die Szenariodaten". */
+/**
+ * Der Eintrag aus M7, „Die Szenariodaten" – mit dem Feldbereich aus M7.1
+ * dazwischen. Der Bereich steht hier nicht wegen der Prüfung (die hat ihre
+ * eigene Datei), sondern weil `setups.js` `scenario_data` **untypisiert**
+ * durchreicht: POST, PUT und GET dürfen an `"D5:G5"` nichts kennen und nichts
+ * zurechtbiegen. Fiele die Route je auf ein Schema zurück, das nur Feldnamen
+ * kennt, bräche jeder Test dieser Datei – und nicht erst der Tisch.
+ */
 const SCENARIOS = {
   gridLabel: 'Kampffeld',
   bosses: {
@@ -49,6 +56,7 @@ const SCENARIOS = {
       terrain: [
         { assetName: 'Fetid Furball', cells: ['C7', 'D7', 'H9'] },
         { assetName: 'Wheat Field', cells: ['M4'] },
+        { assetName: 'Holzzaun', cells: ['D5:G5'] },
       ],
       fields: { B: 'J5', D: ['A1', 'B3', 'C4', 'D6', 'E9'] },
       decks: [{ category: 'Aktionen: Patches', label: 'Verhaltensdeck' }],

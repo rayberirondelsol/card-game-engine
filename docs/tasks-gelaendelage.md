@@ -258,6 +258,17 @@ stehen, statt sie zu löschen (Rückwärtskompatibilität mit älteren Clients).
 - **`validateScenarioData` ohne Bedienung.** Siehe G2, Schicht 3. Solange sie nur
   der Executor ruft, fällt ein Tippfehler in den Szenariodaten erst am Tisch auf
   — und dann als `failed` mitten in der Aktion.
+
+  *In G2 geprüft und bewusst offengelassen.* Der Befund ist schärfer als „kein
+  Aufrufer": **es gibt überhaupt keine Oberfläche, die `scenario_data`
+  bearbeitet.** `GameTable.jsx` lädt die Daten in den State und schickt sie beim
+  Speichern unverändert zurück; getippt werden sie über die API oder direkt in
+  der Datenbank (M7.1, Abnahme 12 nimmt `scenario_data` ausdrücklich vom Editor
+  aus). Eine Meldungsliste neben etwas, das man dort nicht ändern kann, wäre
+  genau die tote Anzeige aus `docs/audit-dead-controls.md`, nur andersherum.
+  Der Aufruf ist also nicht die Arbeit, die hier fehlt — die fehlende Arbeit ist
+  ein Eingabeort für die Szenariodaten. Wer den baut, ruft die Prüfung dort auf;
+  vorher lohnt es nicht.
 - **Nichts sagt, wie groß eine Kachel *ist*,** nur wie viele Felder sie *hier*
   belegt. Dieselbe Kachel zweimal verschieden groß eingetragen bleibt
   unbemerkt. Ein `fieldsWide`/`fieldsTall` am Asset wäre die Prüfung dafür — und

@@ -193,3 +193,65 @@ test('nothing at all in hand is no reason to throw', () => {
   assert.deepStrictEqual(validateScenarioData(null, {}), []);
   assert.deepStrictEqual(validateScenarioData(undefined, undefined), []);
 });
+
+// ── Feldbereiche (M7.1, G2) ──────────────────────────────────────────────────
+//
+// Ein Geländestück deckt mehrere Felder; `E3:G4` ist dort eine Adresse wie
+// jede andere. In `fields` ist es keine: `$B` wandert als Platzhaltertext in
+// ein `place_asset`, und ein Dörfler steht auf einem Feld. Deshalb zwei
+// Prüfungen und zwei Meldungen, nicht eine.
+
+test('a range in terrain is an address like any other', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[0].cells = ['C7:E8', 'H9'];
+  data.bosses.Patches.final.terrain[0].cells = ['K2:K3'];
+  assert.deepStrictEqual(validateScenarioData(data, CTX), []);
+});
+
+test('G4:E3 is the same range and just as clean', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[1].cells = ['G4:E3'];
+  assert.deepStrictEqual(validateScenarioData(data, CTX), []);
+});
+
+test('a range with one end outside the grid is one message, not two', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[0].cells[1] = 'C7:Z99';
+  onlyProblem(data, 'Patches', 'C7:Z99', 'Fetid Furball');
+});
+
+test('a range with three ends is not an address', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[1].cells = ['C7:D8:E9'];
+  onlyProblem(data, 'Patches', 'C7:D8:E9', 'Wheat Field');
+});
+
+test('a range in the single B field gets its own message, not "no such field"', () => {
+  const data = clean();
+  data.bosses.Patches.fields.B = 'J5:K6';
+  const problem = onlyProblem(data, 'Patches', 'B', 'J5:K6');
+  assert.match(problem, /range/i, `"${problem}" has to say that a range is the mistake`);
+  assert.doesNotMatch(problem, /has no field/, 'J5:K6 exists – the range is what is wrong');
+});
+
+test('a range in a D field is caught the same way', () => {
+  const data = clean();
+  data.bosses.Patches.fields.D[2] = 'C4:D5';
+  const problem = onlyProblem(data, 'Patches', 'D3', 'C4:D5');
+  assert.match(problem, /range/i);
+});
+
+test('a range in a final field is caught too', () => {
+  const data = clean();
+  data.bosses.Patches.final.fields.FF[0] = 'K2:K3';
+  const problem = onlyProblem(data, 'Patches', 'FF1', 'K2:K3');
+  assert.match(problem, /range/i);
+});
+
+test('a range in fields is a mistake of form – it is reported without a grid in hand', () => {
+  const data = clean();
+  data.bosses.Patches.fields.B = 'J5:K6';
+  const problems = validateScenarioData(data, { assets: ASSETS });
+  assert.equal(problems.length, 1, JSON.stringify(problems));
+  assert.match(problems[0], /range/i);
+});
