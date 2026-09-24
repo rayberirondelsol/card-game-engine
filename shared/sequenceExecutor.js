@@ -999,6 +999,15 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // nicht wissen"), darum faengt diese Schleife denselben Fall noch einmal.
       const tokens = [];
       const missing = [];
+      // Vermerke: was gemeldet, aber nicht abgebrochen wird. `missing` bricht
+      // vor dem ersten Objekt ab (ein Tippfehler in einer Feldadresse), die
+      // Vermerke lassen liegen, was liegt - ein Teil ohne Rueckseite (M7.6) und
+      // eine fehlende Gelaendekarte (M8.3) sind bekannte Normalfaelle.
+      const notes = [];
+      // Eintraege, die `assetToken` verweigert hat: ihre Karte gehoert nicht
+      // daneben, denn das Teil liegt nicht (M7.6/M8.3 - eine falsche Karte ist
+      // schlimmer als keine).
+      const refused = new Set();
       for (const part of parts) {
         for (const t of (Array.isArray(part?.terrain) ? part.terrain : [])) {
           const asset = findAsset(assets, t?.assetName);
@@ -1021,7 +1030,20 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
             // verschieben - drei gleiche Plaettchen waeren dann eines, das
             // zweimal umzieht. Genau dafuer gibt es diesen Schritt.
             const { x, y } = rangeCenter(grid, r);
-            const token = Object.assign(assetToken(asset, x, y, false), {
+            // Die Seite steht am Eintrag, nicht am Asset - genau wie die
+            // Drehung (M7.6). `assetToken` weigert sich, ein Teil ohne
+            // Rueckseite verdeckt zu legen, und gibt `null` zurueck (Spec §6);
+            // daraus wird hier ein Vermerk. Keine zweite Pruefung daneben: sie
+            // waere eine zweite Antwort auf dieselbe Frage.
+            const placed = assetToken(asset, x, y, t?.faceDown);
+            if (!placed) {
+              // `break`, nicht `continue`: die Weigerung haengt am Eintrag und
+              // nicht am Feld - sonst stuende derselbe Satz je Feld einmal da.
+              notes.push(`"${t.assetName}" has no back side and was not placed face down`);
+              refused.add(`${norm(t?.assetName)}|${Boolean(t?.faceDown)}`);
+              break;
+            }
+            const token = Object.assign(placed, {
               gridId: grid.id,
               cell: rangeLabel(grid, r),
               // Zwei Ausrichtungen sind zwei Gelaendeeintraege - die Drehung
@@ -1052,16 +1074,21 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // legen": das Gelaende liegt schon. Eine fehlende Karte ist auch kein
       // Halbaufbau, sondern ein bekannter Normalfall (die Bundo-Koenigin hat
       // keine) - ein Abbruch dafuer liesse das ganze Kampffeld leer.
-      const notes = [];
       const cardZone = String(scenarioData?.cardZoneLabel ?? '').trim();
       if (cardZone) {
         // Entdoppelt nach Assetname: zwei Holzzaeune auf dem Brett sind zwei
         // Plaettchen und *eine* Karte. Das gilt fuer zwei Felder eines
         // Eintrags genauso wie fuer zwei Eintraege desselben Zauns (zwei
         // Ausrichtungen, M7.1). Reihenfolge bleibt die der Szenariodaten.
+        // Der Schluessel ist Name **und** Seite: dasselbe Plaettchen offen und
+        // verdeckt sind zwei verschiedene Gelaende und damit zwei Karten
+        // (M7.6). Zweimal dieselbe Seite bleibt eine.
         const wanted = [...new Map(parts
           .flatMap(p => (Array.isArray(p?.terrain) ? p.terrain : []))
-          .map(t => [norm(t?.assetName), String(t?.assetName ?? '').trim()])).values()];
+          .map(t => [`${norm(t?.assetName)}|${Boolean(t?.faceDown)}`,
+            { name: String(t?.assetName ?? '').trim(), down: Boolean(t?.faceDown) }]))]
+          .filter(([key]) => !refused.has(key))
+          .map(([, v]) => v);
 
         // Der Namensvergleich ist die ganze Zuordnung - dafuer tragen die
         // Karten seit M8.3 den Namen ihres Gelaendeteils. Kein
@@ -1072,22 +1099,26 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // Teil vor dem Schraegstrich - zwei Versuche, kein dritter und kein
         // Aehnlichkeitsrechner.
         //
-        // Der **vordere** Teil, nicht irgendeiner: dieser Schritt legt Gelaende
-        // mit `assetToken(asset, x, y, false)` hin, also immer offen, und der
-        // Gelaendeeintrag kennt keine Seite. Was daliegt, ist die Vorderseite.
-        // Bei einem Teil, dessen Seiten zwei verschiedene Gelaende sind
-        // ("Doofster-Glocke / Kochtopf"), waere die zweite Karte die Regel zu
-        // einem Gelaende, das gar nicht auf dem Tisch liegt - schlimmer als
-        // keine Karte, weil eine falsche gelesen wird.
-        const front = (name) => (name.includes("/") ? name.slice(0, name.indexOf("/")).trim() : null);
+        // Welcher Teil gilt, sagt die Seite, auf der das Plaettchen liegt
+        // (M7.6): offen der vor dem Schraegstrich, verdeckt der dahinter. Eine
+        // Regel, zwei Richtungen - die Karte heisst wie der Teil des
+        // Teilnamens, zu dem sie gehoert. Die Gegenprobe ist der Grund dafuer:
+        // die Kochtopf-Karte neben eine offen liegende Doofster-Glocke zu
+        // legen waere die Regel zu einem Gelaende, das gar nicht auf dem Tisch
+        // liegt - schlimmer als keine Karte, weil eine falsche gelesen wird.
+        const side = (name, down) => {
+          const i = name.indexOf('/');
+          return i < 0 ? null : (down ? name.slice(i + 1) : name.slice(0, i)).trim();
+        };
 
         // Entdoppelt ein zweites Mal, nun nach *Karte*: erst der Schraegstrich
         // macht moeglich, dass zwei verschieden benannte Teile auf dieselbe
         // Karte zeigen. Dieselbe Regel wie bei zwei Holzzaeunen.
         const found = [];
-        for (const name of wanted) {
+        for (const { name, down } of wanted) {
+          const part = side(name, down);
           const card = cards.find(c => norm(c.name) === norm(name))
-            || (front(name) ? cards.find(c => norm(c.name) === norm(front(name))) : null);
+            || (part ? cards.find(c => norm(c.name) === norm(part)) : null);
           if (!card) notes.push(`no terrain card named "${name}"`);
           else if (!found.includes(card)) found.push(card);
         }

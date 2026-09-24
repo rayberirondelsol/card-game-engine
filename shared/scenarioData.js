@@ -15,7 +15,7 @@
  * Die Form (Spec M7, „Die Szenariodaten"):
  *
  *   { gridLabel, bosses: { "<Basisname>": {
- *       scenario, terrain: [{ assetName, cells: [], rotation }],
+ *       scenario, terrain: [{ assetName, cells: [], rotation, faceDown }],
  *       fields: { B: "J5", D: ["A1", ...] },
  *       decks: [{ category, label }],
  *       final: { terrain: [...], fields: { FF: [...] } } } } }
@@ -34,6 +34,9 @@ import { cellRange } from './gridGeometry.js';
 import { ROTATIONS, rotationOf } from './assetToken.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
+
+/** Was an einem Geländeeintrag stehen darf (M7, M7.1, M7.6). */
+const TERRAIN_KEYS = ['assetName', 'cells', 'rotation', 'faceDown'];
 const text = (s) => String(s ?? '').trim();
 
 /**
@@ -89,6 +92,15 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
       const asset = text(t?.assetName);
       if (!asset) { problems.push(`${who}: a terrain entry has no asset name`); continue; }
       if (!knownAsset(asset)) { problems.push(`${who}: asset "${asset}" not found`); continue; }
+      // Der Geländeeintrag ist die **einzige** Stelle dieser Daten mit einem
+      // abgeschlossenen Satz Schlüssel – darum wird hier ein danebengetipptes
+      // `facedown` gemeldet und sonst nirgends. Ohne die Meldung läge das
+      // Plättchen still falsch herum: ein fehlendes Teil sieht man, ein
+      // verkehrtes nicht. (M7.6; `fields` ist eine freie Namensliste, und der
+      // Eintrag selbst trägt `scenario`, `decks`, `stats`, `final`.)
+      for (const key of Object.keys(t || {})) {
+        if (!TERRAIN_KEYS.includes(key)) problems.push(`${who}: asset "${asset}" has unknown key "${key}"`);
+      }
       const cells = Array.isArray(t?.cells) ? t.cells : [];
       if (cells.length === 0) { problems.push(`${who}: asset "${asset}" names no field`); continue; }
       for (const cell of cells) {

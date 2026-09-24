@@ -295,15 +295,24 @@ const pairCards = () => [
   { id: 'c-pot', game_id: 'g1', category_id: 'cat-n', category: 'Gelände (Üble Nachbarn)', card_back_id: 'back-n', name: 'Kochtopf', image_path: '/uploads/cards/pot.png', width: 300, height: 420 },
 ];
 
-/** Ein Szenario mit genau den genannten Geländeteilen, je auf einem Feld. */
-function pairScenario(...assetNames) {
+/**
+ * Ein Szenario mit genau den genannten Geländeteilen, je auf einem Feld.
+ *
+ * Ein Eintrag ist ein Name oder - seit M7.6 - ein `{ assetName, faceDown }`.
+ * Dieselbe Hilfsfunktion, ein Feld mehr: zwei wären zwei Fixtures, die
+ * auseinanderlaufen.
+ */
+function pairScenario(...entries) {
   return {
     gridLabel: 'Kampffeld',
     cardZoneLabel: 'Geländekarten',
     bosses: {
       Waggums: {
         scenario: 'Zwei Seiten',
-        terrain: assetNames.map((assetName, i) => ({ assetName, cells: [`${'ABCDEFGHIJ'[i]}1`] })),
+        terrain: entries.map((e, i) => ({
+          ...(typeof e === 'string' ? { assetName: e } : e),
+          cells: [`${'ABCDEFGHIJ'[i]}1`],
+        })),
         fields: { B: 'I8:J9' },
       },
     },
@@ -366,4 +375,192 @@ test('der Vergleich bleibt zeichengenau: ein fehlender Bindestrich trifft nicht'
   assert.equal(state.cards.length, 0);
   assert.equal(log[1].status, 'failed');
   assert.match(log[1].reason, /Doofster-Glocke \/ Kochtopf/);
+});
+
+// ── M7.6: ein Geländeteil kann auch auf der Rückseite liegen ─────────────────
+//
+// Drei Dinge stehen hier im Mittelpunkt:
+//
+// 1. **Die Seite kommt aus den Daten.** Der Geländeeintrag trägt `faceDown`
+//    genau wie `rotation`; ohne das Feld liegt alles wie bisher.
+// 2. **Ohne Rückseite wird nicht gelegt.** `assetToken` weigert sich (Spec §6),
+//    der Aufbau macht daraus einen Vermerk und läuft weiter - ein still falsch
+//    herum liegendes Plättchen ist schlimmer als ein fehlendes.
+// 3. **Die Kartenregel gilt in beide Richtungen.** Eine Karte heißt wie der
+//    Teil des Teilnamens, zu dem sie gehört: offen der vor dem Schrägstrich,
+//    verdeckt der dahinter. Eine Regel, nicht zwei.
+
+/**
+ * Die echten Paare aus der Produktion (M7.6) - Plättchen mit zwei Seiten, deren
+ * Seiten zwei *verschiedene* Gelände sind, und zu jeder Seite eine Karte.
+ * Erfundene Namen würden die Regel genauso zeigen und den Ernstfall nicht.
+ */
+const REAL_PAIRS = [
+  ['Doofster-Glocke / Kochtopf', 'Doofster-Glocke', 'Kochtopf'],
+  ['Koederstulle / Rasenmaeher', 'Koederstulle', 'Rasenmaeher'],
+  ['Rangelblume / Die Wolken-Gang', 'Rangelblume', 'Die Wolken-Gang'],
+  ["Wehtuh-Fratzenfalle / Goob's Tavern", 'Wehtuh-Fratzenfalle', "Goob's Tavern"],
+  ['Flut / Matschpfuetze', 'Flut', 'Matschpfuetze'],
+];
+
+// `pairAssets`/`pairCards` tragen die Doofster-Glocke schon - hier gewinnt der
+// Eintrag aus REAL_PAIRS, sonst stünde derselbe Name zweimal in der Bibliothek
+// und `findAsset` nähme den ersten.
+const dropDupes = (rows, names) => rows.filter(r => !names.includes(r.name));
+
+const sideAssets = () => [
+  ...dropDupes(pairAssets(), REAL_PAIRS.map(([n]) => n)),
+  ...REAL_PAIRS.map(([name], i) => ({
+    id: `pair-${i}`, name, type: 'token', category: 'Gelände (Üble Nachbarn)',
+    image_path: `/uploads/tokens/pair-${i}.png`, back_image_path: `/uploads/tokens/pair-${i}-b.png`,
+    width: 60, height: 60,
+  })),
+  // Zweiseitig benannt, aber **ohne** Rückseitenbild: der Fall aus Abnahme 3.
+  {
+    id: 'pair-flat', name: 'Grabhügel / Grabhügel ausgehoben (N)', type: 'token', category: 'Gelände',
+    image_path: '/uploads/tokens/grab.png', back_image_path: null, width: 60, height: 60,
+  },
+];
+
+const sideCards = () => [
+  ...dropDupes(pairCards(), REAL_PAIRS.flatMap(([, f, b]) => [f, b])),
+  ...REAL_PAIRS.flatMap(([, front, back], i) => [
+    { id: `pc-${i}f`, game_id: 'g1', category_id: 'cat-n', category: 'Gelände (Üble Nachbarn)', card_back_id: 'back-n', name: front, image_path: `/uploads/cards/${i}f.png`, width: 300, height: 420 },
+    { id: `pc-${i}b`, game_id: 'g1', category_id: 'cat-n', category: 'Gelände (Üble Nachbarn)', card_back_id: 'back-n', name: back, image_path: `/uploads/cards/${i}b.png`, width: 300, height: 420 },
+  ]),
+];
+
+const buildSide = (scenarioData) => buildWith(scenarioData, sideAssets(), sideCards());
+const tile = (state, label) => state.tokens.find(t => t.label === label);
+
+// ── V1: die Seite kommt aus den Daten ────────────────────────────────────────
+
+test('ein Geländeeintrag mit faceDown legt das Teil mit seinem Rückseitenbild', () => {
+  const { state, log } = buildSide(pairScenario({ assetName: 'Doofster-Glocke / Kochtopf', faceDown: true }));
+
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+  const t = tile(state, 'Doofster-Glocke / Kochtopf');
+  assert.equal(t.faceDown, true);
+  assert.equal(t.imageUrl, '/uploads/tokens/pair-0-b.png');
+});
+
+test('ohne das Feld liegt das Teil offen - die erfassten Szenarien bauen unverändert', () => {
+  const { state } = buildSide(pairScenario('Doofster-Glocke / Kochtopf'));
+
+  const t = tile(state, 'Doofster-Glocke / Kochtopf');
+  assert.equal(t.faceDown, false);
+  assert.equal(t.imageUrl, '/uploads/tokens/pair-0.png');
+});
+
+test('faceDown gilt auch im final-Abschnitt', () => {
+  // Dort stehen die fünf Grabhügel, und die sind zweiseitig. Geprüft wird es an
+  // einem Teil *mit* Rückseitenbild, damit der Fall nicht mit V2 verschmilzt.
+  const data = pairScenario('Hohler Heuhaufen');
+  data.bosses.Waggums.final = {
+    terrain: [{ assetName: 'Flut / Matschpfuetze', cells: ['E9'], faceDown: true }],
+  };
+  const o = { assets: sideAssets(), cards: sideCards(), grids: GRIDS, scenarioData: data };
+  const start = executeSequence(emptyState(),
+    [{ type: 'place_asset', assetName: 'Bösewicht: Waggums', targetZoneLabel: 'Stufenleiste', faceDown: true }],
+    ZONES, o);
+  const { state, log } = executeSequenceWithLog(start,
+    [REVEAL, { type: 'build_scenario', final: true }], ZONES, o);
+
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+  const t = tile(state, 'Flut / Matschpfuetze');
+  assert.equal(t.faceDown, true);
+  assert.equal(t.imageUrl, '/uploads/tokens/pair-4-b.png');
+  assert.deepEqual(names(state), ['Hohler Heuhaufen', 'Matschpfuetze']);
+});
+
+test('die Drehung überlebt die Seite', () => {
+  const data = pairScenario({ assetName: 'Flut / Matschpfuetze', faceDown: true, rotation: 90 });
+  const { state } = buildSide(data);
+
+  assert.equal(tile(state, 'Flut / Matschpfuetze').rotation, 90);
+  assert.equal(tile(state, 'Flut / Matschpfuetze').faceDown, true);
+});
+
+// ── V2: ohne Rückseite wird nicht gelegt, der Rest läuft weiter ──────────────
+
+test('ein Teil ohne Rückseitenbild mit faceDown wird nicht gelegt und steht im Protokoll', () => {
+  const { state, log } = buildSide(pairScenario(
+    { assetName: 'Grabhügel / Grabhügel ausgehoben (N)', faceDown: true },
+    'Hohler Heuhaufen',
+  ));
+
+  // Das Teil liegt nicht …
+  assert.equal(tile(state, 'Grabhügel / Grabhügel ausgehoben (N)'), undefined);
+  // … der übrige Aufbau läuft weiter: das zweite Plättchen liegt, seine Karte auch.
+  assert.ok(tile(state, 'Hohler Heuhaufen'));
+  assert.deepEqual(names(state), ['Hohler Heuhaufen']);
+  // … und der Schritt sagt, welches Teil fehlt.
+  assert.equal(log[1].status, 'failed');
+  assert.match(log[1].reason, /Grabhügel/);
+});
+
+// ── V3: die Kartenregel gilt in beide Richtungen ─────────────────────────────
+
+for (const [name, front, back] of REAL_PAIRS) {
+  test(`verdeckt legt "${name}" die Karte "${back}", offen "${front}"`, () => {
+    assert.deepEqual(names(buildSide(pairScenario({ assetName: name, faceDown: true })).state), [back]);
+    assert.deepEqual(names(buildSide(pairScenario(name)).state), [front]);
+  });
+}
+
+test('dasselbe Teil einmal offen und einmal verdeckt legt zwei Karten', () => {
+  // Die Entdopplung zählt die Seite mit: zwei Seiten sind zwei Gelände.
+  const { state, log } = buildSide(pairScenario(
+    'Doofster-Glocke / Kochtopf',
+    { assetName: 'Doofster-Glocke / Kochtopf', faceDown: true },
+  ));
+
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+  assert.deepEqual(names(state), ['Doofster-Glocke', 'Kochtopf']);
+});
+
+test('zweimal dieselbe Seite legt weiter eine Karte', () => {
+  const { state } = buildSide(pairScenario(
+    { assetName: 'Doofster-Glocke / Kochtopf', faceDown: true },
+    { assetName: 'Doofster-Glocke / Kochtopf', faceDown: true },
+  ));
+
+  assert.deepEqual(names(state), ['Kochtopf']);
+});
+
+test('die hintere Richtung findet nur, was es gibt', () => {
+  // `Wunschbrunnen / Wunschbrunnen (leer)` verdeckt sucht die Karte
+  // `Wunschbrunnen (leer)` - die gibt es nicht, also liegt keine. Die Karte
+  // `Wunschbrunnen` der Vorderseite daneben zu legen wäre die Regel zu einem
+  // Gelände, das gar nicht daliegt.
+  const { state } = buildSide(pairScenario({ assetName: 'Wunschbrunnen / Wunschbrunnen (leer)', faceDown: true }));
+  assert.deepEqual(names(state), []);
+
+  const open = buildSide(pairScenario('Wunschbrunnen / Wunschbrunnen (leer)'));
+  assert.deepEqual(names(open.state), ['Wunschbrunnen']);
+});
+
+test('ein Name ohne Schrägstrich verhält sich mit faceDown unverändert', () => {
+  const assets = sideAssets().map(a => (a.name === 'Holzzaun'
+    ? { ...a, back_image_path: '/uploads/tokens/zaun-b.png' } : a));
+  const { state, log } = buildWith(pairScenario({ assetName: 'Holzzaun', faceDown: true }), assets, sideCards());
+
+  assert.deepEqual(statuses(log), ['ok', 'ok'], reasons(log));
+  assert.deepEqual(names(state), ['Holzzaun']);
+});
+
+test('ein verweigertes Teil bekommt keine Karte', () => {
+  // Das Teil liegt nicht - die Kochtopf-Karte daneben wäre die Regel zu einem
+  // Gelände, das gar nicht auf dem Tisch ist. Genau der Fall, für den M8.3 die
+  // Vorderseite gewählt hat, nur andersherum.
+  const assets = sideAssets().map(a => (a.name === 'Doofster-Glocke / Kochtopf'
+    ? { ...a, back_image_path: null } : a));
+  const { state, log } = buildWith(
+    pairScenario({ assetName: 'Doofster-Glocke / Kochtopf', faceDown: true }, 'Hohler Heuhaufen'),
+    assets, sideCards(),
+  );
+
+  assert.deepEqual(names(state), ['Hohler Heuhaufen']);
+  assert.equal(log[1].status, 'failed');
+  assert.match(log[1].reason, /no back side/);
 });

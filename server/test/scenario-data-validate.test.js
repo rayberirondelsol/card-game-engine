@@ -267,3 +267,41 @@ test('without a grid in hand a range in fields says nothing – same as a single
   data.bosses.Patches.fields.B = 'J8:K9';
   assert.deepStrictEqual(validateScenarioData(data, { assets: ASSETS }), []);
 });
+
+// ── M7.6: die Seite eines Geländeteils ───────────────────────────────────────
+//
+// `faceDown` steht am Geländeeintrag, freiwillig und genau parallel zu
+// `rotation`. Die Prüfung nimmt es an — und meldet, was danebengetippt wurde:
+// ein `facedown` ginge sonst still durch, und das Plättchen läge falsch herum,
+// ohne dass es jemand merkt. Das ist der teuerste Fehlerfall dieser Daten, denn
+// ein fehlendes Plättchen sieht man und ein verkehrtes nicht.
+
+test('faceDown at a terrain entry passes without a word', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[0].faceDown = true;
+  data.bosses.Patches.terrain[1].faceDown = false;
+  data.bosses.Patches.final.terrain[0].faceDown = true;
+  assert.deepStrictEqual(validateScenarioData(data, CTX), []);
+});
+
+test('a misspelled faceDown is reported with boss, asset and key', () => {
+  const data = clean();
+  data.bosses.Patches.terrain[0].facedown = true;
+  onlyProblem(data, 'Patches', 'Fetid Furball', 'facedown');
+});
+
+test('a misspelled key in the final section names the final section', () => {
+  const data = clean();
+  data.bosses.Patches.final.terrain[0].faceDwn = true;
+  onlyProblem(data, 'Patches', 'final', 'Giant Milk Jug', 'faceDwn');
+});
+
+test('unknown keys outside terrain stay untouched', () => {
+  // Der Eintrag selbst trägt `scenario`, `decks`, `stats`, `final` und was die
+  // nächste Spec bringt; `fields` ist eine freie Namensliste. Nur der
+  // Geländeeintrag hat einen abgeschlossenen Satz Schlüssel.
+  const data = clean();
+  data.bosses.Patches.somethingNew = 42;
+  data.bosses.Patches.stats = { BEW: '4', LEB: '30' };
+  assert.deepStrictEqual(validateScenarioData(data, CTX), []);
+});
