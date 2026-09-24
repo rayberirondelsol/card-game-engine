@@ -22,7 +22,7 @@
  *                                        rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
-import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
+import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
@@ -249,7 +249,9 @@ export function hasPlaceholder(value) {
 // `value` steht mit dabei, seit `set_counter` die Werte des Bösewichts aus den
 // Szenariodaten liest (R1/R4). Fuer `place_counter` aendert das nichts:
 // `hasPlaceholder` prueft nur Zeichenketten, und dort steht eine Zahl.
-const NAME_FIELDS = ['assetName', 'cardName', 'cell', 'category', 'label', 'name', 'value'];
+// `slot` steht hier, weil die Werte des Boesewichts als `$BEW`/`$LEB` an die
+// Leisten kommen (M8.10, Nachtrag zu M7.5) - derselbe Weg wie `$B` bei `cell`.
+const NAME_FIELDS = ['assetName', 'cardName', 'cell', 'slot', 'category', 'label', 'name', 'value'];
 
 /** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
 function baseName(name) {
@@ -664,8 +666,23 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           const taken = occupancy(state, zone) - here;
           const refusal = zoneRejects(zone, 'asset', taken);
           if (refusal) return skip(refusal);
-          const slots = zoneSlots(zone);
-          target = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(zone);
+          // M8.10: `slot` nennt den Platz bei seiner **Nummer** statt ihn aus
+          // der Belegung zu zaehlen. Eine Leiste traegt einen Marker, und wo er
+          // liegt, sagt der Wert - nicht, wie voll die Zone ist. Ohne `slot`
+          // bleibt es beim Auffuellen der Reihe nach (Bosseleiste).
+          // Die Zonenregeln oben gelten weiter: ein genannter Platz umgeht
+          // weder `accepts` noch die Kapazitaet.
+          if (step.slot !== undefined && step.slot !== null && step.slot !== '') {
+            const hit = zoneSlotNumbered(zone, step.slot);
+            // Nicht auf den naechsten Platz ausweichen: "Feld 13" auf einer
+            // Zwoelferleiste ist ein Autorenfehler, und ein Marker auf Feld 12
+            // sieht aus wie ein richtiger Aufbau.
+            if (!hit) noPos = `zone "${step.targetZoneLabel}" has no place "${step.slot}"`;
+            else target = hit;
+          } else {
+            const slots = zoneSlots(zone);
+            target = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(zone);
+          }
         }
       } else if (step.gridLabel || step.cell) {
         // Zone, grid field and x/y are three exclusive ways of saying where

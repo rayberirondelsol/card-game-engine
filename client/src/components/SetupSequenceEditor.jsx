@@ -170,6 +170,21 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     gridLabel: () => field('Grid',
       nameSelect(step.gridLabel, gridLabels, '— no grids in this setup —', v => set({ gridLabel: v }), `step-${index}-grid`)),
 
+    // M8.10/L3: die Nummer des Platzes, so wie sie auf dem Brett steht - die
+    // Accuracy-Leiste zaehlt von -4, also kein `min`. Ein **Textfeld**, kein
+    // Auswahlfeld: eine Liste ueber vierundzwanzig Felder ist dieselbe
+    // Unbedienbarkeit wie die ueber 140 Rasterfelder (M7/T1), und leer heisst
+    // "der Reihe nach" - ein Zahlenfeld koennte das nicht sagen.
+    slot: () => field('Place',
+      <input
+        type="text"
+        value={step.slot ?? ''}
+        onChange={e => set({ slot: e.target.value })}
+        placeholder="in order — or 15, -1, $LEB"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-slot`}
+      />),
+
     cell: () => field('Field',
       <input
         type="text"

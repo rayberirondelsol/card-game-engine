@@ -2320,3 +2320,71 @@ Regel 4 stimmte, war aber zu eng: beim Durchgehen der Hilfe waren außer der
 `F`-Zeile vier weitere Zeilen unvollständig oder falsch (`1-9` verschweigt die
 Hand, `Escape` und `Shift+Click` fehlten ganz, „Click + Drag" gilt nur auf der
 leeren Fläche).
+
+### M8.10 — Marker auf den Leisten statt Zahlen daneben
+
+**Befund.** Die Werte des Bösewichts und der Dörfler stehen als **Zähler** neben
+ihren aufgedruckten Leisten. Die Leistenfelder selbst bleiben leer. Am echten
+Tisch liegt dort ein Plättchen.
+
+**Die Messungen liegen vor**, im Kratzverzeichnis:
+
+- `leisten.json` — Zusatz-Brett (300 × 999): **12** Bewegungsfelder, **24**
+  Lebensfelder. Die Lebensleiste läuft in **Schlangenlinie**: 1→12 oben nach
+  rechts, 24→13 darunter nach links zurück. Feld 13 sitzt leicht **links**
+  unter Feld 12.
+- `varianten.json` — Dörfler-Tableaus (300 × 400): **zwei** Layouts, je vier
+  Leisten à zehn Felder. `A` (Henlo, Melba, Norman, Blopsy, Quintus) und `B`
+  (Fridgette, Judy, Yancy). Health/Movement/Moxie zählen **1–10**, Accuracy
+  **−4 bis +5**.
+
+**Drei Dinge, die nicht gerechnet werden dürfen.**
+
+1. **Die Spalten der Variante A sind keine Geraden.** Jedes zweite Feld liegt
+   30 px (5,2 Tableau-Einheiten) versetzt — die 10 links, die 9 rechts, die 8
+   links. Wer `x = konst` modelliert, setzt die Hälfte aller Marker um eine
+   halbe Feldbreite daneben. Das betrifft fünf der acht Dörfler.
+2. **Die Feldabstände auf dem Zusatz-Brett sind unregelmäßig** (42 bis 48 px),
+   und die Unregelmäßigkeit wiederholt sich in allen drei Reihen gleich — das
+   ist die Vorlage, kein Rauschen. Der Schritt von 11 auf 12 ist mit 60 px
+   größer, weil dort die Kehre beginnt.
+3. **In Variante B sitzt die Accuracy-Null 2 px rechts der Spaltenachse**, alle
+   anderen 39 Felder auf ±0,5. Dreimal identisch auf unabhängigen Bildern.
+
+Die gemessenen Werte gehen **unverändert** in die Daten. Nichts wird
+geradegezogen, gemittelt oder durch eine Schrittweite ersetzt.
+
+**Regel.**
+
+1. Jede Leiste wird eine Zone mit `layout: "slots"` und ausdrücklichen Plätzen.
+   Den Mechanismus gibt es (`zoneSlots`, `snapPoint`) — es fehlen nur die
+   Koordinaten, und die liegen vor.
+2. Auf jeder Zone liegt **ein Marker**. Er rastet beim Ziehen auf das nächste
+   Feld ein; das kann `snapPoint` bereits.
+3. Der Aufbau setzt den Marker auf das Feld, das dem Startwert entspricht.
+   Achtung auf die Zuordnung: Leben 1–24 und Bewegung 1–12 sind Feld = Wert,
+   Accuracy läuft von **−4**, und die Lebensleiste hat ihre Kehre.
+
+**Die Entscheidung, die dabei zu treffen ist, und ihr Preis.** Der Marker zeigt
+den Wert; der **Zähler bleibt der Wert**. Ein von Hand gezogener Marker
+schreibt **nicht** in den Zähler zurück — das wäre eine Bindung zwischen zwei
+Objekten, die die Engine nicht kennt. Damit gibt es zwei Stellen, die dasselbe
+sagen, und sie können auseinanderlaufen.
+
+Das ist bewusst so und nicht schön. Die Alternative — den Zähler abschaffen und
+den Marker zur Wahrheit machen — nimmt der Dorfphase ihr `set_counter` und
+damit das Zurücksetzen aller zwölf Attribute auf einen Knopf. Das wiegt
+schwerer. Wer es besser will, baut die Rückbindung; das ist ein eigener Schnitt
+und steht hier ausdrücklich als offener Punkt.
+
+**Abnahme.**
+1. Nach dem Aufbau liegt auf jeder der vier Leisten eines Dörfler-Tableaus ein
+   Marker auf dem Feld seines Startwerts.
+2. Bei einem Dörfler der Variante A sitzt ein Marker auf einem ungeraden Feld
+   sichtbar versetzt zu dem auf dem geraden — das Zickzack ist nachgebaut.
+3. Nach dem Kampfaufbau liegen zwei Marker auf den Leisten des Zusatz-Bretts,
+   auf BEW und LEB des gewählten Bösewichts.
+4. Ein Marker auf Feld 13 der Lebensleiste liegt in der **unteren** Reihe.
+5. Ein von Hand gezogener Marker rastet auf das nächste Feld ein.
+6. Ein Marker auf der Accuracy-Leiste bei Wert −1 liegt vier Felder über dem
+   untersten.

@@ -39,7 +39,9 @@ export const STEP_TYPES = [
   // Dörfler" ist eine am Brett verankerte Zone, und eine feste x/y ist das,
   // was M3a abgeschafft hat. Kein `label`: eine angelegte Karte ist kein Stapel.
   { value: 'place_card', label: 'Place Card', fields: ['cardName', 'targetZoneLabel'] },
-  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
+  // M8.10/L3: `slot` nennt einen Platz der Zielzone bei seiner Nummer - die,
+  // die auf dem Brett steht. Nur mit Zone, siehe `stepFields`.
+  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'slot', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
@@ -79,9 +81,12 @@ export function stepFields(step) {
   // place_asset: zone, grid field and x/y are three exclusive ways of saying
   // where something goes, so only the chosen one is shown. Offering all three
   // invites setting an x/y that the zone then silently overrides.
+  // `slot` haengt an der Zone: ohne Zone gibt es keine Plaetze, und ein Feld
+  // ohne Wirkung ist ein Versprechen, das der Aufbau nicht haelt (M8.10/L3).
   if (spec.value === 'place_asset' && typeof step === 'object') {
     if (step?.targetZoneLabel) return spec.fields.filter(f => !['gridLabel', 'cell', 'x', 'y'].includes(f));
-    if (step?.cell) return spec.fields.filter(f => f !== 'x' && f !== 'y');
+    if (step?.cell) return spec.fields.filter(f => !['slot', 'x', 'y'].includes(f));
+    return spec.fields.filter(f => f !== 'slot');
   }
   // place_stack: dieselbe Regel und derselbe Satz - Zone oder x/y, nie beides.
   if (spec.value === 'place_stack' && typeof step === 'object' && step?.targetZoneLabel) {
@@ -156,7 +161,9 @@ export function defaultStep(type, ctx = {}) {
       // be picked afterwards. Picking one hides x/y (see stepFields).
       // Kein Raster und kein Feld: beides hiesse, x/y auszublenden, und ein
       // geratenes Feld ist eine Behauptung darueber, wo das Objekt hingehoert.
-      return { type, assetName: first(names), targetZoneLabel: '', gridLabel: '', cell: '', x: 0, y: 0, rotation: 0, faceDown: false };
+      // Kein `slot`: leer heisst "der Reihe nach", und das ist, was jeder
+      // vorhandene Aufbau tut (M8.10/L3).
+      return { type, assetName: first(names), targetZoneLabel: '', slot: '', gridLabel: '', cell: '', x: 0, y: 0, rotation: 0, faceDown: false };
     case 'draw_assets':
       return { type, pool: first(pools), count: 1, targetZoneLabel: zone, faceDown: false };
     case 'place_stack':
@@ -238,8 +245,12 @@ export function describeStep(step) {
     case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
     case 'place_card': return `Place the card named ${q(step.cardName)} in ${zone}`;
     case 'place_asset': {
+      // Der Platz steht nur da, wo er gilt und wenn er gesetzt ist - ohne ihn
+      // fuellt der Schritt der Reihe nach, und "on place " waere Rauschen.
+      const place = step.targetZoneLabel && step.slot !== undefined && step.slot !== null && step.slot !== ''
+        ? ` on place ${step.slot}` : '';
       const where = step.targetZoneLabel
-        ? `in zone ${q(step.targetZoneLabel)}`
+        ? `in zone ${q(step.targetZoneLabel)}${place}`
         : step.cell || step.gridLabel
           ? `on grid ${q(step.gridLabel)} field ${q(step.cell)}`
           : `at ${step.x ?? 0}, ${step.y ?? 0}`;
@@ -418,6 +429,15 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('max') && step?.max !== undefined && step?.max !== null && step?.max !== ''
     && counterMax(step.max) === undefined) {
     problems.push('max must be a number');
+  }
+  // M8.10/L3: ein Platz wird bei seiner Nummer genannt, und die ist eine ganze
+  // Zahl (die Accuracy-Leiste zaehlt von -4, also auch negativ). Leer ist die
+  // gueltige Vorgabe: der Reihe nach. Ob es die Nummer in der Zone *gibt*,
+  // prueft der Editor nicht - er kennt nur die Zonennamen, und der Executor
+  // meldet den Fall am Tisch mit demselben Satz.
+  if (fields.has('slot') && step?.slot !== undefined && step?.slot !== null && step?.slot !== ''
+    && !hasPlaceholder(step.slot) && !Number.isInteger(Number(step.slot))) {
+    problems.push(`"${String(step.slot).trim()}" is not a place: a whole number like 15 or -1`);
   }
   // M7.1: ein Plaettchen liegt auf einem Raster. Kein Feld heisst 0 - alte
   // Sequenzen tragen keins, und das ist kein Fehler.

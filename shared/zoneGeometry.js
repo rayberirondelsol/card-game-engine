@@ -215,6 +215,38 @@ export function zoneSlots(zone) {
 }
 
 /**
+ * The place that carries the number `n`, or null (M8.10).
+ *
+ * Every place has a number: the one written at it (`slots[i].n`), and otherwise
+ * its position, counting from 1. That is the whole rule, and it is what lets a
+ * bar be addressed by what is *printed* on it rather than by how full it is –
+ * "the marker goes on field 15" is not "the marker is the 15th thing here".
+ *
+ * The numbers live in the zone data for a reason: the Accuracy bar of Townsfolk
+ * Tussle runs from -4, and a Health bar bends back on itself. Both are
+ * properties of a printed board, not of an engine, so they are measured into
+ * `slots` and never calculated here.
+ *
+ * A number that does not exist is null, not the nearest place. A marker asked
+ * for field 13 of a twelve-field bar is an author's mistake and belongs in the
+ * step protocol, not quietly on field 12.
+ */
+export function zoneSlotNumbered(zone, n) {
+  // Empty is not zero: `Number('')` would be 0, and a step that forgot its
+  // place would silently address one instead of saying it has none.
+  if (n === null || n === undefined || n === '') return null;
+  const want = Number(n);
+  if (!Number.isFinite(want)) return null;
+  const points = zoneSlots(zone);
+  if (!points || !points.length) return null;
+  const explicit = explicitSlots(zone);
+  const i = explicit
+    ? explicit.findIndex((s, k) => (Number.isFinite(s?.n) ? s.n : k + 1) === want)
+    : want - 1;
+  return i >= 0 && i < points.length ? points[i] : null;
+}
+
+/**
  * Where the i-th of n objects a setup step puts into this zone belongs.
  * With fixed places it is place i; without, it is the old spread along the
  * longer axis, unchanged – that is what keeps zones saved before M2 identical.
