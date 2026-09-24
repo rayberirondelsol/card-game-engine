@@ -87,6 +87,23 @@ test('token_move mit Bereichsmassen schreibt cell und Masse', () => {
   );
 });
 
+test('ein aus der Groesse abgeleiteter Bereich kommt genauso im Raum an (M7.2)', () => {
+  // Ein Boesewicht auf 100x100 wird von Hand ueber ein 50er-Raster gezogen und
+  // bekommt dabei zum ersten Mal einen Bereichsnamen. Faende `gridAddress` die
+  // Masse nicht, behielte der Raum die alten 100x100 an der neuen Adresse.
+  const room = fakeRoom({ tokens: [{ id: 'tok-boss', x: 0, y: 0, gridId: 'g1', cell: 'A1', width: 100, height: 100 }] });
+
+  send(room, {
+    type: 'token_move', token_id: 'tok-boss', x: 150, y: 150,
+    gridId: 'g1', cell: 'C3:D4', width: 100, height: 100,
+  });
+
+  const t = room.boardState.tokens[0];
+  assert.equal(t.cell, 'C3:D4');
+  assert.equal(room.sent[0].cell, 'C3:D4');
+  assert.deepStrictEqual({ width: t.width, height: t.height }, { width: 100, height: 100 });
+});
+
 test('token_move ohne cell laesst die vorhandene Adresse stehen', () => {
   // Ein aelterer Client schickt nur x/y. Ein fehlendes Feld ist nicht dasselbe
   // wie ein Feld auf null – sonst verloere der Zaun seinen Bereich und spraenge

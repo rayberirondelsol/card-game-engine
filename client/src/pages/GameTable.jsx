@@ -1589,6 +1589,10 @@ export default function GameTable({ room = null }) {
       hit = snapInto(card.x, card.y, { zone: dropZone, grids: tableGrids, taken });
     }
     // Outside any zone a grid still claims the drop (M3b).
+    // Beide Aufrufe geben **absichtlich** kein `size` mit (M7.2): eine Karte
+    // auf Feldmasse zu ziehen verloere ihr Seitenverhaeltnis (M2.12), und der
+    // Karten-Zweig schreibt weder `hit.width` auf die Karte noch schickt
+    // `card_move` Masse in den Raum – Tisch und Raum sagten Verschiedenes.
     if (!hit) hit = snapInto(card.x, card.y, { grids: tableGrids });
 
     // Check if card/stack is being dropped on another stack
@@ -2121,7 +2125,14 @@ export default function GameTable({ room = null }) {
           // gleich grossen Bereich darunter (M7.1). Ohne das schriebe snapInto
           // ein Einzelfeld zurueck, und der Zaun spraenge beim naechsten Laden
           // einen halben Feldversatz weit.
-          const hit = snapInto(token.x, token.y, { zone: dropZone, grids: tableGrids, taken, cell: token.cell });
+          // Die Groesse geht mit: traegt das Token keinen Bereichsnamen, folgt
+          // die Grundflaeche ihr (M7.2) – eine Figur auf 100x100 ueber einem
+          // 50er-Raster belegt vier Felder statt eines. `|| token.size` faengt
+          // Tisch-Token aus Staenden vor M3c ab, die nur `size` tragen.
+          const hit = snapInto(token.x, token.y, {
+            zone: dropZone, grids: tableGrids, taken, cell: token.cell,
+            size: { width: token.width || token.size, height: token.height || token.size },
+          });
           if (hit.snapped) {
             // `snapped` ist die Antwort auf die Frage, nicht Teil des
             // Ergebnisses – der Rest (x, y, gridId, cell und bei einem Bereich

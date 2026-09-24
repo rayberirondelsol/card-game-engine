@@ -298,6 +298,28 @@ function rangeAt(grid, x, y, cols = 1, rows = 1) {
   return { col, row, cols, rows };
 }
 
+/**
+ * Wie viele Felder ein Stueck dieser Groesse bedeckt (M7.2) – oder `null`,
+ * wenn keine brauchbare Groesse dasteht.
+ *
+ * Ein Feldname sagt nur, *wo* ein Stueck liegt, nicht wie gross es ist; vor
+ * M7.2 galt ohne Bereichsnamen stillschweigend 1x1, und eine Figur, die
+ * optisch ueber vier Felder ragte, hing an einem. Die Groesse sagt es aber
+ * bereits: die Boesewichte stehen auf 100x100, weil sie 2x2 belegen.
+ *
+ * `round`, nicht `ceil` oder `floor`: die Groesse ist eine *verrauschte Angabe
+ * einer gemeinten Feldzahl*, kein Huellrechteck. Ein importiertes Plaettchen,
+ * das zwei Felder breit sein soll, misst 101 statt 100 – `ceil` machte drei
+ * daraus, `floor` bei 99 eines.
+ */
+function footprint(grid, size) {
+  const d = dims(grid);
+  const w = num(size?.width, 0);
+  const h = num(size?.height, 0);
+  if (w <= 0 || h <= 0 || d.cellW <= 0 || d.cellH <= 0) return null;
+  return { cols: Math.max(1, Math.round(w / d.cellW)), rows: Math.max(1, Math.round(h / d.cellH)) };
+}
+
 /** The grid under a point, or null. Later grids are drawn on top, so they win. */
 export function gridAt(grids, x, y) {
   if (!Array.isArray(grids)) return null;
@@ -315,23 +337,30 @@ export function gridAt(grids, x, y) {
  * is what makes "the figure is on C7" survive a reload rather than "the figure
  * is at 340/380", which stops being C7 the moment the board moves.
  */
-export function snapToGrid(grid, x, y, cell = null) {
+export function snapToGrid(grid, x, y, cell = null, size = null) {
   // What the object currently says it covers. A piece on `E3:G4` keeps its
   // three by two fields when it is moved; without this it would be written
   // back as a lone field and jump half a field on the next load (M7.1).
   const held = cell ? cellRange(grid, cell) : null;
-  const r = rangeAt(grid, x, y, held?.cols, held?.rows);
+  // Sonst folgt die Grundflaeche der Groesse des Stuecks (M7.2) – aber nur,
+  // wenn der Aufrufer eine mitgibt. Ein *Bereichsname* schlaegt die Rechnung:
+  // was `build_scenario` ausdruecklich setzt, ist die genauere Aussage. Ein
+  // *Einzelfeld* schlaegt sie nicht, sonst bekaeme ein Boesewicht, der einmal
+  // auf einem Feld stand, seine vier Felder nie.
+  const foot = (held?.ranged ? held : footprint(grid, size)) || held;
+  const r = rangeAt(grid, x, y, foot?.cols, foot?.rows);
   if (!r) return null;
+  const ranged = !!held?.ranged || r.cols > 1 || r.rows > 1;
   const box = rangeBox(grid, r);
   const p = boxCenter(box);
-  const hit = { x: p.x, y: p.y, gridId: grid.id, cell: rangeLabel(grid, { ...r, ranged: !!held?.ranged }) };
+  const hit = { x: p.x, y: p.y, gridId: grid.id, cell: rangeLabel(grid, { ...r, ranged }) };
   // Die Masse eines Bereichs kommen mit – dieselbe Rechnung wie in
   // `placeOnGrids`, damit Ziehen und Laden nicht zwei Antworten geben. Auf
   // demselben Raster ist das die Kantenlaenge, die das Stueck ohnehin hatte;
   // ueber einem Raster mit anderer Feldgroesse ist es die des neuen Bereichs,
   // und ohne sie saehe der Tisch bis zum naechsten Laden etwas anderes als der
   // Raum (M7.1). Ein Einzelfeld behaelt die Groesse seines Assets.
-  if (held?.ranged) { hit.width = box.width; hit.height = box.height; }
+  if (ranged) { hit.width = box.width; hit.height = box.height; }
   return hit;
 }
 
@@ -353,7 +382,7 @@ export function snapToGrid(grid, x, y, cell = null) {
  * be drawn over a play area purely to restrict what may be dropped there
  * while the figures still snap to the printed fields.
  */
-export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = null } = {}) {
+export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = null, size = null } = {}) {
   if (zone?.snap && zoneSlots(zone)?.length) {
     const p = snapPoint(zone, x, y, taken);
     return { x: p.x, y: p.y, gridId: null, cell: null, snapped: true };
@@ -361,7 +390,11 @@ export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = nul
   const grid = gridAt(grids, x, y);
   // `cell` is the address the dragged object holds now – a region keeps its
   // size, and a region that would run over the rim is no target at all.
-  const hit = grid && snapToGrid(grid, x, y, cell);
+  // `size` ist freiwillig: wer sie mitgibt, bekommt die Grundflaeche aus ihr
+  // gerechnet (M7.2), wer nicht, das Verhalten von vorher. Die beiden
+  // Karten-Aufrufer geben keine – eine Karte auf Feldmasse zu ziehen, verloere
+  // ihr Seitenverhaeltnis (M2.12), und `card_move` schickt keine Masse mit.
+  const hit = grid && snapToGrid(grid, x, y, cell, size);
   if (hit) return { ...hit, snapped: true };
   // `snapped` is not the same question as "did the point move": the caller has
   // its own fallback (the table's 80px lattice) and must be able to tell

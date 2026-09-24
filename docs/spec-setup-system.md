@@ -1576,3 +1576,58 @@ Rueckschritt, kein Fortschritt.
 der darauf gesetzte Bösewicht bedeckt vier Felder und sitzt mittig darauf.
 `"D": ["K11", …]` bleibt gültig und unverändert. Ein Bereich mit einem Ende
 außerhalb des Rasters wird weiterhin gemeldet.
+
+## M7.2 — Die Grundfläche folgt der Größe des Stücks
+
+**Befund.** `snapToGrid` leitet die belegten Felder allein aus dem *Feldnamen*
+ab, den das Objekt schon trägt: `cellRange(grid, cell)`. Ein einfacher Name
+(`C7`) ergibt `cols: 1, rows: 1`; nur ein Bereichsname (`C7:D8`) ergibt mehr.
+Die Kantenlänge des Bildes spielt dabei keine Rolle. Eine Figur, die doppelt
+so breit ist wie ein Feld, hängt deshalb trotzdem an *einem* Feld: sie ragt
+optisch über vier Felder, belegt aber eins, und `rangeAt` zentriert sie auf
+dessen Mitte.
+
+Das ist der Grund, warum das Vergrößern der Figuren auf 100×100 (= 2 Felder
+bei 50er-Raster) die Belegung nicht geändert hat. Nachgewiesen gegen
+`shared/gridGeometry.js`:
+
+```
+cell "D4"    -> { cell: "C3" }                     1x1
+cell "D4:E5" -> { cell: "C3:D4", width, height }   2x2
+```
+
+**Regel.** Trägt ein Objekt keinen Bereichsnamen, wird die Grundfläche aus
+seiner Größe im Verhältnis zur Feldgröße gerechnet:
+
+```
+cols = max(1, round(width  / cellW))
+rows = max(1, round(height / cellH))
+```
+
+Ein Bereichsname im `cell` **schlägt die Rechnung**. Damit bleibt alles, was
+`build_scenario` mit ausdrücklichen Bereichen setzt (M7.1), unverändert — die
+Szenariodaten sind weiterhin die genauere Aussage, und die Rechnung greift nur
+dort, wo bisher stillschweigend 1×1 galt.
+
+**Warum aus der Größe und nicht aus einem neuen Feld.** Die Größe sagt es
+bereits: die Bösewichte stehen auf 100×100, weil sie 2×2 belegen, die
+Geländeteile auf 350×200, weil sie 7×4 belegen. Eine zweite Quelle danebenzu-
+stellen (`grid_cols`/`grid_rows` in `table_assets`) hieße, dieselbe Aussage an
+zwei Stellen zu pflegen — genau das Muster, das M3c verursacht hat.
+
+**Folge, die bedacht sein will.** Die Regel gilt für *alle* Stücke, nicht nur
+Figuren. Ein Geländeteil, dessen Bildgröße nicht als Grundfläche gemeint war,
+belegt danach mehr Felder als vorher. Wer das nicht will, gibt dem Stück einen
+ausdrücklichen Bereich — oder die passende Größe.
+
+**Abnahme.**
+1. Eine Figur mit 100×100 auf einem Raster mit 50er-Feldern, von Hand auf das
+   Raster gezogen, kommt mit einem Bereichsnamen über zwei mal zwei Feldern
+   zurück, nicht mit einem Einzelfeld.
+2. Ein Stück mit 50×50 auf demselben Raster kommt weiterhin mit einem
+   Einzelfeld zurück.
+3. Ein Stück, das bereits `C7:D8` trägt, behält zwei mal zwei Felder, auch
+   wenn seine Bildgröße etwas anderes sagt.
+4. `placeOnGrids` setzt ein solches Stück beim Laden wieder auf dieselben
+   Felder — Ziehen und Laden geben dieselbe Antwort.
+5. Im Raum reist die so entstandene Adresse samt `width`/`height` mit (G5).
