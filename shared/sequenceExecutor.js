@@ -676,7 +676,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     }
 
     case 'deal_to_zone': {
-      const { stackLabel, count, targetZoneLabel, faceDown = false } = step;
+      const { stackLabel, count, targetZoneLabel, faceDown = false, fill = false } = step;
       const stack = idx.get(stackLabel);
       if (!stack || !stack.cards.length) return skip(`stack "${stackLabel}" not found or empty`);
 
@@ -687,13 +687,29 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       }
       if (!targetZones.length) return skip(`zone "${targetZoneLabel ?? '(any)'}" not found`);
 
+      // M11.2: auffuellen statt austeilen. `fill` zieht ab, was schon liegt -
+      // dieselbe `occupancy`, die `zoneRoom` gleich darunter befragt, keine
+      // zweite Rechnung. Liegt die Zahl schon aus, ist der gewuenschte Zustand
+      // erreicht: kein Schritt, keine Meldung. Vor `zoneRoom`, weil eine volle
+      // Zone dort als Ablehnung zurueckkaeme und als `skipped` im Protokoll
+      // landete - genau der Laerm, den der Befund nennt.
+      // Kein drittes Vorzeichen an `count`: `count <= 0` heisst heute "der
+      // ganze Stapel", eine negative Zahl waere die stille Umdeutung
+      // vorhandener Aufbauten.
+      let want = count;
+      if (fill && count > 0) {
+        const already = targetZones.reduce((n, z) => n + occupancy(state, z), 0);
+        want = count - already;
+        if (want <= 0) return state;
+      }
+
       // A zone that does not take cards, or that is already full, is not dealt
       // into at all - the cards stay in the stack where they can still be used.
       const { usable, free, occupied, problems } = zoneRoom(state, targetZones, 'card');
       if (!usable.length) return skip(problems.join('; '));
 
       const sorted = [...stack.cards].sort((a, b) => b.zIndex - a.zIndex); // top first
-      const wanted = count > 0 ? sorted.slice(0, count) : sorted;
+      const wanted = want > 0 ? sorted.slice(0, want) : sorted;
       const { groups, leftovers } = shareOut(wanted, usable, free);
 
       // Die ausgeteilten Karten liegen ueber allem, was schon am Tisch liegt,
@@ -738,8 +754,8 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (leftovers.length) {
         notes.push(`${leftovers.length} of ${wanted.length} cards stayed in the stack: ${fullZones(usable, free, 'card').join('; ')}`);
       }
-      if (count > 0 && dealt.length + leftovers.length < count) {
-        notes.push(`stack "${stackLabel}" held only ${wanted.length} of ${count} requested cards`);
+      if (want > 0 && dealt.length + leftovers.length < want) {
+        notes.push(`stack "${stackLabel}" held only ${wanted.length} of ${want} requested cards`);
       }
       return notes.length ? fail(notes.join('; ')) : state;
     }

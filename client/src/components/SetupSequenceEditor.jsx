@@ -236,8 +236,20 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
           const labels = Array.from({ length: n }, (_, i) => step.outputLabels?.[i] || '');
           set({ count: n, outputLabels: labels });
         }))
-      : field(step.type === 'draw_assets' ? 'Assets' : 'Cards',
+      : field(step.type === 'draw_assets' ? 'Assets' : step.fill ? 'Up to' : 'Cards',
           number(step.count, 1, 1, n => set({ count: n }))),
+
+    // M11.2: dasselbe Feld, andere Lesart - die Beschriftung von `count`
+    // wechselt mit, sonst stuende "Cards 6" an einem Schritt, der auf sechs
+    // auffuellt.
+    fill: () => field('Fill up',
+      <input
+        type="checkbox"
+        checked={!!step.fill}
+        onChange={e => set({ fill: e.target.checked })}
+        className="accent-emerald-400"
+        data-testid={`step-${index}-fill`}
+      />),
 
     spacing: () => field('Spacing', number(step.spacing, 130, 0, n => set({ spacing: n }))),
 

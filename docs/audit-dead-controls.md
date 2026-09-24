@@ -47,11 +47,20 @@ ausdruecklich verbietet. Benannte Ansichten liegen jetzt am **Spielstand**
 (`state_data.views`) und werden am Tisch angelegt; die Schaltflaeche ohne
 Handler ist entfernt, die Zonenfelder bleiben tot und harmlos liegen.
 
-### 3. Kontextmenü kennt `customDie` nicht
-Beim Rechtsklick auf einen Custom-Würfel wird `objType: 'customDie'` gesetzt, aber die
-Objektliste im JSX und die Delete-Kette haben keinen solchen Zweig. Der Sperren-Knopf
-beschriftet sich immer als „Lock", der Löschen-Knopf tut nichts und schließt nur das
-Menü. Löschen geht noch über das ✕ am Würfel selbst.
+### 3. ~~Kontextmenü kennt `customDie` nicht~~
+~~Beim Rechtsklick auf einen Custom-Würfel wird `objType: 'customDie'` gesetzt, aber die
+Objektliste im JSX und die Delete-Kette haben keinen solchen Zweig.~~
+
+**Behoben in M2.11**, und das ist der Anlass für `client/src/utils/objectTypes.js`:
+`objectLists` und `objectDeleters` führen alle acht Typen an einer Stelle, geprüft in
+`server/test/object-types.test.js`. Alle drei Würfelsorten (`die`, `customDie`,
+`hitDie`) haben Sperren und Löschen.
+
+**Der Fund stand trotzdem noch hier** und hat M11.3 in die Irre geführt („das
+Kontextmenü kennt `customDie` nicht" — das ist seit M2.11 falsch). Berichtigt bei
+M11.3; die verbliebene Hälfte des Musters lag woanders: **Ziehen** und **Sperren**
+waren zwei weitere if/else-Ketten in `GameTable.jsx`. Sie sind jetzt dieselbe Tabelle
+(`objectSetters`), aus demselben Grund.
 
 Dieselbe Klasse wie der Brett-Sperren-Fehler aus M2.6.
 

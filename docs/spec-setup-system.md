@@ -3063,3 +3063,87 @@ Box bleibt, wie sie ist. Es kommt eine Bedingung dazu, unter der sie zählt.
    vor.
 3. Eine Zone ohne Seitenangabe verhält sich unverändert.
 4. Ein Aufbauschritt in eine abgewandte Zone scheitert mit Grund.
+
+## M11 — Befunde aus der vierten gespielten Solopartie
+
+Die Partie ist **durchgespielt** und regulär verloren gegangen — zehn
+Kampfrunden Zug für Zug. Zwölf der vierzehn Prüfpunkte tragen vollständig:
+kein Fehlgriff beim Schwenken, keine still verschmolzene Karte, kein
+Figurenzug auf die falsche Figur am offenen Feld.
+
+Was jetzt blockiert, sind **feste Leisten über dem Tisch**.
+
+### M11.1 — Bedienelemente werden von Leisten überdeckt
+
+**Befund A.** Das Meldeband `setup-issues` (`fixed top-16 … z-50`) liegt über
+dem Knopf **„Dorfereignis ziehen"**. Dreimal geklickt, nichts geschah, **keine
+Rückmeldung**. `document.elementFromPoint` auf die Knopfmitte liefert das Band,
+nicht den Knopf. Nach einem Klick auf dessen × ging es sofort.
+
+**Befund B.** Die Knopfzeile liegt über dem Schlachtfeld. Ein Zug von `I8` nach
+`I10` bewegte nichts — dort sitzt `table-action-dorfereignis`. Zwei Eingaben in
+den Zähler „Bösewicht: Leben" gingen ebenso verloren, weil er unter der
+Titelzeile lag. Die **untere** Werkzeugleiste lässt sich einklappen (M10.8),
+die **obere** nicht.
+
+M9.1 hat die Zeichenreihenfolge für alles geordnet, **was auf dem Tisch
+liegt**. Die Leisten liegen nicht auf dem Tisch, sondern davor — sie sind von
+der Ordnung nicht erfasst und müssen es auch nicht sein. Was fehlt, ist etwas
+anderes: **sie nehmen Platz weg, den der Tisch braucht.**
+
+**Regel.**
+1. Ein Hinweisband darf kein Bedienelement überdecken.
+2. Was über dem Tisch liegt, lässt sich wegräumen — die obere Zeile so gut wie
+   die untere.
+3. Ein Klick, der nichts bewirkt, ist schlimmer als eine Fehlermeldung. Wo ein
+   Element verdeckt ist, darf der Klick nicht ins Leere gehen.
+
+**Abnahme.**
+1. Alle drei Aktionsknöpfe sind klickbar, auch wenn ein Meldeband steht.
+2. Die obere Zeile lässt sich wegräumen und zurückholen.
+3. Ein Zug auf einer Rasterzeile, die unter einer Leiste läge, erreicht das
+   Raster — oder die Leiste ist dort nicht.
+
+### M11.2 — Die Dorfphase meldet jedes Mal einen Fehlschlag
+
+**Befund.** `#23 deal_to_zone "Heldentaten" — failed: 5 of 6 cards stayed in
+the stack: zone "Heldentaten-Auslage" is full (6)`. Die Aktion teilt **stur
+sechs** Karten aus, statt auf sechs **aufzufüllen**. Das Ergebnis ist zufällig
+richtig, die Meldung ist Lärm — **und sie ist die Ursache von M11.1 Befund A**,
+weil sie das Meldeband erzeugt, das den Knopf totlegt.
+
+M8.4 hat das ausdrücklich so gebaut: „`deal_to_zone` hört auf die Kapazität der
+Zielzone und lässt den Rest im Stapel. Preis: liegen schon welche, steht ein
+Protokolleintrag da. Ein eigener Auffüll-Schritt wäre eine zweite Rechnung." Der
+Preis ist höher als gedacht.
+
+**Regel.** Auf eine Zahl **aufzufüllen** ist etwas anderes als *n* Karten
+auszuteilen, und der Unterschied gehört benannt. Ob als eigener Schritt, als
+Feld am vorhandenen oder als andere Lesart von `count` — entscheidet, wer es
+umsetzt, und begründet es. Eine zweite Rechnung neben `zoneRoom`/`shareOut`
+soll es nicht werden.
+
+**Abnahme.**
+1. Liegen schon sechs Heldentaten aus, teilt die Dorfphase **keine** aus und
+   meldet **nichts**.
+2. Liegen zwei, teilt sie vier aus.
+3. Ein gewöhnliches `deal_to_zone` mit fester Zahl verhält sich unverändert.
+
+### M11.3 — Ein Würfel lässt sich nicht verschieben und nicht löschen
+
+**Befund.** Ein Zug am Würfel bewegt ihn nicht — weder am Bild noch an der
+Titelzeile. Rechtsklick öffnet **kein Menü**. Außer „Roll" hat er keinen Knopf.
+Der Würfel bleibt für immer, wo er entstanden ist; da die Kamera im Kampf
+wandert, war er die halbe Partie außerhalb des Bildes.
+
+M10.5 hat dafür gesorgt, dass er **im Blick** entsteht. Das nützt wenig, wenn
+der Blick danach weiterzieht.
+
+`docs/audit-dead-controls.md` Fund 3 hält fest, dass das Kontextmenü
+`customDie` nicht kennt. Das ist die halbe Erklärung; die andere Hälfte ist das
+Ziehen.
+
+**Abnahme.**
+1. Ein Würfel lässt sich ziehen.
+2. Ein Rechtsklick öffnet ein Menü mit mindestens „Entfernen".
+3. Das Rollen bleibt, wie es ist.

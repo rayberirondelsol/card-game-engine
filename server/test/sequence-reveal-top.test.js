@@ -127,6 +127,9 @@ test('M8.9/3: der letzte Griff raeumt den leeren Stapel ab, der naechste meldet 
 // ── Abnahme 4: der Schritt steht im Editor ───────────────────────────────────
 
 test('M8.9/4: der Schritt steht im Editor — es ist `deal_to_zone`, kein zweiter daneben', () => {
-  assert.deepEqual(stepFields('deal_to_zone'), ['stackLabel', 'count', 'targetZoneLabel', 'faceDown'],
+  // `fill` seit M11.2 dazu: die zweite Lesart von `count` (auf n auffüllen
+  // statt n austeilen). Für das Aufdecken selbst ändert sich nichts — es
+  // bleibt derselbe eine Schritt, kein zweiter daneben.
+  assert.deepEqual(stepFields('deal_to_zone'), ['stackLabel', 'count', 'fill', 'targetZoneLabel', 'faceDown'],
     'Stapel, Anzahl, Zielzone und Seite — mehr braucht das Aufdecken nicht');
 });

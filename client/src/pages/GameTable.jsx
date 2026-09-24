@@ -27,7 +27,7 @@ import { revealZones, revealPlan } from '../utils/revealToZone.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
-import { objectLists, objectDeleters } from '../utils/objectTypes.js';
+import { objectLists, objectDeleters, objectSetters, moveObject } from '../utils/objectTypes.js';
 import { canStartPan } from '../utils/panTarget.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
@@ -389,6 +389,9 @@ export default function GameTable({ room = null }) {
   // es ("ueberlebt einen Neuaufbau nicht zwingend"), und alles andere waere die
   // Frage "je Spiel oder je Geraet?", die niemand gestellt hat.
   const [showToolbar, setShowToolbar] = useState(true);
+  // M11.1 Regel 2: was ueber dem Tisch liegt, laesst sich wegraeumen - die
+  // obere Zeile so gut wie die untere (M10.8/U5).
+  const [showTopBar, setShowTopBar] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
   // M10.7/U2: der Schwenkmodus – der Weg zum Schwenken ohne mittlere Maustaste,
   // also auf Tastfeld und Trackpad. Begruendung in `panTarget.js`.
@@ -2180,6 +2183,11 @@ export default function GameTable({ room = null }) {
     deleteCounter, deleteDie, deleteCustomDie: deleteCustomDieFromTable, deleteHitDie,
     deleteNote, deleteToken, deleteBoard, deleteTextField,
   });
+  // M11.3: dieselbe Tabelle fuer Ziehen und Sperren - vorher zwei if/else-Ketten.
+  const objSetters = objectSetters({
+    setCounters, setDice, setCustomDice: setCustomDiceOnTable, setHitDice,
+    setNotes, setTokens, setBoards, setTextFields,
+  });
 
   // Drag handlers for floating objects (counters, dice, hitDice, notes, tokens, textFields)
   function handleObjDragStart(e, objType, objId) {
@@ -2298,39 +2306,10 @@ export default function GameTable({ room = null }) {
     const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
     const newX = worldPointer.x - dragOffsetRef.current.x;
     const newY = worldPointer.y - dragOffsetRef.current.y;
-    if (draggingObj.type === 'counter') {
-      setCounters(prev => prev.map(c =>
-        c.id === draggingObj.id ? { ...c, x: newX, y: newY } : c
-      ));
-    } else if (draggingObj.type === 'die') {
-      setDice(prev => prev.map(d =>
-        d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
-      ));
-    } else if (draggingObj.type === 'customDie') {
-      setCustomDiceOnTable(prev => prev.map(d =>
-        d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
-      ));
-    } else if (draggingObj.type === 'hitDie') {
-      setHitDice(prev => prev.map(d =>
-        d.id === draggingObj.id ? { ...d, x: newX, y: newY } : d
-      ));
-    } else if (draggingObj.type === 'note') {
-      setNotes(prev => prev.map(n =>
-        n.id === draggingObj.id ? { ...n, x: newX, y: newY } : n
-      ));
-    } else if (draggingObj.type === 'token') {
-      setTokens(prev => prev.map(t =>
-        t.id === draggingObj.id ? { ...t, x: newX, y: newY, attachedTo: null } : t
-      ));
-    } else if (draggingObj.type === 'board') {
-      setBoards(prev => prev.map(b =>
-        b.id === draggingObj.id ? { ...b, x: newX, y: newY } : b
-      ));
-    } else if (draggingObj.type === 'textField') {
-      setTextFields(prev => prev.map(tf =>
-        tf.id === draggingObj.id ? { ...tf, x: newX, y: newY } : tf
-      ));
-    }
+    // M11.3: eine Tabelle statt acht if/else-Zweigen. Ein fehlender Zweig
+    // hiesse "dieser Typ laesst sich nicht ziehen", und im JSX saehe er
+    // trotzdem verdrahtet aus - `objectSetters` haelt das unter Test.
+    objSetters[draggingObj.type]?.(prev => moveObject(prev, draggingObj.id, newX, newY));
   }
 
   function handleObjDragEnd() {
@@ -2500,20 +2479,9 @@ export default function GameTable({ room = null }) {
   }
 
   function toggleLockObj(type, id) {
-    const setter = type === 'counter' ? setCounters
-      : type === 'die' ? setDice
-      : type === 'customDie' ? setCustomDiceOnTable
-      : type === 'hitDie' ? setHitDice
-      : type === 'note' ? setNotes
-      : type === 'token' ? setTokens
-      : type === 'board' ? setBoards
-      : type === 'textField' ? setTextFields
-      : null;
-    if (setter) {
-      setter(prev => prev.map(obj =>
-        obj.id === id ? { ...obj, locked: !obj.locked } : obj
-      ));
-    }
+    objSetters[type]?.(prev => prev.map(obj =>
+      obj.id === id ? { ...obj, locked: !obj.locked } : obj
+    ));
   }
 
   // Token functions
@@ -4504,6 +4472,14 @@ export default function GameTable({ room = null }) {
         className="absolute inset-0 pointer-events-none"
         data-testid="world-transform-wrapper"
         style={{
+          // M11.3: dieselbe Zeile, die die Zeichenflaeche schon hat. Ohne sie
+          // entscheidet der Browser, was ein Wisch ueber einem Tischobjekt
+          // bedeutet - er kann ihn als Seitengeste nehmen und den angefangenen
+          // Zug mit `touchcancel` abbrechen. `touch-action` wirkt ueber die
+          // Vorfahrenkette, eine Zeile deckt also Karten, Token, Zaehler,
+          // Notizen, Textfelder **und** alle drei Wuerfelsorten ab - nicht acht
+          // Zeilen an acht Zeichenstellen.
+          touchAction: 'none',
           transformOrigin: '50% 50%',
           transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
           willChange: 'transform',
@@ -5331,6 +5307,7 @@ export default function GameTable({ room = null }) {
 
       {/* Top bar with game name and back button - compact in landscape */}
       <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
+        {showTopBar && (<>
         <div className={`flex items-center justify-between transition-all duration-300 ease-in-out ${isMobileLandscape ? 'p-1.5' : 'p-3'}`} style={{ paddingLeft: isMobileLandscape ? 'max(0.5rem, env(safe-area-inset-left, 0px))' : 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
           <div className={`flex items-center ${isMobileLandscape ? 'gap-1.5' : 'gap-3'} pointer-events-auto`}>
             <button
@@ -5396,6 +5373,20 @@ export default function GameTable({ room = null }) {
                autoSaveStatus === 'saved' ? 'Auto-saved' :
                'Auto-save: ON'}
             </span>
+            {/* M11.1 Regel 2: die obere Zeile laesst sich wegraeumen, so gut
+                wie die untere (M10.8). Derselbe Knopf, dieselbe Groesse - die
+                Kopfleiste nimmt mit Aktionszeile, Banner und Legende ein
+                Viertel der Hoehe ein, und darunter liegen Rasterzeilen. */}
+            <button
+              onClick={() => setShowTopBar(false)}
+              data-testid="top-bar-collapse-btn"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-black/50 hover:bg-black/70 backdrop-blur-sm text-white/70 hover:text-white transition-colors"
+              title="Hide top bar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18,15 12,9 6,15" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -5559,6 +5550,101 @@ export default function GameTable({ room = null }) {
               </svg>
             </button>
           )}
+          </div>
+        )}
+
+        {/* M11.1 Befund A: die drei Meldebaender standen als `fixed top-4`
+            bzw. `fixed top-16` ueber der Kopfleiste - ein geratener Streifen,
+            dessen Hoehe niemand gemessen hat, und `top-16` liegt genau auf der
+            Aktionszeile. Dreimal auf "Dorfereignis ziehen" geklickt, nichts
+            geschah, keine Rueckmeldung; document.elementFromPoint lieferte das
+            Band. Es ist derselbe Fehler, den M2.8 beim Setup-Banner und bei der
+            Legende schon zweimal behoben hat, und die Abhilfe ist dieselbe:
+            eine Zeile im Fluss kann die Zeilen darueber nicht ueberdecken,
+            egal wie hoch sie wird. Zuletzt, damit ein auftauchendes Band
+            nichts verschiebt. */}
+        {saveToast && (
+          <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
+            <div
+              className="pointer-events-auto bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+              data-testid="save-toast"
+              data-ui-element="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              <span className="text-sm font-medium">{saveToast}</span>
+              <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+            </div>
+          </div>
+        )}
+
+        {/* Setup Sequence Problems - stays until dismissed */}
+        {setupIssues && (
+          <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
+            <div
+              className="pointer-events-auto max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
+              data-testid="setup-issues"
+              data-ui-element="true"
+            >
+              <div className="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                </svg>
+                <div className="text-sm">
+                  <div className="font-medium mb-1">
+                    {setupIssues.length} action{setupIssues.length > 1 ? 's' : ''} did not work
+                  </div>
+                  <ul className="space-y-0.5 text-white/90">
+                    {setupIssues.map(e => (
+                      <li key={e.index}>
+                        #{e.index + 1} {e.type}{e.target ? ' "' + e.target + '"' : ''} &mdash; {e.status}: {e.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <button onClick={() => setSetupIssues(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Draw Cards Toast Notification */}
+        {drawToast && (
+          <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
+            <div
+              className="pointer-events-auto bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+              data-testid="draw-toast"
+              data-ui-element="true"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="M12 8v8" />
+                <path d="M8 12h8" />
+              </svg>
+              <span className="text-sm font-medium" data-testid="draw-toast-text">{drawToast}</span>
+            </div>
+          </div>
+        )}
+        </>)}
+
+        {/* M11.1 Regel 2 / M10.8 Abnahme 3: eingeklappt bleibt ein sichtbarer
+            Weg zurueck. Ausserhalb des showTopBar-Zweigs, sonst verschwaende
+            er mit der Leiste. */}
+        {!showTopBar && (
+          <div className="flex justify-end px-3 pt-3" style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
+            <button
+              onClick={() => setShowTopBar(true)}
+              data-testid="top-bar-show-btn"
+              className="pointer-events-auto flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white/70 hover:text-white shadow-2xl"
+              title="Show top bar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6,9 12,15 18,9" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
@@ -6831,66 +6917,8 @@ export default function GameTable({ room = null }) {
         );
       })()}
 
-      {/* Save Toast Notification */}
-      {saveToast && (
-        <div
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
-          data-testid="save-toast"
-          data-ui-element="true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-          <span className="text-sm font-medium">{saveToast}</span>
-          <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
-        </div>
-      )}
 
-      {/* Setup Sequence Problems - stays until dismissed */}
-      {setupIssues && (
-        <div
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
-          data-testid="setup-issues"
-          data-ui-element="true"
-        >
-          <div className="flex items-start gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-            </svg>
-            <div className="text-sm">
-              <div className="font-medium mb-1">
-                {setupIssues.length} action{setupIssues.length > 1 ? 's' : ''} did not work
-              </div>
-              <ul className="space-y-0.5 text-white/90">
-                {setupIssues.map(e => (
-                  <li key={e.index}>
-                    #{e.index + 1} {e.type}{e.target ? ' "' + e.target + '"' : ''} &mdash; {e.status}: {e.reason}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <button onClick={() => setSetupIssues(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
-          </div>
-        </div>
-      )}
 
-      {/* Draw Cards Toast Notification */}
-      {drawToast && (
-        <div
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
-          data-testid="draw-toast"
-          data-ui-element="true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="4" width="20" height="16" rx="2" />
-            <path d="M12 8v8" />
-            <path d="M8 12h8" />
-          </svg>
-          <span className="text-sm font-medium" data-testid="draw-toast-text">{drawToast}</span>
-        </div>
-      )}
 
       {/* Keyboard Shortcuts Overlay */}
       {showShortcuts && (

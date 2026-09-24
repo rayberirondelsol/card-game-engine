@@ -29,7 +29,12 @@ export const STEP_TYPES = [
   { value: 'set_face_up', label: 'Set Face Up', fields: ['stackLabel'] },
   { value: 'flip_top_card', label: 'Flip Top Card', fields: ['stackLabel'] },
   { value: 'split', label: 'Split Stack', fields: ['stackLabel', 'count', 'outputLabels', 'spacing'] },
-  { value: 'deal_to_zone', label: 'Deal to Zone', fields: ['stackLabel', 'count', 'targetZoneLabel', 'faceDown'] },
+  // M11.2: `fill` liest `count` als Zielzahl statt als Menge - auf sechs
+  // auffuellen statt sechs austeilen. Ein Feld daneben und keine dritte Lesart
+  // von `count`: `count <= 0` heisst schon "der ganze Stapel", und `set_counter`
+  // zeigt (R1), was vier Lesarten eines Feldes kosten - eine eigene
+  // Formbestimmung plus eine Zeile, die sagt, welche gerade gilt.
+  { value: 'deal_to_zone', label: 'Deal to Zone', fields: ['stackLabel', 'count', 'fill', 'targetZoneLabel', 'faceDown'] },
   { value: 'move', label: 'Move Stack', fields: ['stackLabel', 'x', 'y'] },
   // R3/M7.5: `targetZoneLabel` ist die zweite Art zu sagen, wo der Stapel
   // hingehoert - das Aktionsdeck liegt auf einer am Brett verankerten Zone.
@@ -158,7 +163,9 @@ export function defaultStep(type, ctx = {}) {
     case 'split':
       return { type, stackLabel, count: 2, outputLabels: ['', ''], spacing: 130 };
     case 'deal_to_zone':
-      return { type, stackLabel, count: 1, targetZoneLabel: '', faceDown: false };
+      // `fill: false`: ein frischer Schritt teilt aus. Auffuellen ist die
+      // Ausnahme, und die Vorgabe darf kein vorhandenes Verhalten umdeuten.
+      return { type, stackLabel, count: 1, fill: false, targetZoneLabel: '', faceDown: false };
     case 'move':
       return { type, stackLabel, x: 0, y: 0 };
     case 'place_asset':
@@ -246,7 +253,9 @@ export function describeStep(step) {
     case 'set_face_up': return `Turn ${q(step.stackLabel)} face up`;
     case 'flip_top_card': return `Flip top card of ${q(step.stackLabel)}`;
     case 'split': return `Split ${q(step.stackLabel)} into ${step.count ?? 2} stacks`;
-    case 'deal_to_zone': return `Deal ${step.count ?? 1} from ${q(step.stackLabel)} to ${zone}${down(step)}`;
+    case 'deal_to_zone': return step?.fill
+      ? `Fill ${zone} up to ${step.count ?? 1} from ${q(step.stackLabel)}${down(step)}`
+      : `Deal ${step.count ?? 1} from ${q(step.stackLabel)} to ${zone}${down(step)}`;
     case 'move': return `Move ${q(step.stackLabel)} to ${step.x ?? 0}, ${step.y ?? 0}`;
     case 'place_stack': {
       const where = step?.targetZoneLabel ? `in zone ${q(step.targetZoneLabel)}` : `at ${step.x ?? 0}, ${step.y ?? 0}`;
