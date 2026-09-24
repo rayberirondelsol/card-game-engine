@@ -24,7 +24,7 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
-import { resolveGrids, cellFromLabel, cellCenter, cellLabel, cellAt } from './gridGeometry.js';
+import { resolveGrids, cellFromLabel, cellCenter, cellLabel, cellAt, cellRange, rangeLabel, rangeBox, cellPoint } from './gridGeometry.js';
 import { assetToken, assetFace } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter } from './counters.js';
@@ -583,14 +583,22 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // others. The field name travels with the object, the coordinates only
         // follow from it.
         const grid = findGrid(grids, step.gridLabel);
-        const c = grid && cellFromLabel(grid, step.cell);
+        const r = grid && cellRange(grid, step.cell);
         if (!grid) {
           noPos = `grid "${step.gridLabel ?? ''}" not found`;
-        } else if (!c) {
+        } else if (!r) {
           noPos = `grid "${grid.label}" has no cell "${step.cell ?? ''}"`;
         } else {
-          target = cellCenter(grid, c.col, c.row);
-          onGrid = { gridId: grid.id, cell: cellLabel(grid, c.col, c.row) };
+          // `E3:G4` centres on the middle of the six fields and takes their
+          // size; `C7` is the 1×1 case of the same calculation and keeps the
+          // size of its asset (M7.1).
+          target = cellPoint(grid, step.cell);
+          onGrid = { gridId: grid.id, cell: rangeLabel(grid, r) };
+          if (r.ranged) {
+            const box = rangeBox(grid, r);
+            onGrid.width = box.width;
+            onGrid.height = box.height;
+          }
         }
       } else if (typeof step.x === 'number' && typeof step.y === 'number') {
         target = { x: step.x, y: step.y };

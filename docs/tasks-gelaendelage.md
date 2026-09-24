@@ -222,6 +222,37 @@ nichts vom vorigen Kampf übrig.
 
 ---
 
+## G5 — `token_move` traegt die Rasteradresse mit
+
+**Ziel.** Ein von Hand gezogenes Geländestück liegt im Raum dort, wo es der
+Spieler hingezogen hat — auch nach dem nächsten Laden.
+
+**Befund (aus G1).** `server/src/websocket/messageHandler.js` sendet bei
+`token_move` nur `{ token_id, x, y }`. Der neue `cell` und, bei einem Bereich,
+die nachgerechneten Maße kommen nie an: `room.boardState` und die übrigen
+Clients behalten die alte Adresse, und `placeOnGrids` zieht das Stück beim
+nächsten Laden auf den **alten** Bereich zurück — genau den halben Feldversatz
+weit, den G1 beseitigt.
+
+Das ist eine Altlast aus M3b (`cell` war schon vorher betroffen), aber M7.1
+macht sie sichtbar: **Abnahme 7 gilt am Tisch und nicht im Raum, Abnahme 8
+bricht, sobald jemand im Raum zieht.**
+
+**Umfang.** `cell` — und bei `ranged` auch `width`/`height` — in die
+`token_move`-Nachricht, Sender **und** Empfänger. Prüfen, ob `card_move`
+dasselbe Problem hat (Karten tragen `gridId`/`cell` ebenfalls).
+
+**Dateien.** `server/src/websocket/messageHandler.js` ·
+`client/src/pages/GameTable.jsx` (Sendestelle) · ggf. `useGameRoom.js`.
+
+**Testidee.** `server/test/` gegen den Nachrichtenhandler: ein `token_move` mit
+`cell` schreibt ihn in `room.boardState`; eines ohne lässt die alte Adresse
+stehen, statt sie zu löschen (Rückwärtskompatibilität mit älteren Clients).
+
+**Abhängigkeiten.** G1.
+
+---
+
 ## Offene Punkte aus der Planung
 
 - **`validateScenarioData` ohne Bedienung.** Siehe G2, Schicht 3. Solange sie nur

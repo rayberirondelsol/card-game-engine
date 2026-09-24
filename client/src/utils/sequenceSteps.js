@@ -12,7 +12,7 @@
  * it is a promise the setup does not keep.
  */
 import { counterMax } from '../../../shared/counters.js';
-import { cellFromLabel } from '../../../shared/gridGeometry.js';
+import { cellRange } from '../../../shared/gridGeometry.js';
 import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
 
 /**
@@ -311,7 +311,7 @@ export function validateStep(step, ctx = {}) {
     else if (!step?.cell) problems.push('no field chosen');
     // Ein Platzhalter ($B, $D1) ist kein Feldname: welches Feld er meint, weiß
     // erst `build_scenario` am Tisch (M7/T4).
-    else if (grid && !hasPlaceholder(step.cell) && !cellFromLabel(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
+    else if (grid && !hasPlaceholder(step.cell) && !cellRange(grid, step.cell)) problems.push(`grid "${step.gridLabel}" has no field "${step.cell}"`);
   }
   // M7/T2: bei `clear_grid` *ist* das Raster die Adresse, nicht eine von dreien
   // wie bei `place_asset` - "keins" ist hier also keine gueltige Wahl.

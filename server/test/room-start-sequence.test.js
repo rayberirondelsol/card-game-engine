@@ -264,3 +264,34 @@ test('der Raum baut das Szenario des aufgedeckten Boesewichts auf', async () => 
   assert.equal(tiles.length, 2, 'ohne die Szenariodaten in den options laege hier nichts');
   assert.deepEqual(tiles.map(t => t.cell).sort(), ['C7', 'D7']);
 });
+
+test('ein Objekt mit Bereichsadresse liegt im Raum auf der Mitte des Bereichs', async () => {
+  const gameId = await createGame();
+  const state = stateWithDeck();
+  // Gespeichert mit veralteten Koordinaten und der Assetgröße – beides ist beim
+  // Bereich nicht die Wahrheit: `placeOnGrids` rechnet Mitte und Maße neu.
+  state.tokens.push({ id: 't-zaun', label: 'Holzzaun', x: 0, y: 0, width: 40, height: 40, gridId: 'g1', cell: 'E3:G4' });
+  state.tokens.push({ id: 't-fig', label: 'Figur', x: 0, y: 0, width: 40, height: 40, gridId: 'g1', cell: 'C7' });
+  const setupId = await createSetup(gameId, {
+    state_data: JSON.stringify(state),
+    zone_data: JSON.stringify([]),
+    grid_data: JSON.stringify([{
+      id: 'g1', label: 'Feld', type: 'square',
+      origin: { x: 100, y: 100 }, cell: 40, cols: 10, rows: 10,
+      labels: { cols: 'alpha', rows: 'numeric' },
+    }]),
+  });
+
+  const { room_code } = await startRoom(gameId, setupId);
+  const tokens = getRoom(room_code).boardState.tokens;
+
+  // E3:G4 = Spalten 4–6, Zeilen 2–3: Kasten 100+160 .. 100+280 / 100+80 .. 100+160
+  const zaun = tokens.find(t => t.id === 't-zaun');
+  assert.deepEqual({ x: zaun.x, y: zaun.y, width: zaun.width, height: zaun.height },
+    { x: 320, y: 220, width: 120, height: 80 });
+
+  // Und das Einzelfeld daneben ändert seine Größe nicht.
+  const fig = tokens.find(t => t.id === 't-fig');
+  assert.deepEqual({ x: fig.x, y: fig.y, width: fig.width, height: fig.height },
+    { x: 200, y: 360, width: 40, height: 40 });
+});

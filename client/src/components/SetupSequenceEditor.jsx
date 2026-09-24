@@ -153,7 +153,7 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         type="text"
         value={step.cell || ''}
         onChange={e => set({ cell: e.target.value })}
-        placeholder="e.g. C7"
+        placeholder="e.g. C7 or E3:G4"
         className={`flex-1 ${INPUT}`}
         data-testid={`step-${index}-cell`}
       />),

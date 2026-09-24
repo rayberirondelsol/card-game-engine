@@ -191,6 +191,46 @@ export function cellFromLabel(grid, label) {
   return inside(grid, col, row) ? { col, row } : null;
 }
 
+/**
+ * An address as a *region* of fields – `E3:G4`, the spreadsheet spelling
+ * (M7.1). A piece of terrain covers several fields, and a piece with an even
+ * edge length has its centre on a field border: there is no single field that
+ * places the haystack over E3–G4 correctly.
+ *
+ * `{ col, row, cols, rows, ranged }` from the top left corner, or null when
+ * either end is not a field of this grid. The corners normalise, so `G4:E3` is
+ * the same region as `E3:G4`. `ranged` remembers whether a colon was written:
+ * a lone field stays a lone field in every respect that follows – same centre,
+ * and its size still comes from its asset.
+ *
+ * A field name without a colon is the 1×1 case of this one calculation, not a
+ * second one beside it. The colon is free: two numeric axes separate with `-`.
+ */
+export function cellRange(grid, label) {
+  if (typeof label !== 'string') return null;
+  const ends = label.split(':');
+  if (ends.length > 2) return null;
+  const a = cellFromLabel(grid, ends[0]);
+  const b = ends.length === 2 ? cellFromLabel(grid, ends[1]) : a;
+  if (!a || !b) return null;
+  return {
+    col: Math.min(a.col, b.col),
+    row: Math.min(a.row, b.row),
+    cols: Math.abs(a.col - b.col) + 1,
+    rows: Math.abs(a.row - b.row) + 1,
+    ranged: ends.length === 2,
+  };
+}
+
+/** A region back to its name – `E3:G4`, or `C7` when it is a lone field. */
+export function rangeLabel(grid, r) {
+  if (!r) return null;
+  const from = cellLabel(grid, r.col, r.row);
+  if (!r.ranged) return from;
+  const to = cellLabel(grid, r.col + r.cols - 1, r.row + r.rows - 1);
+  return from && to ? `${from}:${to}` : null;
+}
+
 // ── World ↔ cell ─────────────────────────────────────────────────────────────
 
 function inside(grid, col, row) {
@@ -217,10 +257,45 @@ export function cellCenter(grid, col, row) {
   return { x: d.x + (col + 0.5) * d.cellW, y: d.y + (row + 0.5) * d.cellH };
 }
 
-/** The centre of a named field, or null. */
+/** The box a region covers, or null when the grid cannot be computed. */
+export function rangeBox(grid, r) {
+  if (!r || !usable(grid)) return null;
+  const d = dims(grid);
+  return { x: d.x + r.col * d.cellW, y: d.y + r.row * d.cellH, width: r.cols * d.cellW, height: r.rows * d.cellH };
+}
+
+const boxCenter = b => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+
+/**
+ * The centre of a named field *or region*, or null. For a lone field this is
+ * `cellCenter` to the digit; for `E3:G4` it is the middle of the six fields,
+ * which is what puts the piece on its fields instead of half a field beside
+ * them.
+ */
 export function cellPoint(grid, label) {
-  const c = cellFromLabel(grid, label);
-  return c && cellCenter(grid, c.col, c.row);
+  const b = rangeBox(grid, cellRange(grid, label));
+  return b && boxCenter(b);
+}
+
+/**
+ * The region of `cols × rows` fields that sits under a point – used when an
+ * object is dragged by hand and has to keep its edge length (M7.1). Null when
+ * it would run over the rim: that is not a target.
+ *
+ * With 1×1 this is `cellAt` to the field, which is why dragging an ordinary
+ * figure is unchanged. It is a different question all the same – `cellAt` asks
+ * which field *contains* the point, this one which equally sized region is
+ * *centred* nearest to it – so both stay.
+ */
+function rangeAt(grid, x, y, cols = 1, rows = 1) {
+  if (!usable(grid)) return null;
+  const d = dims(grid);
+  if (d.cellW <= 0 || d.cellH <= 0) return null;
+  const col = Math.round((num(x, NaN) - d.x) / d.cellW - cols / 2);
+  const row = Math.round((num(y, NaN) - d.y) / d.cellH - rows / 2);
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+  if (col < 0 || row < 0 || col + cols > d.cols || row + rows > d.rows) return null;
+  return { col, row, cols, rows };
 }
 
 /** The grid under a point, or null. Later grids are drawn on top, so they win. */
@@ -240,11 +315,15 @@ export function gridAt(grids, x, y) {
  * is what makes "the figure is on C7" survive a reload rather than "the figure
  * is at 340/380", which stops being C7 the moment the board moves.
  */
-export function snapToGrid(grid, x, y) {
-  const c = cellAt(grid, x, y);
-  if (!c) return null;
-  const p = cellCenter(grid, c.col, c.row);
-  return { x: p.x, y: p.y, gridId: grid.id, cell: cellLabel(grid, c.col, c.row) };
+export function snapToGrid(grid, x, y, cell = null) {
+  // What the object currently says it covers. A piece on `E3:G4` keeps its
+  // three by two fields when it is moved; without this it would be written
+  // back as a lone field and jump half a field on the next load (M7.1).
+  const held = cell ? cellRange(grid, cell) : null;
+  const r = rangeAt(grid, x, y, held?.cols, held?.rows);
+  if (!r) return null;
+  const p = boxCenter(rangeBox(grid, r));
+  return { x: p.x, y: p.y, gridId: grid.id, cell: rangeLabel(grid, { ...r, ranged: !!held?.ranged }) };
 }
 
 /**
@@ -265,13 +344,16 @@ export function snapToGrid(grid, x, y) {
  * be drawn over a play area purely to restrict what may be dropped there
  * while the figures still snap to the printed fields.
  */
-export function snapInto(x, y, { zone = null, grids = [], taken = [] } = {}) {
+export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = null } = {}) {
   if (zone?.snap && zoneSlots(zone)?.length) {
     const p = snapPoint(zone, x, y, taken);
     return { x: p.x, y: p.y, gridId: null, cell: null, snapped: true };
   }
   const grid = gridAt(grids, x, y);
-  if (grid) return { ...snapToGrid(grid, x, y), snapped: true };
+  // `cell` is the address the dragged object holds now – a region keeps its
+  // size, and a region that would run over the rim is no target at all.
+  const hit = grid && snapToGrid(grid, x, y, cell);
+  if (hit) return { ...hit, snapped: true };
   // `snapped` is not the same question as "did the point move": the caller has
   // its own fallback (the table's 80px lattice) and must be able to tell
   // "nothing claimed this drop" from "a place happens to be where it fell".
@@ -291,8 +373,18 @@ export function placeOnGrids(objects, grids = []) {
   return objects.map(o => {
     if (!o?.gridId || !o?.cell) return o;
     const grid = Array.isArray(grids) ? grids.find(g => g?.id === o.gridId) : null;
-    const p = grid && cellPoint(grid, o.cell);
-    return p ? { ...o, x: p.x, y: p.y } : o;
+    const r = grid && cellRange(grid, o.cell);
+    if (!r) return o;
+    const box = rangeBox(grid, r);
+    const p = boxCenter(box);
+    // The size is recomputed here, not only when the piece was laid down: the
+    // grid hangs on a board, and a board dragged larger has larger fields. A
+    // frozen size would sit beside them – the same reason `cell` travels at
+    // all (M3b). Only for a region, though: a lone field keeps the size of its
+    // asset, or every existing terrain object would change size on this load.
+    return r.ranged
+      ? { ...o, x: p.x, y: p.y, width: box.width, height: box.height }
+      : { ...o, x: p.x, y: p.y };
   });
 }
 

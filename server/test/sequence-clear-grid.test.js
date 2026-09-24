@@ -261,3 +261,21 @@ test('clear_grid is offered with the fields its handler reads', () => {
   assert.deepEqual(validateStep({ type: 'clear_grid', gridLabel: 'Kampffeld' }, {}), [],
     'ohne geladene Raster wird nichts erfunden');
 });
+
+// M7.1/G1: geprüft, nicht geändert. `clear_grid` fragt `cellAt` auf den
+// Mittelpunkt, und der Mittelpunkt eines Bereichs, der ganz im Raster liegt,
+// liegt immer in einem Feld dieses Rasters – auch wenn er bei gerader
+// Kantenlänge auf einer Feldgrenze sitzt.
+test('ein Stück mit Bereichsadresse wird mit abgeräumt', () => {
+  const state = executeSequence(
+    { cards: [], stacks: [], tokens: [], boards: [] },
+    [
+      { type: 'place_asset', assetName: 'Fetid Furball', gridLabel: 'Kampffeld', cell: 'E3:G4' },
+      { type: 'clear_grid', gridLabel: 'Kampffeld' },
+    ],
+    [],
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  assert.equal(state.tokens.length, 0);
+});

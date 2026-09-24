@@ -177,3 +177,74 @@ test('an existing object is moved onto the field, not duplicated', () => {
   assert.equal(state.tokens[0].x, 150);
   assert.equal(state.tokens[0].cell, 'C7');
 });
+
+// ── Ein Bereich als Adresse (M7.1/G1) ────────────────────────────────────────
+
+test('place_asset auf einen Bereich zentriert auf dessen Mitte und nimmt dessen Maße', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(), [placeOnCell('E3:G4')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  const [tile] = state.tokens;
+  // Drei Spalten E–G: waagerecht die Mitte von F. Zwei Zeilen 3–4: senkrecht
+  // auf die Grenze, wo kein Feldmittelpunkt liegt – genau der halbe Versatz,
+  // um den es geht.
+  assert.equal(tile.x, 330);
+  assert.equal(tile.y, 180);
+  assert.equal(tile.width, 180, '3 Spalten à 60');
+  assert.equal(tile.height, 120, '2 Zeilen à 60');
+});
+
+test('die Ecken eines Bereichs werden normalisiert gemerkt', () => {
+  const state = executeSequence(
+    emptyState(), [placeOnCell('g4:E3')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  assert.equal(state.tokens[0].cell, 'E3:G4');
+  assert.equal(state.tokens[0].gridId, 'g1');
+});
+
+test('ein Einzelfeld behält die Maße aus dem Asset – Zeichen für Zeichen wie bisher', () => {
+  const state = executeSequence(
+    emptyState(), [placeOnCell('C7')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  const [tile] = state.tokens;
+  assert.equal(tile.width, 60, 'aus dem Asset, nicht aus dem Feld');
+  assert.equal(tile.height, 60);
+  // E3:E3 ist die ausgesprochene Ausnahme: ein Bereich über einem Feld.
+  const ranged = executeSequence(
+    emptyState(), [placeOnCell('E3:E3')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+  assert.equal(ranged.tokens[0].width, 60);
+  assert.equal(ranged.tokens[0].cell, 'E3:E3');
+});
+
+test('ein Bereich mit einer Ecke außerhalb wird übersprungen, nichts liegt', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(), [placeOnCell('E3:Z99')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason, /E3:Z99/);
+  assert.equal(state.tokens.length, 0);
+});
+
+test('ein vorhandenes Objekt auf einen Bereich zu schieben zieht die Maße nach', () => {
+  const state = executeSequence(
+    emptyState(), [placeOnCell('A1'), placeOnCell('E3:G4')], ZONES,
+    { assets: assetFixture(), grids: gridFixture() }
+  );
+
+  assert.equal(state.tokens.length, 1);
+  assert.deepEqual(
+    { x: state.tokens[0].x, width: state.tokens[0].width, height: state.tokens[0].height },
+    { x: 330, width: 180, height: 120 }
+  );
+});

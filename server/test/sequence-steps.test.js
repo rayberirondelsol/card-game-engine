@@ -469,3 +469,17 @@ test('a field placeholder hides x/y just like a real field does', () => {
   assert.ok(!fields.includes('x') && !fields.includes('y'), 'ein Feldziel schließt Koordinaten aus');
   assert.ok(fields.includes('cell') && fields.includes('gridLabel'));
 });
+
+test('validateStep nimmt einen Feldbereich an und meldet ein Ende außerhalb (M7.1/G1)', () => {
+  const ctx = gridCtx();
+
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'E3:G4' }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'g4:e3' }, ctx), []);
+
+  const outside = validateStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'E3:Z99' }, ctx);
+  assert.equal(outside.length, 1, 'ein Bereichsende außerhalb ist eine Meldung, nicht zwei');
+  assert.match(outside[0], /E3:Z99/);
+
+  // Die Zeile im Editor bleibt lesbar – describeStep gibt den Rohtext aus.
+  assert.match(describeStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'E3:G4' }), /E3:G4/);
+});

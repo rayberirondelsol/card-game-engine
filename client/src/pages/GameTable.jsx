@@ -2085,7 +2085,12 @@ export default function GameTable({ room = null }) {
           const taken = dropZone
             ? [...tableCards, ...tokens.filter(t => t.id !== token.id)].filter(o => zoneContains(dropZone, o.x, o.y))
             : [];
-          const hit = snapInto(token.x, token.y, { zone: dropZone, grids: tableGrids, taken });
+          // Die Adresse, die das Token jetzt hat, geht mit: ein Stueck auf
+          // `E3:G4` behaelt beim Ziehen seine Kantenlaenge und bekommt den
+          // gleich grossen Bereich darunter (M7.1). Ohne das schriebe snapInto
+          // ein Einzelfeld zurueck, und der Zaun spraenge beim naechsten Laden
+          // einen halben Feldversatz weit.
+          const hit = snapInto(token.x, token.y, { zone: dropZone, grids: tableGrids, taken, cell: token.cell });
           if (hit.snapped) {
             setTokens(prev => prev.map(t =>
               t.id === draggingObj.id ? { ...t, x: hit.x, y: hit.y, gridId: hit.gridId, cell: hit.cell } : t
