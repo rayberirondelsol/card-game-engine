@@ -2692,3 +2692,96 @@ drückt Escape.
 1. Eine gültige Eingabe wird beim Wegklicken übernommen.
 2. Escape verwirft und lässt den Wert unverändert.
 3. Eine unlesbare Eingabe sagt es weiterhin.
+
+### M10.4 — Karten verschmelzen beim Ablegen still zu Stapeln
+
+**Befund.** Eine abgelegte Karte wird mit einer darunterliegenden **zu einem
+Stapel zusammengefasst**. Die untere ist danach nur noch über „Browse" zu
+finden; sichtbar ist allein eine kleine Zahl in der Ecke. In der gespielten
+Partie dreimal zugeschlagen, einmal mit Folge: die **aufgedeckte Aktionskarte
+*Heureka-Roulette* rutschte beim Ablegen in den Verhaltensstapel zurück** —
+vom Ablagestapel in den Nachziehstapel, 11 wieder auf 12.
+
+Das ist stille Zustandsverfälschung während des Spiels. Wer die Zahl am Stapel
+nicht im Auge behält, merkt es nicht.
+
+**Es gibt bereits eine Geste zum Verschmelzen:** `G`. Das Ablegen braucht
+deshalb keine zweite.
+
+**Regel.** Eine abgelegte Karte überlappt eine andere, wie auf dem Tisch.
+Verschmolzen wird nur auf Geheiß — über `G` oder das Kontextmenü.
+
+**Abnahme.**
+1. Eine Karte auf eine andere gelegt bleibt eine eigene Karte; beide sind
+   sichtbar und einzeln greifbar.
+2. Eine Karte auf einen **Stapel** gelegt tritt ihm weiterhin bei — das ist
+   die Geste, mit der man einen Stapel füllt, und sie war nie das Problem.
+3. `G` verschmilzt weiterhin.
+4. Eine Karte, die in einer Zone mit `layout: "stack"` landet, liegt weiterhin
+   mittig — das ist die Zone, nicht das Verschmelzen.
+
+#### Nachtrag zu M10.4 (aus der Umsetzung)
+
+Aufgaben und Begründung stehen in `docs/tasks-ablegen.md`.
+
+1. **Das Verschmelzen war Absicht**, wie bei M9.4: eigener Zweig, eigene
+   Vorschau (`'__single_card_target__'`), und TTS macht es genauso. Die
+   Entscheidung der Regel bleibt trotzdem — in TTS bleibt die untere Karte als
+   Stapelbild sichtbar, hier verschwindet sie hinter einer Zahl.
+
+2. **Abnahme 2 verfehlt den Befund, aber nicht am Unterschied Karte/Stapel.**
+   Den kennt der Code; was er nicht kennt, ist „auf". Gefragt wurde ein
+   Mittelpunktsabstand von 80 Pixeln auf der **ungerasterten** Loslassstelle —
+   bei einer 100 × 140 großen Karte und einem 80er-Raster heißt das: das
+   Nachbarfeld liegt auf der Schwelle. Und der Zonenplatz war zwei Zeilen
+   vorher schon ausgerechnet und wurde vom Verschmelzen **verworfen**. So fiel
+   die aufgedeckte Karte von der `Ablage` in den Nachziehstapel daneben.
+
+   **Abnahme 2 lautet jetzt:** eine Karte tritt einem Stapel bei, wenn sie am
+   Ende **auf ihm liegt** — gefragt wird die Stelle, die die Karte wirklich
+   einnimmt (Zonenplatz, sonst Rasterfeld), gegen die Fläche des Stapels. Wer
+   wirklich auf den Stapel legt, rastet auf dessen Stelle ein und tritt bei;
+   wer aufs Nachbarfeld legt, bleibt eine eigene Karte. Ein Zonenplatz schlägt
+   damit das Verschmelzen, ohne dass irgendwo „Zone" stehen muss.
+
+3. **Der Preis:** zwei lose Karten zu stapeln kostet jetzt drei Handgriffe
+   statt einem (beide wählen, `G`).
+
+### M10.5 — Neue Würfel erscheinen übereinander an einer festen Stelle
+
+**Befund.** Ein über die Werkzeugleiste angelegter Würfel erscheint immer an
+derselben Weltposition, nicht dort, wo man hinsieht. Am Ende der Partie lagen
+drei Würfel auf dem Tisch, **zwei davon deckungsgleich** — ein Wurf war nicht
+auswertbar, weil nicht zu erkennen war, welcher gerollt hatte. Drei Proben
+mussten wiederholt werden.
+
+M8.1 und M8.6 haben dieselbe Familie für Karten und Zähler gelöst
+(`shelfSlot`): eine Position aus einer unbegrenzten Listenlänge. Würfel sind
+davon nicht erfasst — sie rechnen aus `canvas.width/2`, also einer
+**Bildschirm**breite in **Welt**koordinaten (notiert in `tasks-ebenen.md` Z7).
+
+**Regel.** Ein neu angelegtes Ding erscheint dort, wo der Spieler hinsieht, und
+nie deckungsgleich auf einem anderen.
+
+**Abnahme.**
+1. Zwei nacheinander angelegte Würfel liegen nicht übereinander.
+2. Ein neuer Würfel liegt im sichtbaren Bildausschnitt.
+3. Zähler und Karten verhalten sich unverändert (M8.1, M8.6).
+
+#### Nachtrag zu M10.5 (aus der Umsetzung)
+
+1. **Die Kamera ist an der Stelle bekannt.** `createDie` und die beiden anderen
+   sind Funktionen von `GameTable`; `cameraRef`, `containerRef` und `worldAt`
+   (M10.2) liegen im selben Bauteil. Es fehlte keine Leitung, es wurde nur
+   `canvas.width / 2` gerechnet — eine Bildschirmbreite als Weltkoordinate.
+
+2. **Der gemeinsame Zähler aus Z7 trägt über die drei Würfelsorten, nicht
+   darüber hinaus.** Zähler liegen auf der absoluten Ablagereihe, Würfel
+   relativ zur Blickmitte; ein gemeinsamer Zähler verschöbe die Zähler und
+   bräche Abnahme 3. Und eine **Liste** ist das bessere Mittel als ein Zähler:
+   ein gelöschter Würfel gibt seinen Platz wieder frei.
+
+3. **Vier weitere Stellen rechneten dieselbe Zeile** (Textfeld, Token,
+   Bild-Token, Notiz) und wurden mitgenommen — die Regel sagt „ein neu
+   angelegtes Ding". `playCardFromHand` bleibt, weil Abnahme 3 Karten
+   ausdrücklich unter Bestandsschutz stellt.

@@ -32,6 +32,8 @@ import { canStartPan } from '../utils/panTarget.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
+import { stackAt } from '../utils/cardDrop.js';
+import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, ZOOM_MIN, ZOOM_MAX } from '../utils/cameraZoom.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
@@ -455,6 +457,33 @@ export default function GameTable({ room = null }) {
       { x: screenX - rect.left, y: screenY - rect.top },
       { x: rect.width / 2, y: rect.height / 2 },
     );
+  }
+
+  /**
+   * Wo der Spieler hinsieht, in Weltkoordinaten (M10.5/J5). Dieselbe eine
+   * Umkehrung wie `screenToWorld`; `canvas.width / 2` war eine
+   * Bildschirmbreite als Weltkoordinate.
+   */
+  function viewCenter() {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 600, y: 400 };
+    const center = { x: rect.width / 2, y: rect.height / 2 };
+    return worldAt(cameraRef.current, center, center);
+  }
+
+  /**
+   * Die Stapel, denen eine gezogene Karte beitreten kann (M10.4/J3): je Stapel
+   * ein Eintrag mit seiner Stelle und den Anzeigemassen seiner Karten – die
+   * Eingabe fuer `stackAt`. Der eigene Stapel ist nie dabei.
+   */
+  function dropCandidates(ownStackId) {
+    const seen = new Map();
+    for (const c of tableCards) {
+      if (!c.inStack || c.inStack === ownStackId || seen.has(c.inStack)) continue;
+      const { w, h } = getCardDims(c);
+      seen.set(c.inStack, { id: c.inStack, x: c.x, y: c.y, w, h });
+    }
+    return [...seen.values()];
   }
 
   // Game objects state (counters, dice, hitDice, notes, tokens, textFields)
@@ -1463,47 +1492,16 @@ export default function GameTable({ room = null }) {
 
     // Check if hovering over a stack for visual feedback
     const card = tableCards.find(c => c.tableId === draggingCard);
-    const STACK_DROP_THRESHOLD = 80;
-    let targetStack = null;
-
-    if (card) {
-      if (card.inStack) {
-        // Dragging a stack - check for other stacks
-        const otherStacks = tableCards.filter(c => c.inStack && c.inStack !== card.inStack);
-        const stacksByID = {};
-        otherStacks.forEach(c => {
-          if (!stacksByID[c.inStack]) {
-            stacksByID[c.inStack] = c;
-          }
-        });
-
-        for (const otherCard of Object.values(stacksByID)) {
-          const dist = Math.sqrt((newX - otherCard.x) ** 2 + (newY - otherCard.y) ** 2);
-          if (dist < STACK_DROP_THRESHOLD) {
-            targetStack = otherCard.inStack;
-            break;
-          }
-        }
-      } else {
-        // Dragging a single card - check all stacks and single cards
-        for (const otherCard of tableCards) {
-          if (otherCard.tableId === draggingCard) continue;
-
-          const dist = Math.sqrt((newX - otherCard.x) ** 2 + (newY - otherCard.y) ** 2);
-          if (dist < STACK_DROP_THRESHOLD) {
-            if (otherCard.inStack) {
-              targetStack = otherCard.inStack;
-              break;
-            } else {
-              // Hovering over a single card - show as drop target
-              targetStack = '__single_card_target__';
-            }
-          }
-        }
-      }
-    }
-
-    setStackDropTarget(targetStack);
+    // M10.4/J1: der 80-Pixel-Umkreis ist weg – eine Karte ist 100 x 140, und
+    // 80 Abstand hiess 20 Pixel Ueberlappung. Gefragt wird die Flaeche, und
+    // zwar mit dem Rasterpunkt, den das Gitter-Aufleuchten ohnehin ausrechnet:
+    // die endgueltige Stelle steht erst beim Loslassen fest (ein Zonenplatz
+    // kann sie noch verschieben), und der Irrtum geht dann nur in die Richtung
+    // "es verschmilzt weniger als die Vorschau versprach".
+    // M10.4/J2: '__single_card_target__' entfaellt mit der Geste selbst.
+    setStackDropTarget(
+      card ? stackAt({ x: snapX, y: snapY }, dropCandidates(card.inStack)) : null,
+    );
 
     // Move the card (and all cards in the same stack or multi-selection)
     const dx = newX - card.x;
@@ -1616,66 +1614,23 @@ export default function GameTable({ room = null }) {
     // `card_move` Masse in den Raum – Tisch und Raum sagten Verschiedenes.
     if (!hit) hit = snapInto(card.x, card.y, { grids: tableGrids });
 
-    // Check if card/stack is being dropped on another stack
-    const STACK_DROP_THRESHOLD = 80; // Distance in pixels to trigger stack merge
-    let targetStack = null;
+    // A zone's places or a grid field own the position; where neither claims
+    // the drop, the table's own 80px lattice does, exactly as before.
+    //
+    // M10.4/J3: **vor** der Stapelfrage. Bisher wurde der Zonenplatz hier
+    // ausgerechnet, dann vom Verschmelzen ueberschrieben und erst danach
+    // benutzt – so fiel eine Karte, die auf die `Ablage` gelegt wurde, in den
+    // Nachziehstapel daneben (der belegte Schadensfall der dritten Partie).
+    const finalX = hit.snapped ? hit.x : snapToGrid(card.x);
+    const finalY = hit.snapped ? hit.y : snapToGrid(card.y);
 
-    // Only check for stack merge if not already in the same stack
-    if (card.inStack) {
-      // If dragging a whole stack, check if it's dropped on another stack
-      const otherStacks = tableCards.filter(c => c.inStack && c.inStack !== card.inStack);
-      const stacksByID = {};
-      otherStacks.forEach(c => {
-        if (!stacksByID[c.inStack]) {
-          stacksByID[c.inStack] = c;
-        }
-      });
-
-      for (const otherCard of Object.values(stacksByID)) {
-        const dist = Math.sqrt((card.x - otherCard.x) ** 2 + (card.y - otherCard.y) ** 2);
-        if (dist < STACK_DROP_THRESHOLD) {
-          targetStack = otherCard.inStack;
-          break;
-        }
-      }
-    } else {
-      // Single card being dropped - check all stacks AND other single cards
-      let targetSingleCard = null;
-      for (const otherCard of tableCards) {
-        if (otherCard.tableId === draggingCard) continue;
-
-        const dist = Math.sqrt((card.x - otherCard.x) ** 2 + (card.y - otherCard.y) ** 2);
-        if (dist < STACK_DROP_THRESHOLD) {
-          if (otherCard.inStack) {
-            targetStack = otherCard.inStack;
-            break;
-          } else {
-            // Dropping on another single card - will create a new stack
-            targetSingleCard = otherCard;
-          }
-        }
-      }
-
-      // Create new stack from two single cards
-      if (!targetStack && targetSingleCard) {
-        const newStackId = crypto.randomUUID();
-        const newZ = maxZIndex + 1;
-        setTableCards(prev => prev.map(c => {
-          if (c.tableId === targetSingleCard.tableId) {
-            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ, gridId: null, cell: null };
-          }
-          if (c.tableId === draggingCard) {
-            return { ...c, inStack: newStackId, x: snapToGrid(targetSingleCard.x), y: snapToGrid(targetSingleCard.y), zIndex: newZ + 1, gridId: null, cell: null };
-          }
-          return c;
-        }));
-        setMaxZIndex(newZ + 1);
-        setDraggingCard(null);
-        setGridHighlight(null);
-        setStackDropTarget(null);
-        return;
-      }
-    }
+    // M10.4/J1: eine Karte tritt einem Stapel bei, wenn sie am Ende **auf ihm
+    // liegt** – gefragt wird die Stelle, die sie wirklich einnimmt, gegen die
+    // Flaeche des Stapels. Der 80-Pixel-Umkreis auf der ungerasterten
+    // Loslassstelle ist weg.
+    // M10.4/J2: Karte auf Karte gruendet keinen Stapel mehr. Dafuer gibt es
+    // `G` (`groupSelectedCards`) – das Ablegen braucht keine zweite Geste.
+    const targetStack = stackAt({ x: finalX, y: finalY }, dropCandidates(card.inStack));
 
     // If dropped on a stack, merge them
     if (targetStack) {
@@ -1714,15 +1669,13 @@ export default function GameTable({ room = null }) {
 
       setDraggingCard(null);
       setGridHighlight(null);
+      // Sonst bleibt der Zielstapel nach dem Verschmelzen leuchtend stehen.
+      setStackDropTarget(null);
       return;
     }
 
     // No stack merge - always snap to grid on release
     const isMultiSelected = selectedCards.size > 1 && selectedCards.has(draggingCard);
-    // A zone's places or a grid field own the position; where neither claims
-    // the drop, the table's own 80px lattice does, exactly as before.
-    const finalX = hit.snapped ? hit.x : snapToGrid(card.x);
-    const finalY = hit.snapped ? hit.y : snapToGrid(card.y);
     const snapDx = finalX - card.x;
     const snapDy = finalY - card.y;
 
@@ -1927,16 +1880,29 @@ export default function GameTable({ room = null }) {
   }
 
   // Dice functions
+
+  /**
+   * Was um die Blickmitte schon liegt (M10.5/J5) – **alle drei Wuerfelsorten**
+   * zusammen. Z7 vermutete hier einen gemeinsamen Zaehler; eine Liste ist das
+   * bessere Mittel, weil ein geloeschter Wuerfel seinen Platz wieder freigibt.
+   * Zaehler und Karten bleiben auf ihrer absoluten Ablagereihe (M8.1, M8.6) –
+   * sie teilen kein Koordinatensystem mit den Wuerfeln.
+   */
+  function dieSpots() {
+    return [...dice, ...customDiceOnTable, ...hitDice];
+  }
+
   function createDie(type) {
-    const canvas = canvasRef.current;
     const maxValue = { d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 }[type] || 6;
     const newDie = {
       id: crypto.randomUUID(),
       type: type,
       value: Math.floor(Math.random() * maxValue) + 1,
       maxValue: maxValue,
-      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      // M10.5/J5: dort, wo der Spieler hinsieht, auf dem ersten freien Platz.
+      // `canvas.width / 2` war eine Bildschirmbreite als Weltkoordinate, und
+      // der Zufall daneben verhinderte kein Uebereinanderliegen.
+      ...spawnSlot(viewCenter(), dieSpots()),
       rolling: false,
     };
     setDice(prev => [...prev, newDie]);
@@ -1970,7 +1936,6 @@ export default function GameTable({ room = null }) {
 
   // Custom Dice (image-based, imported from TTS)
   function placeCustomDie(template) {
-    const canvas = canvasRef.current;
     const newDie = {
       id: crypto.randomUUID(),
       templateId: template.id,
@@ -1978,8 +1943,8 @@ export default function GameTable({ room = null }) {
       faceImages: template.face_images || [],
       numFaces: template.num_faces || template.faceImages?.length || 6,
       currentFace: Math.floor(Math.random() * (template.face_images?.length || 1)),
-      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      // M10.5/J5, siehe createDie.
+      ...spawnSlot(viewCenter(), dieSpots()),
       rolling: false,
       locked: false,
     };
@@ -2029,14 +1994,13 @@ export default function GameTable({ room = null }) {
   }
 
   function createHitDie(hitType) {
-    const canvas = canvasRef.current;
     const newDie = {
       id: crypto.randomUUID(),
       type: 'hit',
       hitType: hitType,
       value: rollHitFace(hitType),
-      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      // M10.5/J5, siehe createDie.
+      ...spawnSlot(viewCenter(), dieSpots()),
       rolling: false,
       locked: false,
     };
@@ -2347,14 +2311,15 @@ export default function GameTable({ room = null }) {
 
   // Text field functions
   function createTextField(text, fontSize, color) {
-    const canvas = canvasRef.current;
     const newField = {
       id: crypto.randomUUID(),
       text: text || 'Text',
       fontSize: fontSize || 16,
       color: color || '#ffffff',
-      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      // M10.5/J5: dieselbe Rechnung wie bei den Wuerfeln. Der Befund nennt
+      // Wuerfel, die Regel nennt "ein neu angelegtes Ding" – und
+      // `canvas.width / 2` stand woertlich hier wie dort.
+      ...spawnSlot(viewCenter(), textFields),
     };
     setTextFields(prev => [...prev, newField]);
     setShowTextFieldModal(false);
@@ -2425,14 +2390,13 @@ export default function GameTable({ room = null }) {
   }
 
   function createToken(shape, color, label) {
-    const canvas = canvasRef.current;
     const newToken = {
       id: crypto.randomUUID(),
       shape: shape,
       color: color,
       label: label || '',
-      x: (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-      y: (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
+      // M10.5/J5, siehe createDie.
+      ...spawnSlot(viewCenter(), tokens),
       attachedTo: null, // support card attachment
     };
     setTokens(prev => [...prev, newToken]);
@@ -6057,12 +6021,11 @@ export default function GameTable({ room = null }) {
             <button
               onClick={() => {
                 if (!newNoteText.trim()) return;
-                const canvas = canvasRef.current;
                 setNotes(prev => [...prev, {
                   id: crypto.randomUUID(),
                   text: newNoteText.trim(),
-                  x: (canvas?.width || 800) / 2,
-                  y: (canvas?.height || 600) / 2,
+                  // M10.5/J5, siehe createDie.
+                  ...spawnSlot(viewCenter(), notes),
                 }]);
                 setShowNoteModal(false);
                 setNewNoteText('');
@@ -6091,17 +6054,14 @@ export default function GameTable({ room = null }) {
                   <button
                     key={token.id}
                     onClick={() => {
-                      const canvas = canvasRef.current;
                       // M3c: dieselbe Fabrik wie der Schritt `place_asset` -
                       // sonst fehlen assetId, beide Bildseiten und das
                       // Seitenverhältnis, und das Brett taugt nicht als Anker.
                       // Immer aufgedeckt: der Dialog hat keine Seitenwahl.
-                      const newToken = assetToken(
-                        token,
-                        (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 100,
-                        (canvas?.height || 600) / 2 + (Math.random() - 0.5) * 100,
-                        false,
-                      );
+                      // M10.5/J5: die Stelle kommt jetzt von dort, wo der
+                      // Spieler hinsieht.
+                      const spot = spawnSlot(viewCenter(), tokens);
+                      const newToken = assetToken(token, spot.x, spot.y, false);
                       setTokens(prev => [...prev, newToken]);
                       if (room) room.sendAction({ type: 'token_create', token: newToken });
                       setShowTokenModal(false);
