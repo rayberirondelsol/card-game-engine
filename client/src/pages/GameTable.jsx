@@ -170,7 +170,7 @@ function drawSolidBackground(ctx, width, height, color) {
 }
 
 // Token shape components
-function TokenShape({ shape, color, size = 30, width = null, height = null, label = '', caption = '', imageUrl = null }) {
+function TokenShape({ shape, color, size = 30, width = null, height = null, label = '', caption = '', imageUrl = null, rotation = 0 }) {
   // M3c: Bild-Token tragen `width`/`height` (Seitenverhältnis des Bildes).
   // Alte Spielstände und die geometrischen Formen haben nur `size`.
   const w = width || size;
@@ -297,16 +297,39 @@ function TokenShape({ shape, color, size = 30, width = null, height = null, labe
         </div>
       );
 
-    case 'image':
+    case 'image': {
+      // M7.1: die Drehung dreht **das Bild, nicht den Kasten**. Der Kasten ist
+      // w x h, wie der Feldbereich ihn hinlegt - daran haengen die
+      // Trefferflaeche zum Ziehen (das aeussere div rechnet `left`/`top` aus
+      // tokenW/tokenH) und `cellAt`. Eine Transformation am aeusseren div
+      // verschoebe genau die. Das Bild steht darum absolut in der Mitte und
+      // tauscht bei 90/270 seine Masse, damit es quer in den Kasten passt.
+      const swap = rotation === 90 || rotation === 270;
       return (
         <div
           className="relative shadow-lg rounded-sm overflow-hidden"
           style={{ width: w, height: h }}
           title={tip || 'Image Token'}
+          data-rotation={rotation || undefined}
         >
-          <img src={imageUrl} alt={tip || 'token'} style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
+          <img
+            src={imageUrl}
+            alt={tip || 'token'}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: swap ? h : w,
+              height: swap ? w : h,
+              objectFit: 'contain',
+              transformOrigin: 'center',
+              transform: `translate(-50%, -50%) rotate(${rotation || 0}deg)`,
+            }}
+            draggable={false}
+          />
         </div>
       );
+    }
 
     default:
       return (
@@ -2922,6 +2945,10 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        // M7.1: die Drehung des Bildes. Sie muss in **beide** Feldlisten -
+        // bei Karten stand sie schon in beiden, bei Token in keiner, und ein
+        // Feld, das nur eine der beiden fuehrt, ueberlebt kein Speichern.
+        rotation: t.rotation || 0,
         // The grid field this object sits on (M3b), if any. Coordinates alone
         // stop meaning "C7" as soon as the board they belong to has moved.
         gridId: t.gridId || null,
@@ -3514,6 +3541,8 @@ export default function GameTable({ room = null }) {
         attachedTo: t.attachedTo || null,
         attachedCorner: t.attachedCorner || null,
         locked: t.locked || false,
+        // Ein Zustand ohne das Feld liest sich als 0 (M7.1) - wie `locked`.
+        rotation: t.rotation || 0,
         gridId: t.gridId || null,
         cell: t.cell || null,
         assetId: t.assetId || null,
@@ -4762,7 +4791,7 @@ export default function GameTable({ room = null }) {
           onTouchStart={(e) => handleObjDragStart(e, 'token', token.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'token', objId: token.id, cardTableId: null, stackId: null }); }}
         >
-          <TokenShape shape={token.shape} color={token.color} size={tokenW} width={tokenW} height={tokenH} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} />
+          <TokenShape shape={token.shape} color={token.color} size={tokenW} width={tokenW} height={tokenH} label={view.name} caption={view.caption} imageUrl={token.imageUrl || null} rotation={token.rotation || 0} />
           {/* Attached indicator */}
           {token.attachedTo && (
             <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow-sm" />

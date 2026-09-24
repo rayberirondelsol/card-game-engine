@@ -13,6 +13,7 @@
  */
 import { counterMax } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
+import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
 
 /**
@@ -31,7 +32,7 @@ export const STEP_TYPES = [
   { value: 'move', label: 'Move Stack', fields: ['stackLabel', 'x', 'y'] },
   { value: 'place_stack', label: 'Place Stack', fields: ['category', 'label', 'x', 'y', 'faceDown'] },
   { value: 'remove_stack', label: 'Remove Stack', fields: ['stackLabel'] },
-  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'faceDown'] },
+  { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
@@ -138,7 +139,7 @@ export function defaultStep(type, ctx = {}) {
       // be picked afterwards. Picking one hides x/y (see stepFields).
       // Kein Raster und kein Feld: beides hiesse, x/y auszublenden, und ein
       // geratenes Feld ist eine Behauptung darueber, wo das Objekt hingehoert.
-      return { type, assetName: first(names), targetZoneLabel: '', gridLabel: '', cell: '', x: 0, y: 0, faceDown: false };
+      return { type, assetName: first(names), targetZoneLabel: '', gridLabel: '', cell: '', x: 0, y: 0, rotation: 0, faceDown: false };
     case 'draw_assets':
       return { type, pool: first(pools), count: 1, targetZoneLabel: zone, faceDown: false };
     case 'place_stack':
@@ -210,7 +211,10 @@ export function describeStep(step) {
         : step.cell || step.gridLabel
           ? `on grid ${q(step.gridLabel)} field ${q(step.cell)}`
           : `at ${step.x ?? 0}, ${step.y ?? 0}`;
-      return `Place ${q(step.assetName)} ${where}${down(step)}`;
+      // Die Drehung steht nur da, wenn es eine gibt: die Zeile ist eine
+      // Zusammenfassung, und "rotated 0deg" waere Rauschen an jedem Schritt.
+      const turned = rotationOf(step.rotation) ? `, rotated ${step.rotation}°` : '';
+      return `Place ${q(step.assetName)} ${where}${turned}${down(step)}`;
     }
     case 'draw_assets':
       return `Draw ${step.count ?? 1} from pool ${q(step.pool)} into ${zone}${down(step)}`;
@@ -347,6 +351,11 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('max') && step?.max !== undefined && step?.max !== null && step?.max !== ''
     && counterMax(step.max) === undefined) {
     problems.push('max must be a number');
+  }
+  // M7.1: ein Plaettchen liegt auf einem Raster. Kein Feld heisst 0 - alte
+  // Sequenzen tragen keins, und das ist kein Fehler.
+  if (fields.has('rotation') && rotationOf(step?.rotation) === null) {
+    problems.push(`rotation "${step.rotation}" is not one of ${ROTATIONS.join('/')}`);
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

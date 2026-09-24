@@ -14,6 +14,7 @@ import {
   setActionSteps,
   actionSteps,
 } from '../utils/setupActions.js';
+import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 
 /**
  * The setup sequence editor. All the knowledge about steps - which types
@@ -157,6 +158,22 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         className={`flex-1 ${INPUT}`}
         data-testid={`step-${index}-cell`}
       />),
+
+    // M7.1: die Drehung dreht das Bild, nicht die Feldbelegung - deshalb steht
+    // sie in jedem Zweig, auch bei Zone und x/y. Vier Winkel, keine
+    // Zwischenwerte: ein Plättchen liegt auf einem Raster.
+    rotation: () => field('Rotation',
+      <select
+        value={String(rotationOf(step.rotation) ?? step.rotation)}
+        onChange={e => set({ rotation: Number(e.target.value) })}
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-rotation`}
+      >
+        {rotationOf(step.rotation) === null && (
+          <option value={String(step.rotation)}>{String(step.rotation)} (invalid)</option>
+        )}
+        {ROTATIONS.map(a => <option key={a} value={a}>{a}°</option>)}
+      </select>),
 
     // M7/T6: die eine Einstellung von `build_scenario`. Drei Antworten, nicht
     // zwei - „auto" ist die haeufigste und steht deshalb oben: derselbe Knopf

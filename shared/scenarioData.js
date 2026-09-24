@@ -15,7 +15,7 @@
  * Die Form (Spec M7, „Die Szenariodaten"):
  *
  *   { gridLabel, bosses: { "<Basisname>": {
- *       scenario, terrain: [{ assetName, cells: [] }],
+ *       scenario, terrain: [{ assetName, cells: [], rotation }],
  *       fields: { B: "J5", D: ["A1", ...] },
  *       decks: [{ category, label }],
  *       final: { terrain: [...], fields: { FF: [...] } } } } }
@@ -31,6 +31,7 @@
  */
 
 import { cellFromLabel, cellRange } from './gridGeometry.js';
+import { ROTATIONS, rotationOf } from './assetToken.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 const text = (s) => String(s ?? '').trim();
@@ -96,6 +97,12 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
       for (const cell of cells) {
         if (!text(cell)) problems.push(`${who}: asset "${asset}" has an empty field`);
         else if (badRange(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (asset "${asset}")`);
+      }
+      // Ein Plättchen liegt auf einem Raster: 0, 90, 180 oder 270 (M7.1). Ein
+      // Zwischenwinkel fiele sonst nirgends auf – der Executor legt ihn als 0
+      // hin, und der Zaun läge still quer statt hochkant.
+      if (rotationOf(t?.rotation) === null) {
+        problems.push(`${who}: asset "${asset}" has rotation "${text(t.rotation)}"; only ${ROTATIONS.join('/')} are allowed`);
       }
     }
 

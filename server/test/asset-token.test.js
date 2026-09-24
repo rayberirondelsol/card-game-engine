@@ -57,6 +57,13 @@ test('the factory sets assetId, both image sides, faceDown, width and height', (
   assert.equal(t.y, 400);
 });
 
+test('the factory lays a token down unrotated (M7.1)', () => {
+  // `rotation` steht neben `locked`: ein Feld, das jedes Tischobjekt hat, statt
+  // eines, das erst der Sequenz-Executor nachtraegt. Ein Zustand ohne das Feld
+  // liest sich als 0 - hier wird es angelegt, damit es gar nicht erst fehlt.
+  assert.equal(assetToken(boardAsset(), 0, 0, false).rotation, 0);
+});
+
 test('a token laid face down shows its back and says so', () => {
   const t = assetToken(boardAsset(), 0, 0, true);
   assert.equal(t.faceDown, true);

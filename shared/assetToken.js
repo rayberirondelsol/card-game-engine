@@ -43,7 +43,25 @@ export function assetToken(asset, x, y, faceDown) {
     attachedTo: null,
     attachedCorner: null,
     locked: false,
+    rotation: 0,
   };
+}
+
+/** Die vier Winkel, die ein Plättchen auf einem Raster einnehmen kann (M7.1). */
+export const ROTATIONS = [0, 90, 180, 270];
+
+/**
+ * Ein Drehwinkel aus dem, was dasteht – oder `null`, wenn es keiner ist (M7.1).
+ *
+ * Eine Funktion, nicht zwei: wer meldet, fragt auf `null`; wer legt, nimmt
+ * `?? 0`. Nichts dazustehen ist kein Fehler, sondern die Vorgabe – `rotation`
+ * fehlt in jedem Spielstand von vor M7.1 und in jeder Sequenz, die ohne
+ * Drehung auskommt.
+ */
+export function rotationOf(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  const n = Number(value);
+  return ROTATIONS.includes(n) ? n : null;
 }
 
 /**

@@ -25,7 +25,7 @@
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, cellPoint } from './gridGeometry.js';
-import { assetToken, assetFace } from './assetToken.js';
+import { assetToken, assetFace, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter } from './counters.js';
 
@@ -563,6 +563,12 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // by `placeOnGrids` on the next load (M3b).
       let onGrid = { gridId: null, cell: null };
       let noPos = `no position given for "${step.assetName}"`;
+      // Die Drehung gehoert zur Platzierung, nicht zum Objekt: es gibt keinen
+      // Schritt, der nur dreht, und eine stehengebliebene Drehung waere still
+      // falsch - dieselbe Ueberlegung wie bei `gridId`/`cell` oben. Sie gilt in
+      // allen drei Zweigen: ein gedrehtes Token in einer Zone ist genauso
+      // legitim (M7.1). Ein Winkel, den es nicht gibt, ist keiner: 0.
+      const rotation = rotationOf(step.rotation) ?? 0;
 
       if (step.targetZoneLabel) {
         const zone = findZone(zones, step.targetZoneLabel);
@@ -609,14 +615,14 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         if (!target) return skip(noPos);
         existing.x = target.x;
         existing.y = target.y;
-        Object.assign(existing, onGrid);
+        Object.assign(existing, onGrid, { rotation });
         return state;
       }
 
       if (!target) return skip(noPos);
       const token = assetToken(asset, target.x, target.y, step.faceDown);
       if (!token) return fail(`"${step.assetName}" has no back side and was not placed face down`);
-      state.tokens.push(Object.assign(token, onGrid));
+      state.tokens.push(Object.assign(token, onGrid, { rotation }));
       return state;
     }
 
@@ -949,6 +955,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
             const token = Object.assign(assetToken(asset, x, y, false), {
               gridId: grid.id,
               cell: rangeLabel(grid, r),
+              // Zwei Ausrichtungen sind zwei Gelaendeeintraege - die Drehung
+              // steht am Eintrag, nicht am Asset, und gilt fuer alle seine
+              // Felder (M7.1). Der Winkel ist hier schon geprueft.
+              rotation: rotationOf(t?.rotation) ?? 0,
             });
             if (r.ranged) {
               const box = rangeBox(grid, r);
