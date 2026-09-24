@@ -28,6 +28,8 @@ import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
 import { canStartPan } from '../utils/panTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
+import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
+import { tokenLayers } from '../utils/tokenLayer.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -470,6 +472,9 @@ export default function GameTable({ room = null }) {
   // Grids (M3b) go the same way and through the same resolution: `grids` is
   // what was saved, `tableGrids` is where the fields are right now.
   const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors]);
+  // M8.2: je groesser die Grundflaeche, desto weiter hinten. Einmal je
+  // Aenderung der Tokenliste gerechnet, nicht je Token.
+  const tokenZ = useMemo(() => tokenLayers(tokens), [tokens]);
 
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
@@ -1077,10 +1082,9 @@ export default function GameTable({ room = null }) {
   function placeCardOnTable(card) {
     const newZIndex = maxZIndex + 1;
     setMaxZIndex(newZIndex);
-    // Spread cards out so they don't overlap too much
-    const existingCount = tableCards.length;
-    const col = existingCount % 4;
-    const row = Math.floor(existingCount / 4);
+    // Spread cards out so they don't overlap too much. M8.1: counted is what
+    // *lies* on the table - a card inside a stack takes no place in the shelf.
+    const slot = shelfSlot(shelfCount(tableCards));
     const newTableCard = {
       tableId: crypto.randomUUID(),
       cardId: card.id,
@@ -1089,8 +1093,8 @@ export default function GameTable({ room = null }) {
       card_back_id: card.card_back_id || null,
       width: card.width || 0,
       height: card.height || 0,
-      x: 250 + col * 150 + (Math.random() - 0.5) * 30,
-      y: 300 + row * 180 + (Math.random() - 0.5) * 30,
+      x: slot.x + (Math.random() - 0.5) * 30,
+      y: slot.y + (Math.random() - 0.5) * 30,
       zIndex: newZIndex,
       faceDown: false,
       rotation: 0,
@@ -1110,12 +1114,10 @@ export default function GameTable({ room = null }) {
     // Create a unique stack ID for this category stack
     const stackId = crypto.randomUUID();
 
-    // Calculate position for the stack (centered area with slight offset)
-    const existingCount = tableCards.length;
-    const col = existingCount % 4;
-    const row = Math.floor(existingCount / 4);
-    const stackX = 250 + col * 150;
-    const stackY = 300 + row * 180;
+    // Calculate position for the stack. Same count as placeCardOnTable (M8.1):
+    // every free card once, every stack once - otherwise two categories placed
+    // in a row would land on the same spot.
+    const { x: stackX, y: stackY } = shelfSlot(shelfCount(tableCards));
 
     // Create table cards for each card in the category
     const newTableCards = categoryCards.map((card, index) => {
@@ -4821,10 +4823,13 @@ export default function GameTable({ room = null }) {
           data-face-down={view.hidden ? 'true' : 'false'}
           data-ui-element="true"
           data-locked={token.locked ? 'true' : undefined}
-          className="absolute z-20 select-none group pointer-events-auto"
+          className="absolute select-none group pointer-events-auto"
           style={{
             left: token.x - Math.floor(tokenW / 2),
             top: token.y - Math.floor(tokenH / 2),
+            // M8.2: das groessere Stueck liegt darunter. Kein z-20 mehr in der
+            // Klassenliste - sonst stuenden zwei Werte an einem Element.
+            zIndex: tokenZ(token),
             cursor: draggingObj?.id === token.id ? 'grabbing' : 'grab',
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'token', token.id)}
