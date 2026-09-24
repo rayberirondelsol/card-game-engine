@@ -253,6 +253,38 @@ stehen, statt sie zu löschen (Rückwärtskompatibilität mit älteren Clients).
 
 ---
 
+## G6 — Ein Bereich ist auch in `fields` erlaubt
+
+**Ziel.** Der Boesewicht steht auf `"B": "J8:K9"` und bedeckt vier Felder.
+
+**Befund.** G2 hat eine eigene Fehlermeldung fuer Bereiche in `fields` gebaut,
+weil M7.1 Regel 1 sagte, dort gehoere ein einzelnes Feld hin. Diese Regel war
+falsch verallgemeinert: **die Basis eines Boesewichts ueberdeckt 2x2 Felder**
+(Basis-Regelwerk S. 16, nachgemessen an allen drei Szenariokarten - der
+R-Kreis hat 1,8 Felder Durchmesser und sitzt auf einem Rasterkreuz). Nur die
+Doerfler und die FF-Gelaendefelder sind einfeldrig.
+
+Siehe den Nachtrag zu M7.1 in `docs/spec-setup-system.md`.
+
+**Umfang.** Die Bereichsmeldung fuer `fields` aus `shared/scenarioData.js`
+entfernen; Feldeintraege in `fields` gehen wie Gelaendefelder durch `cellRange`.
+**Kein Sonderfall fuer den Schluessel `B`** - der Code kennt keine
+Townsfolk-Tussle-Begriffe. Pruefen, ob `build_scenario` den Bereich beim Binden
+der Platzhalter korrekt weitergibt, damit ein folgendes `place_asset` mit
+`cell: "$B"` den ganzen Bereich bekommt und nicht nur dessen erstes Feld.
+
+**Dateien.** `shared/scenarioData.js` · ggf. `shared/sequenceExecutor.js`.
+
+**Testidee.** Die G2-Tests, die einen Bereich in `fields` als Fehler erwarten,
+drehen sich um: sauber statt gemeldet. Neu: `"B": "J8:K9"` bindet `$B` als
+Bereich, ein `place_asset` darauf legt ein Objekt ueber vier Felder mit den
+Massen des Bereichs; `"B": "J8:Z99"` wird weiterhin gemeldet; `"D": ["K11"]`
+unveraendert gueltig.
+
+**Abhaengigkeiten.** G1, G2.
+
+---
+
 ## Offene Punkte aus der Planung
 
 - **`validateScenarioData` ohne Bedienung.** Siehe G2, Schicht 3. Solange sie nur

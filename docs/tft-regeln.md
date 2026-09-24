@@ -1132,3 +1132,24 @@ RUNDE r = 1..4
 9. **Heldentaten- und Dorf-Ereignis-Decks** wurden nicht erfasst (75 bzw. 100
     Karten im Basisspiel, +5 Ereignisse aus FN). Sie liegen als deutsche
     Druckdaten in `Downloads\` vor und extrahieren sauber als Text.
+
+## 5.10 Grundflächen: Bösewicht 2×2, Dörfler 1×1
+
+Fehlte bisher in dieser Referenz und ist regelrelevant, weil daran Nachbarschaft,
+Bewegung und Deckung hängen.
+
+- **Ein Bösewicht belegt vier Felder (2×2).** Belegt in `[BR S.16]`,
+  „Ruffian Movement Examples": das Raster läuft sichtbar unter der Basis durch,
+  und die als benachbart markierten Felder bilden den Achterring um eine
+  2×2-Fläche. Daraus folgt: ein Bösewicht hat **acht** Nachbarfelder, nicht vier.
+- **Ein Dörfler belegt ein Feld (1×1).** Dasselbe Foto zeigt beide Basen
+  nebeneinander; die Dörflerbasis ist halb so breit.
+- **Auf den Szenariokarten** markiert der `R`-Kreis die 2×2-Fläche: sein
+  Durchmesser beträgt rund 1,8 Felder und sein Mittelpunkt liegt auf einem
+  Rasterkreuz. Die `T`-Kreise markieren einzelne Felder.
+- **Für die Engine:** der Bösewicht wird über einen Feldbereich gesetzt
+  (`J8:K9`), die Dörfler über einzelne Felder (M7.1).
+
+**Offen:** ob Bösewichte mit ungewöhnlicher Gestalt (Ms. Falls & Co. als Turm,
+The Door Knockers als Paar) ebenfalls 2×2 belegen, ist nicht geprüft — nur die
+allgemeine Abbildung liegt vor.

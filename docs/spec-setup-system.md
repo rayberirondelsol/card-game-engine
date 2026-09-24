@@ -1535,3 +1535,39 @@ senkrechten Zäune kommen dazu, der Heuhaufen wird `E3:G4`), nicht durch Code.
 - **Nichts sagt, wie groß eine Kachel *ist*** — nur, wie viele Felder sie *hier*
   belegt. Wer dieselbe Kachel zweimal verschieden groß einträgt, merkt es am
   Bild, nicht an einer Meldung.
+
+#### Nachtrag zu M7.1: der Bösewicht belegt 2×2 Felder — `fields` braucht Bereiche
+
+Vom Nutzer eingewandt und am Regelwerk belegt: **die Basis eines Bösewichts
+überdeckt vier Felder, die eines Dörflers eines.** Das Basis-Regelwerk zeigt es
+auf S. 16 („Ruffian Movement Examples"): auf dem Foto läuft das Raster sichtbar
+unter der Bösewicht-Basis hindurch, und die blau markierten Nachbarfelder bilden
+den Ring aus acht Feldern, den nur eine 2×2-Fläche erzeugt. Das Vergleichsfoto
+derselben Seite zeigt Bösewicht und Dörfler nebeneinander; die Dörflerbasis ist
+halb so breit.
+
+Nachgemessen an den drei Szenariokarten: der `R`-Kreis hat **1,8 Felder
+Durchmesser** und sein Mittelpunkt liegt auf einem **Rasterkreuz**, nicht in
+einer Feldmitte — Deputy Waggums `J8:K9`, Virginia Fitz `K11:L12`, The Bundits
+`N4:O5`.
+
+**Damit ist Regel 1 an einer Stelle falsch.** Dort steht, ein Bereich sei in
+`fields` ein Fehler, „ein Dörfler steht auf einem Feld". Das stimmt für die
+Dörfler und für die `FF`-Geländefelder — aber nicht für `B`. Die Begründung war
+richtig beobachtet und falsch verallgemeinert: sie beschreibt die Figuren, die
+ich zufällig zuerst angesehen hatte.
+
+**Die berichtigte Regel:** ein Bereich ist in `fields` erlaubt, überall. Was auf
+einem Feld steht, schreibt ein Feld; was vier Felder belegt, schreibt einen
+Bereich. Die eigene Fehlermeldung für Bereiche in `fields` (aus G2) entfällt
+ersatzlos.
+
+**Kein Sonderfall für `B`.** Der Schlüssel `B` ist ein Townsfolk-Tussle-Begriff;
+der Code kennt ihn nicht und soll ihn nicht kennen (M7, „Der Code weiß nichts
+über Townsfolk Tussle"). Ein Bereich ist erlaubt oder nicht — er wird nicht nach
+Schlüsselnamen beurteilt.
+
+**Abnahme:** `"B": "J8:K9"` wird von `validateScenarioData` nicht beanstandet;
+der darauf gesetzte Bösewicht bedeckt vier Felder und sitzt mittig darauf.
+`"D": ["K11", …]` bleibt gültig und unverändert. Ein Bereich mit einem Ende
+außerhalb des Rasters wird weiterhin gemeldet.
