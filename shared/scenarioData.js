@@ -23,14 +23,14 @@
  * `final` ist additiv: derselbe Eintrag, ein zusätzlicher Abschnitt, der nur
  * für den Endkampf dazukommt – kein zweites Szenario.
  *
- * In `terrain[].cells` darf seit M7.1 ein **Feldbereich** stehen (`"E3:G4"`);
- * in `fields` nicht: ein Dörfler steht auf einem Feld, und `$B` reist als
- * Platzhaltertext in ein `place_asset` weiter. Beides wird geprüft, mit je
- * eigener Meldung – „kein solches Feld" wäre für einen Bereich, den es gibt,
- * die falsche Auskunft.
+ * Überall, wo ein Feldname steht, darf seit M7.1 ein **Feldbereich** stehen
+ * (`"E3:G4"`) – in `terrain[].cells` und in `fields`. Die Basis eines
+ * Bösewichts überdeckt 2×2 Felder, die eines Dörflers eines (Nachtrag zu
+ * M7.1); was ein Eintrag belegt, sagt seine Adresse und nicht sein Schlüssel.
+ * Der Code kennt `B` nicht und soll ihn nicht kennen (M7).
  */
 
-import { cellFromLabel, cellRange } from './gridGeometry.js';
+import { cellRange } from './gridGeometry.js';
 import { ROTATIONS, rotationOf } from './assetToken.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
@@ -69,15 +69,12 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
   else if (Array.isArray(grids) && grids.length && !grid) problems.push(`grid "${label}" not found`);
 
   /**
-   * Eine Geländeadresse gegen das Raster – dieselbe Rechnung wie im Editor
-   * (T1) und im Executor. Seit M7.1 darf das ein Feldbereich sein (`E3:G4`);
-   * ein einzelnes Feld ist der 1×1-Fall derselben Rechnung, nicht eine zweite
-   * daneben.
+   * Eine Adresse gegen das Raster – dieselbe Rechnung wie im Editor (T1) und im
+   * Executor, und dieselbe für Gelände wie für `fields`. Seit M7.1 darf das ein
+   * Feldbereich sein (`E3:G4`); ein einzelnes Feld ist der 1×1-Fall derselben
+   * Rechnung, nicht eine zweite daneben.
    */
   const badRange = (cell) => grid && !cellRange(grid, cell);
-
-  /** Ein einzelner Feldname – für `fields`, wo ein Bereich nichts zu suchen hat. */
-  const badCell = (cell) => grid && !cellFromLabel(grid, cell);
 
   const knownAsset = (name) => !Array.isArray(assets) || assets.length === 0
     || assets.some(a => norm(a?.name) === norm(name));
@@ -114,20 +111,11 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
       list.forEach((cell, i) => {
         const named = Array.isArray(value) ? `${key}${i + 1}` : key;
         if (!text(cell)) problems.push(`${who}: field ${named} is empty`);
-        // Ein Bereich ist hier kein Feld, das es nicht gibt, sondern die
-        // falsche Sorte Adresse: ein Dörfler steht auf einem Feld (M7.1).
-        //
-        // Und er fällt sonst *nirgends* mehr auf: seit G1 nimmt `place_asset`
-        // einen Bereich an. `J5:K6` als `$B` würde also nicht scheitern,
-        // sondern still gelingen – und den Dörfler dabei auf zwei mal zwei
-        // Felder aufblasen, weil ein Bereich seine Maße mitbringt. Genau
-        // deshalb steht die Meldung hier und nicht im Executor.
-        //
-        // Geprüft wird die Schreibweise, nicht das Raster: ein Doppelpunkt ist
-        // in keinem Benennungsschema ein Feldname (zwei Zahlenachsen trennen
-        // mit `-`). Das gilt darum auch ohne Raster in der Hand.
-        else if (text(cell).includes(':')) problems.push(`${who}: field ${named} names a range "${text(cell)}"; a villager stands on a single field`);
-        else if (badCell(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (${named})`);
+        // Ein Bereich ist hier so gültig wie im Gelände: der Bösewicht belegt
+        // 2×2 Felder, der Dörfler eines (Nachtrag zu M7.1). Kein Sonderfall
+        // nach Schlüsselnamen – `B` ist ein Townsfolk-Tussle-Begriff, und der
+        // Code kennt ihn nicht.
+        else if (badRange(cell)) problems.push(`${who}: grid "${label}" has no field "${text(cell)}" (${named})`);
       });
     }
 

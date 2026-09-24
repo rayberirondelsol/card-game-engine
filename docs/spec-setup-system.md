@@ -1567,6 +1567,11 @@ der Code kennt ihn nicht und soll ihn nicht kennen (M7, „Der Code weiß nichts
 über Townsfolk Tussle"). Ein Bereich ist erlaubt oder nicht — er wird nicht nach
 Schlüsselnamen beurteilt.
 
+**Abnahmepunkt 6 oben ist damit zurueckgezogen.** Er verlangt, ein Bereich in
+`fields` werde gemeldet - das war die falsche Regel. Wer die Abnahmeliste
+abarbeitet, ueberspringt ihn; die Pruefung dort wieder einzubauen waere ein
+Rueckschritt, kein Fortschritt.
+
 **Abnahme:** `"B": "J8:K9"` wird von `validateScenarioData` nicht beanstandet;
 der darauf gesetzte Bösewicht bedeckt vier Felder und sitzt mittig darauf.
 `"D": ["K11", …]` bleibt gültig und unverändert. Ein Bereich mit einem Ende

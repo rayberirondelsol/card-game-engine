@@ -392,15 +392,63 @@ test('clear_grid räumt den Bereich genauso weg wie das Einzelfeld', () => {
   assert.equal(tilesNamed(state, 'Fetid Furball').length, 0, 'beide weg – die Mitte eines Bereichs liegt in einem Feld');
 });
 
-test('ein Bereich in fields wird gemeldet, bevor das erste Objekt liegt', () => {
+// ── Bereiche in `fields` (M7.1-Nachtrag, G6) ─────────────────────────
+//
+// Die Basis eines Bösewichts überdeckt 2×2 Felder. `$B` trägt darum einen
+// Bereich, und er muss den Platzhalter **unversehrt** passieren – die Bindung
+// ist Text, und eine Normalisierung unterwegs machte aus `I8:J9` still `I8`.
+
+test('ein Bereich in fields bindet $B unversehrt und legt ein Objekt über vier Felder', () => {
+  const scenario = scenarioFixture();
+  scenario.bosses.Klaus.fields.B = 'I8:J9';
+  delete scenario.bosses.Klaus.final;
+
+  const { state, log, bindings } = executeSequenceWithLog(
+    shortGameBar(),
+    [REVEAL, BUILD, { type: 'place_asset', assetName: '$revealed', gridLabel: 'Kampffeld', cell: '$B' }],
+    ZONES,
+    opts(scenario)
+  );
+
+  assert.deepEqual(statuses(log), ['ok', 'ok', 'ok'], reasons(log));
+  assert.equal(bindings.B, 'I8:J9', 'der Bereich bleibt beim Binden ganz');
+
+  const boss = state.tokens.find(t => t.label === 'Bösewicht: Klaus');
+  assert.equal(boss.cell, 'I8:J9', '$B ist der ganze Bereich, nicht dessen erste Ecke');
+  // Spalten 8-9, Zeilen 7-8: Mitte auf dem Rasterkreuz, Maße des Bereichs.
+  assert.deepEqual(
+    { x: boss.x, y: boss.y, width: boss.width, height: boss.height },
+    { x: 540, y: 480, width: 120, height: 120 },
+    'mittig auf vier Feldern, mit den Maßen des Bereichs'
+  );
+  assert.equal(boss.gridId, 'g1');
+});
+
+test('ein Einzelfeld in fields bleibt, was es war – D behält die Assetgröße', () => {
+  const { state, log, bindings } = executeSequenceWithLog(
+    shortGameBar(),
+    [REVEAL, BUILD, { type: 'place_asset', assetName: 'Figur: Granny', gridLabel: 'Kampffeld', cell: '$D2' }],
+    ZONES,
+    opts()
+  );
+
+  assert.deepEqual(statuses(log), ['ok', 'ok', 'ok'], reasons(log));
+  assert.equal(bindings.D2, 'B3');
+  const granny = state.tokens.find(t => t.label === 'Figur: Granny');
+  assert.deepEqual(
+    { x: granny.x, y: granny.y, width: granny.width, height: granny.height },
+    { ...center(1, 2), width: 40, height: 40 }
+  );
+});
+
+test('ein Bereich in fields mit einem Ende außerhalb wird gemeldet, bevor das erste Objekt liegt', () => {
   const broken = scenarioFixture();
-  broken.bosses.Klaus.fields.B = 'J5:J6';
+  broken.bosses.Klaus.fields.B = 'J5:Z99';
 
   const start = shortGameBar();
   const { state, log } = executeSequenceWithLog(start, [REVEAL, BUILD], ZONES, opts(broken));
 
   assert.deepEqual(statuses(log), ['ok', 'failed'], reasons(log));
-  assert.match(log[1].reason, /J5:J6/);
-  assert.match(log[1].reason, /range/i, 'die eigene Meldung, nicht "kein solches Feld"');
+  assert.match(log[1].reason, /J5:Z99/);
   assert.equal(tilesNamed(state, 'Fetid Furball').length, 0, 'kein einziges Objekt gelegt');
 });
