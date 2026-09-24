@@ -1351,3 +1351,187 @@ bei den drei Dörflern in M4a.
   ist ein Platzhalter im Wert von `place_counter`. Wartet auf die Klärung der
   Regel selbst.
 - **Aktionen im Raum.**
+
+### M7.1 — Ein Stück belegt einen Feldbereich, und es kann gedreht liegen
+
+Beim Abtippen der ersten drei Szenarien (2026-09-24) fielen zwei Dinge auf, die
+die Daten nicht sagen können. Beide sind derselbe Satz: **eine Platzierung trägt
+keine Gestalt, nur eine Adresse — die Gestalt hängt am Asset.**
+
+#### Befund: die Platzierung kann nichts über ihre eigene Form sagen
+
+Geprüft am Stand 2026-09-24:
+
+- **Ein Ziel ist immer eine Feldmitte.** `place_asset` (Raster-Zweig) und
+  `build_scenario` setzen beide `target = cellCenter(grid, col, row)`, also
+  `origin + (col + 0.5) * cellW`. Ein Stück mit gerader Kantenlänge hat seinen
+  Mittelpunkt aber auf einer Feldgrenze: der Heuhaufen über E3–G4 sitzt
+  waagerecht in Spalte F, senkrecht zwischen Reihe 3 und 4. Es gibt kein Feld,
+  das ihn richtig platziert. Derselbe Versatz trifft den waagerechten Holzzaun
+  über D5–G5 (vier Spalten → Mittelpunkt auf der Grenze E/F).
+- **Wie viele Felder ein Stück belegt, steht nirgends.** Die Feldzahl steckt
+  heute allein in `width`/`height` des Assets — und dort ist sie bei Assets vom
+  Typ `token` **quadratisch per Konstruktion**: der TTS-Import schreibt dieselbe
+  Zahl in beide Spalten, und der Größenregler in `GameDetail.jsx` schickt
+  `{ width: v, height: v }`. Nur Assets vom Typ `board` haben getrennte Maße.
+  Die 4:1-Gestalt des Zauns ist damit in keinem Datenfeld vorhanden.
+- **Kein Tischobjekt außer einer Karte kennt eine Drehung.** `rotation` ist bei
+  Karten vollständig verdrahtet — Feldliste in `getGameState` *und*
+  `loadGameState`, `transform: rotate(...)` beim Rendern, Q/E, Kontextmenü,
+  WebSocket `card_rotate`. Bei Token und Brettern steht es **nirgends**:
+  `assetToken` legt es nicht an, die Token-Feldlisten führen es nicht,
+  `TokenShape` (`case 'image'`) rendert ohne Transformation, die Rotate-Knöpfe
+  hängen im Zweig `contextMenu.cardTableId`.
+- **Eine Drehung allein hätte nichts gelöst.** Ohne Gestalt gibt es nichts zu
+  drehen: ein quadratischer Kasten um 90° gedreht ist derselbe Kasten. Das
+  Fehlende ist der belegte Bereich; die Drehung ist das, was danach übrig bleibt.
+- **Ein Bereich würde heute an zwei Stellen still danebengehen.** `placeOnGrids`
+  löst `cell` über `cellFromLabel` auf; ein Bereich ergibt `null`, das Objekt
+  behält seine alten Koordinaten — kommentiert als gewollter, korrigierbarer
+  Fall. Und `snapInto` schreibt beim Ziehen von Hand ein **Einzelfeld** zurück:
+  ein von Hand verschobener Zaun verliert seinen Bereich und springt beim
+  nächsten Laden einen halben Feldversatz weit. `validateStep` und
+  `validateScenarioData` melden einen Bereich dagegen laut.
+- **`clear_grid` ist in Ordnung.** Es fragt `cellAt` auf den Mittelpunkt, und der
+  Mittelpunkt eines Bereichs, der ganz im Raster liegt, liegt immer in einem
+  Feld dieses Rasters. Kein Eingriff nötig.
+
+#### Die Regel 1: eine Adresse darf ein Feldbereich sein
+
+Wo heute ein Feldname steht, darf ein **Bereich** stehen — zwei Feldnamen mit
+einem Doppelpunkt dazwischen, `"E3:G4"`, die Tabellenkalkulations-Schreibweise.
+Der Doppelpunkt ist frei; die Trennung zweier Zahlenachsen benutzt `-`.
+
+- Der Bereich ist die **Ecke-zu-Ecke**-Angabe, die Reihenfolge ist egal:
+  `G4:E3` bezeichnet denselben Bereich und wird als `E3:G4` gemerkt.
+- Das Stück wird auf die **Mitte des Bereichs** zentriert, nicht auf eine
+  Feldmitte. Damit ist der halbe Feldversatz weg, ohne dass irgendwo eine
+  Ausnahme steht: ein einzelnes Feld *ist* der Bereich 1×1, und seine Mitte ist
+  dieselbe wie bisher.
+- Das Stück bekommt die **Maße des Bereichs** (`cols × cellW`, `rows × cellH`) —
+  aber **nur bei einem Bereich**. Ein Einzelfeld behält die Größe seines Assets,
+  Zeichen für Zeichen wie heute. Wer ein einfeldriges Stück auf Feldgröße
+  bringen will, schreibt `E3:E3`; das ist die Ausnahme, die der Autor
+  ausspricht, nicht eine, die das System still macht.
+- Erlaubt ist der Bereich in `terrain[].cells` und in `place_asset.cell`.
+  **Nicht** in `fields`: ein Dörfler steht auf einem Feld, `$B` und `$D1` sind
+  Feldnamen. Ein Bereich dort ist ein Fehler und wird gemeldet.
+- Die Maße werden beim Laden **neu gerechnet**, nicht nur beim Legen
+  (`placeOnGrids`). Ein Raster hängt an einem Brett; wird das Brett größer
+  gezogen, wächst das Feld mit, und ein eingefrorenes Maß läge danach daneben —
+  derselbe Grund, aus dem `cell` überhaupt mitreist (M3b).
+- Wird ein Stück mit Bereichsadresse **von Hand** über das Raster gezogen,
+  behält es seine Kantenlänge und bekommt den Bereich derselben Größe, auf dem
+  es nun liegt. Ein Bereich, der dabei über den Rand liefe, ist kein Ziel.
+
+**Warum der Bereich und nicht eine Feldzahl am Asset:** dieselbe Kachel liegt
+bei „Deputy Waggums" waagerecht und bei „The Bundits" senkrecht. Die Zahl
+variiert also je Platzierung, nicht je Asset. Zwei Quellen für dieselbe Angabe
+wären eine Frage danach, welche gewinnt — und die Antwort bräuchte niemand.
+
+#### Die Regel 2: eine Platzierung darf gedreht sein
+
+`rotation`: `0`, `90`, `180` oder `270`, Vorgabe `0`. Es steht am gelegten
+Objekt, am Schritt `place_asset` und am Geländeeintrag der Szenariodaten.
+
+- **Die Drehung dreht das Bild, nicht die Feldbelegung.** Welche Felder ein
+  Stück bedeckt, sagt der Bereich und nur der Bereich. Ein Kasten von 1×4
+  Feldern bleibt 1×4, ob das Bild darin steht oder liegt. Die Kanten des
+  Objekts — was man anfasst, was `cellAt` findet, woran ein Anker hängt —
+  bleiben, wo der Bereich sie hinlegt.
+- **Zwei Ausrichtungen sind zwei Geländeeinträge.** `terrain` ist eine Liste und
+  verträgt denselben `assetName` zweimal; die Schleife in `build_scenario` fasst
+  nichts zusammen. Ein Zaun, der in einem Szenario waagerecht *und* senkrecht
+  liegt, steht als zwei Einträge da, je einer mit seinem Bereich und seiner
+  Drehung.
+
+```json
+{ "assetName": "Holzzaun", "cells": ["D5:G5"] }
+{ "assetName": "Holzzaun", "cells": ["L10:L13"], "rotation": 90 }
+```
+
+- **Keine abgeleitete Ausrichtung.** Naheliegend wäre: Kasten hochkant, Bild
+  quer → dreh es. Das geht nicht, und zwar aus einem harten Grund: das
+  Seitenverhältnis des Bildes steht in keinem Datenfeld (die Assetmaße sind
+  quadratisch) — es ist erst bekannt, wenn ein `<img>` im Browser geladen hat.
+  Der Raum verteilt seinen Brettzustand aber als JSON. Eine Ausrichtung, die
+  erst nach dem Bildladen entsteht, steht nicht darin, und Tisch und Raum
+  rechneten sie zu verschiedenen Zeitpunkten. Dazu kann sie 180° nicht
+  ausdrücken. Also ausgeschrieben statt geraten — dieselbe Entscheidung wie
+  „keine Bedingungen im Vokabular" in M7.
+
+#### Rückwärtskompatibilität
+
+Die drei erfassten Szenarien liegen mit Einzelfeldern in der Produktion. Sie
+leben unverändert weiter, ohne Migration, ohne neue Spalte, ohne Backfill:
+
+- Ein Einzelfeld **ist** der Bereich 1×1. Dieselbe Mitte, dasselbe Ergebnis.
+- Maße werden nur bei einem Bereich abgeleitet. Kein bestehendes Objekt ändert
+  beim nächsten Laden seine Größe.
+- `rotation` fehlt → `0`, wie `locked` und `faceDown` es schon halten.
+- `scenario_data` reicht der Server untypisiert durch (POST/PUT/GET in
+  `setups.js`). Ein Bereich oder eine Drehung in den Daten braucht **keine
+  Routenänderung**; geprüft wird in `shared/scenarioData.js`.
+
+Korrigiert werden die drei Einträge als **Daten** (die beiden weggelassenen
+senkrechten Zäune kommen dazu, der Heuhaufen wird `E3:G4`), nicht durch Code.
+
+#### Abnahme
+
+1. `place_asset` auf Feld `E3:G4` eines 10×10-Rasters legt das Objekt waagerecht
+   auf die Mitte von F und senkrecht auf die Grenze zwischen 3 und 4, mit
+   `width = 3 × cellW` und `height = 2 × cellH`. Nach Speichern und Laden liegt
+   es wieder dort — auch wenn das Brett darunter vorher **verschoben oder in der
+   Größe geändert** wurde; die Maße wachsen mit.
+2. `G4:E3` bezeichnet denselben Bereich; das gelegte Objekt merkt sich `E3:G4`.
+3. Ein Bereich mit einer Ecke außerhalb des Rasters wird übersprungen und steht
+   mit Grund im Protokoll. Nichts liegt.
+4. `C7` verhält sich Zeichen für Zeichen wie bisher: Mitte von C7, Maße aus dem
+   Asset. `E3:E3` dagegen gibt Feldgröße.
+5. `build_scenario` mit `cells: ["E3:G4"]` legt **ein** Objekt über sechs Felder;
+   `clear_grid` auf dasselbe Raster nimmt es wieder weg.
+6. Ein Bereich in `fields` (`"B": "J5:K6"`) wird von `validateScenarioData`
+   gemeldet und `build_scenario` scheitert, **bevor** das erste Objekt liegt.
+7. Ein von Hand über das Raster gezogenes Stück mit Bereichsadresse behält seine
+   Kantenlänge und bekommt den gleich großen Bereich, auf dem es nun liegt; nach
+   dem Laden liegt es dort und nicht einen halben Feldversatz daneben.
+8. Am Tisch **und** im Raum aus demselben Setup deckt dasselbe Stück dieselben
+   Felder.
+9. `place_asset` mit `rotation: 90` legt das Objekt mit **derselben**
+   Feldbelegung wie ohne und zeigt das Bild um 90° gedreht. Anfassen zum Ziehen
+   und `cellAt` ändern sich durch die Drehung nicht.
+10. Ein Szenario mit zwei Einträgen desselben Zauns — `D5:G5` ungedreht und
+    `L10:L13` mit 90° — legt zwei Objekte, beide richtig herum.
+11. `rotation` überlebt Speichern und Laden am Tisch und im Raum. Ein Zustand
+    ohne das Feld liest sich als `0`.
+12. Alles daraus ist im Sequenz-Editor einstellbar, ohne JSON anzufassen — bis
+    auf `scenario_data` selbst (M7 sinngemäß).
+
+#### Bewusst nicht Teil davon
+
+- **Keine Drehung von Hand am Tisch.** Die Ausrichtung eines Geländestücks
+  gehört zum Szenario; eine Drehung von Hand liefe beim nächsten
+  `build_scenario` still auseinander. Wer sie später doch will, braucht **vier**
+  Stellen, nicht eine: den Zweig im Kontextmenü (die Rotate-Knöpfe hängen heute
+  an `contextMenu.cardTableId`), die Tasten Q/E, eine WebSocket-Aktion
+  `token_rotate` neben `card_rotate` — Sender **und** Empfänger — und nichts
+  sonst, weil `rotation` dann schon persistiert wird.
+- **Keine Zwischenwinkel.** 0/90/180/270. Ein Plättchen liegt auf einem Raster.
+- **Keine Größenangabe am Asset.** Kein `fieldsWide`/`fieldsTall` in
+  `table_assets` — siehe die Begründung bei Regel 1.
+- **Kein zweites Asset je Ausrichtung.** Ein extern gedrehtes PNG als eigenes
+  Asset kostet null Code, verdoppelt aber die Geländekacheln und zerreißt die
+  Zuordnung Kachel ↔ Geländekarte ↔ `quantity`.
+- **Keine Belegungsprüfung.** Zwei Stücke dürfen sich überlappen; ob das
+  regelrichtig ist, entscheidet der Mensch. Das System baut auf, es spielt nicht
+  (Abschnitt 1).
+- **Keine Bereiche auf Hexrastern.** `GRID_TYPES` kennt nur `square`.
+
+#### Offen
+
+- **`validateScenarioData` hat keinen Aufrufer in der Oberfläche.** T5 hat sie
+  als „was die Oberfläche anzeigen kann" geschnitten; sie wird nur vom Executor
+  und aus den Tests gerufen. Dasselbe Muster wie in `docs/audit-dead-controls.md`.
+- **Nichts sagt, wie groß eine Kachel *ist*** — nur, wie viele Felder sie *hier*
+  belegt. Wer dieselbe Kachel zweimal verschieden groß einträgt, merkt es am
+  Bild, nicht an einer Meldung.
