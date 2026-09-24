@@ -74,7 +74,11 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
   // R3: `place_stack` verhaelt sich hier wie `place_asset` - ohne Zone gilt x/y,
   // nicht „alle Spielerzonen".
   const zoneEmptyLabel = step.type === 'place_asset' || step.type === 'place_stack'
-    ? 'Free position (X/Y)' : 'All player zones';
+    ? 'Free position (X/Y)'
+    // M8.8/A3: bei `place_card` ist die Zone Pflicht - eine ausgelegte Karte
+    // ohne Zone hat keinen Ort, und "alle Spielerzonen" waere gelogen.
+    : step.type === 'place_card' ? '— choose a zone —'
+    : 'All player zones';
   const gridLabels = (ctx.grids || []).map(g => g?.label).filter(Boolean);
 
   const render = {
@@ -83,6 +87,20 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
 
     assetName: () => field('Asset',
       nameSelect(step.assetName, ctx.assetNames, '— no named assets —', v => set({ assetName: v }), `step-${index}-asset`)),
+
+    // M8.8/A3: ein **Textfeld**, keine Auswahlliste - aus demselben Grund wie
+    // bei `cell` (M7/T1): eine Liste ueber 1087 kaputte OCR-Namen ist
+    // unbedienbar, und `validateStep` sagt sofort, ob der Name genau eine
+    // Karte trifft.
+    cardName: () => field('Card',
+      <input
+        type="text"
+        value={step.cardName || ''}
+        onChange={e => set({ cardName: e.target.value })}
+        placeholder="e.g. The Rooty Tooter"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-card-name`}
+      />),
 
     pool: () => field('Pool',
       nameSelect(step.pool, ctx.pools, '— no asset categories —', v => set({ pool: v }), `step-${index}-pool`)),
@@ -323,6 +341,7 @@ export default function SetupSequenceEditor({
   availableAssetNames = [],
   availableGrids = [],
   availableCardCategories = [],
+  availableCards = [],
   isOpen,
   onToggle,
 }) {
@@ -362,6 +381,10 @@ export default function SetupSequenceEditor({
     // braucht die Geometrie (cellFromLabel), die Auswahl nur den Namen.
     grids: availableGrids,
     cardCategories: availableCardCategories,
+    // Die Kartenzeilen selbst, nicht nur ihre Kategorien: `place_card` sucht
+    // eine Karte bei Namen, und ob der Name genau eine trifft, entscheidet
+    // sich an den Namen und Bildpfaden (M8.8/A3).
+    cards: availableCards,
   };
 
   function addStep() {

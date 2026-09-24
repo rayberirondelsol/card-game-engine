@@ -15,6 +15,7 @@ import { counterMax, counterValueForm } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
+import { findCardByName } from '../../../shared/cardSearch.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -34,6 +35,10 @@ export const STEP_TYPES = [
   // hingehoert - das Aktionsdeck liegt auf einer am Brett verankerten Zone.
   { value: 'place_stack', label: 'Place Stack', fields: ['category', 'label', 'targetZoneLabel', 'x', 'y', 'faceDown'] },
   { value: 'remove_stack', label: 'Remove Stack', fields: ['stackLabel'] },
+  // M8.8/A3: eine benannte Karte aus der Bibliothek. Keine Stelle - „vor dem
+  // Dörfler" ist eine am Brett verankerte Zone, und eine feste x/y ist das,
+  // was M3a abgeschafft hat. Kein `label`: eine angelegte Karte ist kein Stapel.
+  { value: 'place_card', label: 'Place Card', fields: ['cardName', 'targetZoneLabel'] },
   { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
@@ -159,6 +164,11 @@ export function defaultStep(type, ctx = {}) {
       // nicht vorwegnehmen darf - er ist der feste Name, unter dem ihn
       // `shuffle` und `remove_stack` später wiederfinden (M7/T3).
       return { type, category: first(cardCategories), label: '', x: 0, y: 0, faceDown: false };
+    case 'place_card':
+      // Der Kartenname bleibt leer: den kennt nur der Autor, und geraten wäre
+      // er eine Behauptung darüber, welche Karte gemeint ist. Die Zone ist
+      // vorbelegt wie bei jedem anderen Zonenschritt.
+      return { type, cardName: '', targetZoneLabel: zone };
     case 'set_asset_face':
       return { type, assetName: first(names), faceDown: true };
     case 'place_counter':
@@ -226,6 +236,7 @@ export function describeStep(step) {
       return `Place card category ${q(step.category)} as stack ${q(step.label)} ${where}${down(step)}`;
     }
     case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
+    case 'place_card': return `Place the card named ${q(step.cardName)} in ${zone}`;
     case 'place_asset': {
       const where = step.targetZoneLabel
         ? `in zone ${q(step.targetZoneLabel)}`
@@ -304,7 +315,7 @@ const findGrid = (grids, label) =>
  * @returns {string[]} problems, empty when the step is fine
  */
 export function validateStep(step, ctx = {}) {
-  const { stackLabels, zoneLabels, pools, assetNames: names, grids, cardCategories } = ctx || {};
+  const { stackLabels, zoneLabels, pools, assetNames: names, grids, cardCategories, cards } = ctx || {};
   const fields = new Set(stepFields(step));
   const problems = [];
 
@@ -339,6 +350,20 @@ export function validateStep(step, ctx = {}) {
     else if (!hasPlaceholder(step.category) && !known(cardCategories, step.category)) problems.push(`card category "${step.category}" is empty or unknown`);
   }
   if (fields.has('label') && !String(step?.label ?? '').trim()) problems.push('no stack name given');
+  // M8.8/A3: der Name wird hier gegen die Kartenzeilen gehalten, nicht erst am
+  // Tisch. Genau dieser Fehler - ein Name, der auf keine Karte passt - hat die
+  // Startausrüstung in der Partie gekostet. Ohne geladene Karten wird nichts
+  // erfunden, das ist dieselbe Regel wie bei Pools und Zonen.
+  if (fields.has('cardName')) {
+    if (!String(step?.cardName ?? '').trim()) problems.push('no card name given');
+    else if (!hasPlaceholder(step.cardName) && Array.isArray(cards) && cards.length) {
+      const { card, reason } = findCardByName(cards, step.cardName);
+      if (!card) problems.push(reason);
+    }
+    // Anders als bei `deal_to_zone` ist „keine Zone" keine gültige Wahl: eine
+    // ausgelegte Karte ohne Zone hat keinen Ort.
+    if (!String(step?.targetZoneLabel ?? '').trim()) problems.push('no zone chosen');
+  }
   // M7/T1: Raster und Feld gehoeren zusammen - ein Feld ohne Raster ist keine
   // Adresse, und ein Feld, das es auf dem gewaehlten Raster nicht gibt, wird am
   // Tisch uebersprungen. Beides leer heisst "ueber x/y", das ist gueltig.

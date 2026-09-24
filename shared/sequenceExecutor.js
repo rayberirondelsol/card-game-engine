@@ -28,6 +28,7 @@ import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } fr
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter, counterValue } from './counters.js';
+import { findCardByName } from './cardSearch.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -98,7 +99,7 @@ function stepTarget(step) {
   // `category` vor `label`: wie bei jedem anderen Schritt steht im Protokoll,
   // *woraus* er baut (place_stack liest eine Kartenkategorie), nicht was dabei
   // herauskommt. `label` bleibt als Rückfall, damit die Zeile nie namenlos ist.
-  return step?.assetName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.category ?? step?.label ?? step?.name ?? null;
+  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? step?.category ?? step?.label ?? step?.name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -233,7 +234,7 @@ export function hasPlaceholder(value) {
 // `value` steht mit dabei, seit `set_counter` die Werte des Bösewichts aus den
 // Szenariodaten liest (R1/R4). Fuer `place_counter` aendert das nichts:
 // `hasPlaceholder` prueft nur Zeichenketten, und dort steht eine Zahl.
-const NAME_FIELDS = ['assetName', 'cell', 'category', 'label', 'name', 'value'];
+const NAME_FIELDS = ['assetName', 'cardName', 'cell', 'category', 'label', 'name', 'value'];
 
 /** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
 function baseName(name) {
@@ -486,6 +487,48 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         card_ids: stackCards.map(c => c.cardId),
         table_ids: stackCards.map(c => c.tableId),
       });
+      return state;
+    }
+
+    // M8.8: **eine** Karte bei Namen aus der Bibliothek in eine Zone. Die
+    // Startausrüstung steht auf dem Dörfler-Tableau, und das Vokabular konnte
+    // sie nicht auslegen: `deal_to_zone` setzt einen Stapel am Tisch voraus,
+    // `place_stack` erzeugt einen — eine angelegte Ausrüstungskarte ist beides
+    // nicht, sie liegt frei und wird einzeln bewegt.
+    //
+    // Nur eine Zone, keine x/y: „vor dem Dörfler" ist eine am Brett verankerte
+    // Zone, und eine feste Stelle ist das, was M3a abgeschafft hat — sie
+    // wandert nicht mit dem Brett und wird vom nächsten `clear_zone` nicht
+    // gefunden.
+    case 'place_card': {
+      const zone = findZone(zones, step.targetZoneLabel);
+      if (!zone) return skip(`zone "${step.targetZoneLabel || '(none)'}" not found`);
+
+      // Kein Treffer ist eine fehlende Voraussetzung, mehrere sind ein Fehler:
+      // die Spec unterscheidet das, und das Protokoll soll es auch.
+      const { card, reason, ambiguous } = findCardByName(cards, step.cardName);
+      if (!card) return ambiguous ? fail(reason) : skip(reason);
+
+      const { usable, free, occupied, problems } = zoneRoom(state, [zone], 'card');
+      if (!usable.length) return skip(problems.join('; '));
+      const start = occupied.get(zone);
+
+      // Per Spread aus der Bibliothekszeile, nicht über eine aufgezählte
+      // Feldliste — die hat hier schon zweimal `width`/`height` verschluckt
+      // (Nachtrag zu M2.12, M4a).
+      state.cards.push({
+        ...card,
+        tableId: crypto.randomUUID(),
+        cardId: card.id,
+        ...zoneSlot(zone, start, start + 1),
+        zIndex: start + 1,
+        faceDown: false,
+        face_up: true,
+        rotation: 0,
+      });
+      // Ein Griff in einen Dublettenstapel ist kein Fehler, aber er gehört ins
+      // Protokoll — wie beim `remove_stack`, der nichts vorfindet.
+      if (reason) entry.reason = reason;
       return state;
     }
 

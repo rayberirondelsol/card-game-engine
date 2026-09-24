@@ -31,7 +31,7 @@ import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
 import { tokenLayers } from '../utils/tokenLayer.js';
-import { matchesCardSearch } from '../utils/cardSearch.js';
+import { matchesCardSearch } from '../../../shared/cardSearch.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -5344,7 +5344,7 @@ export default function GameTable({ room = null }) {
               )}
               {/* M8.5: das einzige Eingabefeld der Oberflaeche. Sucht ueber alle
                   Kategorien, auch die zugeklappten, und lebt mit den kaputten
-                  OCR-Namen (client/src/utils/cardSearch.js). */}
+                  OCR-Namen (shared/cardSearch.js). */}
               {availableCards.length > 0 && (
                 <input
                   type="search"
@@ -7303,6 +7303,7 @@ export default function GameTable({ room = null }) {
           availableAssetNames={assetNames(tableAssets)}
           availableGrids={grids}
           availableCardCategories={categories.map(c => c.name).filter(Boolean)}
+          availableCards={availableCards}
           isOpen={showSequenceEditor}
           onToggle={() => setShowSequenceEditor(prev => !prev)}
         />

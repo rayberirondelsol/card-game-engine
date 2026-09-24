@@ -91,7 +91,7 @@ Box) und `shared/gridGeometry.js` (Raster; benutzt `resolveBox` aus `anchoring.j
 statt eine zweite Auflösung danebenzustellen).
 
 **`shared/` (M6):** `sequenceExecutor`, `zoneGeometry`, `anchoring`, `assetToken`,
-`counters` und `gridGeometry` liegen im Wurzelverzeichnis, weil Tisch **und**
+`counters`, `cardSearch` und `gridGeometry` liegen im Wurzelverzeichnis, weil Tisch **und**
 Raum denselben Aufbau ausführen (`POST /api/rooms/:code/start`). Es gibt genau
 einen Executor — kopiert wird nichts. Beide Images bauen deshalb vom
 Wurzelkontext (`docker-compose.yml`) und legen `shared/` neben die App (`/app` +

@@ -2131,3 +2131,107 @@ anlegt.
 5. Der zwölfte angelegte Zähler liegt im sichtbaren Bereich.
 6. `place_counter` aus einer Sequenz setzt weiterhin genau den Wert, der im
    Schritt steht.
+
+### M8.7 — Der Würfel zeigt seinen Texturatlas statt der gewürfelten Seite
+
+**Befund aus der gespielten Partie.** Der Custom-W10 rollt zuverlässig, zeigt
+danach aber **die gesamte 4096×4096-Grafik** in einem 48-px-Kästchen — zehn
+Glyphen nebeneinander. Das Ergebnis steht nur im `alt`-Text als „Seite 7". Am
+Tisch ist nicht ablesbar, was man gewürfelt hat; der Spieler hat jeden Wurf aus
+dem DOM gelesen.
+
+**Ursache, in den Daten belegt.** `custom_dice.face_images` ist eine Liste mit
+einem Eintrag je Seite. Für diesen Würfel stehen dort **zehn Einträge, die alle
+auf dasselbe Bild zeigen** — den ungeschnittenen Atlas. Der TTS-Import hat die
+Textur-URL zehnmal eingetragen, statt sie zu zerlegen.
+
+Die Darstellung ist also **nicht** kaputt: sie zeigt getreu, was in den Daten
+steht. Repariert wird die Datenquelle.
+
+**Regel.**
+
+1. Jede Seite bekommt ihr eigenes Bild, zugeschnitten auf ihre Glyphe.
+2. Die Zuordnung ist festzulegen und zu dokumentieren: **Seite 1–9 sind die
+   Ziffern 1–9, Seite 10 ist der Knaller-Stern.** Das war bisher nirgends
+   festgehalten, und der Spieler musste es entscheiden (§13 der Regeln, offene
+   Frage 3).
+3. Der Atlas ist ein UV-Netz eines Pentagon-Trapezoeders — **kein Raster**. Die
+   Glyphen liegen verstreut und zum Teil gedreht. Geschnitten wird an den
+   zusammenhängenden hellen Flächen, nicht an gerechneten Kanten.
+
+**Was ausdrücklich nicht dazugehört.** Den **Import** zu reparieren, sodass er
+Würfeltexturen künftig selbst zerlegt, ist ein eigener Schnitt. In diesem Spiel
+gibt es genau einen Custom-Würfel; zehn Bilder einmal zu schneiden ist kürzer
+als ein UV-Entpacker, den niemand zweimal braucht. Wenn ein zweites Spiel
+Würfel mitbringt, ist das der Anlass, nicht dieser.
+
+**Abnahme.**
+1. `face_images` hat zehn **verschiedene** Einträge.
+2. Jedes Bild zeigt genau eine Glyphe, aufrecht und mittig.
+3. Ein Wurf zeigt am Tisch die gewürfelte Glyphe, ohne dass jemand das DOM
+   liest.
+4. Seite 10 zeigt den Knaller.
+
+### M8.8 — Die Startausrüstung wird nicht ausgelegt
+
+**Befund aus der gespielten Partie.** Auf jedem Dörfler-Tableau steht
+„Starting Gear: …" mit zwei Karten. Die werden nicht ausgelegt. Ohne Waffen ist
+kein Kampf zu führen; der Spieler hat die Werte aus den Kartenbildern abgelesen
+und im Kopf geführt.
+
+**Was fehlt, ist ein Schritt.** Das Vokabular kann heute nur *aus einem Stapel
+austeilen* (`deal_to_zone`) oder *eine Kategorie zu einem Stapel stapeln*
+(`place_stack`). **Eine bestimmte Karte bei Namen auf den Tisch zu legen, geht
+gar nicht.** Genau das braucht die Startausrüstung — und dieselbe Lücke ist dem
+Spieler bei „Paulis Gebiss" aus einem Dorf-Ereignis begegnet (M8.1), wo er über
+die Bibliothek gehen musste.
+
+**Regel.**
+
+1. Ein neuer Schritt legt **eine Karte bei Namen** in eine Zone oder an eine
+   Stelle. Er gehört ins Schrittvokabular (`sequenceSteps.js`), sonst gibt es
+   ihn im Editor nicht.
+2. Gesucht wird mit derselben Normalisierung wie die Bibliothekssuche aus M8.5
+   — die Kartennamen sind durch den OCR-Textlayer zerlegt, und die
+   Startausrüstung ist genau dort nicht zu finden gewesen.
+3. Findet er keine Karte, landet das im Protokoll und der Aufbau läuft weiter.
+   Findet er **mehrere**, ist das ein Fehler und kein Zufallsgriff: er meldet
+   es und legt nichts.
+4. Welche Karten zu wem gehören, steht in den **Daten**, nicht im Code.
+
+**Abnahme.**
+1. Nach dem Aufbau liegt je Dörfler seine Startausrüstung vor ihm.
+2. Ein Name, den es nicht gibt, bricht den Aufbau nicht ab.
+3. Ein Name, der auf mehrere Karten passt, legt nichts und meldet es.
+4. Der Schritt steht im Editor zur Auswahl, mit seinen Feldern.
+
+#### Nachtrag zu M8.8 (aus der Umsetzung)
+
+Drei Stellen der Regel stimmten nicht. Aufgaben und Begründung stehen in
+`docs/tasks-startausruestung.md`.
+
+1. **„in eine Zone oder an eine Stelle" ist einmal zu viel.** Der neue Schritt
+   `place_card` hat **nur** eine Zone, und sie ist Pflicht. „Vor dem Dörfler"
+   ist genau das, was eine am Brett verankerte Zone ausdrückt; eine feste x/y
+   wäre das, was M3a abgeschafft hat — sie wandert nicht mit dem Brett und wird
+   vom nächsten `clear_zone` nicht gefunden. Der zweite genannte Fall („Paulis
+   Gebiss", M8.1) ist kein Sequenzschritt, sondern ein Griff in die Bibliothek
+   mitten in der Partie; dafür ist die Suche aus M8.5 zuständig.
+
+2. **`matchesCardSearch` taugt nicht allein.** Es ist absichtlich großzügig:
+   `zaun` findet Holzzaun, Gartenzaun und Zaunlatte. Ein reiner
+   `squashName`-Vergleich taugt aber auch nicht, weil die OCR-Namen jedes Wort
+   doppelt tragen. `findCardByName` in `shared/cardSearch.js` sucht deshalb in
+   **zwei Stufen, exakt vor großzügig**.
+
+3. **Regel 3 in ihrer Form ist unbrauchbar.** „Mehrere Treffer: melden und
+   nichts legen" behandelt zwei verschiedene Dinge gleich. Zwei *verschiedene*
+   Karten sind eine mehrdeutige Anfrage — melden, nichts legen. Zwei
+   *Exemplare derselben* Karte sind in einem Deck aus drei Erweiterungen der
+   Normalfall, und jedes davon ist richtig. Unterschieden wird am
+   `image_path`: gleiches Bild heißt Dublette, die erste wird gelegt und der
+   Griff steht im Protokoll.
+
+Dazu ist `client/src/utils/cardSearch.js` nach `shared/cardSearch.js` gezogen:
+der Executor braucht dieselbe Normalisierung, und `client/` gibt es im
+Server-Image nicht.
