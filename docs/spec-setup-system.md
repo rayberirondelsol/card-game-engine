@@ -1758,3 +1758,117 @@ wäre ein eigener Schritt und ist hier **nicht** gefordert.
    verdrahtet.
 4. Der Aufbau der Dorfphase bleibt unverändert; das Brett zeigt weiter die
    Dorfphase, bis jemand es umdreht.
+
+## M8 — Befunde aus der gespielten Solopartie
+
+Eine vollständige Solopartie (verkürzt, drei Bösewichte, beide Erweiterungen)
+wurde am echten Tisch gespielt. Der Aufbau trägt: Kurzpartie-Marker, drei
+verdeckte Bösewichte, 45 Münzen, sechs offene Heldentaten, `reveal_next` trifft
+den richtigen Leistenplatz, `final: "auto"` greift nur im Endkampf, und der
+zweite Kampfaufbau räumt den ersten sauber ab. Die zwölf Attributleisten
+stimmen zeichengenau mit den Tableaus.
+
+Drei Dinge blockierten das Spiel. Zwei davon sind Fehler und stehen hier.
+
+### M8.1 — Eine Karte aus der Bibliothek landet außerhalb des Tisches
+
+**Befund.** Eine über die Kartenbibliothek auf den Tisch gelegte Karte landete
+auf `y = 14 289`, während der ganze Tisch zwischen `y = 60` und `y = 1 500`
+liegt — im Browser über fünftausend Punkte unterhalb des Sichtfensters.
+
+**Ursache.** `placeCardOnTable` in `client/src/pages/GameTable.jsx` rechnet die
+Ablage aus `tableCards.length` (`y = 300 + Zeile * 180`, 16 je Zeile).
+`tableCards` enthält aber **auch alle Karten, die in Stapeln stecken** — beim
+Befund 296 Stück, also Zeile 78. Gezählt wird, was auf dem Tisch *liegt*; in
+einem Stapel liegt nichts frei.
+
+**Regel.** Gezählt werden nur frei liegende Karten. Eine Karte in einem Stapel
+belegt keinen Platz in der Ablagereihe.
+
+**Abnahme.**
+1. Bei 300 Karten in Stapeln und keiner freien Karte landet die erste gelegte
+   Karte in der ersten Zeile, nicht in Zeile 78.
+2. Sechzehn freie Karten füllen die erste Zeile, die siebzehnte beginnt die
+   zweite — unverändert.
+3. Die gelegte Karte liegt im sichtbaren Bereich des Tisches.
+
+### M8.2 — Eine Figur auf einem Gebiet-Terrain ist weder sichtbar noch greifbar
+
+**Befund.** Der Bösewicht stand auf `L9:M10`, mitten im Geländeteil
+„Überwuchertes Maisfeld" (`K8:P10`). Er war unsichtbar, und **jeder Zug an
+seiner Position bewegte das Geländeteil**, nie die Figur.
+
+**Ursache, zwei Teile.**
+1. Gelände und Figuren tragen denselben `z-index: 20`. Bei gleichem Wert
+   gewinnt, was später im DOM steht — und das Gelände wird nach den Figuren
+   gezeichnet.
+2. Ein Geländeteil fängt den Zeiger über seiner **ganzen rechteckigen Fläche**
+   ab, auch über durchsichtigen Rändern.
+
+**Regel.** Ein Stück, das mehr Felder belegt als ein anderes, liegt darunter.
+Die Reihenfolge folgt der belegten Fläche, nicht der Reihenfolge im DOM: je
+größer die Grundfläche, desto weiter hinten. Bei gleicher Fläche bleibt es beim
+bisherigen Verhalten.
+
+Das ist absichtlich eine Regel über die **Fläche** und nicht über eine
+Kategorie: „Gelände" ist keine Eigenschaft, die ein Token trägt, und eine
+zweite Quelle dafür einzuführen hieße, dieselbe Aussage an zwei Stellen zu
+pflegen. Die Fläche steht ohnehin schon da.
+
+**Abnahme.**
+1. Eine Figur von zwei mal zwei Feldern auf einem Geländeteil von sechs mal
+   drei Feldern ist sichtbar.
+2. Ein Zug, der auf der Figur beginnt, bewegt die Figur, nicht das Gelände.
+3. Ein Zug, der auf dem Gelände daneben beginnt, bewegt weiterhin das Gelände.
+4. Zwei Stücke gleicher Größe verhalten sich unverändert.
+
+### Nachträge zu M7.4 (aus der Umsetzung)
+
+**Die Quelle ist das Bild, nicht das Assetmaß.** Meine Vermutung war falsch und
+widersprach der eigenen Spec: für `type: 'token'` schreibt der TTS-Import
+zweimal dieselbe Zahl in `width` und `height`, und der Größenregler in der
+Oberfläche tut es auch. Nur `type: 'board'` bekommt getrennte Maße. Gegen die
+Assetmaße geprüft wäre jedes nicht-quadratische Teil ein Treffer und jeder
+echte Tippfehler an einem quadratischen unsichtbar.
+
+**Die Alternative „Bereich falsch abgetippt, nicht das Bild" ist unvollständig.**
+Es gibt vier Ursachen, und die Prüfung unterscheidet sie nicht:
+
+1. der Bereich ist falsch abgetippt,
+2. **die Drehung fehlt** — der Bereich stimmt, das Bild liegt quer,
+3. **das Bild ist ungeeignet** (abfotografiertes Pappteil samt Untergrund,
+   schräg aufgenommen): sein Verhältnis ist das des Fotos, nicht des Teils,
+4. am Namen hängt **das falsche Bild**.
+
+Von den drei Verdächtigen war genau **einer** ein falscher Bereich. Ein
+Treffer heißt „nachsehen", nie „Bereich falsch" — wer das verwechselt,
+korrigiert einen richtigen Bereich kaputt.
+
+**Die Prüfung ist blind für den häufigeren Zuschnittfehler.** Ein ringsum
+gleichmäßiger Rand im Bild — Untergrund rundum, wie bei allen fünf Grabhügeln —
+lässt das Seitenverhältnis unverändert und das Teil trotzdem zu klein und
+gerahmt aussehen. Neun der neunzehn Geländebilder sind so. Dagegen hilft nur
+eine Prüfung auf Rand im Bild; eigener Schritt, hier nicht vorgesehen.
+
+**Die Grenze steht bei fünf Prozent, nicht bei zwölf.** Zwölf stand in einer
+leeren Lücke: 26 unauffällige Bereiche bei höchstens 2,3 %, der nächste
+Treffer erst bei 21,8 %. Entschieden wird sie am häufigsten Tippfehler — ein
+Bereich, der um **ein** Feld danebenliegt, weicht um 1/n der Kantenlänge ab,
+beim zwölf Felder breiten „Trüben Fluss" also um 8,3 %. Zwölf Prozent lassen
+den durch.
+
+**Die Rasterüberlagerungen im Kratzverzeichnis sind nicht kalibriert** (3 % zu
+breit, rund 12 px zu hoch, am rechten Kartenrand fast ein halbes Feld Versatz).
+Sie sind zur Sichtprüfung brauchbar, als Messmittel nicht — und sie sind die
+wahrscheinlichste Ursache der „eine Spalte zu viel"-Fehler. Wer die restlichen
+siebzehn Bösewichte abtippt, misst an den **gedruckten** Rasterlinien und
+Spaltenbuchstaben.
+
+**Berichtigt:** Maisfeld `K8:P10` → `L8:P10`; Rostige Schrottkarre `L4:M6` →
+`L4:M5`; Marodes Farmhaus `P4:S8` **unverändert**, dafür `rotation: 90`.
+
+**Offen geblieben:** am Namen „Rostige Schrottkarre" hängt ein hellblauer
+Kleinlaster, auf der Karte liegt dort ein rostiges Wrack — das Bild passt zu
+keinem Bereich der Karte. Und zwei Geländeteile fehlen ganz: bei Virginia Fitz
+ein Holzschuppen auf `C1:E2` (hochkant, also `rotation: 90`), bei The Bundits
+eine zweite Kopie der Grafik, die bei Fitz auf `L4` liegt.
