@@ -111,11 +111,10 @@ anklickbar. Wenn nicht, ist das ein Befund.
 ruf **nicht** `/play/<id>` auf, um neu zu laden — diese Adresse öffnet einen
 leeren Tisch.
 
-**Grundflächen.** Bösewicht und Dörfler belegen **je 2×2 Felder**; im echten
-Spiel ist der Dörfler 1×1 (§5.10), in der Engine ist es eine Entscheidung
-zugunsten der Lesbarkeit. Für Reichweiten und Nachbarschaft rechnest du mit
-**1×1**, sonst passen drei Figuren und ein Bösewicht auf 19×14 nie sauber
-nebeneinander. Schreib auf, wo dich das gestört hat.
+**Grundflächen.** Der Bösewicht belegt **2×2**, ein Dörfler **1×1** — wie im
+echten Spiel (§5.10). Die Dörfler sind runde Token in Draufsicht, keine
+Figuren; sie rasten auf einzelne Rasterfelder ein. Reichweiten und
+Nachbarschaft rechnest du damit ohne Umrechnung.
 
 **Der Aufbau baut seine Stapel selbst** — auch vom leeren Tisch aus. Die
 geheimen Dorf-Ereignisse sind nach §2.2 aussortiert; das Ereignisdeck hat 80

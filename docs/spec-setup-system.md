@@ -2957,3 +2957,21 @@ Aufgaben und Begründung stehen in `docs/tasks-ergonomie.md`.
    werden mit `stackId === null` gezeichnet, und `stackDropTarget` ist null,
    solange nichts gezogen wird — alle losen Karten lagen dauerhaft im grünen
    Leuchten und um 5 % vergrößert da.
+
+### Nachtrag zu M7.2/M7.3 — die Dörfler sind wieder 1×1
+
+Die Dörfler-Figuren waren graue 3D-Renderbilder und wurden deshalb auf zwei mal
+zwei Felder gesetzt: von der Seite betrachtet, zu klein auf einem Feld, und die
+Entscheidung ging zugunsten der Lesbarkeit gegen das Regelwerk (§5.10 sagt
+1×1).
+
+Sie sind jetzt **runde Token in Draufsicht** und damit auf einem Feld lesbar.
+Die neun Assets stehen auf 50×50, also **1×1** — wie im Regelwerk. Der
+Bösewicht bleibt bei 2×2.
+
+**Das macht die Szenariodaten nachträglich wörtlich richtig.** Dort stehen die
+Dörfler seit jeher als Einzelfelder (`"D": ["K11", "M11", …]`). M7.3 musste
+daraus vier Felder ableiten, weil das Asset 100×100 groß war; jetzt trifft der
+Eintrag zu, wie er dasteht. Die Ableitung aus M7.2/M7.3 bleibt unverändert und
+wird hier schlicht nicht mehr gebraucht — sie trägt weiterhin den Bösewicht und
+jedes Geländeteil.
