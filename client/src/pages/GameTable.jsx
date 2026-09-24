@@ -23,6 +23,7 @@ import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo,
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement } from '../utils/menuPlacement.js';
+import { revealZones, revealPlan } from '../utils/revealToZone.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
@@ -3759,6 +3760,28 @@ export default function GameTable({ room = null }) {
     }
   }
 
+  // M8.9: die oberste Karte eines Stapels offen in eine Zone aufdecken - ein
+  // Griff statt Flip, Ziehen und Ablegen. Dieselbe Maschinerie wie
+  // `runSetupAction`, nur mit einem Schritt, den `revealPlan` schreibt: der
+  // Schritt ist `deal_to_zone` mit count 1, und einen zweiten Weg, eine Karte
+  // vom Stapel in eine Zone zu legen, gibt es damit nicht.
+  function revealTopCardToZone(stackId, zoneLabel) {
+    const plan = revealPlan(getGameState(), stackId, zoneLabel);
+    const { state: next, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
+    loadGameState(next);
+    // Der Hilfsname fuer einen namenlosen Stapel war nur die Adresse des
+    // Schritts - in der Oberflaeche hat er nichts zu suchen.
+    if (plan.tempLabel) {
+      setStackNames(prev => {
+        const next2 = { ...prev };
+        delete next2[stackId];
+        return next2;
+      });
+    }
+    const bad = log.filter(e => e.status !== 'ok');
+    setSetupIssues(bad.length ? bad : null);
+  }
+
   // Load save state from URL query param on mount
   useEffect(() => {
     if (saveLoadedRef.current) return;
@@ -6500,18 +6523,34 @@ export default function GameTable({ room = null }) {
               </button>
             </div>
             <div className="space-y-2">
+              {/* M8.9 Regel 4: die Hilfe behauptet nichts, was nicht geht.
+                  Gegen den Horcher oben geprueft, Zeile fuer Zeile:
+                  - F/Q/E wirken auf `selectedCards`. Ein Stapel steht dort bei
+                    einem gewoehnlichen Klick nicht (actualCardDragStart steigt
+                    bei 2+ Karten vorher aus), also versprach "Flip card/stack"
+                    etwas, das es nicht gibt - der Spieler hat genau daran
+                    zwanzig Minuten verloren. Das Stapelstueck dazu heisst
+                    "Flip Stack" und steht im Kontextmenue.
+                  - 1-9 zieht auf die **Hand**. Wohin gezogen wird, war der
+                    springende Punkt von M8.9 und stand nicht da.
+                  - Escape (M2.10) und Shift+Click fehlten ganz.
+                  - Aufdecken bekommt keine Taste: ohne Zielzone waere sie
+                    geraten, und eine geratene Zone ist derselbe Fehler noch
+                    einmal. Es steht im Kontextmenue, mit der Zone im Namen. */}
               {[
-                ['F', 'Flip card/stack'],
-                ['Q', 'Rotate 90\u00B0 counter-clockwise'],
-                ['E', 'Rotate 90\u00B0 clockwise'],
+                ['F', 'Flip selected card(s)'],
+                ['Q', 'Rotate selected card(s) 90\u00B0 counter-clockwise'],
+                ['E', 'Rotate selected card(s) 90\u00B0 clockwise'],
                 ['ALT', 'Preview card under cursor'],
                 ['G', 'Group selected cards into stack'],
-                ['1-9', 'Draw cards from stack'],
-                ['Ctrl+Click', 'Multi-select cards'],
+                ['1-9', 'Draw that many cards from the stack to your hand'],
+                ['Ctrl+Click', 'Toggle a card in the selection'],
+                ['Shift+Click', 'Add a card or stack to the selection'],
+                ['Esc', 'Close the topmost menu or dialog'],
                 ['?', 'Toggle this help overlay'],
                 ['Scroll', 'Zoom in/out'],
-                ['Click + Drag', 'Pan the table'],
-                ['Right-click', 'Context menu'],
+                ['Drag empty table', 'Pan the table'],
+                ['Right-click', 'Context menu (flip, rotate, reveal, stack actions)'],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-3">
                   <kbd className="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-300 min-w-[60px] text-center">
@@ -6698,6 +6737,24 @@ export default function GameTable({ room = null }) {
                     >
                       Draw Card
                     </button>
+                    {/* M8.9: die oberste Karte offen in eine Zone aufdecken -
+                        ein Griff. Ein Eintrag je Zielzone, weil das Menue
+                        ohnehin offen ist: die Wahl der Zone *ist* der Klick,
+                        der sonst "Reveal" hiesse. Liegt ein Ablagestapel im
+                        Setup (layout: "stack"), steht genau einer da. */}
+                    {revealZones(zones).map(zone => (
+                      <button
+                        key={zone.label}
+                        onClick={() => {
+                          revealTopCardToZone(contextMenu.stackId, zone.label);
+                          setContextMenu(null);
+                        }}
+                        data-testid={`context-reveal-${zone.label}`}
+                        className="w-full px-4 py-2 text-left text-sm text-amber-300 hover:bg-slate-700 hover:text-amber-200 transition-colors"
+                      >
+                        Reveal Top Card to "{zone.label}"
+                      </button>
+                    ))}
                   </>
                 )}
 

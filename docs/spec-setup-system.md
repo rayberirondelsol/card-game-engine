@@ -2235,3 +2235,88 @@ Drei Stellen der Regel stimmten nicht. Aufgaben und Begründung stehen in
 Dazu ist `client/src/utils/cardSearch.js` nach `shared/cardSearch.js` gezogen:
 der Executor braucht dieselbe Normalisierung, und `client/` gibt es im
 Server-Image nicht.
+
+### M8.9 — Die oberste Karte eines Stapels offen aufdecken
+
+**Befund aus der gespielten Partie.** §6.2 sagt: „Der ganze Zug besteht darin,
+die **oberste Karte des Aktionsdecks aufzudecken** und von oben nach unten
+abzuarbeiten." In der Engine geht das nicht in einem Griff:
+
+- Rechtsklick → **Flip** dreht die oberste Karte offen, sie bleibt aber **im
+  Stapel** und muss danach von Hand auf die Ablage gezogen werden.
+- Rechtsklick → **Draw Card** legt sie grundsätzlich auf die **Hand** — wo sie
+  nach Regelwerk nie hingehört. So sind in der Partie sechs Aktionskarten dort
+  gelandet.
+- Die Tastenkürzel-Hilfe nennt `F` als „Flip card/stack". **Auf einem Stapel
+  tut `F` nichts** — im Code belegt: der Horcher wirkt ausschließlich auf
+  `selectedCards`, und ein Stapel kann dort nicht stehen. Die Hilfe verspricht
+  etwas, das es nicht gibt.
+
+Ein Bösewicht-Zug kostete damit drei Handgriffe und zwei Pan-Züge.
+
+**Regel.**
+
+1. Ein Bedienelement am Stapel deckt die **oberste Karte offen auf und legt sie
+   in eine Zone** — in einem Griff. Es gibt sie auch als Sequenzschritt, damit
+   der Laden sie zum Nachfüllen benutzen kann.
+2. Die Zone bestimmt, wo die Karte liegt. Bei `layout: "stack"` — wie die
+   `Ablage` — deckt jede neue Karte die vorige zu; das **ist** ein Ablagestapel.
+3. Ist der Stapel leer, passiert nichts und es steht im Protokoll. Das
+   Nachmischen des Ablagestapels (§6.2) ist **nicht** Teil davon: es ist eine
+   Entscheidung mit Sonderfällen („Karten, die liegen bleiben"), und ein
+   stillschweigendes Neumischen würde sie übergehen.
+4. **Die Tastenkürzel-Hilfe wird berichtigt.** Entweder `F` wirkt auf einen
+   Stapel, oder die Zeile sagt nicht mehr, dass sie es tut. Eine Hilfe, die
+   etwas verspricht, das nicht geht, kostet mehr Zeit als eine fehlende Zeile —
+   der Spieler hat genau daran zwanzig Minuten verloren.
+
+**Was ausdrücklich nicht dazugehört.** „Draw Card" bleibt, wie es ist. Eine
+Karte auf die Hand zu ziehen ist für Ausrüstung und Heldentaten richtig; falsch
+war nur, dass es der **einzige** Weg war.
+
+**Abnahme.**
+1. Ein Griff am Verhaltensdeck legt die oberste Karte **offen** auf die
+   `Ablage`, nicht auf eine Hand.
+2. Der nächste Griff legt die folgende Karte darüber; die vorige bleibt
+   darunter liegen und ist nicht verschwunden.
+3. Bei leerem Stapel geschieht nichts, und es steht im Protokoll.
+4. Der Schritt steht im Editor zur Auswahl, mit seinen Feldern.
+5. Die Tastenkürzel-Hilfe behauptet nichts, was nicht geht.
+
+#### Nachtrag zu M8.9 (aus der Umsetzung)
+
+Drei Stellen der Regel stimmten nicht. Aufgaben und Begründung stehen in
+`docs/tasks-aufdecken.md`.
+
+1. **Es braucht keinen neuen Schritt.** `deal_to_zone` mit `count: 1` und
+   `faceDown: false` nimmt die oberste Karte (`stack.cards` nach `zIndex`
+   absteigend), legt sie offen in die Zone, lässt den Rest im Stapel und meldet
+   einen leeren Stapel als übersprungen — Abnahme 1, 3 und 4 waren ohne eine
+   Zeile Code erfüllt. `defaultStep('deal_to_zone')` liefert `count: 1` und
+   `faceDown: false` sogar schon als Vorbelegung. Anders als bei M8.8 fehlte
+   hier nicht die Fähigkeit, sondern nur ihr Bedienelement.
+
+2. **Abnahme 2 war kaputt, aber nicht aus dem vermuteten Grund.** Zwei offen
+   abgelegte Karten verschmelzen *nicht* zu einem Stapel — das tut nur das
+   Ziehen von Hand (`handleCardDragEnd`). Sie liegen übereinander, weil
+   `zoneSlots` für `layout: "stack"` genau einen Platz liefert; das ist Regel 2
+   und richtig. Falsch war die **Reihenfolge**: `deal_to_zone` ließ den `zIndex`
+   der Karte *aus dem Stapel* stehen, und der fällt beim Abtragen von oben mit
+   jedem Griff. Die zweite aufgedeckte Karte lag damit unter der ersten. Wer
+   eine Karte auf den Tisch legt, gibt ihr jetzt einen Platz über allem, was
+   schon liegt.
+
+3. **Das Bedienelement gehört ins Kontextmenü, nicht auf eine Taste.** Eine
+   Taste braucht ein Ziel, und ein Stapel weiß nichts von Zonen; die Zone zu
+   raten wäre derselbe Fehler wie „Draw Card legt auf die Hand". Das
+   Kontextmenü ist beim Rechtsklick ohnehin offen — die Wahl der Zone *ist* der
+   Klick, der sonst „Reveal" hieße. Zur Wahl stehen die Kartenzonen mit
+   `layout: "stack"`, denn eine Zone, auf der jede neue Karte die vorige
+   zudeckt, *ist* nach Regel 2 ein Ablagestapel; gibt es keine, alle
+   Kartenzonen. Getan wird es vom Executor, über denselben Weg wie
+   `runSetupAction` — einen zweiten gibt es nicht.
+
+Regel 4 stimmte, war aber zu eng: beim Durchgehen der Hilfe waren außer der
+`F`-Zeile vier weitere Zeilen unvollständig oder falsch (`1-9` verschweigt die
+Hand, `Escape` und `Shift+Click` fehlten ganz, „Click + Drag" gilt nur auf der
+leeren Fläche).

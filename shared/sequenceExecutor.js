@@ -127,6 +127,21 @@ function reassignZIndices(cards) {
   cards.forEach((c, i) => { c.zIndex = i + 1; });
 }
 
+/**
+ * Der hoechste zIndex, der am Tisch schon vergeben ist (M8.9/D2).
+ *
+ * Eine Karte, die einen Stapel verlaesst, bringt ihren zIndex *aus dem Stapel*
+ * mit — und der faellt beim Abtragen von oben mit jedem Griff. Zwei nacheinander
+ * aufgedeckte Karten landeten so uebereinander, aber in der falschen
+ * Reihenfolge: die zuletzt aufgedeckte lag unter der vorigen und war unsichtbar.
+ * Wer sie auf den Tisch legt, gibt ihr darum einen Platz *ueber* allem, was
+ * schon liegt.
+ */
+function topZIndex(state) {
+  const cards = Array.isArray(state?.cards) ? state.cards : [];
+  return cards.reduce((max, c) => (Number.isFinite(c?.zIndex) && c.zIndex > max ? c.zIndex : max), 0);
+}
+
 // ── Asset helpers ─────────────────────────────────────────────────────────────
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
@@ -572,6 +587,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const wanted = count > 0 ? sorted.slice(0, count) : sorted;
       const { groups, leftovers } = shareOut(wanted, usable, free);
 
+      // Die ausgeteilten Karten liegen ueber allem, was schon am Tisch liegt,
+      // und untereinander in der Reihenfolge des Austeilens (M8.9/D2).
+      let z = topZIndex(state);
       const dealt = [];
       for (const [zone, group] of groups) {
         const slots = zoneSlots(zone);
@@ -592,6 +610,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
             faceDown,
             rotation: card.rotation || 0,
             face_up: !faceDown,
+            zIndex: ++z,
           };
           delete dealtCard.inStack; // die Karte hat den Stapel gerade verlassen
           state.cards.push(dealtCard);
