@@ -63,11 +63,24 @@ export function zoneContains(zone, x, y) {
   }
 }
 
+/**
+ * Is this zone bound to the side of its anchor that is currently NOT showing?
+ * (M10.13.) `resolveZones` decides that – a zone on its own has no way to know
+ * – and leaves the answer on the zone, so every reader here is one comparison.
+ *
+ * `zoneContains` deliberately does not ask: it answers the pure question of
+ * shape ("is this point in that hexagon"), and an away-facing zone is still
+ * that hexagon. Whether it counts is a different question, and it is asked at
+ * the three places below, which is everything that hit-tests, accepts or
+ * counts.
+ */
+const facingAway = (zone) => zone?.facingAway === true;
+
 /** The zone under a point, or null. Later zones are drawn on top, so they win. */
 export function zoneAt(zones, x, y) {
   if (!Array.isArray(zones)) return null;
   for (let i = zones.length - 1; i >= 0; i--) {
-    if (zoneContains(zones[i], x, y)) return zones[i];
+    if (!facingAway(zones[i]) && zoneContains(zones[i], x, y)) return zones[i];
   }
   return null;
 }
@@ -109,6 +122,11 @@ export function zoneCapacity(zone) {
  */
 export function zoneRejects(zone, kind, occupied = 0) {
   const name = zone?.label ? `"${zone.label}"` : 'zone';
+  // First, because it is not a property of the contents: the zone is not there
+  // at all. This is the one guard every placing path runs through – `zoneRoom`
+  // for the dealing steps, directly for `place_stack`, `place_asset` and
+  // `reveal_next`, and the drop handler on the table (M10.13 rule 3).
+  if (facingAway(zone)) return `zone ${name} is on the side of its anchor that is not showing`;
   if (!zoneAccepts(zone, kind)) return `zone ${name} does not accept ${kind}s`;
   const cap = zoneCapacity(zone);
   if (cap !== null && occupied >= cap) return `zone ${name} is full (${cap})`;
@@ -129,6 +147,11 @@ export function countInZone(zone, ...lists) {
 
 /** The objects themselves, same rule – for steps that need one, not a number. */
 export function objectsInZone(zone, ...lists) {
+  // Nothing is in a zone that is not there (M10.13). Without this, `clear_zone
+  // Ablage` would sweep the shop cards that geometrically lie in the discard's
+  // box while the board shows the village side - the reported bug, with a
+  // broom instead of a hand.
+  if (facingAway(zone)) return [];
   const anchorId = zone?.anchor?.assetId || null;
   const found = [];
   for (const list of lists) {

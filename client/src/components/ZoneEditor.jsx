@@ -487,6 +487,31 @@ export default function ZoneEditor({ zones = [], anchors = [], onZonesChange, ca
               </p>
             )}
           </div>
+          {/* The side of the anchor this zone is printed on (M10.13). Only for
+              anchored zones: without an anchor there is no side to refer to,
+              and a control that does nothing is the finding of
+              docs/audit-dead-controls.md. Not shown while the anchor is
+              missing either - that warning already stands right above. */}
+          {selectedZone.anchor && !selectedZone.anchorMissing && (
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Side of the anchor</label>
+              <select
+                data-testid="zone-anchor-side-select"
+                value={selectedZone.anchorSide || ''}
+                onChange={e => updateZone(selectedZone.id, { anchorSide: e.target.value || null })}
+                className="w-full px-2 py-1 text-sm bg-slate-800 border border-slate-600 rounded text-white"
+              >
+                <option value="">Both sides</option>
+                <option value="front">Front only</option>
+                <option value="back">Back only</option>
+              </select>
+              <p className="text-[10px] text-gray-500 mt-1">
+                {selectedZone.anchorSide
+                  ? 'Only counts while the anchor shows this side. Otherwise the zone takes nothing, catches no drop and is not drawn.'
+                  : 'Counts whichever side the anchor shows.'}
+              </p>
+            </div>
+          )}
           <div>
             <label className="block text-xs text-gray-400 mb-1">Accepts (none checked = everything)</label>
             <div className="flex gap-3">

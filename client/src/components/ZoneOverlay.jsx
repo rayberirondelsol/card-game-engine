@@ -17,11 +17,16 @@ const COLOR_HEX = {
  * Parent container must use: transform: `translate(${camX}px, ${camY}px) scale(${zoom})`
  */
 export default function ZoneOverlay({ zones = [], myColor = null }) {
-  if (!zones.length) return null;
+  // A zone bound to the side of its anchor that is not showing is not there
+  // (M10.13 rule 2), so it is not drawn either. Filtered here rather than at
+  // the call site because ZoneEditor gets the same resolved zones and must
+  // draw them all - you cannot correct a zone you cannot see.
+  const shown = zones.filter(z => !z.facingAway);
+  if (!shown.length) return null;
 
   return (
     <>
-      {zones.map(zone => {
+      {shown.map(zone => {
         const hex = COLOR_HEX[zone.color] || COLOR_HEX.null;
         const isMyZone = zone.color === myColor;
         return (

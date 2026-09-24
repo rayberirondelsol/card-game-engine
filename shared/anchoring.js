@@ -58,6 +58,10 @@ export function assetBox(obj) {
     y: obj.y - height / 2,
     width,
     height,
+    // Which side is up (M10.13). A board without the field shows its front –
+    // the same default `assetToken` and `assetFace` already set, so a table
+    // saved before M3c reads as "front" rather than as "unknown".
+    faceDown: obj.faceDown === true,
   };
 }
 
@@ -113,19 +117,33 @@ export function relativeBox(abs, anchor) {
  * without it) leaves the zone at its last resolved position and marks it
  * `anchorMissing`. Dropping the zone would hide a mistake that is easy to
  * correct, and moving it to some default would be a second, invisible error.
+ *
+ * SIDES (M10.13). A zone may name the side of its anchor it is printed on:
+ * `anchorSide: 'front' | 'back'`, absent = both, as before. Turn the board
+ * over and the zone is not there – it takes nothing, catches no drop and is
+ * not drawn. This is the one place where a zone and its anchor are both in
+ * hand, so it is the one place that can decide; everything downstream reads
+ * `facingAway` off the zone and needs to know nothing about anchors.
+ *
+ * Both flags are findings of this resolution, not properties of the zone: a
+ * stale one is dropped rather than set to false, because the editor writes
+ * resolved zones back and either would otherwise end up in the saved setup.
  */
 export function resolveZones(zones, anchors = []) {
   if (!Array.isArray(zones)) return [];
   return zones.map(zone => {
     const id = zone?.anchor?.assetId;
     if (!id) return zone;
+    const { anchorMissing: _stale, facingAway: _stale2, ...rest } = zone;
     const anchor = anchors.find(a => a.id === id);
-    if (!anchor) return { ...zone, anchorMissing: true };
-    // The flag is dropped rather than set to false: it is a finding of this
-    // resolution, not a property of the zone, and must not end up in the saved
-    // setup as a stale `true`.
-    const { anchorMissing: _stale, ...rest } = zone;
-    return { ...rest, ...resolveBox(zone.anchor, anchor) };
+    // An absent anchor shows no side at all. The zone stays usable: "which way
+    // round is a board that is not on the table" has no answer, and silencing
+    // the zone would hide the missing asset behind a second symptom.
+    if (!anchor) return { ...rest, anchorMissing: true };
+    const resolved = { ...rest, ...resolveBox(zone.anchor, anchor) };
+    const showing = anchor.faceDown ? 'back' : 'front';
+    if (zone.anchorSide && zone.anchorSide !== showing) resolved.facingAway = true;
+    return resolved;
   });
 }
 

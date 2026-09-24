@@ -95,6 +95,9 @@ test('a factory token keeps the aspect ratio of its image, centre-anchored', () 
     y: 400 - 1000 / 2,
     width: 1200,
     height: 1000,
+    // Seit M10.13 traegt die Ankerbox auch die Seite, die oben liegt: eine
+    // Zone kann an eine davon gebunden sein.
+    faceDown: false,
   });
 });
 

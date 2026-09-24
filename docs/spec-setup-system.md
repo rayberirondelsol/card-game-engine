@@ -3026,3 +3026,40 @@ Linksklick daneben oder der Wahl eines Eintrags.
 1. Ein Rechtsklick öffnet das Menü, gleich was vorher war.
 2. Ein Rechtsklick auf ein anderes Objekt zeigt dessen Menü, nicht das alte.
 3. Escape schließt es weiterhin (M2.10).
+
+### M10.13 — Eine Zone weiß nichts von Vorder- und Rückseite
+
+**Befund, und er ist die Ursache von M10.11.** `Nachschub-Auslage` wird von
+**`Aktionen` und `Ablage`** überlappt. Alle drei hängen am Zusatz-Brett, aber
+auf **verschiedenen Seiten**: die Ladenauslage auf der Dorfphasenseite, die
+beiden Buchseiten auf der Kampfseite. Dasselbe Brett, dieselbe Fläche.
+
+`zoneAt` gibt die **zuletzt eingetragene** zurück. Eine Karte, die in den Laden
+soll, landet deshalb in der `Ablage` — die `layout: "stack"` hat und keine
+Kapazität, also mittig statt auf einem der zehn Plätze. Wörtlich der Befund aus
+der dritten Partie, und derselbe Grund, aus dem dort zwei Ladenkarten nach dem
+Brettwenden die frisch aufgedeckte Aktionskarte verdeckten.
+
+**M7.5 hat das ausgesprochen und hingenommen:** „eine Zone hängt über eine
+relative Box am Anker und weiß nichts von Vorder- und Rückseite … eine
+seitenabhängige Zone wäre ein eigener Schritt und ist hier **nicht**
+gefordert." Der eigene Schritt ist jetzt fällig.
+
+**Regel.**
+1. Eine Zone kann an eine **Seite** ihres Ankers gebunden werden. Ohne Angabe
+   gilt sie wie bisher für beide.
+2. Zeigt der Anker die andere Seite, ist die Zone **nicht da**: sie nimmt
+   nichts an, `zoneAt` übergeht sie, und gezeichnet wird sie auch nicht.
+3. Der Aufbau kennt dieselbe Regel — ein Schritt, der in eine abgewandte Zone
+   legen will, scheitert mit Grund, statt still danebenzulegen.
+
+**Was das nicht ist.** Kein Umbau der Verankerung, keine zweite Geometrie: die
+Box bleibt, wie sie ist. Es kommt eine Bedingung dazu, unter der sie zählt.
+
+**Abnahme.**
+1. Zeigt das Zusatz-Brett die Dorfphase, nimmt `Nachschub-Auslage` eine Karte
+   auf einen ihrer zehn Plätze.
+2. Zeigt es die Kampfphase, nimmt `Ablage` sie, und die Ladenauslage ist außen
+   vor.
+3. Eine Zone ohne Seitenangabe verhält sich unverändert.
+4. Ein Aufbauschritt in eine abgewandte Zone scheitert mit Grund.
