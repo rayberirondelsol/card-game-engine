@@ -105,3 +105,74 @@ export function tableLayers(items) {
 
   return (key) => byKey.get(key) ?? TOKEN_Z_FLOOR;
 }
+
+/**
+ * Wer bekommt den Zeiger? (Spec M10.1)
+ *
+ * Vier von etwa fuenfzehn Figurenzuegen der dritten Solopartie haben die
+ * falsche Figur erwischt. Eine Figur belegt ein Kaestchen von zwei mal zwei
+ * Feldern; stehen zwei auf benachbarten Feldern, ueberlappen sich ihre
+ * Kaestchen um ein volles Feld, und wer oben liegt, bekommt den ganzen
+ * Streifen – bei 47 % Zoom blieb von der unteren ein elf Pixel breiter Rand.
+ *
+ * M8.2 hat das fuer verschieden grosse Stuecke ueber die Flaeche geloest.
+ * Zwischen zwei gleich grossen hilft die Reihenfolge nicht, und genau dort
+ * setzt diese Funktion an: **die Ordnung bleibt die von M8.2/M9.1** (kleinere
+ * Flaeche gewinnt), und der naehere Mittelpunkt ist der Tie-Break bei
+ * *gleicher* Flaeche – die Stelle, an der bisher die DOM-Reihenfolge stand
+ * ("bei gleicher Flaeche bleibt es beim bisherigen Verhalten", M8.2).
+ *
+ * **Warum nicht der naechste Mittelpunkt schlechthin.** Dann verloere eine
+ * Figur, die nahe der Mitte eines sechs mal drei Felder grossen Gelaendeteils
+ * steht, gegen dessen Mittelpunkt – M8.2 Abnahme 2 faellt, und der Befund der
+ * ersten Partie waere zurueck.
+ *
+ * **Warum nicht die Trefferflaeche verkleinern.** Das Bild steht mit
+ * `object-fit: contain` mittig im Kasten; "unten mittig eingepasst" ist eine
+ * Eigenschaft des Bildinhalts, nicht des Einpassens. Jeder Schrumpffaktor
+ * waere geraten und braeche M10.1 Abnahme 3 fuer randlose Teile. Und mit der
+ * Trefferflaeche verschoebe sich das Ereignisziel, an dem M2.13
+ * (`canStartPan`) haengt. Hier schrumpft nichts: der Druck landet auf
+ * demselben Element wie bisher, nur die Zuordnung danach rechnet nach.
+ *
+ * Der Preis steht in docs/tasks-greifen-und-lesen.md: der durchsichtige Rand
+ * einer *einzeln* stehenden Figur greift weiterhin die Figur, statt zu pannen.
+ * Das geht ohne Bilddaten nicht.
+ *
+ * @param {{x: number, y: number}} point Weltkoordinaten des Zeigers.
+ * @param {Array<{key: string, x: number, y: number, width?: number, height?: number, size?: number}>} items
+ *   Dieselbe Liste wie bei `tableLayers`, in derselben Reihenfolge.
+ * @returns {string|null} Schluessel des getroffenen Stuecks, sonst `null`.
+ */
+export function pickTopmost(point, items) {
+  const px = Number(point?.x);
+  const py = Number(point?.y);
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
+
+  let best = null;
+  (Array.isArray(items) ? items : []).forEach((item, index) => {
+    if (item?.key == null) return;
+    const w = Number(item.width) || Number(item.size) || 30;
+    const h = Number(item.height) || Number(item.size) || w;
+    const x = Number(item.x);
+    const y = Number(item.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const dx = px - x;
+    const dy = py - y;
+    if (Math.abs(dx) > w / 2 || Math.abs(dy) > h / 2) return;
+
+    const area = w * h;
+    const dist = dx * dx + dy * dy;
+    // Kleinere Flaeche zuerst (M8.2/M9.1), dann naeherer Mittelpunkt (M10.1),
+    // dann der spaetere in der Liste – das bisherige Verhalten.
+    if (
+      best === null ||
+      area < best.area ||
+      (area === best.area && (dist < best.dist || (dist === best.dist && index > best.index)))
+    ) {
+      best = { key: item.key, area, dist, index };
+    }
+  });
+
+  return best && best.key;
+}

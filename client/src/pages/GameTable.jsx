@@ -32,7 +32,8 @@ import { canStartPan } from '../utils/panTarget.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { tableLayers, WIDGET_BOX } from '../utils/tokenLayer.js';
+import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
+import { zoomAt, worldAt, ZOOM_MIN, ZOOM_MAX } from '../utils/cameraZoom.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 
@@ -446,14 +447,14 @@ export default function GameTable({ room = null }) {
     if (!container) return { x: screenX, y: screenY };
     const rect = container.getBoundingClientRect();
     const camera = cameraRef.current;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const relX = screenX - rect.left;
-    const relY = screenY - rect.top;
-    return {
-      x: (relX - centerX) / camera.zoom - camera.x + centerX,
-      y: (relY - centerY) / camera.zoom - camera.y + centerY,
-    };
+    // M10.2/W4: die Umkehrung steht in `cameraZoom.js`, einmal. Sie hier
+    // auszuschreiben war die vierte Kopie derselben Matrix – und eine der vier
+    // hatte das Vorzeichen falsch.
+    return worldAt(
+      camera,
+      { x: screenX - rect.left, y: screenY - rect.top },
+      { x: rect.width / 2, y: rect.height / 2 },
+    );
   }
 
   // Game objects state (counters, dice, hitDice, notes, tokens, textFields)
@@ -866,20 +867,17 @@ export default function GameTable({ room = null }) {
       e.preventDefault();
       const camera = cameraRef.current;
       const rect = canvas.getBoundingClientRect();
-      const cursorX = e.clientX - rect.left;
-      const cursorY = e.clientY - rect.top;
 
-      // Convert cursor to world coordinates before zoom
-      const worldX = (cursorX - rect.width / 2) / camera.zoom + camera.x;
-      const worldY = (cursorY - rect.height / 2) / camera.zoom + camera.y;
-
-      // Apply zoom
+      // M10.2 Regel 2: der Zoom folgt dem Mauszeiger. Die Rechnung steht in
+      // `cameraZoom.js` – hier stand sie mit umgekehrtem Vorzeichen, und das
+      // Ziel flog beim Zoomen doppelt so schnell aus dem Bild.
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
-
-      // Adjust camera to keep world point under cursor fixed
-      camera.x = worldX - (cursorX - rect.width / 2) / camera.zoom;
-      camera.y = worldY - (cursorY - rect.height / 2) / camera.zoom;
+      Object.assign(camera, zoomAt(
+        camera,
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        { x: rect.width / 2, y: rect.height / 2 },
+        camera.zoom * delta,
+      ));
 
       setZoomDisplay(Math.round(camera.zoom * 100));
       setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
@@ -1869,6 +1867,44 @@ export default function GameTable({ room = null }) {
   }
 
   /**
+   * M10.3: Escape verwirft, alles andere uebernimmt. Die Fahne steht hier,
+   * weil Escape das Feld abmeldet und ein `blur` aus dem Abmelden sonst doch
+   * noch uebernaehme - in dieser Reihenfolge ist "verwerfen" wirklich
+   * verworfen.
+   */
+  const counterEditDiscardedRef = useRef(false);
+
+  function discardCounterEdit() {
+    counterEditDiscardedRef.current = true;
+    cancelCounterEdit();
+  }
+
+  /**
+   * Wegklicken uebernimmt, was dasteht - wie Enter (M10.3).
+   *
+   * Vorher stand hier `cancelCounterEdit`: `11` getippt, auf den Tisch
+   * geklickt, Feld zu, Wert unveraendert - und zwar wortlos. Das hat den
+   * Spieler dreimal erwischt, bevor er es verstand, und widerspricht M9.5
+   * Regel 2 ("eine ungueltige Eingabe wird nicht stillschweigend verworfen")
+   * an der Stelle, an der eine **gueltige** verschwand.
+   *
+   * **Warum uebernehmen und nicht verwerfen.** Beide Richtungen verlieren
+   * manchmal etwas; den Ausschlag gibt, welcher Verlust sichtbar ist. Ein
+   * ungewolltes Uebernehmen steht danach am Tisch und ist einen Klick weit
+   * weg. Ein stilles Verwerfen sieht aus wie "hat geklappt" - genau der
+   * Befund. Der Vertipper bleibt ausserdem gedeckt: was sich nicht lesen
+   * laesst, geht seit M9.5 in den Meldekasten, nicht in den Wert. Und Escape
+   * steht als ausdrueckliches Verwerfen daneben.
+   */
+  function blurCounterEdit(counterId) {
+    if (counterEditDiscardedRef.current) {
+      counterEditDiscardedRef.current = false;
+      return;
+    }
+    commitCounterEdit(counterId);
+  }
+
+  /**
    * Die Eingabe uebernehmen. Was sie *bedeutet*, steht in shared/counters.js:
    * eine Zahl setzt, `+21`/`-21` rechnet, `max` fuellt auf die Obergrenze - die
    * vier Lesarten, die auch `set_counter` benutzt.
@@ -2057,11 +2093,42 @@ export default function GameTable({ room = null }) {
       e.preventDefault();
     }
 
-    const obj = (objLists[objType] || []).find(o => o.id === objId);
-    if (!obj) return;
-
     // Get unified pointer position (convert to world coords for offset)
     const pointer = getPointerPosition(e);
+
+    // M10.1: welche Figur war gemeint? Das Ereignisziel sagt es nicht – eine
+    // Figur belegt zwei mal zwei Felder, zwei benachbarte ueberlappen sich um
+    // ein volles Feld, und wer oben liegt, bekaeme den ganzen Streifen. Bei
+    // *gleicher* Flaeche entscheidet deshalb der naehere Mittelpunkt
+    // (`pickTopmost`), nicht die Zeichenreihenfolge. Hier und nicht am DOM:
+    // kein Kasten schrumpft, kein `pointer-events` faellt weg, also sieht
+    // M2.13 (`canStartPan`) keinen Unterschied.
+    //
+    // Vor dem Langdruck-Zeitgeber, damit das Kontextmenue auf Touch denselben
+    // Token meint wie der Zug. Nur Token: Zaehler und Wuerfel sind klein und
+    // liegen nach M9.1 ohnehin oben, und Karten laufen ueber
+    // `handleCardDragStart` – ihre Stapel liegen deckungsgleich, der Abstand
+    // waere dort fuer alle derselbe.
+    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
+
+    let obj = (objLists[objType] || []).find(o => o.id === objId);
+    if (!obj) return;
+
+    // Gesperrte Token bleiben aussen vor – auf beiden Seiten. Ein Druck auf ein
+    // gesperrtes Objekt pant den Tisch (M2.13), und `canStartPan` fragt dazu
+    // das **Ereignisziel**. Wer von einem gesperrten Token wegloeste, zoege
+    // gleichzeitig ein anderes und pannte; wer auf eines hinloeste, taete gar
+    // nichts mehr. Beides bleibt darum genau wie bisher.
+    if (objType === 'token' && !obj.locked) {
+      const hit = pickTopmost(worldPointer, tokens
+        .filter(t => !t.locked)
+        .map(t => ({ key: t.id, x: t.x, y: t.y, width: t.width, height: t.height, size: t.size })));
+      const picked = hit == null ? null : tokens.find(t => t.id === hit);
+      if (picked) {
+        objId = hit;
+        obj = picked;
+      }
+    }
 
     // M2.11: Langdruck öffnet das Kontextmenü – auch auf einem gesperrten
     // Objekt, sonst gäbe es auf Touch keinen Weg zum Entsperren.
@@ -2084,8 +2151,6 @@ export default function GameTable({ room = null }) {
 
     // Don't drag locked objects
     if (obj.locked) return;
-
-    const worldPointer = screenToWorld(pointer.clientX, pointer.clientY);
 
     dragOffsetRef.current = {
       x: worldPointer.x - (obj.x || 0),
@@ -2449,26 +2514,21 @@ export default function GameTable({ room = null }) {
 
       // Calculate zoom change based on distance change
       const distanceRatio = currentDistance / pinchStartDistanceRef.current;
-      const newZoom = Math.max(0.2, Math.min(5, pinchStartZoomRef.current * distanceRatio));
+      const newZoom = pinchStartZoomRef.current * distanceRatio;
 
       // Get canvas position for zooming toward pinch center
       const canvas = canvasRef.current;
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        const canvasX = center.x - rect.left;
-        const canvasY = center.y - rect.top;
-
-        // Convert to world coordinates before zoom
+        // M10.2 Regel 2, dritte Zoomstelle: dieselbe Rechnung wie am Mausrad,
+        // nur mit der Mitte zwischen den Fingern statt dem Zeiger.
         const camera = cameraRef.current;
-        const worldX = (canvasX - rect.width / 2) / camera.zoom + camera.x;
-        const worldY = (canvasY - rect.height / 2) / camera.zoom + camera.y;
-
-        // Apply new zoom
-        camera.zoom = newZoom;
-
-        // Adjust camera position to zoom toward pinch center
-        camera.x = worldX - (canvasX - rect.width / 2) / camera.zoom;
-        camera.y = worldY - (canvasY - rect.height / 2) / camera.zoom;
+        Object.assign(camera, zoomAt(
+          camera,
+          { x: center.x - rect.left, y: center.y - rect.top },
+          { x: rect.width / 2, y: rect.height / 2 },
+          newZoom,
+        ));
 
         setZoomDisplay(Math.round(camera.zoom * 100));
         setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
@@ -3985,24 +4045,17 @@ export default function GameTable({ room = null }) {
     const container = containerRef.current;
     const rect = container ? container.getBoundingClientRect() : null;
 
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
     if (rect) {
-      const cursorX = e.clientX - rect.left;
-      const cursorY = e.clientY - rect.top;
-
-      // Convert cursor to world coordinates before zoom
-      const worldX = (cursorX - rect.width / 2) / camera.zoom + camera.x;
-      const worldY = (cursorY - rect.height / 2) / camera.zoom + camera.y;
-
-      // Apply zoom
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
-
-      // Adjust camera to keep world point under cursor fixed
-      camera.x = worldX - (cursorX - rect.width / 2) / camera.zoom;
-      camera.y = worldY - (cursorY - rect.height / 2) / camera.zoom;
+      // M10.2 Regel 2, dieselbe Rechnung wie im nativen Horcher oben.
+      Object.assign(camera, zoomAt(
+        camera,
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        { x: rect.width / 2, y: rect.height / 2 },
+        camera.zoom * delta,
+      ));
     } else {
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      camera.zoom = Math.max(0.2, Math.min(5, camera.zoom * delta));
+      camera.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.zoom * delta));
     }
 
     setZoomDisplay(Math.round(camera.zoom * 100));
@@ -4481,10 +4534,17 @@ export default function GameTable({ room = null }) {
                         </span>
                       </div>
                     )}
-                    {/* Card name label */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white sm:text-[8px] text-xs text-center py-0.5 truncate px-1">
-                      {view.name}
-                    </div>
+                    {/* M10.2 Regel 3: hier lag das graue Namensschild ueber dem
+                        Kartenbild und verdeckte dessen unterste Zeile. Es
+                        skalierte nicht mit, verdeckte bei kleinem Zoom also
+                        relativ mehr – genau dann, wenn man ohnehin schlecht
+                        liest. Der Name ist damit nicht verloren: der aeussere
+                        Rahmen traegt ihn als `title`, eine Karte ohne Bild
+                        zeichnet ihn mittig (Zweig darueber), das Kontextmenue
+                        nennt ihn, und die Grossansicht schreibt ihn unter das
+                        Bild. Unter die Karte geschoben stuende er ausserhalb
+                        des Kartenkastens, finge dort Zeiger ab und verschoebe
+                        genau die Trefferflaechen, die M10.1 geradezieht. */}
                   </div>
 
                   {/* Back face - show card back image if assigned, otherwise blue gradient fallback */}
@@ -4620,10 +4680,11 @@ export default function GameTable({ room = null }) {
                 -
               </button>
               {editingCounterId === counter.id ? (
-                /* M8.6 Regel 1: Enter uebernimmt, Escape und Fokusverlust
-                   brechen ab. Escape wird hier abgefangen (stopPropagation) und
-                   steht bewusst NICHT in ESCAPE_LAYERS - dieselbe Form wie die
-                   Notiz-Bearbeitung weiter unten, und M2.10 bleibt unberuehrt. */
+                /* M8.6 Regel 1 + M10.3: Enter und Fokusverlust uebernehmen,
+                   Escape verwirft. Escape wird hier abgefangen
+                   (stopPropagation) und steht bewusst NICHT in ESCAPE_LAYERS -
+                   dieselbe Form wie die Notiz-Bearbeitung weiter unten, und
+                   M2.10 bleibt unberuehrt. */
                 <input
                   type="text"
                   value={editingCounterText}
@@ -4640,10 +4701,11 @@ export default function GameTable({ room = null }) {
                   onChange={(e) => setEditingCounterText(e.target.value)}
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
-                  onBlur={cancelCounterEdit}
+                  /* M10.3: Wegklicken uebernimmt, wie Enter. Escape verwirft. */
+                  onBlur={() => blurCounterEdit(counter.id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') { e.preventDefault(); commitCounterEdit(counter.id); }
-                    if (e.key === 'Escape') { e.preventDefault(); cancelCounterEdit(); }
+                    if (e.key === 'Escape') { e.preventDefault(); discardCounterEdit(); }
                     e.stopPropagation();
                   }}
                   data-testid={`counter-value-input-${counter.id}`}
@@ -6615,6 +6677,21 @@ export default function GameTable({ room = null }) {
                 <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
                   {contextMenu.stackId ? 'Stack Actions' : 'Card Actions'}
                 </div>
+                {/* M10.2 Abnahme 1: ein Griff zeigt die Karte lesbar. Das
+                    Kontextmenue hatte dafuer keinen Eintrag - die Grossansicht
+                    gab es nur ueber ALT (Desktop) und Langdruck/Doppeltipp
+                    (Touch). Hier keine zweite Ansicht, sondern dieselbe. */}
+                <button
+                  onClick={() => {
+                    setLongPressPreviewCard(contextMenu.cardTableId);
+                    setContextMenu(null);
+                  }}
+                  data-testid="context-enlarge"
+                  className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  <span>Enlarge</span>
+                  <span className="ml-auto text-xs text-slate-500">ALT</span>
+                </button>
                 <button
                   onClick={() => {
                     setTableCards(prev => prev.map(c => {
@@ -7234,6 +7311,13 @@ export default function GameTable({ room = null }) {
         // The preview shows the back of a face-down card - and used to caption
         // it with the name, which undoes its own branching.
         const view = tableObjectView(previewCard, 'Card');
+        // M10.2 Abnahme 1: lesbar heisst bildschirmfuellend. 280 x 392 waren
+        // 280 % einer Tischkarte (100 x 140); gelesen werden konnte der
+        // Fliesstext erst bei 450 bis 500 %. Das Seitenverhaeltnis kommt aus
+        // derselben Quelle wie am Tisch (`getCardDims`), die Groesse aus dem
+        // Fenster - nicht aus einer festen Zahl, die auf dem naechsten
+        // Bildschirm wieder zu klein ist.
+        const previewRatio = getCardDims(previewCard, 1000, 1400);
         return (
           <div
             className="fixed inset-0 z-[70] flex items-center justify-center"
@@ -7253,7 +7337,14 @@ export default function GameTable({ room = null }) {
             >
               <div
                 className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
-                style={{ width: 280, height: 392, backgroundColor: '#fff' }}
+                style={{
+                  aspectRatio: `${previewRatio.w} / ${previewRatio.h}`,
+                  // 74vh und nicht 100: darunter stehen Name und Schliesshinweis.
+                  height: '74vh',
+                  maxHeight: '74vh',
+                  maxWidth: '92vw',
+                  backgroundColor: '#fff',
+                }}
               >
                 {previewCard.faceDown ? (
                   previewCard.card_back_id && cardBackMap[previewCard.card_back_id] ? (
@@ -7280,13 +7371,16 @@ export default function GameTable({ room = null }) {
                     <span className="text-sm text-gray-500 text-center px-4">{view.name}</span>
                   </div>
                 )}
-                <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm text-center py-1.5 px-2 truncate font-medium">
-                  {view.caption}
-                </div>
               </div>
-              <div className="text-center mt-3">
-                <span className="text-white/80 text-xs bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm">
-                  Tap anywhere to close
+              {/* M10.2 Regel 3: die Bildunterschrift steht UNTER dem Bild.
+                  Ueber dem Bild verdeckte sie dessen unterste Zeile - genau
+                  der Fehler, den das Namensschild am Tisch gemacht hat. */}
+              <div className="text-center mt-3 text-white text-base font-medium px-4 truncate">
+                {view.caption}
+              </div>
+              <div className="text-center mt-1">
+                <span className="text-white/60 text-xs bg-black/60 px-3 py-1 rounded-full backdrop-blur-sm">
+                  Click anywhere to close
                 </span>
               </div>
             </div>

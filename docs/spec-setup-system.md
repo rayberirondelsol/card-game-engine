@@ -2602,3 +2602,93 @@ und zusammen mit der klemmenden Löschtaste ist es eine Falle.
 2. `Backspace` löscht ein Zeichen.
 3. `−3` auf `−2` ergibt `−5`, `3` auf `−2` ergibt `3`.
 4. Eine unlesbare Eingabe lässt den Wert unverändert und sagt es.
+
+## M10 — Befunde aus der dritten gespielten Solopartie
+
+**Alle siebzehn Befunde der ersten beiden Partien halten am Tisch**, alle acht
+Prüfpunkte tragen. Die Partie ist **regulär verloren** gegangen — alle drei
+Dörfler im ersten Kampf ausgeschaltet —, nicht an einer Blockade gescheitert.
+Der Kampf war Zug für Zug ausspielbar, samt Wutangriffen, Kettenaktionen,
+Gleichstandswürfen und der aktivierten Schwäche des Bösewichts.
+
+Was jetzt scheitert, liegt eine Ebene tiefer: nicht ein fehlendes
+Bedienelement, sondern die vorhandenen sind **zu klein, zu weit auseinander
+und zu ungenau zu treffen**.
+
+### M10.1 — Eine Figur lässt sich nicht gezielt greifen
+
+**Befund.** **Vier von etwa fünfzehn Figurenzügen haben die falsche Figur
+erwischt.** Ein Zug aus der Mitte des Bösewichts bewegte Henlo Bulwark; ebenso
+Granny statt Fridgette, Fridgette statt Henlo, ein Heldentaten-Stapel statt der
+leeren Fläche.
+
+**Ursache.** Eine Figur belegt ein quadratisches Kästchen von zwei mal zwei
+Feldern (82 × 82 px bei 82 % Zoom). Die gezeichnete Figur ist klein und unten
+mittig eingepasst — der **durchsichtige Bereich darüber fängt den Klick
+trotzdem**. Stehen zwei Figuren auf benachbarten Feldern, überlappen sich ihre
+Kästchen um ein volles Feld: bei 47 % Zoom blieb von der unteren ein elf Pixel
+breiter Streifen, darunter ist sie **gar nicht mehr adressierbar**.
+
+Das ist derselbe Fehler, den M8.2 für Gelände über Figuren gelöst hat — dort
+über die Zeichenreihenfolge. **Zwischen zwei gleich großen Figuren hilft die
+Reihenfolge nicht**; hier muss die Trefferfläche selbst der Figur folgen.
+
+**Regel.** Der Zeiger trifft, was man sieht. Über einem durchsichtigen Teil
+eines Stücks greift man das, was darunter liegt.
+
+**Abnahme.**
+1. Ein Zug, der auf dem durchsichtigen Rand einer Figur beginnt, bewegt die
+   Figur darunter — oder pannt, wenn dort nichts liegt.
+2. Zwei Figuren auf benachbarten Feldern sind beide einzeln greifbar.
+3. Ein Zug auf der gezeichneten Figur bewegt sie, unverändert.
+4. Bei 45 % Zoom, dem Zoom, bei dem man auf Felder zieht, sind alle vier
+   Figuren eines Kampfes einzeln greifbar.
+
+### M10.2 — Eine Karte ist am Tisch nicht lesbar
+
+**Befund.** Um den Fließtext einer Dorf-Ereignis- oder Aktionskarte zu lesen,
+muss man auf **etwa 450 bis 500 Prozent** zoomen. Der Weg dorthin sind rund
+130 Mausrad-Rasten plus mehrere Schwenks, weil **der Zoom auf die Bildmitte
+ankert, nicht auf den Mauszeiger** — das Ziel wandert beim Zoomen aus dem Bild.
+Je Aktionskarte des Bösewichts acht bis fünfzehn Bedienschritte.
+
+Der Spieler ist ab der Hälfte des Kampfes dazu übergegangen, die Bild-URL der
+Karte **in einem zweiten Browser-Tab** zu öffnen. Das ist die ehrlichste
+Auskunft über den Zustand.
+
+Die ALT-Lupe steht in der Tastenkürzel-Hilfe, ließ sich aber nicht auslösen
+(Halten statt Tippen) — das ist eine Messgrenze, kein Befund. **Das
+Kontextmenü einer Karte hat dagegen keinen Eintrag zum Vergrößern**, und das
+ist einer.
+
+**Dazu.** Das graue Namensschild liegt **über** dem Kartenbild und verdeckt die
+unterste Zeile. Es skaliert nicht mit, verdeckt bei kleinem Zoom also relativ
+mehr — genau dann, wenn man ohnehin schlecht liest.
+
+**Regel.**
+1. Eine Karte lässt sich in **einem** Schritt groß und vollständig ansehen.
+2. Der Zoom folgt dem Mauszeiger, nicht der Bildmitte.
+3. Das Namensschild verdeckt das Kartenbild nicht.
+
+**Abnahme.**
+1. Ein Griff an einer Karte zeigt sie lesbar, ohne Zoomen und Schwenken.
+2. Zoomen über einer Karte behält sie im Bild.
+3. Der unterste Text einer Karte ist bei jedem Zoom sichtbar.
+
+### M10.3 — Das Zählerfeld verwirft eine gültige Eingabe beim Wegklicken
+
+**Befund.** `11` ins Feld getippt, dann auf den Tisch geklickt: Feld zu, Wert
+unverändert. Mit **Enter** wird dieselbe Eingabe anstandslos übernommen. Den
+Spieler hat das dreimal erwischt, bevor er es verstand.
+
+Das widerspricht M9.5 Regel 2 unmittelbar — dort steht, eine **ungültige**
+Eingabe werde nicht stillschweigend verworfen. Hier wird eine **gültige**
+verworfen, und zwar wortlos.
+
+**Regel.** Wegklicken übernimmt, was dasteht — wie Enter. Wer verwerfen will,
+drückt Escape.
+
+**Abnahme.**
+1. Eine gültige Eingabe wird beim Wegklicken übernommen.
+2. Escape verwirft und lässt den Wert unverändert.
+3. Eine unlesbare Eingabe sagt es weiterhin.
