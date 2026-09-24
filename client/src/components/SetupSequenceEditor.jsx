@@ -71,7 +71,10 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     );
   }
 
-  const zoneEmptyLabel = step.type === 'place_asset' ? 'Free position (X/Y)' : 'All player zones';
+  // R3: `place_stack` verhaelt sich hier wie `place_asset` - ohne Zone gilt x/y,
+  // nicht „alle Spielerzonen".
+  const zoneEmptyLabel = step.type === 'place_asset' || step.type === 'place_stack'
+    ? 'Free position (X/Y)' : 'All player zones';
   const gridLabels = (ctx.grids || []).map(g => g?.label).filter(Boolean);
 
   const render = {
@@ -206,7 +209,20 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         data-testid={`step-${index}-counter-name`}
       />),
 
-    value: () => field('Start', number(step.value, 0, undefined, n => set({ value: n }), 'w-20')),
+    // R1: bei `set_counter` ist der Wert keine Zahl, sondern eine von vier
+    // Lesarten - „max", „+18" und „$LEB" passen in kein Zahlenfeld. Bei
+    // `place_counter` bleibt es der Startwert und damit eine Zahl.
+    value: () => (step.type === 'set_counter'
+      ? field('Value',
+        <input
+          type="text"
+          value={step.value ?? ''}
+          onChange={e => set({ value: e.target.value })}
+          placeholder="4, +18, max or $LEB"
+          className={`flex-1 ${INPUT}`}
+          data-testid={`step-${index}-counter-value`}
+        />)
+      : field('Start', number(step.value, 0, undefined, n => set({ value: n }), 'w-20'))),
 
     // Leer heisst "keine Obergrenze" - darum kein `number()`: das ersetzt eine
     // geleerte Eingabe durch den Vorgabewert und man wuerde `max` nie wieder los.

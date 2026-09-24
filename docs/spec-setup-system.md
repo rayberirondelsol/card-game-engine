@@ -1872,3 +1872,187 @@ Kleinlaster, auf der Karte liegt dort ein rostiges Wrack — das Bild passt zu
 keinem Bereich der Karte. Und zwei Geländeteile fehlen ganz: bei Virginia Fitz
 ein Holzschuppen auf `C1:E2` (hochkant, also `rotation: 90`), bei The Bundits
 eine zweite Kopie der Grafik, die bei Fitz auf `L4` liegt.
+
+### M8.3 — Die Geländekarten werden nicht ausgelegt
+
+**Befund.** `build_scenario` legt die Geländeteile auf das Brett, aber nicht
+die dazugehörigen **Geländekarten**. Regelwerk §5.1 Schritt 5 verlangt sie, und
+ohne sie ist nicht bedienbar, was ein Teil tut: Hohler Heuhaufen, Wunschbrunnen
+und Pilzwäldchen haben Regeltext, der nur auf der Karte steht. Drei der sechs
+Heldentaten hängen daran.
+
+Die Karten sind vorhanden: Kategorie `Gelände` (20) und
+`Gelände (Üble Nachbarn)` (13).
+
+**Warum es nicht einfach geht: die Kartennamen sind zerschossen.** Der Import
+hat den PDF-Textlayer übernommen, in dem fette und normale Schrift übereinander
+liegen. Jedes Wort steht deshalb **doppelt**, und die Buchstaben sind
+auseinandergerissen:
+
+```
+HO H LE R HO H LE R HE UH A UF EN HE UH A UF EN   →  Hohler Heuhaufen
+DOR FD O KT ORS DOR FD O KT ORS HÜT E DE S HÜT E DE S  →  Hütte des Dorfdoktors
+SCH RO T KAR RE … RO S TI GE …                     →  Rostige Schrottkarre
+```
+
+Bei manchen ist zusätzlich die **Wortreihenfolge vertauscht** (zweite Zeile des
+Kartenkopfs zuerst), und die OCR verliert gelegentlich einen Buchstaben
+(`SCHROTKARRE` statt `SCHROTTKARRE`).
+
+**Regel.**
+
+1. **Die 33 Geländekartennamen werden einmalig bereinigt.** Sie bekommen den
+   Namen, den das Geländeteil trägt — `Hohler Heuhaufen`, `Hütte des
+   Dorfdoktors`, `Überwuchertes Maisfeld`. Damit ist die Zuordnung ein
+   Namensvergleich und braucht keinen Ähnlichkeitsrechner.
+
+   Bereinigt wird **von Hand und nachgeprüft**, nicht algorithmisch geraten:
+   33 Karten sind abzählbar, und ein Rechner, der `SCHROTKARRE` auf
+   `Schrottkarre` zieht, zieht beim nächsten Deck etwas Falsches.
+
+2. **`build_scenario` legt je Geländeteil des Szenarios eine Karte aus**, in
+   einer Reihe unter dem Hauptplan. Kommt ein Teil zweimal vor (zwei Holzzäune,
+   zwei dichte Wälder), liegt die Karte **einmal**.
+
+3. Die Reihe ist eine **Zone** (`Geländekarten`), damit sie mit dem Brett
+   wandert und beim nächsten Kampfaufbau mit abgeräumt wird — wie das übrige
+   Bösewichtmaterial.
+
+**Abnahme.**
+1. Nach dem Kampfaufbau gegen Deputy Waggums liegen sieben Geländekarten aus:
+   Hohler Heuhaufen, Holzzaun, Wunschbrunnen, Verwahrlostes Picknick,
+   Pilzwäldchen, Gemüsebeet, Überwuchertes Maisfeld — der Holzzaun **einmal**,
+   obwohl er zweimal auf dem Brett liegt.
+2. Ein Geländeteil ohne Karte (etwa die Bundo-Königin im Endkampf) lässt die
+   Reihe unverändert und landet im Protokoll, statt den Aufbau abzubrechen.
+3. Der nächste Kampfaufbau räumt die Reihe ab und legt die Karten des neuen
+   Bösewichts aus.
+4. Alle 33 Geländekarten tragen den Namen ihres Geländeteils.
+
+### M8.4 — Ab Runde 2 gibt es keine Dorfphase
+
+**Befund.** Nach dem gewonnenen Kampf verlangt das Regelwerk §7 acht Schritte
+und danach §4 die vier Schritte der Dorfphase. In der Engine gibt es dafür
+**keinen Knopf**: die Aktionen heißen „Kampf beginnen" und „Dorfereignis
+ziehen". Nach dem zweiten „Kampf beginnen" standen die Lebenszähler immer noch
+auf 0/3, 0/4, 0/4, der Laden war leer und blieb leer. Die Ladenauslage entsteht
+nur einmal, im Anfangsaufbau.
+
+**Regel.** Eine neue Aktion **„Dorfphase beginnen"** führt aus, was sich
+automatisieren lässt:
+
+Aus §7 (nach dem Kampf):
+1. Bösewichtmaterial wegräumen — Tableau, Figur, Aktionsdeck, Ablage,
+   Geländeteile, Geländekarten. *Heute steht das am Anfang von „Kampf
+   beginnen". Es gehört hierher: zwischen zwei Kämpfen soll der Tisch leer
+   sein, nicht bis zum nächsten Kampf voll bleiben.*
+2. Alle Dörflerwerte zurücksetzen. Leben auf den Höchstwert, die übrigen drei
+   auf ihren Ausgangswert.
+3. Münzen: **sechs je Dörfler** in den gemeinsamen Topf (solo, §2.2/S2).
+4. „Wer ist dran?"-Leiste rotieren: oberster Dörfler nach unten, Rest rückt auf.
+5. Zusatz-Brett auf die Dorfphase wenden.
+
+Aus §4 (Dorfphase):
+6. Heldentaten auf **sechs offene** auffüllen (Solo-Regel S1).
+7. Tante Emmas Laden neu auslegen: **zehn** Karten offen.
+
+**Nicht automatisiert**, weil es eine Entscheidung der Spieler ist: unerfüllte
+Heldentaten abwerfen (§7.1), die Bösewicht-Beute (§7.3), erfüllte Heldentaten
+beiseitelegen (§7.4). Die bleiben Handarbeit und sollen es bleiben.
+
+**Was dabei fehlen dürfte.** Zwei der Schritte haben im Schrittvokabular
+vermutlich keine Entsprechung: einen Zähler auf einen Wert **setzen** (nicht
+anlegen), und eine Zone **rotieren**. Wer das umsetzt, prüft das zuerst und
+sagt, was er gebaut hat — ein neuer Schritt ist in Ordnung, eine zweite
+Rechnung neben einer vorhandenen nicht.
+
+**Abnahme.**
+1. Nach „Dorfphase beginnen" ist der Hauptplan leer: kein Gelände, keine
+   Bösewichtfigur, kein Tableau, kein Verhaltensdeck, keine Geländekarten.
+2. Die zwölf Attributzähler stehen wieder auf ihren Ausgangswerten, Leben auf
+   dem Höchstwert.
+3. Der Münztopf ist um achtzehn gestiegen (drei Dörfler à sechs).
+4. Die Heldentaten-Auslage zeigt sechs offene Karten, die Ladenauslage zehn.
+5. „Kampf beginnen" räumt danach **nicht doppelt** ab — was in die Dorfphase
+   gewandert ist, steht dort nicht mehr.
+6. Der erste Kampf einer Partie ist unverändert: der Anfangsaufbau bleibt, wie
+   er ist.
+
+### Nachtrag zu M7.5 — woher die Werte des Bösewichts kommen
+
+M7.5 verlangt zwei Zähler mit den BEW- und LEB-Werten des gewählten
+Bösewichts. Diese Werte stehen in §5.5 des Regelwerks, **nicht** im Code: der
+Executor weiß nichts über Townsfolk Tussle. Sie gehören zu den Szenariodaten,
+neben `scenario` und `terrain`, und zwar als Solo-Wert (Spalte 3P).
+
+Barry Bluff ist die Ausnahme — seine Werte stehen als **Formel** auf dem
+Tableau, nicht als Zahl. Er ist in den drei erfassten Szenarien nicht dabei;
+das Feld muss die Formel aber aufnehmen können, ohne dass der Aufbau daran
+scheitert.
+
+## M7.6 — Ein Geländeteil kann auch auf der Rückseite liegen
+
+**Befund.** `build_scenario` legt Gelände mit fest verdrahtetem
+`assetToken(asset, x, y, false)` hin. **Immer offen, es gibt keinen Schalter.**
+Der Geländeeintrag kennt `assetName`, `cells` und `rotation` — keine Seite.
+
+Viele Geländeteile sind aber zweiseitig und heißen deshalb
+`Vorderseite / Rückseite`:
+
+```
+Wunschbrunnen / Wunschbrunnen (leer)
+Altes Fass / Altes Fass (leer)
+Marodes Farmhaus / Marodes Farmhaus (gedeckter Tisch)
+Doofster-Glocke / Kochtopf
+Koederstulle / Rasenmaeher
+Rangelblume / Die Wolken-Gang
+Wehtuh-Fratzenfalle / Goob's Tavern
+Flut / Matschpfuetze
+Lagerfeuer / Lagerfeuer (erloschen)
+Werkzeugschuppen / Werkzeugschuppen (offen)
+Bärenfalle / Bärenfalle (zugeschnappt)
+Grabhügel / Grabhügel ausgehoben (N)
+```
+
+Verlangt ein Szenario die Rückseite — etwa den Kochtopf statt der
+Doofster-Glocke —, legt der Aufbau heute **das falsche Bild** auf das Brett.
+Das fiel bisher nicht auf, weil die drei erfassten Szenarien zufällig nur
+Vorderseiten verlangen.
+
+**Regel.**
+
+1. Ein Geländeeintrag nimmt ein freiwilliges **`faceDown`**, genau parallel zu
+   `rotation`. Fehlt es, bleibt alles wie bisher.
+2. `assetToken` weigert sich bereits, ein Objekt ohne Rückseite verdeckt zu
+   legen (Spec §6) und gibt `null` zurück. `build_scenario` macht daraus einen
+   Protokolleintrag und legt das Teil **nicht** — ein still falsch herum
+   liegendes Plättchen ist schlimmer als ein fehlendes.
+3. **Die Geländekarte folgt der Seite.** M8.3 nimmt bei einem Namen mit
+   Schrägstrich den Teil **davor**. Liegt das Teil verdeckt, gilt der Teil
+   **dahinter**: `Doofster-Glocke / Kochtopf` mit `faceDown` sucht die Karte
+   `Kochtopf`. Damit gilt eine einzige Regel — *eine Karte heißt wie der Teil
+   des Teilnamens, zu dem sie gehört* — und die Rückseitenkarten, die heute nie
+   gefunden werden, werden erreichbar.
+4. `validateScenarioData` nimmt das Feld an, ohne daran zu scheitern.
+
+**Was ausdrücklich nicht dazugehört.** Die Szenariodaten haben **keine
+Oberfläche** — es gibt nichts, was sie bearbeitet. `sequenceSteps.js` braucht
+deshalb keinen Eintrag: `build_scenario` ist ein Schritt ohne Felder, und
+`faceDown` sitzt in den Daten, nicht im Schritt. Wer hier trotzdem etwas am
+Editor ändert, baut Vokabular für eine Oberfläche, die es nicht gibt.
+
+**Abnahme.**
+1. Ein Geländeeintrag mit `"faceDown": true` legt das Teil mit seinem
+   Rückseitenbild.
+2. Ohne das Feld liegt es offen — die drei erfassten Szenarien bauen
+   unverändert.
+3. Ein Teil **ohne** Rückseitenbild mit `"faceDown": true` wird nicht gelegt
+   und steht im Protokoll; der übrige Aufbau läuft weiter.
+4. `Doofster-Glocke / Kochtopf` mit `faceDown` legt die Karte `Kochtopf` aus,
+   ohne `faceDown` die Karte `Doofster-Glocke`.
+5. Ein Name ohne Schrägstrich verhält sich bei der Kartensuche unverändert,
+   mit und ohne `faceDown`.
+
+**Offen und nicht Teil davon:** `Sprengstoff & Auslöser` ist **eine** Karte,
+aber `Sprengstoff` und `Auslöser` sind **zwei** Plättchen. Eine Karte für zwei
+Teile passt in keine der beiden Regeln; das ist ein eigener Fall.

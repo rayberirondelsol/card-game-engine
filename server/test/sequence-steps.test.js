@@ -483,3 +483,105 @@ test('validateStep nimmt einen Feldbereich an und meldet ein Ende außerhalb (M7
   // Die Zeile im Editor bleibt lesbar – describeStep gibt den Rohtext aus.
   assert.match(describeStep({ type: 'place_asset', assetName: 'Klaus', gridLabel: 'Kampffeld', cell: 'E3:G4' }), /E3:G4/);
 });
+
+// ── R5: die drei Schritte der Rundenwende (M7.5, M8.4) ───────────────────────
+//
+// Wer einen Schritt nur im Executor baut, hat ihn im Editor nicht - genau das
+// Muster, das docs/audit-dead-controls.md sammelt.
+
+test('set_counter und rotate_zone stehen im Vokabular, mit den Feldern ihrer Handler', () => {
+  const types = STEP_TYPES.map(t => t.value);
+  assert.ok(types.includes('set_counter'), 'set_counter fehlt im Editor');
+  assert.ok(types.includes('rotate_zone'), 'rotate_zone fehlt im Editor');
+
+  assert.deepEqual(stepFields('set_counter').sort(), ['name', 'value']);
+  assert.deepEqual(stepFields('rotate_zone'), ['zoneLabel']);
+
+  // Ein Zähler hat weder Stapel noch Zone noch Stelle: `set_counter` schreibt
+  // in einen vorhandenen, `place_counter` legt an.
+  for (const f of ['x', 'y', 'max', 'targetZoneLabel', 'stackLabel']) {
+    assert.ok(!stepFields('set_counter').includes(f), `set_counter darf kein ${f} anbieten`);
+  }
+  // rotate_zone dreht *in* der Zone - ein Ziel gäbe es nicht zu wählen.
+  assert.ok(!stepFields('rotate_zone').includes('targetZoneLabel'));
+});
+
+test('place_stack fragt nach x/y nur, solange keine Zone gewählt ist', () => {
+  assert.ok(stepFields('place_stack').includes('targetZoneLabel'));
+  const withZone = { type: 'place_stack', category: 'A', label: 'Deck', targetZoneLabel: 'Auslage', x: 0, y: 0 };
+  assert.ok(!stepFields(withZone).includes('x'));
+  assert.ok(!stepFields(withZone).includes('y'));
+  assert.ok(stepFields({ ...withZone, targetZoneLabel: '' }).includes('x'));
+});
+
+test('ein frischer set_counter- und rotate_zone-Schritt ist schon fast gültig', () => {
+  const ctx = { zoneLabels: ['Bosseleiste', 'Reihenfolge'] };
+  const sc = defaultStep('set_counter', ctx);
+  assert.equal(sc.type, 'set_counter');
+  assert.equal(sc.name, '', 'den Namen kennt nur der Autor - wie bei place_counter');
+  assert.equal(sc.value, 0);
+
+  const rz = defaultStep('rotate_zone', ctx);
+  assert.equal(rz.zoneLabel, 'Bosseleiste');
+});
+
+test('die Zusammenfassung nennt, welche Lesart des Werts gilt', () => {
+  const line = (value) => describeStep({ type: 'set_counter', name: 'Henlo: Leben', value });
+  assert.match(line('max'), /maximum/i);
+  assert.match(line('+18'), /\bby 18\b/);
+  assert.match(line('-2'), /\bby -2\b/);
+  assert.match(line(4), /\bto 4\b/);
+  assert.match(line(4), /Henlo: Leben/);
+  assert.match(describeStep({ type: 'rotate_zone', zoneLabel: 'Reihenfolge' }), /Reihenfolge/);
+  for (const l of [line('max'), line(4), describeStep({ type: 'rotate_zone' })]) {
+    assert.ok(!l.includes('_'), `zeigt den rohen Typ: ${l}`);
+  }
+});
+
+test('validateStep meldet einen namenlosen Zähler, einen unlesbaren Wert und eine fehlende Zone', () => {
+  const ctx = { zoneLabels: ['Bosseleiste'] };
+  assert.deepEqual(validateStep({ type: 'set_counter', name: 'Münzen', value: '+18' }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'set_counter', name: 'Münzen', value: 'max' }, ctx), []);
+  assert.deepEqual(validateStep({ type: 'set_counter', name: 'Münzen', value: 0 }, ctx), []);
+  // Ein Platzhalter steht für einen Wert, den erst der Tisch kennt (M7).
+  assert.deepEqual(validateStep({ type: 'set_counter', name: 'Münzen', value: '$LEB' }, ctx), []);
+
+  assert.ok(validateStep({ type: 'set_counter', name: '', value: 1 }, ctx).some(p => /counter name/i.test(p)));
+  assert.ok(validateStep({ type: 'set_counter', name: 'Münzen', value: 'irgendwas' }, ctx).some(p => /value/i.test(p)));
+  assert.ok(validateStep({ type: 'set_counter', name: 'Münzen', value: '' }, ctx).some(p => /value/i.test(p)));
+
+  assert.deepEqual(validateStep({ type: 'rotate_zone', zoneLabel: 'Bosseleiste' }, ctx), []);
+  assert.ok(validateStep({ type: 'rotate_zone', zoneLabel: '' }, ctx).some(p => /zone/i.test(p)));
+  assert.ok(validateStep({ type: 'rotate_zone', zoneLabel: 'Gibts nicht' }, ctx).some(p => /Gibts nicht/.test(p)));
+});
+
+test('eine im Editor gebaute Rundenwende läuft im Executor durch', () => {
+  const zones = zoneFixture();
+  const ctx = { zoneLabels: zones.map(z => z.label), stackLabels: [], pools: [], assetNames: [] };
+  const steps = [
+    { ...defaultStep('set_counter', ctx), name: 'Henlo: Leben', value: 'max' },
+    { ...defaultStep('set_counter', ctx), name: 'Münzvorrat', value: '+18' },
+    { ...defaultStep('rotate_zone', ctx), zoneLabel: 'Reihenfolge' },
+  ];
+  for (const s of steps) assert.deepEqual(validateStep(s, ctx), [], describeStep(s));
+
+  const state = {
+    cards: [], stacks: [], tokens: [
+      { id: 'a', assetId: 'order-0', label: 'Bäcker-Marke', x: 640, y: 100, size: 40 },
+      { id: 'b', assetId: 'order-1', label: 'Schmied-Marke', x: 640, y: 200, size: 40 },
+    ], boards: [],
+    counters: [
+      { id: 'c1', name: 'Henlo: Leben', value: 0, max: 4, x: 0, y: 0, locked: false },
+      { id: 'c2', name: 'Münzvorrat', value: 12, x: 0, y: 0, locked: false },
+    ],
+  };
+  const { state: out, log } = executeSequenceWithLog(state, steps, zones);
+  assert.deepEqual(log.map(e => e.status), ['ok', 'ok', 'ok'], log.map(e => e.reason).join(' | '));
+  assert.equal(out.counters.find(c => c.name === 'Henlo: Leben').value, 4);
+  assert.equal(out.counters.find(c => c.name === 'Münzvorrat').value, 30);
+  assert.notDeepEqual(
+    out.tokens.map(t => t.y),
+    [100, 200],
+    'die Leiste ist gerückt'
+  );
+});

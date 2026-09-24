@@ -247,9 +247,11 @@ test('das Vokabular kennt beide Schritte mit genau den Feldern, die der Executor
 
   assert.ok(placeSpec, 'place_stack fehlt im Editor-Vokabular');
   assert.ok(removeSpec, 'remove_stack fehlt im Editor-Vokabular');
-  assert.deepEqual(placeSpec.fields, ['category', 'label', 'x', 'y', 'faceDown']);
+  // R3: `targetZoneLabel` kam dazu - die Zone ist die zweite Art zu sagen, wo
+  // der Stapel hingehoert, und der Executor liest sie.
+  assert.deepEqual(placeSpec.fields, ['category', 'label', 'targetZoneLabel', 'x', 'y', 'faceDown']);
   assert.deepEqual(removeSpec.fields, ['stackLabel']);
-  assert.deepEqual(stepFields({ type: 'place_stack' }), ['category', 'label', 'x', 'y', 'faceDown']);
+  assert.deepEqual(stepFields({ type: 'place_stack' }), ['category', 'label', 'targetZoneLabel', 'x', 'y', 'faceDown']);
 });
 
 test('defaultStep füllt place_stack aus den Kartenkategorien vor, den Namen schreibt der Autor', () => {
@@ -293,4 +295,56 @@ test('stackLabelsFor bietet auch die Stapel an, die diese Folge erst herstellt',
   assert.deepEqual(stackLabelsFor([], ['Nachschub']), ['Nachschub']);
   assert.deepEqual(stackLabelsFor(steps, []), ['Verhaltensdeck']);
   assert.deepEqual(stackLabelsFor(null, null), []);
+});
+
+// ── R3: place_stack darf eine Zone als Ziel nehmen (M7.5 Regel 1) ────────────
+//
+// Das Aktionsdeck des Bösewichts gehört auf die ACTION-Buchseite des
+// Zusatz-Bretts, und die ist eine am Brett verankerte Zone. Eine feste x/y wäre
+// genau das, was M3a abgeschafft hat: verschiebt jemand das Brett, liegt der
+// Stapel daneben.
+
+const ZONES_R3 = [
+  { id: 'z-act', label: 'Aktionen', x: 500, y: 700, width: 120, height: 180, accepts: ['card'], layout: 'stack' },
+  { id: 'z-tok', label: 'Nur Tokens', x: 900, y: 700, width: 120, height: 180, accepts: ['asset'], layout: 'stack' },
+];
+
+test('place_stack mit Zone legt den Stapel auf die Zone statt auf x/y', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(), [place({ targetZoneLabel: 'Aktionen' })], ZONES_R3, opts());
+  assert.equal(log[0].status, 'ok', log[0].reason || '');
+  const stack = stackNamed(state, 'Verhaltensdeck');
+  assert.equal(stack.x, 560, 'Mitte der Zone waagerecht');
+  assert.equal(stack.y, 790, 'Mitte der Zone senkrecht');
+});
+
+test('der Stapel folgt dem Anker, an dem die Zone hängt', () => {
+  // Dieselbe Zone, einmal an einem Brett bei 1000/1000 und einmal bei 2000/1000.
+  const anchored = { ...ZONES_R3[0], anchor: { assetId: 'side', relX: 0.1, relY: 0.5, relWidth: 0.4, relHeight: 0.2 } };
+  const board = (x) => ({ id: 'side', assetId: 'side', label: 'Zusatz-Brett', x, y: 1000, width: 300, height: 1000 });
+  const a = executeSequence({ ...emptyState(), boards: [board(1000)] }, [place({ targetZoneLabel: 'Aktionen' })], [anchored], opts());
+  const b = executeSequence({ ...emptyState(), boards: [board(2000)] }, [place({ targetZoneLabel: 'Aktionen' })], [anchored], opts());
+  assert.equal(stackNamed(b, 'Verhaltensdeck').x - stackNamed(a, 'Verhaltensdeck').x, 1000);
+  assert.equal(stackNamed(a, 'Verhaltensdeck').y, stackNamed(b, 'Verhaltensdeck').y);
+});
+
+test('ohne Zone gilt weiter x/y – unverändert', () => {
+  const state = executeSequence(emptyState(), [place()], ZONES_R3, opts());
+  assert.equal(stackNamed(state, 'Verhaltensdeck').x, 300);
+  assert.equal(stackNamed(state, 'Verhaltensdeck').y, 400);
+});
+
+test('eine Zone, die keine Karten nimmt, bekommt auch keinen Kartenstapel', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(), [place({ targetZoneLabel: 'Nur Tokens' })], ZONES_R3, opts());
+  assert.equal(log[0].status, 'skipped');
+  assert.equal(state.stacks.length, 0, 'lieber kein Stapel als einer in der Tischmitte');
+});
+
+test('eine Zone, die es nicht gibt, legt den Stapel nicht auf x/y ab', () => {
+  const { state, log } = executeSequenceWithLog(
+    emptyState(), [place({ targetZoneLabel: 'Gibts nicht' })], ZONES_R3, opts());
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason, /Gibts nicht/);
+  assert.equal(state.stacks.length, 0);
 });

@@ -11,7 +11,7 @@
  * for one. Offering a field the handler ignores is worse than offering none:
  * it is a promise the setup does not keep.
  */
-import { counterMax } from '../../../shared/counters.js';
+import { counterMax, counterValueForm } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder } from '../../../shared/sequenceExecutor.js';
@@ -30,7 +30,9 @@ export const STEP_TYPES = [
   { value: 'split', label: 'Split Stack', fields: ['stackLabel', 'count', 'outputLabels', 'spacing'] },
   { value: 'deal_to_zone', label: 'Deal to Zone', fields: ['stackLabel', 'count', 'targetZoneLabel', 'faceDown'] },
   { value: 'move', label: 'Move Stack', fields: ['stackLabel', 'x', 'y'] },
-  { value: 'place_stack', label: 'Place Stack', fields: ['category', 'label', 'x', 'y', 'faceDown'] },
+  // R3/M7.5: `targetZoneLabel` ist die zweite Art zu sagen, wo der Stapel
+  // hingehoert - das Aktionsdeck liegt auf einer am Brett verankerten Zone.
+  { value: 'place_stack', label: 'Place Stack', fields: ['category', 'label', 'targetZoneLabel', 'x', 'y', 'faceDown'] },
   { value: 'remove_stack', label: 'Remove Stack', fields: ['stackLabel'] },
   { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
   { value: 'draw_assets', label: 'Draw Assets', fields: ['pool', 'count', 'targetZoneLabel', 'faceDown'] },
@@ -38,7 +40,13 @@ export const STEP_TYPES = [
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
   { value: 'place_counter', label: 'Place Counter', fields: ['name', 'value', 'max', 'x', 'y'] },
+  // R1/M8.4: der Gegenschritt zu `place_counter` - er schreibt in einen
+  // vorhandenen Zaehler statt einen zweiten anzulegen. Weder Stelle noch `max`:
+  // beides gehoert dem Zaehler, nicht dem Schreibenden.
+  { value: 'set_counter', label: 'Set Counter', fields: ['name', 'value'] },
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
+  // R2/M8.4: die Leiste rueckt auf. Kein Ziel - gedreht wird *in* der Zone.
+  { value: 'rotate_zone', label: 'Rotate Zone', fields: ['zoneLabel'] },
   { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
   { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel'] },
   // M7/T6: kein `gridLabel` - das Raster steht in den Szenariodaten, nicht am
@@ -69,6 +77,10 @@ export function stepFields(step) {
   if (spec.value === 'place_asset' && typeof step === 'object') {
     if (step?.targetZoneLabel) return spec.fields.filter(f => !['gridLabel', 'cell', 'x', 'y'].includes(f));
     if (step?.cell) return spec.fields.filter(f => f !== 'x' && f !== 'y');
+  }
+  // place_stack: dieselbe Regel und derselbe Satz - Zone oder x/y, nie beides.
+  if (spec.value === 'place_stack' && typeof step === 'object' && step?.targetZoneLabel) {
+    return spec.fields.filter(f => f !== 'x' && f !== 'y');
   }
   // clear_zone: die Seite gilt nur für Karten, die in einen Stapel
   // zurückgehen. Ohne Stapelziel wäre sie eine Einstellung ohne Wirkung.
@@ -154,6 +166,13 @@ export function defaultStep(type, ctx = {}) {
       // Name bleibt leer, weil ihn nur der Autor kennt - er ist das eine Feld,
       // das die Validierung darum sofort anmahnt.
       return { type, name: '', value: 0, x: 0, y: 0 };
+    case 'set_counter':
+      // Derselbe Grund wie oben: den Namen kennt nur der Autor. `0` ist die
+      // harmloseste der vier Lesarten - „auf null", nicht „um null".
+      return { type, name: '', value: 0 };
+    case 'rotate_zone':
+      // Wie `reveal_next`: die Zone *ist* die Adresse, also steht die erste da.
+      return { type, zoneLabel: zone };
     case 'lock_asset':
     case 'unlock_asset':
       return { type, assetName: first(names) };
@@ -202,8 +221,10 @@ export function describeStep(step) {
     case 'split': return `Split ${q(step.stackLabel)} into ${step.count ?? 2} stacks`;
     case 'deal_to_zone': return `Deal ${step.count ?? 1} from ${q(step.stackLabel)} to ${zone}${down(step)}`;
     case 'move': return `Move ${q(step.stackLabel)} to ${step.x ?? 0}, ${step.y ?? 0}`;
-    case 'place_stack':
-      return `Place card category ${q(step.category)} as stack ${q(step.label)} at ${step.x ?? 0}, ${step.y ?? 0}${down(step)}`;
+    case 'place_stack': {
+      const where = step?.targetZoneLabel ? `in zone ${q(step.targetZoneLabel)}` : `at ${step.x ?? 0}, ${step.y ?? 0}`;
+      return `Place card category ${q(step.category)} as stack ${q(step.label)} ${where}${down(step)}`;
+    }
     case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
     case 'place_asset': {
       const where = step.targetZoneLabel
@@ -224,6 +245,19 @@ export function describeStep(step) {
       const start = max === undefined ? `${step?.value ?? 0}` : `${step?.value ?? 0} / ${max}`;
       return `Place counter ${q(step.name)} at ${step.x ?? 0}, ${step.y ?? 0} starting at ${start}`;
     }
+    // R1: die Zeile sagt, **welche** der vier Lesarten von `value` gilt - „+18"
+    // und „18" sehen nebeneinander gleich aus und tun Verschiedenes.
+    case 'set_counter': {
+      const form = counterValueForm(step?.value);
+      const n = Number(String(step?.value ?? '').trim());
+      const what = form === 'max' ? 'to its maximum'
+        : form === 'add' ? `by ${n}`
+        : form === 'set' ? `to ${n}`
+        : `to ${q(step?.value, '(nothing)')}`;
+      return `Set counter ${q(step.name)} ${what}`;
+    }
+    case 'rotate_zone':
+      return `Rotate zone ${q(step.zoneLabel)} by one place`;
     case 'set_asset_face':
       return `Turn ${q(step.assetName)} ${step.faceDown ? 'face down' : 'face up'}`;
     case 'reveal_next': {
@@ -340,9 +374,17 @@ export function validateStep(step, ctx = {}) {
   // Stelle. Beides fehlt der Executor sonst erst am Tisch (er überspringt den
   // Schritt), und dann ist der Aufbau schon gelaufen.
   if (fields.has('name') && !String(step?.name ?? '').trim()) problems.push('no counter name given');
+  // R1: `set_counter` hat vier Lesarten für `value` (Zahl, „+n", „max",
+  // Platzhalter). Was keine davon trifft, überspringt der Executor am Tisch -
+  // und dann ist der Rundenwechsel schon gelaufen. `place_counter` ist davon
+  // nicht betroffen: sein `value` ist ein Zahlenfeld und der Startwert.
+  if (typeOf(step) === 'set_counter' && !hasPlaceholder(step?.value)
+    && counterValueForm(step?.value) === null) {
+    problems.push(`"${String(step?.value ?? '').trim()}" is not a value: a number, "+6", "-6" or "max"`);
+  }
   // Nur hier: `move` darf x oder y weglassen (dann bleibt die Koordinate, wie
-  // sie ist), und `place_asset` mit Zone zeigt x/y gar nicht erst an.
-  if (typeOf(step) === 'place_counter' || typeOf(step) === 'place_stack') {
+  // sie ist), und `place_asset`/`place_stack` mit Zone zeigen x/y gar nicht an.
+  if (fields.has('x') && (typeOf(step) === 'place_counter' || typeOf(step) === 'place_stack')) {
     const num = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
     if (!Number.isFinite(num(step?.x)) || !Number.isFinite(num(step?.y))) problems.push('no position given');
   }

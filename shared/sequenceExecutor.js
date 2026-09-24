@@ -27,7 +27,7 @@ import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
-import { normalizeCounter } from './counters.js';
+import { normalizeCounter, counterValue } from './counters.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -230,7 +230,10 @@ export function hasPlaceholder(value) {
  * (M7). Eine Liste an einer Stelle, nicht eine Sonderbehandlung je Feld: der
  * `assetName`-Sonderfall hat genau deshalb jedes neue Feld verpasst.
  */
-const NAME_FIELDS = ['assetName', 'cell', 'category', 'label', 'name'];
+// `value` steht mit dabei, seit `set_counter` die Werte des Bösewichts aus den
+// Szenariodaten liest (R1/R4). Fuer `place_counter` aendert das nichts:
+// `hasPlaceholder` prueft nur Zeichenketten, und dort steht eine Zahl.
+const NAME_FIELDS = ['assetName', 'cell', 'category', 'label', 'name', 'value'];
 
 /** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
 function baseName(name) {
@@ -432,12 +435,31 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const inCategory = cards.filter(c => norm(c.category) === norm(step.category));
       if (!inCategory.length) return skip(`category "${step.category ?? ''}" is empty or unknown`);
 
-      // Leer ist keine 0 – dieselbe Rechnung wie bei `place_counter`: ein
-      // Stapel klammheimlich in der Tischmitte ist schlimmer als ein gemeldeter
-      // fehlender Wert.
-      const coord = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
-      const [x, y] = [coord(step.x), coord(step.y)];
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return skip(`no position given for stack "${label}"`);
+      // R3/M7.5: eine Zone ist die zweite Art zu sagen, wo der Stapel hingehört
+      // - dieselbe Ausschließlichkeit wie bei `place_asset`. Das Aktionsdeck
+      // liegt auf einer am Zusatz-Brett verankerten Buchseite, und eine feste
+      // x/y wäre genau das, was M3a abgeschafft hat.
+      //
+      // Die Zone gibt ihm die **Stelle**, nicht die Kapazität: `countInZone`
+      // liest `state.cards`, und die Karten eines Stapels liegen in
+      // `stack.cards` und sind dort unsichtbar. `accepts` gilt trotzdem - eine
+      // Zone, die keine Karten nimmt, nimmt auch keinen Kartenstapel.
+      let x, y;
+      if (step.targetZoneLabel) {
+        const zone = findZone(zones, step.targetZoneLabel);
+        if (!zone) return skip(`zone "${step.targetZoneLabel}" not found`);
+        const refusal = zoneRejects(zone, 'card', occupancy(state, zone));
+        if (refusal) return skip(refusal);
+        const slots = zoneSlots(zone);
+        ({ x, y } = slots ? slots[0] : zoneCenter(zone));
+      } else {
+        // Leer ist keine 0 – dieselbe Rechnung wie bei `place_counter`: ein
+        // Stapel klammheimlich in der Tischmitte ist schlimmer als ein
+        // gemeldeter fehlender Wert.
+        const coord = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
+        [x, y] = [coord(step.x), coord(step.y)];
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return skip(`no position given for stack "${label}"`);
+      }
 
       const stackId = crypto.randomUUID();
       const faceDown = Boolean(step.faceDown);
@@ -867,6 +889,37 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       return state;
     }
 
+    // R2/M8.4: die „Wer ist dran?"-Leiste rueckt auf - oberstes Objekt nach
+    // unten, der Rest einen Platz hoch (Regelwerk §7 Schritt 7).
+    //
+    // Gedreht werden die **Stellen der vorhandenen** Objekte, nicht die
+    // Plaetze der Zone: die Leiste hat fuenf Plaetze, solo stehen drei Doerfler
+    // darauf, und „nach unten" heisst ans Ende der drei. Die Reihenfolge kommt
+    // aus `inSlotOrder` - dieselbe, die `reveal_next` liest; eine zweite
+    // daneben waere eine zweite Antwort auf dieselbe Frage.
+    case 'rotate_zone': {
+      const zone = findZone(zones, step.zoneLabel);
+      if (!zone) return skip(`zone "${step.zoneLabel ?? ''}" not found`);
+
+      const inside = inSlotOrder(zone, objectsInZone(zone, state.cards, state.tokens));
+      // Gesperrt heisst gesperrt (siehe `clear_zone`): wer festliegt, dreht
+      // nicht mit, und die uebrigen drehen unter sich.
+      const locked = inside.filter(o => o.locked);
+      const movable = inside.filter(o => !o.locked);
+      // Nichts oder eines zu drehen ist gelungen, nicht gescheitert - der
+      // gewuenschte Zustand liegt schon vor (wie beim leeren `clear_zone`).
+      if (movable.length > 1) {
+        const spots = movable.map(o => ({ x: o.x, y: o.y }));
+        movable.forEach((o, i) => {
+          const spot = spots[(i + spots.length - 1) % spots.length];
+          o.x = spot.x;
+          o.y = spot.y;
+        });
+      }
+      if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
+      return state;
+    }
+
     // M7/T2: das Gegenstueck zu `clear_zone` fuer die Flaeche, auf der gekaempft
     // wird. Es loescht - was ueberleben soll (der besiegte Boesewicht in die
     // Trophaeenreihe), wird vorher mit `clear_zone` weggeraeumt.
@@ -1084,6 +1137,15 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           if (Array.isArray(value)) value.forEach((cell, i) => { ctx.vars[`${name}${i + 1}`] = String(cell).trim(); });
           else ctx.vars[name] = String(value).trim();
         }
+        // R4/Nachtrag zu M7.5: die Werte des Boesewichts (BEW, LEB) binden wie
+        // ein einwertiges `fields`. Dieselbe Regel, ein zweiter Block - der
+        // Code kennt `BEW` so wenig, wie er `B` kennt, und `set_counter` traegt
+        // sie ein. Barry Bluffs Formel ist hier ein Text wie jeder andere; sie
+        // bindet, und der Zaehlerschritt dahinter sagt, dass er sie nicht lesen
+        // kann.
+        for (const [name, value] of Object.entries(part?.stats || {})) {
+          ctx.vars[name] = String(value).trim();
+        }
       }
       // Die Platzhalter binden auch dann, wenn eine Gelaendekarte fehlte: der
       // Boesewicht kommt trotzdem auf sein Feld.
@@ -1104,6 +1166,31 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         return skip(`no position given for counter "${name}"`);
       }
       state.counters.push(normalizeCounter({ name, value: step.value, max: step.max, x, y }));
+      return state;
+    }
+
+    // R1: einen **vorhandenen** Zähler auf einen Wert setzen. `place_counter`
+    // ist das Gegenstück und legt an; es kann das hier nicht halb, weil es
+    // bedingungslos einen zweiten anlegt - nach vier Kämpfen lägen acht
+    // Bösewichtwerte übereinander, und es gibt keinen Schritt, der sie
+    // wieder wegnimmt.
+    //
+    // Die vier Lesarten von `value` stehen in `shared/counters.js`, damit der
+    // Editor dieselbe Frage mit derselben Antwort stellen kann.
+    case 'set_counter': {
+      const name = String(step.name ?? '').trim();
+      if (!name) return skip('no counter name given');
+      const counter = state.counters.find(c => norm(c.name) === norm(name));
+      if (!counter) return skip(`no counter named "${name}"`);
+      // Gesperrt heißt gesperrt - dieselbe Regel wie bei `move`, `place_asset`
+      // und `clear_zone`. Ein Schloss, das gegen das Zurücksetzen wirkungslos
+      // wäre, wäre kein Schloss.
+      if (counter.locked) return skip(`counter "${name}" is locked, not changing it`);
+      const next = counterValue(counter, step.value);
+      // Unlesbar heißt unangetastet: Barry Bluffs Werte stehen als Formel auf
+      // dem Tableau, und eine geratene Zahl wäre schlimmer als keine.
+      if (next === null) return skip(`counter "${name}": "${String(step.value ?? '').trim()}" is not a value it can take`);
+      counter.value = next;
       return state;
     }
 
