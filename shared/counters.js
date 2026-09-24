@@ -40,6 +40,25 @@ export function counterMax(value) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Womit ein von Hand angelegter Zähler startet (M8.6, Regel 2): auf seinem
+ * Maximum, sonst auf 0. Ein Maximum ist die Obergrenze eines Vorrats, und ein
+ * Vorrat ist beim Anlegen voll – Lebenspunkte, Munition, Bewegung. „Waggums:
+ * Leben" mit Maximum 14 stand nach dem Anlegen auf `0 / 14`, und für
+ * Lebenspunkte folgten vierzehn Klicks auf `+`.
+ *
+ * **Hier und nicht in `normalizeCounter`.** Beide Wege, ein Zähler zu
+ * entstehen, laufen durch `normalizeCounter`: der Knopf am Tisch und
+ * `place_counter` aus einer Sequenz. Dort gesetzt, bekäme ein
+ * `place_counter`-Schritt ohne `value`, aber mit `max` klammheimlich einen
+ * anderen Startwert – und Abnahme 6 fiele, die dem Aufbau genau den Wert
+ * zusichert, der im Schritt steht. Die Regel gilt für den Zähler, den ein
+ * Mensch über die Oberfläche anlegt, also entscheidet der Aufrufer.
+ */
+export function newCounterValue(max) {
+  return counterMax(max) ?? 0;
+}
+
 /** Was am Tisch im Zählerfeld steht: `2 / 3` mit Obergrenze, sonst `2`. */
 export function counterDisplay(counter) {
   const max = counterMax(counter?.max);

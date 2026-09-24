@@ -2056,3 +2056,78 @@ Editor ändert, baut Vokabular für eine Oberfläche, die es nicht gibt.
 **Offen und nicht Teil davon:** `Sprengstoff & Auslöser` ist **eine** Karte,
 aber `Sprengstoff` und `Auslöser` sind **zwei** Plättchen. Eine Karte für zwei
 Teile passt in keine der beiden Regeln; das ist ein eigener Fall.
+
+### M8.5 — Die Kartenbibliothek hat keine Suche
+
+**Befund aus der gespielten Partie.** 1087 Karten in 38 Kategorien, und in der
+ganzen Oberfläche **kein einziges Eingabefeld** (`document.querySelectorAll('input')`
+liefert nichts). Um eine bestimmte Karte zu legen, muss man raten, in welcher
+Kategorie sie steckt — „Paulis Gebiss" lag in `Nachschub` mit 256 Karten. Eine
+Startausrüstung („The Rooty Tooter") wurde unter den zerschossenen OCR-Namen
+gar nicht gefunden, und der Kampf lief ohne sie.
+
+Dazu: **das Mausrad scrollt die Liste nicht.** Zeiger über der Liste, Rad nach
+unten — die Liste bleibt stehen, stattdessen zoomt der Tisch darunter. Bewegen
+lässt sie sich nur über den Scrollbalken.
+
+**Regel.**
+
+1. Die Bibliothek bekommt ein Suchfeld. Es sucht über **alle** Kategorien, nicht
+   nur die gerade geöffnete, und zeigt bei einem Treffer, aus welcher Kategorie
+   er stammt.
+2. Gesucht wird **unempfindlich gegen die Schäden des OCR-Textlayers**: ohne
+   Rücksicht auf Groß- und Kleinschreibung, und **Leerzeichen im Kartennamen
+   werden ignoriert**. `HO H LE R HE UH A UF EN` muss auf `heuhaufen` finden.
+   Das ist kein Ähnlichkeitsrechner, sondern eine Normalisierung — dieselbe,
+   mit der die 33 Geländekarten zugeordnet wurden.
+3. Das Mausrad über der Liste scrollt die Liste und zoomt **nicht** den Tisch.
+
+**Warum die Normalisierung und nicht die Namen.** Die 33 Geländekarten wurden
+von Hand bereinigt, weil sie abzählbar waren. 1087 sind es nicht. Die Suche muss
+mit den kaputten Namen leben.
+
+**Abnahme.**
+1. `heuhaufen` findet `HO H LE R HO H LE R HE UH A UF EN HE UH A UF EN`.
+2. Eine Suche findet Karten aus Kategorien, die gerade nicht geöffnet sind.
+3. Ein Treffer nennt seine Kategorie.
+4. Das Mausrad über der Liste ändert den Zoom des Tisches nicht.
+5. Ohne Eingabe verhält sich die Bibliothek unverändert.
+
+### M8.6 — Zähler sind nur in Einerschritten bedienbar
+
+**Befund aus der gespielten Partie.**
+
+- Ein Einkauf über 21 Münzen sind **21 Klicks**. Ein Klick auf den Wert selbst
+  öffnet kein Eingabefeld.
+- Ein neu angelegter Zähler **mit Maximum startet bei 0**. „Waggums: Leben" mit
+  Maximum 14 stand auf `0 / 14`; für Lebenspunkte folgen 14 Klicks auf `+`.
+- `createCounter` rechnet die Ablage aus `counters.length * 160`. Ab dem
+  sechsten Zähler steht der nächste 800 Punkte rechts, ab dem zehnten außerhalb
+  jedes Bildes. Dieselbe Fehlerfamilie wie M8.1, nur ohne versteckten Anteil in
+  der Liste.
+
+**Regel.**
+
+1. Ein Klick auf den **Wert** eines Zählers öffnet ein Eingabefeld. Die Eingabe
+   ersetzt den Wert; abbrechen lässt ihn unverändert.
+2. Ein Zähler, der mit einem Maximum angelegt wird, **startet auf seinem
+   Maximum**. Ein Maximum ist die Obergrenze eines Vorrats, und ein Vorrat ist
+   beim Anlegen voll — Lebenspunkte, Munition, Bewegung. Wer bei null anfangen
+   will, trägt null ein.
+3. Die Ablage neuer Zähler bricht um, statt ins Unendliche zu wandern —
+   dieselbe Entscheidung wie in M8.1: sichtbar zu bleiben ist mehr wert als
+   überschneidungsfrei zu liegen.
+
+**Was ausdrücklich nicht dazugehört.** Die zwölf Attributzähler des Aufbaus
+entstehen über `place_counter` mit ausdrücklichem `value`; an denen ändert
+Regel 2 nichts. Sie gilt für den Zähler, den ein Mensch über die Oberfläche
+anlegt.
+
+**Abnahme.**
+1. Ein Klick auf den Wert öffnet ein Feld; eine Eingabe setzt den Wert.
+2. Abbrechen lässt den Wert unverändert.
+3. Ein über die Oberfläche angelegter Zähler mit Maximum 14 steht auf `14 / 14`.
+4. Ein Zähler ohne Maximum verhält sich unverändert.
+5. Der zwölfte angelegte Zähler liegt im sichtbaren Bereich.
+6. `place_counter` aus einer Sequenz setzt weiterhin genau den Wert, der im
+   Schritt steht.

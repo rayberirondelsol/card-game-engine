@@ -18,7 +18,7 @@ import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
-import { normalizeCounter, counterDisplay } from '../../../shared/counters.js';
+import { normalizeCounter, counterDisplay, newCounterValue, counterValue } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
@@ -27,9 +27,11 @@ import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
 import { canStartPan } from '../utils/panTarget.js';
+import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
 import { tokenLayers } from '../utils/tokenLayer.js';
+import { matchesCardSearch } from '../utils/cardSearch.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -453,6 +455,9 @@ export default function GameTable({ room = null }) {
 
   // Game objects state (counters, dice, hitDice, notes, tokens, textFields)
   const [counters, setCounters] = useState([]);
+  // M8.6 Regel 1: welcher Zaehlerwert gerade als Eingabefeld dasteht.
+  const [editingCounterId, setEditingCounterId] = useState(null);
+  const [editingCounterText, setEditingCounterText] = useState('');
   const [dice, setDice] = useState([]);
   const [hitDice, setHitDice] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -481,6 +486,20 @@ export default function GameTable({ room = null }) {
   const [categories, setCategories] = useState([]); // card categories/folders
   const [cardBacks, setCardBacks] = useState([]); // card back images for the game
   const [expandedCategories, setExpandedCategories] = useState(new Set()); // expanded category IDs
+  // M8.5: die Suche in der Kartenbibliothek. Leer heisst: Schublade wie bisher.
+  const [cardSearch, setCardSearch] = useState('');
+  // M8.5: die Treffer der Bibliothekssuche - ueber ALLE Kategorien, gleich ob
+  // aufgeklappt oder nicht. `null` heisst "keine Suche", und dann steht die
+  // Schublade unveraendert da (Abnahme 5).
+  const cardSearchHits = useMemo(() => (
+    cardSearch.trim()
+      ? availableCards.filter(c => matchesCardSearch(c.name, cardSearch))
+      : null
+  ), [cardSearch, availableCards]);
+  const categoryNames = useMemo(
+    () => new Map(categories.map(c => [c.id, c.name])),
+    [categories]
+  );
   const [tableCards, setTableCards] = useState([]); // cards placed on the table
   const [showCardDrawer, setShowCardDrawer] = useState(false);
   const [draggingCard, setDraggingCard] = useState(null); // card being dragged on table
@@ -809,6 +828,11 @@ export default function GameTable({ room = null }) {
     if (!canvas) return;
 
     function handleWheel(e) {
+      // M8.5 Regel 3: ueber einer scrollenden Liste gehoert das Rad ihr. Muss
+      // VOR dem preventDefault stehen - das allein erstickt das Scrollen schon,
+      // auch ohne den Zoom darunter. Nicht `data-ui-element` fragen: das tragen
+      // Boards und Token selbst (M2.13), das Rad ueber dem Hauptplan zoomt.
+      if (!canZoomTable(e.target, containerRef.current)) return;
       e.preventDefault();
       const camera = cameraRef.current;
       const rect = canvas.getBoundingClientRect();
@@ -1791,16 +1815,23 @@ export default function GameTable({ room = null }) {
 
   // Counter functions
   function createCounter(name, max) {
-    const canvas = canvasRef.current;
-    const offset = counters.length * 160;
     // max kommt aus dem Dialog und ist optional - leer heisst "keine Obergrenze"
     // (normalizeCounter wirft es dann weg).
+    //
+    // M8.6 Regel 2: ein Vorrat ist beim Anlegen voll. Der Startwert wird *hier*
+    // entschieden und nicht in normalizeCounter - dort gesetzt, aenderte er
+    // auch place_counter aus einer Sequenz (Abnahme 6).
+    //
+    // M8.6 Regel 3: die Ablage kam aus `counters.length * 160`, also ab dem
+    // zehnten Zaehler ausserhalb jedes Bildes. Dieselbe Reihe wie die
+    // Bibliothek (M8.1), damit keine zweite Rechnung danebensteht - ein neuer
+    // Zaehler kann dadurch auf einer ausgelegten Karte landen, und sichtbar zu
+    // bleiben ist mehr wert als ueberschneidungsfrei zu liegen.
     const newCounter = normalizeCounter({
       name: name || 'Counter',
-      value: 0,
+      value: newCounterValue(max),
       max,
-      x: (canvas?.width || 800) / 2 + offset,
-      y: (canvas?.height || 600) / 2 - 60,
+      ...shelfSlot(counters.length),
     });
     setCounters(prev => [...prev, newCounter]);
     setShowCounterModal(false);
@@ -1822,6 +1853,33 @@ export default function GameTable({ room = null }) {
 
   function deleteCounter(counterId) {
     setCounters(prev => prev.filter(c => c.id !== counterId));
+  }
+
+  // M8.6 Regel 1: ein Klick auf den Wert oeffnet ein Feld. Ein Einkauf ueber 21
+  // Muenzen waren 21 Klicks.
+  function startCounterEdit(counter) {
+    setEditingCounterId(counter.id);
+    setEditingCounterText(String(counter.value));
+  }
+
+  function cancelCounterEdit() {
+    setEditingCounterId(null);
+    setEditingCounterText('');
+  }
+
+  /**
+   * Die Eingabe uebernehmen. Was sie *bedeutet*, steht in shared/counters.js:
+   * eine Zahl setzt, `+21`/`-21` rechnet, `max` fuellt auf die Obergrenze - die
+   * vier Lesarten, die auch `set_counter` benutzt. Was sich nicht lesen laesst,
+   * gibt `null` und faellt damit mit Abbrechen zusammen (Abnahme 2).
+   */
+  function commitCounterEdit(counterId) {
+    setCounters(prev => prev.map(c => {
+      if (c.id !== counterId) return c;
+      const next = counterValue(c, editingCounterText);
+      return next === null ? c : { ...c, value: next };
+    }));
+    cancelCounterEdit();
   }
 
   // Dice functions
@@ -3888,6 +3946,9 @@ export default function GameTable({ room = null }) {
     // Only zoom if not over a UI element
     const isUIElement = e.target.closest && e.target.closest('[data-ui-element]');
     if (isUIElement) return;
+    // M8.5 Regel 3: dieselbe Frage wie im nativen Horcher oben, fuer Panels,
+    // die kein data-ui-element tragen.
+    if (!canZoomTable(e.target, containerRef.current)) return;
 
     const camera = cameraRef.current;
     const container = containerRef.current;
@@ -4526,14 +4587,40 @@ export default function GameTable({ room = null }) {
               >
                 -
               </button>
-              <span
-                className="text-xl font-mono font-bold text-white min-w-[40px] text-center"
-                data-testid={`counter-value-${counter.id}`}
-              >
-                {/* M4a: mit Obergrenze steht hier "2 / 3". Erzwungen wird sie
-                    nicht - der rote Marker liegt daneben, der Tisch rechnet nicht. */}
-                {counterDisplay(counter)}
-              </span>
+              {editingCounterId === counter.id ? (
+                /* M8.6 Regel 1: Enter uebernimmt, Escape und Fokusverlust
+                   brechen ab. Escape wird hier abgefangen (stopPropagation) und
+                   steht bewusst NICHT in ESCAPE_LAYERS - dieselbe Form wie die
+                   Notiz-Bearbeitung weiter unten, und M2.10 bleibt unberuehrt. */
+                <input
+                  type="text"
+                  value={editingCounterText}
+                  autoFocus
+                  onChange={(e) => setEditingCounterText(e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onBlur={cancelCounterEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); commitCounterEdit(counter.id); }
+                    if (e.key === 'Escape') { e.preventDefault(); cancelCounterEdit(); }
+                    e.stopPropagation();
+                  }}
+                  data-testid={`counter-value-input-${counter.id}`}
+                  className="w-[72px] px-1 py-0.5 bg-slate-900 border border-blue-400 rounded text-xl font-mono font-bold text-white text-center focus:outline-none"
+                />
+              ) : (
+                <span
+                  className="text-xl font-mono font-bold text-white min-w-[40px] text-center cursor-text"
+                  data-testid={`counter-value-${counter.id}`}
+                  title="Click to set a value (21, +21, -21, max)"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); startCounterEdit(counter); }}
+                >
+                  {/* M4a: mit Obergrenze steht hier "2 / 3". Erzwungen wird sie
+                      nicht - der rote Marker liegt daneben, der Tisch rechnet nicht. */}
+                  {counterDisplay(counter)}
+                </span>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); incrementCounter(counter.id); }}
                 data-testid={`counter-increment-${counter.id}`}
@@ -5250,8 +5337,32 @@ export default function GameTable({ room = null }) {
                 <p className="text-white/50 text-xs mt-1">
                   {availableCards.length === 0
                     ? 'No cards imported yet. Go to game details to upload cards.'
-                    : `${availableCards.length} card(s) available. Click to place on table.`}
+                    : cardSearchHits
+                      ? `${cardSearchHits.length} of ${availableCards.length} card(s) match.`
+                      : `${availableCards.length} card(s) available. Click to place on table.`}
                 </p>
+              )}
+              {/* M8.5: das einzige Eingabefeld der Oberflaeche. Sucht ueber alle
+                  Kategorien, auch die zugeklappten, und lebt mit den kaputten
+                  OCR-Namen (client/src/utils/cardSearch.js). */}
+              {availableCards.length > 0 && (
+                <input
+                  type="search"
+                  value={cardSearch}
+                  onChange={(e) => setCardSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Escape raeumt erst die Suche; ist sie leer, bleibt es
+                    // M2.10 ueberlassen (dann schliesst es die Schublade).
+                    if (e.key === 'Escape' && cardSearch) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setCardSearch('');
+                    }
+                  }}
+                  placeholder="Search all categories…"
+                  data-testid="card-search-input"
+                  className="mt-2 w-full px-2 py-1 bg-slate-900/80 border border-white/15 rounded text-white text-xs placeholder-white/30 focus:outline-none focus:border-blue-400"
+                />
               )}
             </div>
             <div className="flex-1 overflow-y-auto p-2">
@@ -5269,6 +5380,46 @@ export default function GameTable({ room = null }) {
                     Import Cards
                   </button>
                 </div>
+              ) : cardSearchHits ? (
+                /* M8.5: ein Treffer nennt seine Kategorie (Abnahme 3) - sonst
+                   waere er genauso wenig auffindbar wie vorher. */
+                cardSearchHits.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-white/40 text-xs px-2 text-center">
+                    <span data-testid="card-search-empty">No card matches “{cardSearch}”.</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2" data-testid="card-search-results">
+                    {cardSearchHits.map(card => (
+                      <button
+                        key={card.id}
+                        onClick={() => placeCardOnTable(card)}
+                        data-testid={`drawer-card-${card.id}`}
+                        className="group relative rounded-lg overflow-hidden border border-white/10 hover:border-blue-400 transition-all bg-slate-700/50 flex flex-col"
+                        title={`Place "${card.name}" on table`}
+                      >
+                        <div
+                          className="w-full"
+                          style={{ aspectRatio: (card.width > 0 && card.height > 0) ? `${card.width}/${card.height}` : '5/7' }}
+                        >
+                          {card.image_path ? (
+                            <img src={card.image_path} alt={card.name} className="w-full h-full object-contain" draggable={false} />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-600 text-white/40 text-[10px]">no image</div>
+                          )}
+                        </div>
+                        <div className="w-full bg-black/70 text-white sm:text-[9px] text-xs text-center py-0.5 truncate px-1">
+                          {card.name}
+                        </div>
+                        <div
+                          className="w-full bg-black/40 text-blue-300 sm:text-[8px] text-[10px] text-center py-0.5 truncate px-1"
+                          data-testid={`drawer-card-category-${card.id}`}
+                        >
+                          {categoryNames.get(card.category_id) || 'Uncategorized'}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
               ) : (
                 <div className="space-y-2">
                   {/* Categories */}
