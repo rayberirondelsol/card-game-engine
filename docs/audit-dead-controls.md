@@ -77,10 +77,10 @@ Abmelden-Knopf** in der Oberfläche. Eine Sitzung lässt sich nicht beenden.
 ## Geprüft und sauber
 
 - `<button>` ohne `onClick`: außer „Save Current View" nur `type="submit"` in Formularen
-- `STEP_TYPES` gegen den Executor: 12 zu 12, Feldlisten passen
+- ~~`STEP_TYPES` gegen den Executor: 12 zu 12~~ — **ueberholt**, seit M8.4/M8.8/M8.9/M8.10 sind es mehr; die Gleichheit wird in `sequence-steps.test.js` gehalten
 - `toggleLockObj`: Brett-Zweig vorhanden
 - Zonen zeichnen: Handler hängen an der Zeichenfläche
-- Tastenkürzel-Legende gegen Listener: alle elf beidseitig
+- ~~Tastenkürzel-Legende gegen Listener: alle elf beidseitig~~ — **war falsch**, siehe Fund 11
 - Props aller Komponenten in beide Richtungen
 - Client-Aufrufe auf nicht existierende Endpunkte: keine
 - Zonen-Eigenschaften `accepts`/`capacity`/`layout`/`snap`/`exclusive`/`anchor`: alle
@@ -90,3 +90,64 @@ Abmelden-Knopf** in der Oberfläche. Eine Sitzung lässt sich nicht beenden.
 
 Serverinterne Toterkennung außerhalb der Endpunktliste, die `test-feature-*.mjs` im
 Wurzelverzeichnis, CSS-only-Zustände.
+
+---
+
+## Nachtrag: Funde aus den Partien und den Umbauten M7.2–M8.11
+
+### 7. Aktionen laufen im Mehrspieler-Raum gar nicht
+
+`MultiplayerGame.jsx` liest `action_data` nie. „Kampf beginnen" und „Dorfphase
+beginnen" gibt es dort also nicht — im Raum ist die Partie nicht führbar.
+Dasselbe Muster wie Fund 1, eine Ebene höher.
+
+### 8. Zonen werden nur im Raum gezeichnet
+
+`ZoneOverlay` hängt in `GameTable.jsx` ausschließlich im `{room && (…)}`-Zweig.
+**Am Hotseat-Tisch ist keine einzige Zone sichtbar** — weder Rahmen noch
+Namensschild. Die Solopartie, für die das Ganze gebaut ist, sieht also nichts
+von den vierzig Zonen. Raster haben für die Gegenrichtung ein `showInPlay`;
+Zonen haben nichts Vergleichbares, weshalb im Raum umgekehrt **alle** gezeichnet
+werden, auch die vierzehn Leisten-Zonen über dem Aufdruck.
+
+### 9. `stack_move` und die stummen Kartenzüge
+
+Der Empfänger für `stack_move` existiert, **der Client sendet es nie**.
+Ebenso senden der Mehrfachauswahl- und der Stapelzweig von
+`handleCardDragEnd` **gar keine** Nachricht: im Raum bewegt sich dabei nichts.
+Und **Bretter und Textfelder haben überhaupt keine Bewegungsnachricht** — ein
+im Raum verschobenes Brett zieht die daran verankerten Rasterfelder und Zonen
+mit, ohne dass es jemand erfährt.
+
+### 10. Die Brettliste `boards` lässt sich nicht füllen
+
+Es gibt eine eigene Liste `boards`, die mit `zIndex: 1` gezeichnet wird, aber
+`setBoards` wird nur beim Laden und Löschen gerufen. `place_asset` und
+`build_scenario` schieben ausnahmslos in `state.tokens`. Hauptplan und
+Zusatz-Brett sind also Token wie jedes andere Stück.
+
+### 11. Die Tastenkürzel-Hilfe log an fünf Stellen
+
+Nachgeprüft bei M8.9: `F` wirkt nur auf ausgewählte **Karten**, nie auf einen
+Stapel — die Hilfe versprach „Flip card/stack". `1-9` sagt nicht, dass es auf
+die **Hand** zieht. `Escape` und `Shift+Click` fehlten ganz, obwohl beide
+Horcher existieren. „Click + Drag: Pan the table" gilt nur auf der leeren
+Fläche (`canStartPan`). Berichtigt; die Zeile für das Aufdecken fehlt bewusst,
+weil es keine Taste hat.
+
+### 12. Zwei Ungenauigkeiten in der Zonenrechnung
+
+`handleObjDragEnd` baut seine Liste der belegten Plätze mit `zoneContains`
+statt mit `objectsInZone` — das **Ankerobjekt** der Zone wird mitgezählt.
+Genau dagegen wurde `objectsInZone` gebaut. Und die vier Leisten-Zonen eines
+Dörfler-Tableaus **überlappen sich** um rund zwei Einheiten; `zoneAt` nimmt die
+zuletzt eingetragene, ein in den Überlappungsstreifen gezogener Marker rastet
+also in die Nachbarleiste. Beides folgenlos, solange die Plätze weit genug
+innen liegen — aber es ist Zufall, nicht Absicht.
+
+### 13. Der Zählerabstand läuft ins Unendliche
+
+`createCounter` rechnete `counters.length * 160`: ab dem sechsten Zähler stand
+der nächste 800 Punkte rechts, ab dem zehnten außerhalb jedes Bildes.
+Behoben in M8.6 über `shelfSlot`; hier notiert, weil es dieselbe Familie ist
+wie M8.1 — eine Position aus einer unbegrenzten Listenlänge.
