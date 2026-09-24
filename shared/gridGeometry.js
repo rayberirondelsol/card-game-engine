@@ -322,8 +322,17 @@ export function snapToGrid(grid, x, y, cell = null) {
   const held = cell ? cellRange(grid, cell) : null;
   const r = rangeAt(grid, x, y, held?.cols, held?.rows);
   if (!r) return null;
-  const p = boxCenter(rangeBox(grid, r));
-  return { x: p.x, y: p.y, gridId: grid.id, cell: rangeLabel(grid, { ...r, ranged: !!held?.ranged }) };
+  const box = rangeBox(grid, r);
+  const p = boxCenter(box);
+  const hit = { x: p.x, y: p.y, gridId: grid.id, cell: rangeLabel(grid, { ...r, ranged: !!held?.ranged }) };
+  // Die Masse eines Bereichs kommen mit – dieselbe Rechnung wie in
+  // `placeOnGrids`, damit Ziehen und Laden nicht zwei Antworten geben. Auf
+  // demselben Raster ist das die Kantenlaenge, die das Stueck ohnehin hatte;
+  // ueber einem Raster mit anderer Feldgroesse ist es die des neuen Bereichs,
+  // und ohne sie saehe der Tisch bis zum naechsten Laden etwas anderes als der
+  // Raum (M7.1). Ein Einzelfeld behaelt die Groesse seines Assets.
+  if (held?.ranged) { hit.width = box.width; hit.height = box.height; }
+  return hit;
 }
 
 /**
@@ -358,6 +367,35 @@ export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = nul
   // its own fallback (the table's 80px lattice) and must be able to tell
   // "nothing claimed this drop" from "a place happens to be where it fell".
   return { x, y, gridId: null, cell: null, snapped: false };
+}
+
+/**
+ * Die Adressfelder, die eine Bewegungsnachricht mitbringt – und nur die, die
+ * wirklich drinstehen (M7.1/G5).
+ *
+ * Ein Objekt merkt sich seit M3b nicht nur, *wo* es liegt, sondern auf *welchem
+ * Feld*, und seit M7.1 kann das ein Bereich mit nachgerechneten Massen sein.
+ * Wanderte die Adresse bei `token_move`/`card_move` nicht mit, behielte der Raum
+ * die alte, und `placeOnGrids` zoege das Stueck beim naechsten Laden dorthin
+ * zurueck – genau den halben Feldversatz weit, den der Bereich beseitigt.
+ *
+ * Ein *fehlendes* Feld ist nicht dasselbe wie ein Feld auf `null`: ein aelterer
+ * Client schickt keins davon, und sein Zug darf die vorhandene Adresse nicht
+ * loeschen. Ein ausdrueckliches `null` dagegen ist eine Aussage – "von Hand vom
+ * Raster gezogen" – und loescht.
+ *
+ * Steht hier, weil Server (Raumzustand) und Client (Tisch) dieselbe Antwort
+ * brauchen; zwei Listen waeren zwei Antworten.
+ */
+const ADDRESS_FIELDS = ['gridId', 'cell', 'width', 'height'];
+
+export function gridAddress(payload) {
+  const out = {};
+  if (!payload || typeof payload !== 'object') return out;
+  for (const key of ADDRESS_FIELDS) {
+    if (key in payload) out[key] = payload[key];
+  }
+  return out;
 }
 
 /**

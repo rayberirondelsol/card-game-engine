@@ -11,7 +11,7 @@ import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/zoneGeometry.js';
-import { resolveGrids, snapInto, placeOnGrids } from '../../../shared/gridGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids, gridAddress } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
@@ -1728,7 +1728,12 @@ export default function GameTable({ room = null }) {
         // stack keeps no field: it moved as part of something else.
         return { ...c, x: finalX, y: finalY, gridId: hit.gridId, cell: hit.cell };
       }));
-      if (room) room.sendAction({ type: 'card_move', table_id: draggingCard, x: finalX, y: finalY });
+      // Dieselbe Luecke wie bei `token_move`: Karten tragen seit M3b
+      // `gridId`/`cell`, und ohne sie behielte der Raum das alte Feld (G5).
+      if (room) room.sendAction({
+        type: 'card_move', table_id: draggingCard, x: finalX, y: finalY,
+        gridId: hit.gridId ?? null, cell: hit.cell ?? null,
+      });
     }
 
     // Haptic feedback on card drop (short vibration)
@@ -2090,6 +2095,12 @@ export default function GameTable({ room = null }) {
   }
 
   function handleObjDragEnd() {
+    // Wo das Token zur Ruhe kommt. `setTokens` wirkt erst beim naechsten
+    // Render, `tokens` traegt beim Senden also noch die Werte von vor dem
+    // Einrasten – ohne dieses Zwischenergebnis gingen der ungerastete Punkt
+    // und die alte Adresse in den Raum (M7.1/G5).
+    let movedToken = null;
+    let movedPlace = null;
     if (draggingObj && draggingObj.type === 'token') {
       const token = tokens.find(t => t.id === draggingObj.id);
       if (token) {
@@ -2097,12 +2108,9 @@ export default function GameTable({ room = null }) {
         // was dropped on a particular card – so it beats both a zone's places
         // and a grid field, and clears any field the token used to hold.
         const snap = findNearestCardCorner(token.x, token.y);
+        let moved = null;
         if (snap) {
-          setTokens(prev => prev.map(t =>
-            t.id === draggingObj.id
-              ? { ...t, x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner, gridId: null, cell: null }
-              : t
-          ));
+          moved = { x: snap.x, y: snap.y, attachedTo: snap.cardTableId, attachedCorner: snap.corner, gridId: null, cell: null };
         } else {
           const dropZone = zoneAt(tableZones, token.x, token.y);
           const taken = dropZone
@@ -2115,15 +2123,20 @@ export default function GameTable({ room = null }) {
           // einen halben Feldversatz weit.
           const hit = snapInto(token.x, token.y, { zone: dropZone, grids: tableGrids, taken, cell: token.cell });
           if (hit.snapped) {
-            setTokens(prev => prev.map(t =>
-              t.id === draggingObj.id ? { ...t, x: hit.x, y: hit.y, gridId: hit.gridId, cell: hit.cell } : t
-            ));
+            // `snapped` ist die Antwort auf die Frage, nicht Teil des
+            // Ergebnisses – der Rest (x, y, gridId, cell und bei einem Bereich
+            // dessen Masse) ist, was am Token gilt und in den Raum geht.
+            const { snapped, ...place } = hit;
+            moved = place;
           } else if (token.gridId || token.cell) {
             // Dragged off the grid: the field it names is no longer where it
             // is, and a stale field would teleport it on the next load.
-            setTokens(prev => prev.map(t => (t.id === draggingObj.id ? { ...t, gridId: null, cell: null } : t)));
+            moved = { gridId: null, cell: null };
           }
         }
+        if (moved) setTokens(prev => prev.map(t => (t.id === draggingObj.id ? { ...t, ...moved } : t)));
+        movedPlace = moved;
+        movedToken = { ...token, ...moved };
       }
     }
     if (room && draggingObj) {
@@ -2141,8 +2154,19 @@ export default function GameTable({ room = null }) {
         const obj = notes.find(n => n.id === objId);
         if (obj) room.sendAction({ type: 'note_move', note_id: objId, x: obj.x, y: obj.y });
       } else if (objType === 'token') {
-        const obj = tokens.find(t => t.id === objId);
-        if (obj) room.sendAction({ type: 'token_move', token_id: objId, x: obj.x, y: obj.y });
+        const obj = movedToken || tokens.find(t => t.id === objId);
+        // Die Adresse geht mit, sonst behielte der Raum die alte und
+        // `placeOnGrids` zoege das Stueck beim naechsten Laden dorthin
+        // zurueck (M7.1/G5). `null` ist hier eine Aussage – vom Raster
+        // gezogen – und kein fehlendes Feld.
+        if (obj) room.sendAction({
+          type: 'token_move', token_id: objId, x: obj.x, y: obj.y,
+          gridId: obj.gridId ?? null, cell: obj.cell ?? null,
+          // Nur ein Bereich bringt nachgerechnete Masse mit; ein Einzelfeld
+          // behaelt die Groesse seines Assets, und ein Zug, der keine schickt,
+          // darf die vorhandenen nicht ueberschreiben.
+          ...(movedPlace && 'width' in movedPlace ? { width: obj.width, height: obj.height } : {}),
+        });
       }
     }
     setDraggingObj(null);
@@ -2990,8 +3014,11 @@ export default function GameTable({ room = null }) {
     try {
       switch (msg.type) {
         case 'card_move':
+          // `gridAddress` nimmt nur die Felder, die wirklich in der Nachricht
+          // stehen: ein aelterer Client schickt keine Adresse, und sein Zug
+          // darf die vorhandene nicht loeschen (M7.1/G5).
           setTableCards(prev => prev.map(c =>
-            c.tableId === msg.table_id ? { ...c, x: msg.x, y: msg.y } : c
+            c.tableId === msg.table_id ? { ...c, x: msg.x, y: msg.y, ...gridAddress(msg) } : c
           ));
           break;
         case 'card_flip':
@@ -3066,7 +3093,9 @@ export default function GameTable({ room = null }) {
           setNotes(prev => prev.map(n => n.id === msg.note_id ? { ...n, text: msg.text } : n));
           break;
         case 'token_move':
-          setTokens(prev => prev.map(t => t.id === msg.token_id ? { ...t, x: msg.x, y: msg.y } : t));
+          setTokens(prev => prev.map(t => (
+            t.id === msg.token_id ? { ...t, x: msg.x, y: msg.y, ...gridAddress(msg) } : t
+          )));
           break;
         case 'token_create':
           setTokens(prev => {

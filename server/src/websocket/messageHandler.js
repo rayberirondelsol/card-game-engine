@@ -5,6 +5,9 @@
 
 import { broadcast, sendToPlayer } from './broadcast.js';
 import { getDb } from '../database.js';
+// Der Server rechnet die Adresse nicht nach - er kennt weder Raster noch
+// Bretter. Was gilt, entscheidet der Tisch, der gezogen hat (wie bei x/y auch).
+import { gridAddress } from '../../../shared/gridGeometry.js';
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -102,16 +105,15 @@ function isActionAllowed(room, playerId, x, y) {
 
 // ─── Card actions ─────────────────────────────────────────────────────────────
 
-function handleCardMove(room, playerId, { table_id, x, y }, timestamp) {
+function handleCardMove(room, playerId, payload, timestamp) {
+  const { table_id, x, y } = payload;
   if (!isActionAllowed(room, playerId, x, y)) {
     return sendToPlayer(room, playerId, { type: 'error', message: 'Not allowed in this zone' });
   }
+  const address = gridAddress(payload);
   const card = room.boardState.cards.find(c => c.tableId === table_id);
-  if (card) {
-    card.x = x;
-    card.y = y;
-  }
-  broadcast(room, { type: 'card_move', table_id, x, y, from_player_id: playerId, timestamp }, playerId);
+  if (card) Object.assign(card, { x, y }, address);
+  broadcast(room, { type: 'card_move', table_id, x, y, ...address, from_player_id: playerId, timestamp }, playerId);
 }
 
 function handleCardFlip(room, playerId, { table_id, face_down }, timestamp) {
@@ -261,10 +263,12 @@ function handleNoteEdit(room, playerId, { note_id, text }, timestamp) {
   broadcast(room, { type: 'note_edit', note_id, text, from_player_id: playerId, timestamp }, playerId);
 }
 
-function handleTokenMove(room, playerId, { token_id, x, y }, timestamp) {
+function handleTokenMove(room, playerId, payload, timestamp) {
+  const { token_id, x, y } = payload;
+  const address = gridAddress(payload);
   const token = room.boardState.tokens.find(t => t.id === token_id);
-  if (token) { token.x = x; token.y = y; }
-  broadcast(room, { type: 'token_move', token_id, x, y, from_player_id: playerId, timestamp }, playerId);
+  if (token) Object.assign(token, { x, y }, address);
+  broadcast(room, { type: 'token_move', token_id, x, y, ...address, from_player_id: playerId, timestamp }, playerId);
 }
 
 // ─── Hand count sync ──────────────────────────────────────────────────────────

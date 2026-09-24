@@ -162,6 +162,28 @@ test('am Rand findet ein 3×2-Stück keinen Platz mehr', () => {
   assert.deepStrictEqual({ x: hit.x, y: hit.y }, ecke, 'der Punkt bleibt unangetastet');
 });
 
+test('ein Bereich bringt beim Ziehen seine nachgerechneten Masse mit', () => {
+  // Dieselbe Rechnung wie in `placeOnGrids`, damit Ziehen und Laden nicht zwei
+  // Antworten geben - und damit `token_move` sie in den Raum tragen kann
+  // (M7.1/G5). Auf demselben Raster ist das die Kantenlaenge, die das Stueck
+  // ohnehin hatte; ueber einem Raster mit groesseren Feldern die neue.
+  const ziel = cellPoint(grid(), 'H6:J7');
+  const hit = snapInto(ziel.x, ziel.y, { grids: [grid()], cell: 'E3:G4' });
+  assert.deepStrictEqual({ width: hit.width, height: hit.height }, { width: 180, height: 120 });
+
+  const gross = grid({ id: 'g2', cell: 90 });
+  const drueben = snapInto(cellPoint(gross, 'H6:J7').x, cellPoint(gross, 'H6:J7').y, { grids: [gross], cell: 'E3:G4' });
+  assert.equal(drueben.cell, 'H6:J7', 'dieselben drei mal zwei Felder');
+  assert.deepStrictEqual({ width: drueben.width, height: drueben.height }, { width: 270, height: 180 });
+});
+
+test('ein Einzelfeld bringt keine Masse mit – es behaelt die seines Assets', () => {
+  const p = cellPoint(grid(), 'C7');
+  const hit = snapInto(p.x, p.y, { grids: [grid()], cell: 'C7' });
+  assert.ok(!('width' in hit), 'sonst waere jede Figur ploetzlich feldgross');
+  assert.ok(!('height' in hit));
+});
+
 test('ohne Bereichsadresse zieht sich alles wie bisher – ein Feld', () => {
   const p = cellPoint(grid(), 'C7');
   const alt = snapInto(p.x + 5, p.y + 5, { grids: [grid()] });
