@@ -19,7 +19,8 @@ Datenbank. Du spielst und **protokollierst, was sich nicht spielen lässt.**
 2. `docs/spec-setup-system.md` — der Vertrag der Engine. Für das Spielen
    zählen M3b (Raster), M7 bis M7.6 (Kampfaufbau, Bereichsfelder, Drehung,
    Grundflächen, Kampfseite des Zusatz-Bretts, Rückseiten von Geländeteilen)
-   und M8.1 bis M8.11 (alles, was aus gespielten Partien entstanden ist).
+   und M8.1 bis M8.11 sowie M9.1 bis M9.5 (alles, was aus gespielten Partien
+   entstanden ist).
 
 `docs/audit-dead-controls.md` ist die Liste der bekannten toten Bedienelemente.
 **Lies sie, bevor du etwas als neuen Fund meldest.**
@@ -90,6 +91,24 @@ Kampfseite des Zusatz-Bretts), dazu die vierzehn Leisten-Zonen.
 
 **Zonen werden am Hotseat-Tisch nicht gezeichnet** — nur im Multiplayer-Raum.
 Du siehst also keine Rahmen. Das ist kein Fehler.
+
+**Stapel ziehst du wie jedes andere Ding.** Die oberste Karte abzuheben liegt
+im Kontextmenü als **„Take Top Card"**. Das halbe-Sekunde-Halten gibt es nicht
+mehr.
+
+**Eine Aktion hält ganz an, wenn ihre Vorbedingung nicht stimmt.** „Kampf
+beginnen" ohne vorherige Dorfphase deckt **keinen** Bösewicht auf, sondern sagt
+„Erst die Dorfphase beginnen". Umgekehrt genauso. Eine Zeile Meldung, nicht
+sechzehn.
+
+**Alles liegt über den Brettern** — Karten, Würfel, Zähler, Notizen. Das
+Aktionsdeck auf der ACTION-Buchseite, die zehn Ladenkarten, die beiden
+Bösewicht-Zähler an den RUFFIAN-Leisten und jeder Würfel sind sichtbar und
+anklickbar. Wenn nicht, ist das ein Befund.
+
+**Ein leerer Tisch überschreibt keinen gefüllten Speicherstand.** Trotzdem:
+ruf **nicht** `/play/<id>` auf, um neu zu laden — diese Adresse öffnet einen
+leeren Tisch.
 
 **Grundflächen.** Bösewicht und Dörfler belegen **je 2×2 Felder**; im echten
 Spiel ist der Dörfler 1×1 (§5.10), in der Engine ist es eine Entscheidung
