@@ -156,8 +156,27 @@ function handleCardPlayFromHand(room, playerId, { card, x, y }, timestamp) {
 
 // ─── Stack actions ────────────────────────────────────────────────────────────
 
+/**
+ * Der Stapel, den eine Nachricht meint.
+ *
+ * Jeder Stapel im System heisst `stackId`: so legt ihn `sequenceExecutor.js`
+ * an (`place_stack`, `clear_zone`), so serialisiert ihn `getGameState`, so
+ * liest ihn `loadGameState`. Die Stapel-Empfaenger hier suchten aber `s.id`
+ * und fanden deshalb nie etwas - der Rundruf ging raus, der Raumzustand blieb
+ * stehen, und ein spaeter hinzukommender Spieler sah den alten Stand
+ * (docs/audit-dead-controls.md, Fund 9). `id` bleibt als Rueckfall stehen,
+ * damit ein alter Raumzustand weiter gefunden wird.
+ */
+function stackIdOf(stack) {
+  return stack?.stackId ?? stack?.id;
+}
+
+function findStack(room, stackId) {
+  return room.boardState.stacks.find(s => stackIdOf(s) === stackId);
+}
+
 function handleStackMove(room, playerId, { stack_id, x, y }, timestamp) {
-  const stack = room.boardState.stacks.find(s => s.id === stack_id);
+  const stack = findStack(room, stack_id);
   if (stack) {
     stack.x = x;
     stack.y = y;
@@ -169,13 +188,14 @@ function handleStackCreate(room, playerId, { stack_id, card_table_ids, x, y }, t
   // Remove cards from table, put them in a new stack
   const cards = room.boardState.cards.filter(c => card_table_ids.includes(c.tableId));
   room.boardState.cards = room.boardState.cards.filter(c => !card_table_ids.includes(c.tableId));
-  room.boardState.stacks.push({ id: stack_id, cards, x, y });
+  // `stackId`, nicht `id` – derselbe Name wie im Executor und im Spielstand.
+  room.boardState.stacks.push({ stackId: stack_id, cards, x, y });
   broadcast(room, { type: 'stack_create', stack_id, card_table_ids, x, y, from_player_id: playerId, timestamp }, playerId);
 }
 
 function handleStackMerge(room, playerId, { from_stack_id, to_stack_id }, timestamp) {
-  const fromIdx = room.boardState.stacks.findIndex(s => s.id === from_stack_id);
-  const toStack = room.boardState.stacks.find(s => s.id === to_stack_id);
+  const fromIdx = room.boardState.stacks.findIndex(s => stackIdOf(s) === from_stack_id);
+  const toStack = findStack(room, to_stack_id);
   if (fromIdx !== -1 && toStack) {
     const fromStack = room.boardState.stacks[fromIdx];
     toStack.cards = [...toStack.cards, ...fromStack.cards];
@@ -185,14 +205,14 @@ function handleStackMerge(room, playerId, { from_stack_id, to_stack_id }, timest
 }
 
 function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestamp) {
-  const stack = room.boardState.stacks.find(s => s.id === stack_id);
+  const stack = findStack(room, stack_id);
   if (!stack || stack.cards.length === 0) return;
   const topCard = stack.cards.pop();
   const tableCard = { ...topCard, x: new_x, y: new_y, tableId: topCard.tableId || generateId() };
   room.boardState.cards.push(tableCard);
   // Remove empty stack
   if (stack.cards.length === 0) {
-    room.boardState.stacks = room.boardState.stacks.filter(s => s.id !== stack_id);
+    room.boardState.stacks = room.boardState.stacks.filter(s => stackIdOf(s) !== stack_id);
   }
   broadcast(room, {
     type: 'stack_take_top',
@@ -206,7 +226,7 @@ function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestam
 }
 
 function handleStackShuffle(room, playerId, { stack_id }, timestamp) {
-  const stack = room.boardState.stacks.find(s => s.id === stack_id);
+  const stack = findStack(room, stack_id);
   if (stack) {
     for (let i = stack.cards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -219,7 +239,7 @@ function handleStackShuffle(room, playerId, { stack_id }, timestamp) {
 // ─── Private hand draw ────────────────────────────────────────────────────────
 
 function handleCardDrawToHand(room, playerId, { stack_id, count }) {
-  const stack = room.boardState.stacks.find(s => s.id === stack_id);
+  const stack = findStack(room, stack_id);
   if (!stack) return sendToPlayer(room, playerId, { type: 'draw_response', cards: [] });
 
   const drawCount = Math.min(count || 1, stack.cards.length);
@@ -227,7 +247,7 @@ function handleCardDrawToHand(room, playerId, { stack_id, count }) {
 
   // Remove empty stack
   if (stack.cards.length === 0) {
-    room.boardState.stacks = room.boardState.stacks.filter(s => s.id !== stack_id);
+    room.boardState.stacks = room.boardState.stacks.filter(s => stackIdOf(s) !== stack_id);
     broadcast(room, { type: 'stack_removed', stack_id, from_player_id: playerId, timestamp: Date.now() });
   } else {
     broadcast(room, {

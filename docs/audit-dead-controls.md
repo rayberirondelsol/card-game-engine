@@ -112,9 +112,19 @@ werden, auch die vierzehn Leisten-Zonen über dem Aufdruck.
 
 ### 9. `stack_move` und die stummen Kartenzüge
 
-Der Empfänger für `stack_move` existiert, **der Client sendet es nie**.
-Ebenso senden der Mehrfachauswahl- und der Stapelzweig von
-`handleCardDragEnd` **gar keine** Nachricht: im Raum bewegt sich dabei nichts.
+~~Der Empfänger für `stack_move` existiert, **der Client sendet es nie**.~~
+**Teilweise behoben in M9.4** (`docs/tasks-stapel-und-zaehler.md`, H4): seit ein
+Zug am Stapel den Stapel verschiebt, sendet `handleCardDragEnd` die Nachricht.
+Der Empfänger taugte dabei **nicht**, wie er dastand — er suchte
+`stacks.find(s => s.id === …)`, während jeder Stapel im System `stackId` heißt
+(Executor, `getGameState`, `loadGameState`). Er hätte nie etwas gefunden:
+Rundruf ja, gespeicherter Raumzustand nein. Betroffen waren auch
+`stack_create`, `stack_merge`, `stack_take_top`, `stack_shuffle` und
+`card_draw_to_hand`; alle sechs gehen jetzt über `findStack`.
+
+Der Rest des Fundes steht unverändert: der **Mehrfachauswahl**-Zweig von
+`handleCardDragEnd` sendet weiterhin **gar keine** Nachricht, im Raum bewegt
+sich dabei nichts.
 Und **Bretter und Textfelder haben überhaupt keine Bewegungsnachricht** — ein
 im Raum verschobenes Brett zieht die daran verankerten Rasterfelder und Zonen
 mit, ohne dass es jemand erfährt.

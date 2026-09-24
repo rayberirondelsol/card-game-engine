@@ -18,12 +18,13 @@ import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
-import { normalizeCounter, counterDisplay, newCounterValue, counterValue } from '../../../shared/counters.js';
+import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement } from '../utils/menuPlacement.js';
 import { revealZones, revealPlan } from '../utils/revealToZone.js';
+import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
 import { objectLists, objectDeleters } from '../utils/objectTypes.js';
@@ -623,10 +624,11 @@ export default function GameTable({ room = null }) {
   // Browse stack modal state
   const [browseStackId, setBrowseStackId] = useState(null);
 
-  // Press-and-hold state for stack interaction
-  const pressHoldTimerRef = useRef(null);
+  // M9.4: Der Zeitgeber ist weg - ein Zug am Stapel verschiebt ihn sofort.
+  // Geblieben ist die Schwelle: `pendingStackRef` haelt den gedrueckten Stapel,
+  // bis der Zeiger sich wirklich bewegt, und `pressHoldActive` sagt, ob daraus
+  // ein Zug wurde oder nur ein Klick.
   const [pressHoldActive, setPressHoldActive] = useState(false);
-  const PRESS_HOLD_DELAY = 500; // milliseconds to distinguish quick-click from press-hold
   // Track the pending stack interaction (which card was pressed, which stack it's in)
   const pendingStackRef = useRef(null); // { tableId, stackId, event }
 
@@ -1303,27 +1305,31 @@ export default function GameTable({ room = null }) {
     const pointer = getPointerPosition(e);
     const stackId = card.inStack;
 
-    // If card is in a stack, implement press-and-hold behavior
+    // M9.4: Ein Zug am Stapel verschiebt den Stapel.
+    //
+    // Vorher stand hier die Geste aus Tabletop Simulator: wer eine halbe
+    // Sekunde hielt, zog den Stapel, wer sofort zog, hob die oberste Karte ab.
+    // Gebaut war das absichtlich, verteilt war es falsch herum - der
+    // alltaegliche Griff kostete Wartezeit, der seltene war die Vorgabe. Am
+    // Tisch hat niemand gewartet: aus "Aktionen: Deputy Waggums (15)" wurde
+    // dreimal (14) plus einer losen Karte. Der Zeitgeber ist darum weg; der
+    // Zug gilt dem ganzen Stapel.
+    //
+    // `pendingStackRef` bleibt, aber nur noch als Schwelle: bis zum ersten
+    // echten Zeigerweg passiert nichts, damit ein blosser Klick den Stapel
+    // auswaehlt und ihn nicht auf das Raster rueckt.
+    //
+    // Abheben gibt es weiterhin, im Kontextmenue: "Take Top Card" (verdeckt
+    // daneben), "Draw Card" (auf die Hand) und "Reveal Top Card to ..." (offen
+    // in eine Zone).
     if (stackId) {
       const stackCards = tableCards.filter(c => c.inStack === stackId);
 
-      // Only apply press-and-hold if stack has 2+ cards
       if (stackCards.length >= 2) {
-        // Find the top card (highest zIndex) - this is the one we'll detach on short press + move
+        // Der Zug haengt am obersten Blatt - es ist das, was gezeichnet wird.
         const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max);
 
-        // Store pending stack info so handleCardDragMove knows what to do
         pendingStackRef.current = { tableId: topCard.tableId, stackId, event: e };
-
-        // Start timer for press-and-hold (long press = drag entire stack)
-        pressHoldTimerRef.current = setTimeout(() => {
-          // Haptic feedback on long-press recognition (medium vibration)
-          triggerHaptic('longPress');
-          // After delay, allow dragging the entire stack
-          setPressHoldActive(true);
-          pendingStackRef.current = null;
-          startDraggingCard(e, topCard.tableId, topCard, stackId);
-        }, PRESS_HOLD_DELAY);
 
         // Store initial pointer position to detect if pointer moves (use world coords for offset)
         const worldPos = screenToWorld(pointer.clientX, pointer.clientY);
@@ -1425,53 +1431,18 @@ export default function GameTable({ room = null }) {
       }
     }
 
-    // If timer is active and pointer moves significantly, cancel timer and detach top card from stack
-    if (pressHoldTimerRef.current && cardDragOffsetRef.current.initialX !== undefined) {
+    // M9.4: der erste echte Zeigerweg auf einem Stapel startet den Zug des
+    // *ganzen* Stapels. Die 5-px-Schwelle bleibt, damit ein Klick ohne Weg den
+    // Stapel nur auswaehlt (handleCardDragEnd) und ihn nicht aufs Raster rueckt.
+    if (!draggingCard && pendingStackRef.current && cardDragOffsetRef.current.initialX !== undefined) {
       const dx = Math.abs(pointer.clientX - cardDragOffsetRef.current.initialX);
       const dy = Math.abs(pointer.clientY - cardDragOffsetRef.current.initialY);
       if (dx > 5 || dy > 5) {
-        // Pointer moved before long-press timer - cancel timer
-        clearTimeout(pressHoldTimerRef.current);
-        pressHoldTimerRef.current = null;
+        const { tableId: topCardId, stackId } = pendingStackRef.current;
+        pendingStackRef.current = null;
         setPressHoldActive(true);
-
-        // Short press + move: detach only the top card from the stack
-        if (!draggingCard && pendingStackRef.current) {
-          const { tableId: topCardId, stackId } = pendingStackRef.current;
-          pendingStackRef.current = null;
-
-          // Detach the top card from its stack
-          const topCard = tableCards.find(c => c.tableId === topCardId);
-          if (topCard) {
-            // Remove the top card from the stack (set inStack to null)
-            setTableCards(prev => {
-              const updated = prev.map(c => {
-                if (c.tableId === topCardId) {
-                  return { ...c, inStack: null };
-                }
-                return c;
-              });
-              // If only one card left in the stack, unstack it too
-              const remainingInStack = updated.filter(c => c.inStack === stackId);
-              if (remainingInStack.length === 1) {
-                return updated.map(c => c.inStack === stackId ? { ...c, inStack: null } : c);
-              }
-              return updated;
-            });
-
-            // Start dragging the detached single card (NOT as part of a stack)
-            startDraggingCard(e, topCardId, topCard, null);
-          }
-        } else if (!draggingCard) {
-          // Fallback for non-stack cards (shouldn't normally happen)
-          const card = tableCards.find(c =>
-            Math.abs(c.x - (cardDragOffsetRef.current.initialX - cardDragOffsetRef.current.x)) < 10 &&
-            Math.abs(c.y - (cardDragOffsetRef.current.initialY - cardDragOffsetRef.current.y)) < 10
-          );
-          if (card) {
-            startDraggingCard(e, card.tableId, card, card.inStack);
-          }
-        }
+        const topCard = tableCards.find(c => c.tableId === topCardId);
+        if (topCard) startDraggingCard(e, topCardId, topCard, stackId);
       }
     }
 
@@ -1585,13 +1556,7 @@ export default function GameTable({ room = null }) {
       longPressPreviewTimerRef.current = null;
     }
 
-    // Clear press-hold timer if it exists
-    if (pressHoldTimerRef.current) {
-      clearTimeout(pressHoldTimerRef.current);
-      pressHoldTimerRef.current = null;
-    }
-
-    // If we have a pending stack interaction that wasn't activated (no movement, no long press)
+    // If we have a pending stack interaction that wasn't activated (no movement)
     // This is a short click with no movement on a stack - just select the stack, don't draw to hand
     const card = draggingCard ? tableCards.find(c => c.tableId === draggingCard) : null;
 
@@ -1626,7 +1591,11 @@ export default function GameTable({ room = null }) {
       const mine = new Set(card.inStack
         ? tableCards.filter(c => c.inStack === card.inStack).map(c => c.tableId)
         : [draggingCard]);
-      const others = tableCards.filter(c => !mine.has(c.tableId));
+      // M9.4/H2: was schon in der Zone liegt - ein Stapel zaehlt als *ein*
+      // Ding. Ohne `zoneOccupants` waere ein Aktionsdeck mit fuenfzehn Karten
+      // fuenfzehn Belegungen, und eine Zone mit `capacity: 1` wiese jeden
+      // weiteren Zug ab, obwohl nur ein Ding darin liegt.
+      const others = zoneOccupants(tableCards.filter(c => !mine.has(c.tableId)));
       const refusal = zoneRejects(dropZone, 'card', countInZone(dropZone, others, tokens));
       if (refusal) {
         const { originX, originY } = cardDragOffsetRef.current;
@@ -1778,6 +1747,10 @@ export default function GameTable({ room = null }) {
         }
         return c;
       }));
+      // M9.4: der Zug am Stapel geht in den Raum. Den Empfaenger gab es seit
+      // jeher (audit-dead-controls Fund 9), er suchte den Stapel nur unter dem
+      // falschen Feldnamen - siehe `findStack` in messageHandler.js.
+      if (room) room.sendAction({ type: 'stack_move', stack_id: card.inStack, x: finalX, y: finalY });
     } else {
       setTableCards(prev => prev.map(c => {
         if (c.tableId !== draggingCard) return c;
@@ -1898,15 +1871,22 @@ export default function GameTable({ room = null }) {
   /**
    * Die Eingabe uebernehmen. Was sie *bedeutet*, steht in shared/counters.js:
    * eine Zahl setzt, `+21`/`-21` rechnet, `max` fuellt auf die Obergrenze - die
-   * vier Lesarten, die auch `set_counter` benutzt. Was sich nicht lesen laesst,
-   * gibt `null` und faellt damit mit Abbrechen zusammen (Abnahme 2).
+   * vier Lesarten, die auch `set_counter` benutzt.
+   *
+   * M9.5 Regel 2: was sich nicht lesen laesst, verschwindet nicht mehr
+   * stillschweigend. `counterEdit` gibt den Grund, und der steht in demselben
+   * Meldekasten, in dem auch eine abgewiesene Zone ihren nennt - am Tisch sah
+   * "Enter tut nichts" sonst genauso aus wie "Enter hat gespeichert".
    */
   function commitCounterEdit(counterId) {
-    setCounters(prev => prev.map(c => {
-      if (c.id !== counterId) return c;
-      const next = counterValue(c, editingCounterText);
-      return next === null ? c : { ...c, value: next };
-    }));
+    const counter = counters.find(c => c.id === counterId);
+    const result = counterEdit(counter, editingCounterText);
+    if (result.reason) {
+      setSetupIssues([{ index: 0, type: 'counter', target: counter?.name || null, status: 'skipped', reason: result.reason }]);
+      cancelCounterEdit();
+      return;
+    }
+    setCounters(prev => prev.map(c => (c.id === counterId ? { ...c, value: result.value } : c)));
     cancelCounterEdit();
   }
 
@@ -2589,11 +2569,7 @@ export default function GameTable({ room = null }) {
     clearTimeout(longPressMenuTimerRef.current);
     longPressMenuTimerRef.current = null;
 
-    // 1. Clear press-hold timer
-    if (pressHoldTimerRef.current) {
-      clearTimeout(pressHoldTimerRef.current);
-      pressHoldTimerRef.current = null;
-    }
+    // 1. Drop a pending stack press
     setPressHoldActive(false);
     pendingStackRef.current = null;
 
@@ -4652,6 +4628,15 @@ export default function GameTable({ room = null }) {
                   type="text"
                   value={editingCounterText}
                   autoFocus
+                  /* M9.5 Regel 1: der alte Wert ist markiert, Tippen ersetzt
+                     ihn. Das steht der relativen Eingabe nicht im Weg - `+2`
+                     ist die ganze Eingabe, nicht ein Zusatz zum Feldinhalt.
+                     Genau weil der alte Wert stehenblieb, wurde aus `-2` ein
+                     `-2-3`, und das ist keine Zahl. Regel 3 steht daneben im
+                     Platzhalter und im Titel. */
+                  onFocus={(e) => e.target.select()}
+                  placeholder="21, +21, -21, max"
+                  title="A plain number sets the value, +n and -n add, max fills up"
                   onChange={(e) => setEditingCounterText(e.target.value)}
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
@@ -6586,6 +6571,9 @@ export default function GameTable({ room = null }) {
                 ['?', 'Toggle this help overlay'],
                 ['Scroll', 'Zoom in/out'],
                 ['Drag empty table', 'Pan the table'],
+                /* M9.4: der Zug am Stapel verschiebt ihn - ohne Wartezeit und
+                   ohne dass eine Karte hängenbleibt. Abheben steht daneben. */
+                ['Drag a stack', 'Move the whole stack (take one card off via the context menu)'],
                 ['Right-click', 'Context menu (flip, rotate, reveal, stack actions)'],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-3">
@@ -6755,6 +6743,22 @@ export default function GameTable({ room = null }) {
                       className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                     >
                       Browse
+                    </button>
+                    {/* M9.4 Abnahme 3: die oberste Karte abheben, seit der Zug
+                        am Stapel den Stapel verschiebt. Es ist `performSplit`
+                        mit Anzahl 1 - genau das, was "Split Stack" schon tut,
+                        nur ohne Dialog und getippte Eins. Die Karte landet
+                        verdeckt neben dem Stapel, also da, wo sie der alte Zug
+                        auch hingelegt hat. */}
+                    <button
+                      onClick={() => {
+                        performSplit(contextMenu.stackId, 1);
+                        setContextMenu(null);
+                      }}
+                      data-testid="context-take-top"
+                      className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                    >
+                      Take Top Card
                     </button>
                     <button
                       onClick={() => {

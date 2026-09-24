@@ -103,3 +103,28 @@ export function counterValue(counter, raw) {
   const n = Number(typeof raw === 'number' ? raw : String(raw).trim());
   return form === 'add' ? Number(counter?.value ?? 0) + n : n;
 }
+
+/**
+ * Was aus dem Getippten am Zählerfeld wird: `{ value }` oder `{ reason }`
+ * (M9.5 Regel 2).
+ *
+ * Vorher verschwand eine unlesbare Eingabe stillschweigend – `counterValue`
+ * gab `null`, das Feld schloss sich, der Wert blieb stehen. Am Tisch sah das
+ * aus wie „Enter tut nichts", und zusammen mit der klemmenden Löschtaste war
+ * es eine Falle: aus `-2` wurde `-2-3`, und `Number("-2-3")` ist `NaN`.
+ *
+ * **Hier wird nichts nachgerechnet.** Die vier Lesarten stehen in
+ * `counterValueForm`/`counterValue` und werden gefragt, nicht kopiert – eine
+ * zweite Rechnung wäre eine zweite Antwort. Neu ist allein die Übersetzung
+ * von `null` in einen Satz für den Meldekasten, in derselben Form wie
+ * `zoneRejects` sie für eine abgewiesene Zone liefert.
+ */
+export function counterEdit(counter, raw) {
+  const value = counterValue(counter, raw);
+  if (value !== null) return { value };
+  const written = String(raw ?? '').trim();
+  if (counterValueForm(raw) === 'max') {
+    return { reason: `counter has no maximum` };
+  }
+  return { reason: `cannot read "${written}" – type 21, +21, -21 or max` };
+}

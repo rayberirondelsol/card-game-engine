@@ -74,3 +74,23 @@ body {
 .safe-margin-right {
   margin-right: env(safe-area-inset-right, 0px);
 }
+
+/*
+ * M9.5: Eingabefelder am Spieltisch sind wieder Eingabefelder.
+ *
+ * Der Tischrahmen traegt `select-none` (GameTable.jsx), damit ein Zug ueber
+ * die Flaeche keinen Text markiert. `user-select` vererbt sich aber in jedes
+ * Kind, auch in jedes <input> darin: in einem Feld, in dem keine Auswahl
+ * entstehen kann, gibt es auch nichts, worauf sich Backspace, Entf oder
+ * Strg+A beziehen koennten. Getippte Zeichen hingen hinten an, aus -2 wurde
+ * -2-3, und nur ein Dreifachklick half.
+ *
+ * Hier und nicht am Zaehlerfeld: betroffen war jedes der acht Felder am Tisch
+ * (Notiz, Textfeld, Speichern-, Zaehler-, Wuerfel-, Teilen-Dialog). Ein
+ * `select-text` an einem davon haette sieben stehen lassen.
+ */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
