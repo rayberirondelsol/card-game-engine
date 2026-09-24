@@ -1631,3 +1631,130 @@ ausdrücklichen Bereich — oder die passende Größe.
 4. `placeOnGrids` setzt ein solches Stück beim Laden wieder auf dieselben
    Felder — Ziehen und Laden geben dieselbe Antwort.
 5. Im Raum reist die so entstandene Adresse samt `width`/`height` mit (G5).
+
+## M7.3 — Der Aufbau setzt Figuren auf ein Feld, obwohl sie zwei belegen
+
+**Befund am gespielten Tisch.** In `scenario_data` stehen die Dörfler als
+Einzelfelder:
+
+```json
+"fields": { "B": "J8:K9", "D": ["K11", "M11", "H12", "J12", "L13"] }
+```
+
+Ein Einzelfeld ergibt Grundfläche 1×1. Der Aufbau setzt die Figur damit auf die
+Mitte eines 50er-Feldes, ihr Bild ist aber 100×100 (M7.2) und ragt auf allen
+vier Seiten eine halbe Feldbreite über. Die Figur sitzt richtig und sieht falsch
+aus.
+
+M7.2 hilft hier nicht: die Ableitung wird vom Aufrufer angeboten, und
+`build_scenario` bietet sie nicht an. Das war bei der Umsetzung von M7.2
+richtig — M7.1-Abnahme 4 verlangte ausdrücklich, dass ein Dörfler aus `"D"`
+ein Feld belegt.
+
+**Diese Abnahme ist überholt.** Sie stammt aus der Zeit, als Figuren in der
+Engine 1×1 groß waren. Seit der Entscheidung, dass Figuren zwei mal zwei Felder
+belegen, ist sie falsch. **M7.1-Abnahme 4 wird hiermit zurückgezogen.**
+
+**Regel.** `build_scenario` leitet die Grundfläche eines Stücks aus dessen
+Größe ab, wenn die Szenariodaten ein Einzelfeld nennen — dieselbe Rechnung wie
+M7.2, derselbe Helfer, keine zweite Antwort. Ein ausdrücklicher Bereich in den
+Szenariodaten schlägt die Ableitung weiterhin.
+
+Ein Einzelfeld in `"D"` bedeutet damit **die Mitte der Figur**, nicht ihre
+Ecke: `K11` bei einer Figur von zwei mal zwei Feldern deckt die vier Felder um
+den Rasterpunkt bei K11. Das ist dieselbe Lesart, die `rangeAt` beim Ziehen
+schon hat, und deshalb geben Aufbau und Ziehen dieselbe Antwort.
+
+**Abnahme.**
+1. Ein Dörfler von 100×100 aus `"D": ["K11"]` belegt nach dem Aufbau vier
+   Felder, nicht eins.
+2. Ein Stück von 50×50 aus einer Einzelfeldangabe belegt weiterhin ein Feld.
+3. Ein ausdrücklicher Bereich (`"B": "J8:K9"`) gilt unverändert.
+4. Wird das so gesetzte Stück von Hand gezogen und wieder losgelassen, kommt
+   dieselbe Grundfläche heraus. Aufbau, Ziehen und Laden geben eine Antwort.
+5. Ein Stück, dessen abgeleitete Fläche über den Rasterrand ragt, wird wie
+   bisher nicht gesetzt und landet im Protokoll — es wird nicht stillschweigend
+   hineingeschoben.
+
+## M7.4 — Abgetippte Bereiche gegen das Bild prüfen
+
+**Befund.** Drei der 29 Geländebereiche in `scenario_data` haben ein
+Seitenverhältnis, das nicht zu ihrem Bild passt:
+
+| Teil | abgetippt | Bild |
+|---|---|---|
+| Überwuchertes Maisfeld | `K8:P10` (6×3, 2,00) | 1,64 |
+| Rostige Schrottkarre | `L4:M6` (2×3, 0,67) | 1,54 |
+| Marodes Farmhaus | `P4:S8` (4×5, 0,80) | 1,26 |
+
+Die übrigen 26 stimmen auf zwei Prozent. Ein Bild, das nicht zum Kasten passt,
+wird per `object-fit: contain` eingepasst und schwimmt mittig — das Teil sieht
+dann verrutscht aus, obwohl es auf seinen Feldern sitzt.
+
+**Regel.** Das Seitenverhältnis eines Geländebereichs muss zu dem seines Bildes
+passen (bei `rotation: 90` zum Kehrwert). Zwölf Prozent Abweichung sind die
+Grenze; darüber ist der Bereich falsch abgetippt, nicht das Bild.
+
+Das ist als Prüfung zu haben und gehört neben `validateScenarioData`, damit
+der nächste abgetippte Bösewicht nicht wieder von Hand nachgemessen werden muss.
+
+## M7.5 — Die Kampfseite des Zusatz-Bretts wird nicht aufgebaut
+
+**Befund am gespielten Tisch.** Das Zusatz-Brett (`Sideboard`, 300×999) ist
+beidseitig. Der Aufbau legt es mit `set_asset_face faceDown` auf die
+**Dorfphase** — richtig für die Dorfphase, aber die **Kampfseite** wird nie
+bedient. Auf ihr steht alles, was der Kampf braucht:
+
+| Bereich | Inhalt | heute im Aufbau |
+|---|---|---|
+| Buchseite links, **ACTION** | Aktionsdeck des Bösewichts | keine Zone |
+| Buchseite rechts, **DISCARD** | Ablagestapel dazu | keine Zone |
+| **RUFFIAN MOVEMENT**, Felder 1–12 | Marker auf BEW des Bösewichts | kein Zähler |
+| **RUFFIAN HEALTH**, Felder 1–24 (Schlangenlinie, 1–12 oben, 24–13 darunter) | Marker auf LEB des Bösewichts | kein Zähler |
+
+Die zwölf vorhandenen Attributzähler gehören alle den drei Dörflern (je vier).
+Der Bösewicht hat keine.
+
+Das Brett sagt es selbst: „Place their Ruffian card and action deck onto the
+sideboard" und „Mark the Ruffian HP and MVMT" — beides Schritte der
+Kampfvorbereitung, die `build_scenario` heute nicht ausführt.
+
+**Maße** (aus dem Bild gemessen, Maßstab 300/751; Ursprung links oben am
+Zusatz-Brett, in dessen eigenen Einheiten):
+
+- ACTION-Seite: Mitte ≈ (86, 675), Seitenfläche ≈ 124 × 184
+- DISCARD-Seite: Mitte ≈ (217, 675), gleiche Fläche
+- RUFFIAN MOVEMENT: Feldmitten auf y ≈ 842, Feld 1 bei x ≈ 50, Feld 12 bei
+  x ≈ 250, Schrittweite ≈ 18,2
+- RUFFIAN HEALTH, obere Reihe (1→12): y ≈ 917, x von ≈ 51 bis ≈ 258;
+  untere Reihe (24→13, **rückwärts**): y ≈ 949, gleiche Spanne
+
+Die Zahlen sind gemessen, nicht abgelesen — wer das umsetzt, prüft sie am
+Bild nach und korrigiert sie, statt sie zu glauben.
+
+**Regel.**
+1. Der Aufbau legt zwei Zonen auf die Kampfseite des Zusatz-Bretts: `Aktionen`
+   und `Ablage`. Das Aktionsdeck des gewählten Bösewichts kommt gemischt und
+   verdeckt auf `Aktionen`, `Ablage` bleibt leer.
+2. `build_scenario` setzt zwei Zähler: **Bösewicht: Bewegung** (Höchstwert 12)
+   und **Bösewicht: Leben** (Höchstwert 24), beide mit den Werten des gewählten
+   Bösewichts aus §5.4 des Regelwerks.
+3. Die Leisten sind **Anzeigen, keine Zonen**: der Zähler trägt seinen Wert
+   selbst, so wie die Attributzähler der Dörfler (M4a). Die Schlangenlinie der
+   Lebensleiste wird nicht nachgebaut.
+
+**Was dabei auffällt und benannt gehört.** Eine Zone hängt über eine relative
+Box am Anker (M3a) und weiß nichts von Vorder- und Rückseite. Zwei Zonen auf
+der Kampfseite liegen damit auch dann dort, wenn das Brett die Dorfphase zeigt.
+Das ist hinnehmbar, solange es ausgesprochen ist — eine seitenabhängige Zone
+wäre ein eigener Schritt und ist hier **nicht** gefordert.
+
+**Abnahme.**
+1. Nach dem Kampfaufbau liegt das Aktionsdeck des gewählten Bösewichts
+   gemischt und verdeckt auf `Aktionen`.
+2. Zwei Zähler tragen die BEW- und LEB-Werte des Bösewichts und stehen an den
+   beiden Leisten.
+3. Ein anderer Bösewicht ergibt andere Werte — die Zähler sind nicht fest
+   verdrahtet.
+4. Der Aufbau der Dorfphase bleibt unverändert; das Brett zeigt weiter die
+   Dorfphase, bis jemand es umdreht.

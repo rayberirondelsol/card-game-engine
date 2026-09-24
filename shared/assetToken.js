@@ -1,4 +1,20 @@
 /**
+ * Die Masse, mit denen ein Asset auf den Tisch kommt (M7.3).
+ *
+ * Eine Funktion, weil sie zwei Fragen beantwortet: wie gross das Token wird
+ * *und* wie viele Rasterfelder es belegt. Zwei Rechnungen waeren zwei
+ * Antworten – ein Stueck, das andere Felder belegt, als es bedeckt.
+ *
+ * Der Rueckfall von `height` auf die Breite ist der Grund, dass es sie gibt:
+ * ohne ihn gaebe ein Asset mit leerer `height` gar keine Ableitung (eine
+ * unbrauchbare Groesse ergibt keine Grundflaeche) und belegte still ein Feld.
+ */
+export function assetSize(asset) {
+  const width = asset?.width || 60;
+  return { width, height: asset?.height || width };
+}
+
+/**
  * Build a table token from a table_asset row – the one factory both ways onto
  * the table go through (spec milestone M3c).
  *
@@ -24,7 +40,7 @@ export function assetToken(asset, x, y, faceDown) {
   const back = asset.back_image_path || null;
   if (faceDown && !back) return null;
   const down = Boolean(faceDown);
-  const width = asset.width || 60;
+  const { width, height } = assetSize(asset);
   return {
     id: crypto.randomUUID(),
     assetId: asset.id,
@@ -37,7 +53,7 @@ export function assetToken(asset, x, y, faceDown) {
     faceDown: down,
     size: width,
     width,
-    height: asset.height || width,
+    height,
     x,
     y,
     attachedTo: null,

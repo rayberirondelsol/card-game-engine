@@ -233,7 +233,11 @@ test('der Raum baut das Szenario des aufgedeckten Boesewichts auf', async () => 
   // Verdeckt aufgedeckt werden kann nur, was eine Rueckseite hat.
   getDb().prepare('UPDATE table_assets SET back_image_path = ? WHERE name = ?')
     .run('/uploads/back.png', 'Boesewicht: Klaus');
-  addTableAsset(gameId, 'Fetid Furball');
+  // Feldgross (40 auf einem 40er-Raster): dieser Test fragt, ob der Raum dasselbe
+  // baut wie der Tisch, nicht wie viele Felder ein Stueck belegt. Mit der Vorgabe
+  // von 60 leitete M7.3 hier 2x2 ab, und der Test pruefte still die
+  // Grundflaechenregel mit (die steht in scenario-footprint.test.js).
+  addTableAsset(gameId, 'Fetid Furball', { width: 40, height: 40 });
 
   const setupId = await createSetup(gameId, {
     state_data: JSON.stringify(stateWithDeck()),
@@ -301,7 +305,7 @@ test('der Raum baut einen Feldbereich aus den Szenariodaten genauso auf wie der 
   addTableAsset(gameId, 'Boesewicht: Klaus', { image_path: '/uploads/klaus.png' });
   getDb().prepare('UPDATE table_assets SET back_image_path = ? WHERE name = ?')
     .run('/uploads/back.png', 'Boesewicht: Klaus');
-  addTableAsset(gameId, 'Holzzaun');
+  addTableAsset(gameId, 'Holzzaun', { width: 40, height: 40 });
 
   const setupId = await createSetup(gameId, {
     state_data: JSON.stringify(stateWithDeck()),
@@ -341,7 +345,7 @@ test('der Raum baut einen Feldbereich aus den Szenariodaten genauso auf wie der 
   // Das Einzelfeld daneben behaelt die Groesse seines Assets.
   const single = tiles.find(t => t.cell === 'J2');
   assert.deepEqual({ x: single.x, y: single.y, width: single.width, height: single.height },
-    { x: 480, y: 160, width: 60, height: 60 });
+    { x: 480, y: 160, width: 40, height: 40 });
 });
 
 test('ein Bereich in den Szenariodaten des Raums scheitert, bevor das erste Objekt liegt', async () => {

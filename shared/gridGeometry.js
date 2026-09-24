@@ -205,21 +205,45 @@ export function cellFromLabel(grid, label) {
  *
  * A field name without a colon is the 1×1 case of this one calculation, not a
  * second one beside it. The colon is free: two numeric axes separate with `-`.
+ *
+ * `size` ist freiwillig und die Antwort auf M7.3: wer sie mitgibt, bekommt die
+ * Flaeche, die ein Stueck dieser Groesse an dieser Adresse belegt. Ein
+ * *Einzelfeld* heisst dann die **Mitte** des Stuecks – `K11` bei einer Figur
+ * von zwei mal zwei Feldern deckt die vier Felder um den Rasterpunkt bei K11.
+ * Ein *Bereichsname* schlaegt die Rechnung, wie ueberall (M7.1): was
+ * ausdruecklich dasteht, ist die genauere Aussage.
+ *
+ * Ohne `size` ist das Verhalten Zeichen fuer Zeichen das bisherige. Die drei
+ * pruefenden Aufrufer (`validateStep`, `validateScenarioData`, `placeOnGrids`)
+ * geben keine mit und sollen keine mitgeben: die ersten beiden pruefen den
+ * *getippten* Namen, und in `placeOnGrids` versetzte die Rechnung jedes
+ * vorhandene uebergrosse Stueck beim naechsten Laden (M7.2-Befund 4).
  */
-export function cellRange(grid, label) {
+export function cellRange(grid, label, size = null) {
   if (typeof label !== 'string') return null;
   const ends = label.split(':');
   if (ends.length > 2) return null;
   const a = cellFromLabel(grid, ends[0]);
   const b = ends.length === 2 ? cellFromLabel(grid, ends[1]) : a;
   if (!a || !b) return null;
-  return {
+  const written = {
     col: Math.min(a.col, b.col),
     row: Math.min(a.row, b.row),
     cols: Math.abs(a.col - b.col) + 1,
     rows: Math.abs(a.row - b.row) + 1,
     ranged: ends.length === 2,
   };
+  if (written.ranged) return written;
+
+  const foot = footprint(grid, size);
+  if (!foot || (foot.cols === 1 && foot.rows === 1)) return written;
+  // Dieselbe Lesart wie beim Ziehen von Hand: `rangeAt` zentriert die Flaeche
+  // um den Punkt, statt sie mit der Ecke anzulegen – und antwortet `null`,
+  // wenn sie ueber den Rand liefe. Das ist kein Ziel, und der Aufrufer macht
+  // daraus den Protokolleintrag (M7.3, Abnahme 5).
+  const p = cellCenter(grid, written.col, written.row);
+  const r = rangeAt(grid, p.x, p.y, foot.cols, foot.rows);
+  return r && { ...r, ranged: true };
 }
 
 /** A region back to its name – `E3:G4`, or `C7` when it is a lone field. */
@@ -267,14 +291,25 @@ export function rangeBox(grid, r) {
 const boxCenter = b => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
 
 /**
+ * Die Mitte eines Bereichs, oder null – das, worauf ein Stueck zentriert wird.
+ *
+ * Steht neben `cellPoint`, weil der Executor die Mitte der **abgeleiteten**
+ * Flaeche braucht (M7.3) und `cellPoint` die des *geschriebenen* Feldes gibt.
+ * Eine zweite Mittelpunktrechnung waere eine zweite Antwort.
+ */
+export function rangeCenter(grid, r) {
+  const b = rangeBox(grid, r);
+  return b && boxCenter(b);
+}
+
+/**
  * The centre of a named field *or region*, or null. For a lone field this is
  * `cellCenter` to the digit; for `E3:G4` it is the middle of the six fields,
  * which is what puts the piece on its fields instead of half a field beside
  * them.
  */
 export function cellPoint(grid, label) {
-  const b = rangeBox(grid, cellRange(grid, label));
-  return b && boxCenter(b);
+  return rangeCenter(grid, cellRange(grid, label));
 }
 
 /**

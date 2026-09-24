@@ -24,8 +24,8 @@
  */
 import { zoneSlots, zoneSlotFor, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
-import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, cellPoint } from './gridGeometry.js';
-import { assetToken, assetFace, rotationOf } from './assetToken.js';
+import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
+import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter } from './counters.js';
 
@@ -589,16 +589,25 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // others. The field name travels with the object, the coordinates only
         // follow from it.
         const grid = findGrid(grids, step.gridLabel);
-        const r = grid && cellRange(grid, step.cell);
+        // Die Grundflaeche folgt der Groesse des Stuecks, wenn ein Einzelfeld
+        // dasteht (M7.3) - und massgeblich ist, was auf dem Tisch liegt, nicht
+        // was die Assetzeile sagt: dieselbe Quelle, die das Ziehen von Hand
+        // liest. Sonst gaeben Aufbau und Ziehen zwei Antworten.
+        const r = grid && cellRange(grid, step.cell, assetSize(existing || asset));
         if (!grid) {
           noPos = `grid "${step.gridLabel ?? ''}" not found`;
-        } else if (!r) {
+        } else if (!cellRange(grid, step.cell)) {
           noPos = `grid "${grid.label}" has no cell "${step.cell ?? ''}"`;
+        } else if (!r) {
+          // Das Feld gibt es, das Stueck passt nur nicht mehr darauf. Das ist
+          // eine andere Auskunft, und wer sie liest, sucht sonst einen
+          // Tippfehler, den es nicht gibt (M7.3, Abnahme 5).
+          noPos = `"${step.assetName}" does not fit on grid "${grid.label}" at "${step.cell}"`;
         } else {
           // `E3:G4` centres on the middle of the six fields and takes their
           // size; `C7` is the 1×1 case of the same calculation and keeps the
-          // size of its asset (M7.1).
-          target = cellPoint(grid, step.cell);
+          // size of its asset (M7.1) - es sei denn, die Groesse sagt mehr.
+          target = rangeCenter(grid, r);
           onGrid = { gridId: grid.id, cell: rangeLabel(grid, r) };
           if (r.ranged) {
             const box = rangeBox(grid, r);
@@ -946,12 +955,19 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
             // `E3:G4` zentriert auf die Mitte der sechs Felder und bekommt
             // deren Masse, `C7` ist der 1x1-Fall davon und behaelt die Groesse
             // seines Assets.
-            const r = cellRange(grid, label);
-            if (!r) { missing.push(`grid "${grid.label}" has no field "${label}"`); continue; }
+            // ... und seit M7.3 heisst ein Einzelfeld die **Mitte** des
+            // Stuecks, wenn seine Groesse mehr als ein Feld sagt. Nicht wegen
+            // der Doerfler - die kommen ueber `place_asset` auf den Tisch, aus
+            // einem gebundenen `$D1` - sondern damit ein Gelaendeteil, das von
+            // Hand angefasst wird, nicht auf eine andere Flaeche springt, als
+            // der Aufbau ihm gegeben hat (Abnahme 4).
+            const r = cellRange(grid, label, assetSize(asset));
+            if (!cellRange(grid, label)) { missing.push(`grid "${grid.label}" has no field "${label}"`); continue; }
+            if (!r) { missing.push(`"${t.assetName}" does not fit on grid "${grid.label}" at "${label}"`); continue; }
             // Je Feld ein eigenes Objekt. `place_asset` wuerde das vorhandene
             // verschieben - drei gleiche Plaettchen waeren dann eines, das
             // zweimal umzieht. Genau dafuer gibt es diesen Schritt.
-            const { x, y } = cellPoint(grid, label);
+            const { x, y } = rangeCenter(grid, r);
             const token = Object.assign(assetToken(asset, x, y, false), {
               gridId: grid.id,
               cell: rangeLabel(grid, r),
