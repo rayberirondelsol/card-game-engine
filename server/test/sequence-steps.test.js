@@ -585,3 +585,96 @@ test('eine im Editor gebaute Rundenwende läuft im Executor durch', () => {
     'die Leiste ist gerückt'
   );
 });
+
+// ── require_zone (M9.3 / P2) ─────────────────────────────────────────────────
+
+test('require_zone steht im Vokabular, mit den Feldern seines Handlers', () => {
+  const ctx = ctxFixture();
+
+  assert.ok(STEP_TYPES.some(t => t.value === 'require_zone'), 'require_zone fehlt in STEP_TYPES');
+  assert.deepEqual(stepFields('require_zone').sort(), ['expect', 'message', 'zoneLabel']);
+  // Weder Ziel noch Seite noch Anzahl: die Wache legt nichts hin, sie prüft.
+  for (const f of ['targetZoneLabel', 'faceDown', 'count', 'assetName']) {
+    assert.ok(!stepFields('require_zone').includes(f), `require_zone darf nicht nach "${f}" fragen`);
+  }
+
+  const fresh = defaultStep('require_zone', ctx);
+  assert.equal(fresh.type, 'require_zone');
+  assert.equal(fresh.zoneLabel, 'Bosseleiste', 'vorbelegt wie jeder andere Zonenschritt');
+  assert.equal(fresh.expect, 'empty');
+  assert.deepEqual(Object.keys(fresh).sort(), ['expect', 'message', 'type', 'zoneLabel']);
+});
+
+test('die Zusammenfassung nennt die Bedingung und was sonst passiert', () => {
+  const line = describeStep({ type: 'require_zone', zoneLabel: 'Bosseleiste', expect: 'empty', message: 'Erst die Dorfphase beginnen.' });
+  assert.ok(!line.includes('_'), `zeigt den rohen Typ: ${line}`);
+  assert.match(line, /Bosseleiste/);
+  assert.match(line, /empty/i);
+  assert.match(line, /stop|skip|rest/i, 'die Zeile muss sagen, dass der Rest ausfällt');
+
+  const gegen = describeStep({ type: 'require_zone', zoneLabel: 'Reihenfolge', expect: 'occupied' });
+  assert.match(gegen, /Reihenfolge/);
+  assert.equal(typeof describeStep({ type: 'require_zone' }), 'string');
+});
+
+test('validateStep meldet eine fehlende Zone, ein unlesbares expect und eine fehlende Meldung', () => {
+  const ctx = ctxFixture();
+
+  assert.deepEqual(
+    validateStep({ type: 'require_zone', zoneLabel: 'Bosseleiste', expect: 'empty', message: 'Erst die Dorfphase beginnen.' }, ctx),
+    []
+  );
+  assert.ok(validateStep({ type: 'require_zone', zoneLabel: '', expect: 'empty', message: 'x' }, ctx).some(p => /zone/i.test(p)));
+  assert.ok(validateStep({ type: 'require_zone', zoneLabel: 'Gibts nicht', expect: 'empty', message: 'x' }, ctx).some(p => /Gibts nicht/.test(p)));
+  assert.ok(validateStep({ type: 'require_zone', zoneLabel: 'Bosseleiste', expect: 'vielleicht', message: 'x' }, ctx).some(p => /empty/.test(p)));
+  // Regel 2: ohne Meldung steht am Tisch eine Diagnose statt einer Auskunft.
+  assert.ok(validateStep({ type: 'require_zone', zoneLabel: 'Bosseleiste', expect: 'empty' }, ctx).some(p => /message/i.test(p)));
+});
+
+test('eine im Editor gebaute Wache hält die Folge im Executor an', () => {
+  const zones = zoneFixture();
+  const ctx = { zoneLabels: zones.map(z => z.label), stackLabels: ['Nachschub'], pools: [], assetNames: [] };
+  const steps = [
+    { ...defaultStep('require_zone', ctx), zoneLabel: 'Reihenfolge', expect: 'empty', message: 'Erst abräumen.' },
+    { ...defaultStep('shuffle', ctx), stackLabel: 'Nachschub' },
+  ];
+  for (const s of steps) assert.deepEqual(validateStep(s, ctx), [], describeStep(s));
+
+  const belegt = { ...stateFixture(), tokens: [{ id: 'a', assetId: 'order-0', label: 'Marke', x: 640, y: 100, size: 40 }] };
+  const { log } = executeSequenceWithLog(belegt, steps, zones);
+  assert.equal(log.length, 1, 'der zweite Schritt bekommt keine eigene Zeile');
+  assert.equal(log[0].status, 'skipped');
+  assert.ok(log[0].reason.includes('Erst abräumen.'));
+
+  const frei = executeSequenceWithLog(stateFixture(), steps, zones);
+  assert.deepEqual(frei.log.map(e => e.status), ['ok', 'ok'], frei.log.map(e => e.reason).join(' | '));
+});
+
+// ── Schicht 3: jedes Feld hat auch einen Renderer (M9.3/P3) ──────────────────
+
+test('jedes Feld des Vokabulars hat im Editor einen Renderer', async () => {
+  // Der Befund, der diesen Test ausgeloest hat: `zoneLabel` stand seit M5 in
+  // STEP_TYPES und hatte in `SetupSequenceEditor.jsx` keinen Eintrag in
+  // `render`. `fields.map(f => render[f]?.())` zeichnet dafuer stillschweigend
+  // nichts - die Quellzone von `reveal_next`, `rotate_zone` und `clear_zone`
+  // liess sich im Editor nicht setzen. Genau das Muster aus
+  // `docs/audit-dead-controls.md`, und es faellt ohne diesen Test nicht auf.
+  //
+  // Gelesen wird die Quelle als Text: fuer den Client gibt es keine
+  // Testinfrastruktur, und ein Vergleich der Namen ist mehr wert als keiner.
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../../client/src/components/SetupSequenceEditor.jsx', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('const render = {'));
+
+  for (const type of STEP_TYPES) {
+    for (const f of type.fields) {
+      // Die Renderer stehen alle auf derselben Ebene in `const render = {`;
+      // die Zeile davorzunehmen unterscheidet den Schluessel von jedem
+      // `step.stackLabel` mitten im Code.
+      assert.ok(
+        body.includes(`\n    ${f}: () =>`),
+        `"${f}" (${type.value}) hat keinen Renderer in SetupSequenceEditor.jsx`
+      );
+    }
+  }
+});

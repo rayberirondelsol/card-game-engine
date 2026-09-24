@@ -60,6 +60,11 @@ export const STEP_TYPES = [
   // Schritt. Der Schritt hat genau eine Einstellung: ob der Endkampf-Abschnitt
   // dazugehoert.
   { value: 'build_scenario', label: 'Build Scenario', fields: ['final'] },
+  // M9.3/P2: die Vorbedingung. Steht sie vorn, gilt sie fuer die ganze Folge -
+  // trifft sie nicht zu, laeuft kein Schritt dahinter. `message` ist der Text,
+  // den der Spieler liest: der Executor weiss nichts ueber das Spiel, „Erst
+  // die Dorfphase beginnen" kann nur hier stehen.
+  { value: 'require_zone', label: 'Require Zone', fields: ['zoneLabel', 'expect', 'message'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -190,6 +195,11 @@ export function defaultStep(type, ctx = {}) {
     case 'rotate_zone':
       // Wie `reveal_next`: die Zone *ist* die Adresse, also steht die erste da.
       return { type, zoneLabel: zone };
+    case 'require_zone':
+      // „leer" ist der haeufigere Fall (und der aus M9.3). Die Meldung bleibt
+      // leer: sie ist die eine Entscheidung, die der Schritt nicht vorwegnehmen
+      // darf - geraten waere sie eine Auskunft, die niemand gegeben hat.
+      return { type, zoneLabel: zone, expect: 'empty', message: '' };
     case 'lock_asset':
     case 'unlock_asset':
       return { type, assetName: first(names) };
@@ -285,6 +295,14 @@ export function describeStep(step) {
     }
     case 'rotate_zone':
       return `Rotate zone ${q(step.zoneLabel)} by one place`;
+    // M9.3/P2: beide Haelften in einer Zeile - die Bedingung und was passiert,
+    // wenn sie nicht gilt. Ohne die zweite liest sich der Schritt wie eine
+    // Pruefung ohne Folgen.
+    case 'require_zone': {
+      const want = step?.expect === 'occupied' ? 'occupied' : 'empty';
+      const say = String(step?.message ?? '').trim();
+      return `Require zone ${q(step.zoneLabel)} to be ${want}, else stop the sequence${say ? `: "${say}"` : ''}`;
+    }
     case 'set_asset_face':
       return `Turn ${q(step.assetName)} ${step.faceDown ? 'face down' : 'face up'}`;
     case 'reveal_next': {
@@ -457,6 +475,19 @@ export function validateStep(step, ctx = {}) {
   // Sequenzen tragen keins, und das ist kein Fehler.
   if (fields.has('rotation') && rotationOf(step?.rotation) === null) {
     problems.push(`rotation "${step.rotation}" is not one of ${ROTATIONS.join('/')}`);
+  }
+  // M9.3/P2: die Wache hat zwei Antworten, und eine dritte laesst der Executor
+  // nicht durch - er haelt dann die ganze Folge an. Das gehoert hierher
+  // gemeldet, nicht am Tisch.
+  if (typeOf(step) === 'require_zone') {
+    if (step?.expect !== 'empty' && step?.expect !== 'occupied') {
+      problems.push(`"${String(step?.expect ?? '').trim()}" is not a condition: "empty" or "occupied"`);
+    }
+    // Spec M9.3 Regel 2: die Meldung nennt die Bedingung, nicht den Schritt,
+    // der umgefallen ist. Ohne sie steht am Tisch eine Diagnose.
+    if (!String(step?.message ?? '').trim()) {
+      problems.push('no message given: the protocol then shows a diagnosis, not what to do');
+    }
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

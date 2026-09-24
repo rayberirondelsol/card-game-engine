@@ -164,6 +164,43 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         data-testid={`step-${index}-stack-name`}
       />),
 
+    // M9.3/P3: `zoneLabel` hatte bis hierher **keinen** Renderer. Die Quellzone
+    // von `reveal_next`, `rotate_zone` und `clear_zone` liess sich im Editor
+    // also gar nicht setzen - `fields.map(f => render[f]?.())` zeichnete
+    // stillschweigend nichts. Dieselbe Familie wie die Funde in
+    // `docs/audit-dead-controls.md`.
+    //
+    // Anders als bei `targetZoneLabel` gibt es keinen Leereintrag: „keine
+    // Zone" ist hier keine gueltige Wahl, und `validateStep` sagt das auch.
+    zoneLabel: () => field(
+      step.type === 'require_zone' || step.type === 'rotate_zone' ? 'Zone' : 'From zone',
+      nameSelect(step.zoneLabel, ctx.zoneLabels, '— no zones in this setup —', v => set({ zoneLabel: v }), `step-${index}-from-zone`)),
+
+    // M9.3/P2: die zwei Antworten der Wache. Ein Haekchen koennte es auch,
+    // aber „belegt/leer" liest sich in der Zeile wie die Regel, die es ist.
+    expect: () => field('Must be',
+      <select
+        value={step.expect === 'occupied' ? 'occupied' : 'empty'}
+        onChange={e => set({ expect: e.target.value })}
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-expect`}
+      >
+        <option value="empty">empty</option>
+        <option value="occupied">occupied</option>
+      </select>),
+
+    // M9.3 Regel 2: der Satz, den der Spieler im Protokoll liest. Er steht
+    // hier und nicht im Code, weil der Executor nichts ueber das Spiel weiss.
+    message: () => field('Message',
+      <input
+        type="text"
+        value={step.message || ''}
+        onChange={e => set({ message: e.target.value })}
+        placeholder="e.g. Erst die Dorfphase beginnen."
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-message`}
+      />),
+
     targetZoneLabel: () => field('Zone',
       <select
         value={step.targetZoneLabel || ''}

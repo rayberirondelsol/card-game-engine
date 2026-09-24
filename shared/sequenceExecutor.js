@@ -74,9 +74,13 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // `vars` ist die Ersetzungstabelle (Platzhaltername → Text), `revealedLast`
   // die eine Tatsache, die kein Text ist: kam das Aufgedeckte vom letzten Platz
   // der Leiste? Das ist, was der Endkampf liest (M7).
-  const ctx = { vars: {}, revealedLast: false };
+  //
+  // `halted` ist das dritte: hat eine Vorbedingung die ganze Folge angehalten
+  // (M9.3)? Es steht neben dem Zustand, weil es nur diesen einen Lauf betrifft.
+  const ctx = { vars: {}, revealedLast: false, halted: false };
 
-  sequenceData.forEach((step, index) => {
+  for (let index = 0; index < sequenceData.length; index++) {
+    const step = sequenceData[index];
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
@@ -85,7 +89,20 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
       entry.status = 'failed';
       entry.reason = err.message;
     }
-  });
+    // M9.3: eine nicht erfüllte Vorbedingung hält *alle* folgenden Schritte an
+    // - nicht den ersten, der zufällig daran scheitert. Ein `break`, kein
+    // `throw`: `executeSequence` wirft weiterhin nie.
+    //
+    // Die übersprungenen Schritte bekommen **keine eigene Zeile**. Die
+    // Oberfläche zeigt `log.filter(e => e.status !== 'ok')`, und sechzehnmal
+    // „skipped" wäre lauter als das Problem, gegen das die Bedingung steht.
+    // Wie viele ausgefallen sind, steht an der einen Zeile, die bleibt.
+    if (ctx.halted) {
+      const rest = sequenceData.length - index - 1;
+      if (rest) entry.reason = `${entry.reason} (${rest} further step${rest === 1 ? '' : 's'} skipped)`;
+      break;
+    }
+  }
 
   return { state, log, bindings: ctx.vars, revealedLast: ctx.revealedLast };
 }
@@ -402,6 +419,37 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
   }
 
   switch (step.type) {
+    // M9.3: die Vorbedingung einer Sequenz. Steht sie vorn, gilt sie für die
+    // ganze Folge - trifft sie nicht zu, läuft kein einziger Schritt dahinter.
+    // Das ist die Antwort auf „ein halb aufgebauter Kampf ist schlimmer als
+    // keiner", die M7 innerhalb von `build_scenario` schon gibt.
+    //
+    // Die Meldung steht **am Schritt**, nicht im Code: der Executor weiß
+    // nichts über Townsfolk Tussle, und „Erst die Dorfphase beginnen" ist eine
+    // Auskunft, die nur das Setup geben kann. Ohne sie bleibt die Diagnose.
+    case 'require_zone': {
+      // Angehalten wird über `ctx`, nicht über einen Wurf - `executeSequence`
+      // wirft nie (Spec M9.3 Regel 3). Die Schleife oben liest das Kennzeichen.
+      const halt = (reason) => { ctx.halted = true; return skip(reason); };
+
+      const zone = findZone(zones, step.zoneLabel);
+      // Eine Bedingung, die sich nicht prüfen lässt, ist keine erfüllte:
+      // durchzulassen hieße genau den Schaden zuzulassen, gegen den sie steht.
+      // Hier gilt die Diagnose auch dann, wenn eine Meldung dasteht - sie
+      // spräche von der Dorfphase, während in Wahrheit der Zonenname klemmt.
+      if (!zone) return halt(`zone "${step.zoneLabel ?? ''}" not found`);
+      if (step.expect !== 'empty' && step.expect !== 'occupied') {
+        return halt(`"${step.expect ?? ''}" is not a condition: "empty" or "occupied"`);
+      }
+
+      // Dieselbe Zählung wie `clear_zone` und `rotate_zone`, also ohne das
+      // Ankerobjekt: ein Brett mit einer aufgedruckten Zone liegt nicht *in*
+      // ihr, sonst wäre jede solche Zone dauerhaft belegt.
+      const inside = objectsInZone(zone, state.cards, state.tokens).length;
+      if (step.expect === 'empty' ? inside === 0 : inside > 0) return state;
+      return halt(step.message || `zone "${zone.label}" is ${inside ? `not empty (${inside})` : 'empty'}`);
+    }
+
     case 'shuffle': {
       const stack = idx.get(step.stackLabel);
       if (!stack) return skip(`stack "${step.stackLabel}" not found`);
