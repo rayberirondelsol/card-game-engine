@@ -7,11 +7,11 @@ steht es dabei.
 Spiel-ID `072123c0-cd97-4ffb-a330-369630fab93f`.
 
 > **Umsetzungsstand.** §1 bis §4 beschreiben den Zustand **wie vorgefunden**.
-> Danach wurden **V1, V3, V5 und V9 aus §5 umgesetzt** — die Kategorien und
-> Kartennamen in den Tabellen von §2 und §3 sind seither die unten in §5.0
-> genannten. **Nicht** umgesetzt (bewusst): V4 (256er-`Nachschub` zerlegen),
-> V7 (englische Dubletten löschen), V8 (Token für `HERR KÄLTET`). Am Code
-> wurde nichts geändert.
+> Danach wurden in zwei Durchgängen **V1, V3, V5, V9** (§5.0) und **V7, V4**
+> (§5.5) umgesetzt — die Kategorien und Kartennamen in den Tabellen von §2 und
+> §3 sind seither die dort genannten. **Nicht** umgesetzt: V8 (Token für
+> `HERR KÄLTET`; die Karte kann in einer Erstpartie ohnehin nicht in Umlauf
+> kommen). Am Code wurde nichts geändert.
 
 ---
 
@@ -310,6 +310,10 @@ englisch als 30×30-Rest eines älteren Imports:
 Dazu zwei gleichnamige `Fetid Furball` (95×95, `f54df116…`, `fa08482e…`) ohne
 deutsche Entsprechung.
 
+**Die fünf Dubletten sind inzwischen gelöscht** (V7, siehe §5.5 — dort stehen
+die Zeilen im Volltext). Die beiden `Fetid Furball` blieben unberührt: sie
+haben keine deutsche Entsprechung, sind also keine Dublette im selben Sinn.
+
 ---
 
 ## 4. Die 24 namenlosen Token
@@ -464,7 +468,8 @@ Knaller von 9+ einzeln gezogen (§7.4). Ohne Markierung im Namen oder in einer
 eigenen Mini-Kategorie muss der Spieler 3 Bilder aufmachen, um sie zu finden.
 Vorschlag: Suffix ` ★` im Kartennamen der 20 Sternkarten.
 
-**V4 — die 256er-`Nachschub` ist unabhängig davon zu zerlegen.** Gemessen
+**V4 — die 256er-`Nachschub` ist unabhängig davon zu zerlegen.** *(umgesetzt,
+§5.5)* Gemessen
 enthält sie 177 blaue (echter Nachschub), 36 lila (Beute), 28 gelbe
 (einzigartig) und 15 graue (Startausrüstung) Karten. Als Nachziehstapel ist
 sie in dieser Form **falsch**: wer daraus zieht, zieht Beute- und
@@ -482,7 +487,8 @@ bleiben Nachschubkarten Nr. 73–161; die Kategorie ist eine Sicht, kein Deck.
 normalisierten Namen ist damit ohne Datenpflege möglich; nur `HERR KÄLTET`
 braucht ein neues Token.
 
-**V7 — die fünf englischen 30×30-Dubletten löschen** (§3.4). Sie stiften am
+**V7 — die fünf englischen 30×30-Dubletten löschen** (§3.4). *(umgesetzt,
+§5.5)* Sie stiften am
 Tisch nur Verwechslung mit den deutschen Originalen.
 
 **V8 — Nr. 107 „HERR KÄLTET":** Token fehlt. Entweder aus dem Kartenbild
@@ -492,6 +498,111 @@ freistellen oder die Karte bis dahin als unspielbar markieren.
 
 **V9 — die 24 nach §4 benennen.** Vorher die Doppelung der Kostümteile klären
 (§4.2): entweder den alten oder den neuen Satz entfernen.
+
+### 5.5 Nachtrag: V7 und V4 nachträglich freigegeben und umgesetzt
+
+Auch dies wieder mit Trockenlauf vorab (**0 Beanstandungen**) und einer
+einzigen `db.transaction(...)`.
+
+#### V7 — die fünf englischen Dubletten
+
+**Vorher geprüft, Ergebnis: vollständig referenzfrei.** Keine der fünf
+`table_assets.id` und keiner der fünf Namen kommt in `state_data`,
+`zone_data`, `sequence_data`, `action_data`, `scenario_data` oder `grid_data`
+irgendeines Aufbaus vor, ebenso wenig in einem `save_state`. Ihre
+`category_id` ist überall **NULL** — der einzige `draw_assets`-Schritt im
+Bestand zieht aus dem Pool `Bösewichte` und kann sie damit nicht treffen.
+
+**Gelöscht wurde nur die Datenbankzeile.** Die Bilddateien unter
+`/app/uploads/…` liegen unverändert weiter. Die fünf Zeilen im Volltext,
+damit sie sich von Hand wiederherstellen lassen (`game_id` ist überall
+`072123c0-cd97-4ffb-a330-369630fab93f`, `type` überall `token`,
+`category_id`, `source_url` und `back_image_path` überall `NULL`,
+`quantity` = 1):
+
+| `id` | `name` | `image_path` | `width` × `height` |
+|---|---|---|---|
+| `1764cbf4-6a6d-4083-9d66-86a833ccfc36` | Rocking Horse | `/uploads/072123c0-cd97-4ffb-a330-369630fab93f/c9d1e677-2c09-4f5b-94ae-600896d13b9c.png` | 30 × 30 |
+| `42f399e9-a980-49d3-81ea-fc555635ab57` | Trampoline | `/uploads/072123c0-cd97-4ffb-a330-369630fab93f/af1d9395-6bbc-4b3e-9a0a-09f473547a85.png` | 30 × 30 |
+| `90829682-89a1-4563-a311-1935ead8f3c1` | Possessed Spirit | `/uploads/072123c0-cd97-4ffb-a330-369630fab93f/1626b834-00cb-494a-b7c0-7f38e76813a8.png` | 30 × 30 |
+| `bb356c97-e6d7-499e-80d6-d53aad129c19` | Training Scarecrow | `/uploads/072123c0-cd97-4ffb-a330-369630fab93f/38d74ce9-3919-4876-8063-52c30935a729.png` | 30 × 30 |
+| `d15377bf-0f32-4f5c-95f7-eaf2b41bdf1a` | Tunable Trebuchet | `/uploads/072123c0-cd97-4ffb-a330-369630fab93f/ce756711-054d-4111-aadf-c7a061e029ad.png` | 30 × 30 |
+
+`table_assets` für dieses Spiel: **217 → 212**.
+
+#### V4 — die Sammelkategorien nach Rahmenfarbe zerlegt
+
+Die Farbanteile wurden **neu gezählt** (Randpixel-Messung nach §1.3 gegen den
+aktuellen Kategoriestand), nicht aus der alten Messung übernommen.
+
+| Kategorie | vorher | nachher |
+|---|---|---|
+| `Nachschub` | 220 = 177 blau + 28 gelb + 15 grau | **177** (nur blau) |
+| → `Startausrüstung` | — | **15** (grau) |
+| → `Einzigartige Ausrüstung` | — | **28** (gelb) |
+| `Ausrüstung (Üble Nachbarn)` | 40 = 33 gelb + 7 grau, **0 blau** | umbenannt, s. u. |
+| → `Einzigartige Ausrüstung (Üble Nachbarn)` | — | **33** (gelb) |
+| → `Startausrüstung (Üble Nachbarn)` | — | **7** (grau) |
+| `Ausrüstung (Hookbox)` | 16 = 12 blau + 4 grau | **12** (nur blau) |
+| → `Startausrüstung (Hookbox)` | — | **4** (grau) |
+
+Insgesamt 54 Karten verschoben. Kartenbestand unverändert (1087), alle
+verschobenen Karten behalten ihre Rückseite (`cards.card_back_id`), keine
+Kategorie steht ohne Karten **und** ohne Assets da.
+
+**Eine Abweichung vom Auftrag, bewusst und hier begründet.** Der Auftrag
+lautete „blau bleibt in `Ausrüstung (Üble Nachbarn)`". In dieser Kategorie
+liegt aber **keine einzige blaue Karte** — sie besteht nur aus gelb und grau.
+Wären beide Farben ausgezogen, wäre eine leere Kategorie `Ausrüstung (Üble
+Nachbarn)` zurückgeblieben, die behauptet, es gäbe Nachschub-Ausrüstung für
+die Erweiterung. Statt sie zu leeren wurde sie deshalb **umbenannt** in
+`Einzigartige Ausrüstung (Üble Nachbarn)`; die 33 gelben Karten blieben
+liegen, nur die 7 grauen zogen um. Das erreicht denselben Endzustand, spart
+33 Schreibvorgänge, erzeugt keine leere Hülle und löscht nichts. Bei
+`Ausrüstung (Hookbox)` stellte sich die Frage nicht — dort bleiben 12 blaue
+Karten liegen, die Kategorie behält ihren Namen.
+
+**`Nachschub (freischaltbar)` (24 = 10 blau + 14 grau) wurde nicht
+angefasst.** Sie hat rein zahlenmäßig dasselbe Problem, aber die Klammer
+`(freischaltbar)` beschreibt eine **andere Achse** als die Rahmenfarbe: den
+Freischaltzustand. Die 14 grauen Karten dort sind die **alternative
+Startausrüstung**, die laut `[BR S.8]` erst „durch Endkampf-Sonderziele
+freigeschaltet" wird. Sie in `Startausrüstung` zu schieben würde genau die
+Auskunft vernichten, dass sie noch gesperrt sind. Wenn das doch gewünscht
+ist, wäre `Startausrüstung (freischaltbar)` der richtige Zielname — das ist
+eine Entscheidung, kein Befund.
+
+#### Was vor V4 geprüft wurde, damit nichts bricht
+
+1. **Kategorien in Sequenzen.** Kein Schritt im Bestand nennt `Nachschub`,
+   `Ausrüstung (Üble Nachbarn)` oder `Ausrüstung (Hookbox)` als Kategorie.
+   Die einzigen `place_stack`-Kategorien sind `Dorf-Ereignisse` +
+   `Dorf-Ereignisse (Üble Nachbarn)`, `Heldentaten` und
+   `Toller Trödel: Nachschub (Nr. 1-30)`.
+2. **Vorgebaute Stapel binden über `card_ids`, nicht über den Kategorienamen
+   — eine Textsuche findet das nicht.** Deshalb wurde jede `card_ids`-Liste
+   in `setups.state_data` und in allen `save_states` ausgelesen und Karte für
+   Karte ihrer Kategorie zugeordnet. Ergebnis: **kein Stapel** enthält Karten
+   aus den drei Kategorien. In drei `save_states` liegen einzelne Karten
+   daraus **frei auf dem Tisch** (4–5 aus `Nachschub`, 2 aus
+   `Ausrüstung (Üble Nachbarn)`); eine ausgelegte Karte trägt ihre Daten als
+   Kopie und verweist über `cardId` auf eine unveränderte Bibliotheks-ID, ein
+   Kategoriewechsel erreicht sie nicht.
+3. **Wo die Startausrüstung herkommt** (`docs/tasks-startausruestung.md`).
+   Der Aufbau *TFT Kurzpartie* legt sie über **sechs `place_card`-Schritte**
+   aus: BAUERNLATZHOSE, ROSTIGE SICHEL, OMMAS GEHSTOCK, DAS ALTE EISEN (alle
+   grau, vorher in `Nachschub`) sowie GEFRIERFACHTÜR und KÜHL-PACK (grau,
+   vorher in `Ausrüstung (Üble Nachbarn)`). **Alle sechs waren also vom Umbau
+   betroffen.** `place_card` löst aber über den **Namen in der gesamten
+   Bibliothek** auf — `findCardByName(cards, step.cardName)` in
+   `shared/sequenceExecutor.js:699`, ohne Kategoriefilter, und `cards` ist in
+   `server/src/routes/rooms.js:268` ein schlichtes
+   `SELECT … FROM cards WHERE game_id = ?`. Der Umzug ist damit folgenlos.
+   Kontrolle danach: alle sechs Namen sind in der Bibliothek weiterhin
+   **eindeutig** (je genau ein Treffer), `place_card` kann also auch nicht
+   mehrdeutig werden. Nebenbei beantwortet der Umbau Punkt 2 der offenen
+   Datenfragen in `tasks-startausruestung.md`: die Startausrüstung hat jetzt
+   eine eigene Kategorie, deren Namensliste man abfragen kann.
 
 ---
 
