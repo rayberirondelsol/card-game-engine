@@ -181,8 +181,12 @@ Nachbarschaft rechnest du damit ohne Umrechnung.
 
 **Der Aufbau baut seine Stapel selbst** — auch vom leeren Tisch aus. Die
 geheimen Dorf-Ereignisse sind nach §2.2 aussortiert; das Ereignisdeck hat 80
-Karten, nicht 105. Es gibt **neun** Dörfler zur Wahl, Georgie Irongut
-eingeschlossen.
+Karten, nicht 105.
+
+**Die Kurzpartie stellt die Gruppe fest** — Henlo Bulwark, Fridgette Jones und
+Granny Melba. Du wählst nicht; das ist Absicht, damit die Partien vergleichbar
+bleiben. In der Bibliothek stehen neun Dörfler, Georgie Irongut eingeschlossen,
+aber die gehören zu anderen Aufbauten.
 
 **Der Laden führt nur Nr. 1–30** (§9.1: in der Erstpartie ist nur das kaufbar,
 der Rest liegt hinter „Locked"). Der Stapel hat also 30 Karten, zehn liegen
@@ -193,8 +197,12 @@ die Trennkarte „HALT STOP!", ist das ein Befund — melde ihn.
 Bibliothek eine Kategorie **`Beute: <Name>`** mit genau seinen drei
 Ausrüstungen; die mit dem **★ im Kartennamen** ist die, die im Kampf über einen
 Knaller-Wurf von 9+ zu holen ist (§7.4). Nach dem Sieg nimmt der Dörfler mit den
-meisten erfüllten Heldentaten **eine zufällige der drei** (§7.3) — such die
-Kategorie über die Bibliothekssuche, zieh eine und leg sie vor ihn.
+meisten erfüllten Heldentaten **eine zufällige der drei** (§7.3).
+
+**Die Bibliothekssuche findet nur Kartennamen, keine Kategorienamen** — `beute
+waggums` gibt null Treffer (belegt in Partie 6). Scroll stattdessen in der
+Kategorieliste nach unten, dort stehen die zwanzig `Beute:`-Kategorien
+beieinander.
 
 **Aufstellbares gibt es, aber nicht in dieser Partie.** Alle 24 Karten tragen
 Nr. 73–161 und liegen damit im gesperrten Deck. Wenn Du meinst, eines benutzen
