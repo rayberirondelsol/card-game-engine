@@ -3648,3 +3648,60 @@ erste.
 2. `card_ids`, `table_ids` und `cards` sind gleich lang.
 3. Nach „Dorfphase beginnen" liegen zehn Ladenkarten aus Nr. 1–30 aus; die
    Trennkarte „HALT STOP!" taucht nicht auf.
+
+### M13.7 — Die Sammelkategorien nach Rahmenfarbe zerlegt
+
+**Befund.** Die Rahmenfarbe einer Ausrüstungskarte ist ihre Art:
+
+> „**Ausrüstungsrahmen-Farben:** grau = Start, blau = Nachschub, lila =
+> Bösewicht-Beute, gelb = einzigartig" — `docs/tft-regeln.md`, `[BR S.8]`
+
+Sie ist im Bild messbar (umlaufender Hintergrund des 744×744-PNG, rechnerisch
+bimodal). Gemessen enthielten drei Kategorien ein Gemisch: `Nachschub` 177 blau
++ 28 gelb + 15 grau, `Ausrüstung (Üble Nachbarn)` 33 gelb + 7 grau **und keine
+einzige blaue**, `Ausrüstung (Hookbox)` 12 blau + 4 grau. Als Nachziehstapel
+wäre jede davon falsch — wer daraus zieht, zieht Startausrüstung mit, die laut
+`[BR S.8]` nicht einmal verkauft werden darf.
+
+**Änderung.** Grau nach `Startausrüstung`, gelb nach `Einzigartige Ausrüstung`,
+je mit dem Erweiterungszusatz der vorhandenen Konvention
+(`… (Üble Nachbarn)`, `… (Hookbox)`). 54 Karten verschoben, Bestand unverändert
+**1087**, alle behalten ihre Rückseite (die hängt an `cards.card_back_id`, nicht
+an der Kategorie).
+
+`Ausrüstung (Üble Nachbarn)` wurde nicht geleert, sondern **umbenannt** in
+`Einzigartige Ausrüstung (Üble Nachbarn)`: ohne blaue Karten wäre sonst eine
+leere Kategorie zurückgeblieben, die behauptet, es gäbe Erweiterungs-Nachschub.
+
+**Nicht angefasst: `Nachschub (freischaltbar)`** (10 blau + 14 grau). Der
+Zusatz beschreibt eine **andere Achse** als die Rahmenfarbe: die 14 grauen sind
+die **alternative Startausrüstung**, die laut `[BR S.8]` erst über
+Endkampf-Sonderziele freigeschaltet wird. Sie nach `Startausrüstung` zu schieben
+vernichtete genau die Auskunft, dass sie noch gesperrt sind.
+
+**Warum das die Startausrüstung im Aufbau nicht bricht.** *TFT Kurzpartie* legt
+sechs graue Karten über `place_card` aus; alle sechs sind umgezogen. `place_card`
+löst aber über den **Namen in der ganzen Bibliothek** auf
+(`findCardByName` in `shared/sequenceExecutor.js`, ohne Kategoriefilter — die
+Route lädt schlicht alle Karten des Spiels). Nachgeprüft: alle sechs Namen sind
+weiterhin eindeutig, der Aufruf kann also auch nicht mehrdeutig werden.
+
+**Ebenfalls geprüft, weil M13.6 die Lehre erzwingt:** kein vorgebauter Stapel in
+`setups.state_data` und kein `save_state` bindet Karten aus den drei Kategorien
+über `card_ids`. In drei Spielständen liegen einzelne davon frei auf dem Tisch —
+eine ausgelegte Karte trägt ihre Daten als Kopie und zeigt über `cardId` auf eine
+unveränderte Bibliotheks-ID, ein Kategoriewechsel erreicht sie nicht.
+
+**Nebenbei entfernt.** Fünf englische 30×30-Token (`Trampoline`,
+`Tunable Trebuchet`, `Training Scarecrow`, `Possessed Spirit`, `Rocking Horse`)
+— Importreste neben den deutschen Originalen, nachweislich in keinem Aufbau,
+Spielstand, Szenario und in keiner Sequenz referenziert. Gelöscht wurde nur die
+Datenbankzeile; die Bilddateien liegen unberührt, und die fünf Zeilen stehen im
+Volltext in `docs/befund-beute-und-aufstellbares.md` §5.5. `table_assets`
+217 → **212**.
+
+**Abnahme.**
+1. Keine Kategorie mischt noch Rahmenfarben.
+2. Der Kartenbestand ist unverändert (1087), keine Karte hat ihre Rückseite
+   verloren.
+3. Der Aufbau *TFT Kurzpartie* legt weiterhin seine sechs Startausrüstungen aus.
