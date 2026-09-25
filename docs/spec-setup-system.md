@@ -3407,3 +3407,97 @@ ablesen lässt.
 Festgehalten in `docs/tft-regeln.md` §5.1 und in der Spielerrolle. Am Tisch heißt
 das: **Ausgangswert** des Zählers heben, nicht nur den Wert — sonst holt die
 nächste Dorfphase die Erhöhung wieder ab (M11.4).
+
+## M13 — Was Partie 5 offen ließ
+
+Drei Punkte, die am Tisch fehlten und die Partie 5 nur mit Behelfen spielbar
+machten. M13.1 ist Code, M13.2 und M13.3 sind Daten (eigener Befund).
+
+### M13.1 — Ein Token lässt sich am Tisch nicht drehen
+
+**Befund.** Der Bösewicht hat eine Blickrichtung, und sie ist mechanisch:
+
+> „Er **dreht sich zum Ziel** und nimmt den kürzesten Weg." … „**„Bewege dich
+> vorwärts":** Er dreht sich zum Ziel und geht dann BEW Felder **geradeaus**.
+> Bei perfekter Diagonale wählen die Spieler die Richtung."
+> — `docs/tft-regeln.md` §6, `[BR S.15-16]`
+
+Ohne sichtbare Richtung ist „geradeaus" nicht entscheidbar; in Partie 5 hat der
+Spieler sie sich gemerkt statt sie zu sehen.
+
+Der Bösewicht ist ein **Token** (2×2 Felder). Das Kontextmenü eines Tokens kennt
+heute **Lock**, **Flip** (M3d) und **Enlarge** (M11.6) — **kein Drehen**. Die
+Tastenkürzel `E`/`Q` drehen nur **Karten**, und sie hängen an `selectedCards`;
+für Tokens gibt es **gar keine Auswahl**, nur `draggingObj` während des Ziehens.
+
+**Der Befund ist größer als der Bösewicht.** Auch Geländeteile sind Tokens. Das
+Szenario legt sie mit `rotation` hin (M7.1, z. B. Farmhaus 90°) — wer eines am
+Tisch selbst drehen will, kann es nicht. Es fehlt also nicht die Blickrichtung
+des Bösewichts, sondern **das Drehen von Tokens überhaupt**.
+
+**Was schon da ist und nicht neu gebaut wird.**
+- `TokenShape` rendert `rotation` bereits, inklusive Maßtausch bei 90/270.
+- **M7.1 hat entschieden: die Drehung dreht das Bild, nicht den Kasten.** Der
+  Kasten bleibt `w × h`, daran hängen Trefferfläche und `cellAt`. **Damit ändert
+  Drehen den Feldbereich nicht** — `snapInto`, `footprint` und `placeOnGrids`
+  sind nicht betroffen, und niemand fasst sie an.
+- `rotationOf` in `shared/assetToken.js` ist die eine Auslegung eines Winkels.
+  `ROTATIONS` ist `[0, 90, 180, 270]`.
+
+**Was fehlt.**
+1. Eine reine Funktion **`nextRotation(current, step)`** in `shared/assetToken.js`,
+   die den nächsten erlaubten Winkel gibt und dabei umläuft (270 + 90 → 0,
+   0 − 90 → 270). Sie liest ihren Eingang über `rotationOf` — **keine zweite
+   Auslegung daneben**. `step` ist `+90` oder `−90`; etwas anderes gibt den
+   unveränderten Winkel zurück. Geprüft in `server/test/`.
+   *Anmerkung:* Karten drehen heute mit `(c.rotation || 0) ± 90` **ohne
+   Begrenzung** — eine dreimal gedrehte Karte trägt 270, eine viermal gedrehte
+   360. Das ist bestehendes Verhalten und wird in dieser Aufgabe **nicht**
+   angefasst; wer es mitziehen will, sagt es und belegt, dass keine gespeicherte
+   Partie dadurch springt.
+2. Zwei Einträge im **Kontextmenü eines Tokens**: links herum und rechts herum.
+   Nur für Tokens mit Bild (`shape === 'image'`). Ein geometrisches Token ist
+   Kreis oder Quadrat — ein Knopf, der nichts Sichtbares tut, ist genau der
+   Fehler aus `docs/audit-dead-controls.md`.
+   Das Kontextmenü ist bewusst die **einzige** Geste: es geht mit Maus
+   (Rechtsklick) **und** mit dem Finger (langes Drücken), anders als `E`/`Q`.
+   `locked` wird **nicht** geprüft — gesperrt heißt unbeweglich, nicht
+   undrehbar, wie schon bei Flip.
+3. Eine Mehrspieler-Aktion **`token_rotate`**, gebaut wie `token_flip`:
+   `handleTokenRotate` in `server/src/websocket/messageHandler.js`, ein `case`
+   in der Verteilung, und im Tisch ein Zweig in der Nachrichtenbehandlung.
+   Ein Winkel, der `rotationOf` nicht passiert, wird **verworfen** statt
+   gespeichert.
+
+**Nicht in dieser Aufgabe.** Eine Auswahl für Tokens (und damit `E`/`Q` für sie),
+45°-Schritte für die Diagonale — die Regel löst die Diagonale ausdrücklich über
+die Spielerwahl, vier Richtungen reichen —, und eine Blickrichtung als eigenes
+Feld neben `rotation`.
+
+**Abnahme.**
+1. Das Kontextmenü eines Bild-Tokens hat zwei Dreh-Einträge; das eines
+   geometrischen Tokens hat keinen.
+2. Viermal „rechts herum" bringt das Token in die Ausgangslage zurück — der
+   gespeicherte Winkel ist danach `0`, nicht `360`.
+3. Ein 2×2-Bösewicht auf dem Raster liegt nach dem Drehen auf **denselben vier
+   Feldern**; `gridAddress` meldet dieselbe Zelle.
+4. Ein nicht quadratisches Geländeteil (z. B. `Holzzaun`, 200×50) zeigt nach
+   90° quer, ohne aus seinem Kasten zu laufen.
+5. Nach Speichern und erneutem Laden steht der Winkel noch.
+6. Im Mehrspielerraum sieht der zweite Platz die Drehung.
+
+### M13.2 / M13.3 — Bösewicht-Beute und Aufstellbares
+
+Beides ist **kein Codeproblem**, sondern ein Datenproblem, und beides steht
+nicht fest genug für eine Abnahme:
+
+- **Beute** (§5.3, §7.3): drei lila gerahmte Ausrüstungen je Bösewicht. Ob sie
+  importiert sind und wo sie stecken, ist offen — die Sammelkategorie
+  `Nachschub` mit 256 Karten ist ein Mischmasch (vgl. M6.2, „Paulis Gebiss").
+- **Aufstellbares** (§9.3): Karte plus Token auf ein leeres angrenzendes Feld.
+  Die Kategorie `Toller Trödel: Aufstellbares` ist **leer**, während unter den
+  217 Assets schon `Trampolin`, `Bärenfalle`, `Sprengstoff`, `Stabiles Katapult`
+  und anderes liegt — und **24 Tokens gar keinen Namen tragen**.
+
+Erhoben wird das in `docs/befund-beute-und-aufstellbares.md`. Erst danach
+bekommen M13.2 und M13.3 eine Abnahme.
