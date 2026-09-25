@@ -158,6 +158,18 @@ sonst nur den Wert für den nächsten Kampf.
 **„Enlarge" gibt es auch für Tokens** — Bösewicht-Tableau, Dörfler-Tableau,
 Geländeteil. Das ist der Weg, Regeltexte zu lesen; nicht zoomen.
 
+**Tokens lassen sich drehen** — `↺ Rotate Left` und `↻ Rotate Right` im
+Kontextmenü eines Bild-Tokens (neu in M13). **Benutze das für den Bösewicht.**
+Seine Blickrichtung ist nicht Deko: er *dreht sich zum Ziel* und geht bei
+„Bewege dich vorwärts" BEW Felder **geradeaus** (§6, `[BR S.15-16]`). Dreh ihn
+also jedes Mal, wenn er sich ausrichtet, statt Dir die Richtung zu merken —
+sonst ist „geradeaus" nach zwei Zügen nicht mehr entscheidbar.
+
+Ein quadratisches Token (Bösewicht 2×2) bleibt dabei auf denselben Feldern. Ein
+längliches Geländeteil dreht **um seine linke obere Ecke**: ein Zaun auf
+`A3:D3` liegt danach auf `A3:A6` und nach der nächsten Drehung wieder auf
+`A3:D3`. Das ist umkehrbar, Du kannst also gefahrlos probieren.
+
 **Escape schließt** Kontextmenü, Vergrößerung und das Views-Menü.
 
 **Würfel lassen sich ziehen** und über das Kontextmenü entfernen.
@@ -171,6 +183,26 @@ Nachbarschaft rechnest du damit ohne Umrechnung.
 geheimen Dorf-Ereignisse sind nach §2.2 aussortiert; das Ereignisdeck hat 80
 Karten, nicht 105. Es gibt **neun** Dörfler zur Wahl, Georgie Irongut
 eingeschlossen.
+
+**Der Laden führt nur Nr. 1–30** (§9.1: in der Erstpartie ist nur das kaufbar,
+der Rest liegt hinter „Locked"). Der Stapel hat also 30 Karten, zehn liegen
+offen aus. Triffst Du am Tisch auf eine Karte mit einer Nummer über 30 oder auf
+die Trennkarte „HALT STOP!", ist das ein Befund — melde ihn.
+
+**Die Bösewicht-Beute ist auffindbar.** Zu jedem Bösewicht gibt es in der
+Bibliothek eine Kategorie **`Beute: <Name>`** mit genau seinen drei
+Ausrüstungen; die mit dem **★ im Kartennamen** ist die, die im Kampf über einen
+Knaller-Wurf von 9+ zu holen ist (§7.4). Nach dem Sieg nimmt der Dörfler mit den
+meisten erfüllten Heldentaten **eine zufällige der drei** (§7.3) — such die
+Kategorie über die Bibliothekssuche, zieh eine und leg sie vor ihn.
+
+**Aufstellbares gibt es, aber nicht in dieser Partie.** Alle 24 Karten tragen
+Nr. 73–161 und liegen damit im gesperrten Deck. Wenn Du meinst, eines benutzen
+zu können, hast Du Dich vertan — melde es.
+
+**Die Ausrüstungskategorien folgen der Rahmenfarbe** (`[BR S.8]`): `Nachschub`
+blau, `Startausrüstung` grau, `Einzigartige Ausrüstung` gelb, `Beute: …` lila —
+jeweils mit dem Erweiterungszusatz `(Üble Nachbarn)` bzw. `(Hookbox)`.
 
 ## Deine Partie
 
