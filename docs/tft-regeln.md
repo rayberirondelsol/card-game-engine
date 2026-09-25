@@ -218,6 +218,12 @@ Nachziehen bis wieder 6 offen liegen `[E01 43:47]`.
   **Heldenpunkte**.
 - Erfüllt ein Dörfler das Ziel **nachdem** er die Karte erhalten hat, deckt er sie
   **sofort** auf, nimmt sie vor sich und kassiert die Belohnung **sofort**.
+- **Werteerhöhungen aus Heldentaten gelten dauerhaft** — für den Rest der Partie,
+  nicht nur für den nächsten Kampf. Die Karten tragen nicht die Grund-Kennzeichnung
+  der Dorf-Ereignisse (§ „Werteänderungen lesen"), die Regel sagt dazu nichts;
+  **Entscheidung des Auftraggebers, 2026-09-25**. Am Tisch heißt das: nicht nur den
+  Zählerstand erhöhen, sondern den **Grundwert** (§ „Zähler" der Spec) — sonst holt
+  die nächste Dorfphase die Erhöhung wieder ab.
 - Heldentaten können **in der Dorfphase genauso wie im Kampf** erfüllt werden —
   immer alle Texte prüfen `[E01 46:04]`.
 - Erfüllte Heldentaten liegen offen vor ihrem Erfüller.

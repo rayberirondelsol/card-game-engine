@@ -150,6 +150,11 @@ sie einträgst: hebt eine Ausrüstung einen Wert *dauerhaft* (§7.5), **hebst du
 den Ausgangswert von Hand**, wie du am echten Tisch die Karte vor dich legst.
 Tust du es nicht, ist der Bonus nach der nächsten Dorfphase weg.
 
+**Dasselbe gilt für Werteerhöhungen aus Heldentaten** — die sind laut §5.1
+dauerhaft, also gehört auch ihr Plus in den **Ausgangswert**. Nur bei
+Dorf-Ereignissen entscheidet der schwarze Grund (§5.2): schwarz → Ausgangswert,
+sonst nur den Wert für den nächsten Kampf.
+
 **„Enlarge" gibt es auch für Tokens** — Bösewicht-Tableau, Dörfler-Tableau,
 Geländeteil. Das ist der Weg, Regeltexte zu lesen; nicht zoomen.
 

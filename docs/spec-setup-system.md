@@ -3354,3 +3354,56 @@ wie viele es sind, und die oberste greifen kann.
 1. Mehrere Karten auf einem Ablagestapel sind als mehrere erkennbar.
 2. Die oberste lässt sich greifen, ohne die darunter zu verschieben.
 3. Eine Zone mit festen Plätzen verhält sich unverändert.
+
+### M12.6 — Der Laden legte das **gesperrte** Deck aus (Datenbefund, ohne Codeänderung)
+
+**Auftrag.** „und beschränke den Laden auf 1-30".
+
+**Regel.** `docs/tft-regeln.md` §9.1: In der Erstpartie sind **nur Nr. 1–30**
+kaufbar; der Rest liegt ungemischt hinter dem Register „Locked (Odd Jobs)".
+§9.5: ohne das Händler-Journal bleibt der Pool **dauerhaft** bei 1–30.
+
+**Befund.** Die Kartennummer steht **oben rechts im Bild**, nicht im Namen. Über
+die abfotografierten Ecken aller Karten gelesen:
+
+| Kategorie bisher | Karten | gedruckte Nummern |
+|---|---|---|
+| `Toller Trödel: Nachschub` | 133 | Trennkarte „HALT STOP! Das ist GESPERRTE Ausrüstung", dann **31–162** (Nummer = Importposition + 29) |
+| `Toller Trödel: Nachschub (klein)` | 34 | **1–30**, danach 163–166 (goldene Geldkarten: Kantinenfraß, 3× Sack Münzen) |
+
+Der Aufbau baute den Ladenstapel aus der **133er**-Kategorie — also aus genau
+dem Material, das laut Regel ungemischt in der Schachtel bleibt. Die 30
+kaufbaren Karten lagen die ganze Zeit ungenutzt in der Kategorie, deren
+Klammerzusatz „(klein)" nur das quadratische 63×63-mm-Format meinte (744×744 px,
+das Ausrüstungsformat aus §M6.2).
+
+**Änderung — reine Produktionsdaten, kein Code, keine neuen Tests.**
+1. Die vier goldenen Karten 163–166 in eine neue Kategorie
+   `Toller Trödel: Geld (Nr. 163-166)` verschoben.
+2. Umbenannt, damit der Zusatz die Nummern nennt statt des Formats:
+   `… (klein)` → **`Toller Trödel: Nachschub (Nr. 1-30)`** (30 Karten),
+   `Toller Trödel: Nachschub` → **`Toller Trödel: Nachschub (gesperrt, Nr. 31-162)`** (133).
+3. Der einzige lebende Verweis — `place_stack.category` im Aufbau *TFT
+   Kurzpartie* — zeigt jetzt auf `(Nr. 1-30)`. Vorher über alle JSON-Spalten
+   aller Aufbauten gesucht: es war genau **eine** Fundstelle. Die Dorfphase füllt
+   über `stackLabel` nach, nicht über die Kategorie, und ist darum nicht berührt.
+
+**Nicht geändert.** `Nachschub (freischaltbar)` (24 Karten) bleibt draußen — das
+ist die über Endkampf-Sonderziele freischaltbare Ware, die laut §9.1 nur
+einsortiert werden *darf*, wer sie schon hat.
+
+**Abnahme.**
+1. Der Ladenstapel hat nach dem Aufbau 20 Karten, die Auslage 10 — zusammen 30.
+2. Keine ausliegende Ladenkarte trägt oben rechts eine Nummer über 30.
+3. Die Trennkarte „HALT STOP!" taucht nicht mehr am Tisch auf.
+
+### M12.7 — Werteerhöhungen aus Heldentaten sind dauerhaft
+
+**Entscheidung des Auftraggebers, 2026-09-25** („ja, dauerhaft"). Die Regel
+schweigt: Heldentaten-Belohnungen tragen nicht die Grund-Kennzeichnung der
+Dorf-Ereignisse `[E01 47:08]`, aus der sich dauerhaft gegen „nur nächster Kampf"
+ablesen lässt.
+
+Festgehalten in `docs/tft-regeln.md` §5.1 und in der Spielerrolle. Am Tisch heißt
+das: **Ausgangswert** des Zählers heben, nicht nur den Wert — sonst holt die
+nächste Dorfphase die Erhöhung wieder ab (M11.4).
