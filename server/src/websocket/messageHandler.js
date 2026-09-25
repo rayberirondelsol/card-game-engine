@@ -8,6 +8,9 @@ import { getDb } from '../database.js';
 // Der Server rechnet die Adresse nicht nach - er kennt weder Raster noch
 // Bretter. Was gilt, entscheidet der Tisch, der gezogen hat (wie bei x/y auch).
 import { gridAddress } from '../../../shared/gridGeometry.js';
+// Ein Winkel wird genau einmal ausgelegt (M7.1/M13.1) - der Server liest ihn
+// mit derselben Funktion wie Tisch, Editor und Executor.
+import { rotationOf } from '../../../shared/assetToken.js';
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -60,6 +63,8 @@ export function handleMessage(room, playerId, rawData) {
       return handleTokenDelete(room, playerId, payload, timestamp);
     case 'token_flip':
       return handleTokenFlip(room, playerId, payload, timestamp);
+    case 'token_rotate':
+      return handleTokenRotate(room, playerId, payload, timestamp);
     case 'counter_move':
       return handleCounterMove(room, playerId, payload, timestamp);
     case 'die_move':
@@ -322,6 +327,26 @@ function handleTokenFlip(room, playerId, { token_id, face_down }, timestamp) {
   token.faceDown = face_down;
   token.imageUrl = face_down ? token.backImageUrl : (token.frontImageUrl || token.imageUrl);
   broadcast(room, { type: 'token_flip', token_id, face_down, from_player_id: playerId, timestamp }, playerId);
+}
+
+/**
+ * Drehen nach dem Vorbild von handleTokenFlip (Spec M13.1). Die Nachricht
+ * traegt den fertigen Zielwinkel, nicht den Schritt – der Tisch, der gedreht
+ * hat, hat ihn schon ueber `nextRotation` ausgerechnet, und zwei Rechnungen
+ * waeren zwei Antworten.
+ *
+ * Ein Winkel, den `rotationOf` nicht passiert, wird verworfen statt
+ * gespeichert. Der Client bietet nichts anderes an, aber darauf verlaesst sich
+ * der Server nicht – sonst stuende im Raumzustand ein Wert, den der Renderer
+ * nicht kennt (`swap` prueft auf genau 90/270).
+ */
+function handleTokenRotate(room, playerId, { token_id, rotation }, timestamp) {
+  const angle = rotationOf(rotation);
+  if (angle === null) return;
+  const token = room.boardState.tokens.find(t => t.id === token_id);
+  if (!token) return;
+  token.rotation = angle;
+  broadcast(room, { type: 'token_rotate', token_id, rotation: angle, from_player_id: playerId, timestamp }, playerId);
 }
 
 function handleTokenDelete(room, playerId, { token_id }, timestamp) {

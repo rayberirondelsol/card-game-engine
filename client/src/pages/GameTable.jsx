@@ -17,7 +17,7 @@ import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView, tokenPreview } from '../utils/tableObjectView';
-import { assetToken, assetFace } from '../../../shared/assetToken.js';
+import { assetToken, assetFace, nextRotation } from '../../../shared/assetToken.js';
 import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
@@ -3456,6 +3456,13 @@ export default function GameTable({ room = null }) {
         case 'token_flip':
           setTokens(prev => prev.map(t => (
             t.id === msg.token_id ? { ...t, ...(assetFace(t, msg.face_down) || {}) } : t
+          )));
+          break;
+        case 'token_rotate':
+          // M13.1: der Server hat den Winkel schon durch `rotationOf` geschickt
+          // und Unlesbares verworfen - hier steht darum keine zweite Pruefung.
+          setTokens(prev => prev.map(t => (
+            t.id === msg.token_id ? { ...t, rotation: msg.rotation } : t
           )));
           break;
         case 'counter_move':
@@ -7511,6 +7518,49 @@ export default function GameTable({ room = null }) {
                     >
                       {'\u{1F504} Flip'}
                     </button>
+                  );
+                })()}
+                {/* M13.1: Drehen. Der Boesewicht hat eine mechanische
+                    Blickrichtung ("er dreht sich zum Ziel und geht dann BEW
+                    Felder geradeaus"), und auch Gelaendeteile sind Tokens.
+                    Das Kontextmenue ist bewusst die **einzige** Geste: es geht
+                    mit Maus (Rechtsklick) und mit dem Finger (Langdruck),
+                    anders als E/Q, die an `selectedCards` haengen - und eine
+                    Auswahl fuer Tokens gibt es nicht.
+                    Nur Bild-Token: ein Kreis sieht keine Drehung, und ein
+                    Knopf, der nichts Sichtbares tut, ist der Fehler aus
+                    docs/audit-dead-controls.md. Eine Rueckseite braucht es
+                    nicht - eine einseitige Figur laesst sich drehen.
+                    `locked` wird absichtlich nicht geprueft: gesperrt heisst
+                    unbeweglich, nicht undrehbar, wie schon bei Flip.
+                    Gedreht wird **nur** `rotation`: der Kasten bleibt w x h
+                    (M7.1), daran haengen Trefferflaeche und Feldbelegung. */}
+                {contextMenu.objType === 'token' && (() => {
+                  const tok = tokens.find(t => t.id === contextMenu.objId);
+                  if (!tok || tok.shape !== 'image') return null;
+                  const turn = (step) => {
+                    const rotation = nextRotation(tok.rotation, step);
+                    setTokens(prev => prev.map(t => (t.id === tok.id ? { ...t, rotation } : t)));
+                    if (room) room.sendAction({ type: 'token_rotate', token_id: tok.id, rotation });
+                    setContextMenu(null);
+                  };
+                  return (
+                    <>
+                      <button
+                        onClick={() => turn(-90)}
+                        data-testid="context-token-rotate-ccw"
+                        className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      >
+                        {'↺ Rotate Left'}
+                      </button>
+                      <button
+                        onClick={() => turn(90)}
+                        data-testid="context-token-rotate-cw"
+                        className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      >
+                        {'↻ Rotate Right'}
+                      </button>
+                    </>
                   );
                 })()}
                 {/* M11.6: „Enlarge" fuer Tokens. Das Boesewicht-Tableau ist

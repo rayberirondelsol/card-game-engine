@@ -81,6 +81,26 @@ export function rotationOf(value) {
 }
 
 /**
+ * Der nächste erlaubte Winkel, mit Umlauf (M13.1): `270 + 90` ist `0`,
+ * `0 − 90` ist `270`.
+ *
+ * Der Eingang geht durch `rotationOf` – es gibt genau **eine** Auslegung eines
+ * Winkels, keine zweite daneben. Ein unlesbarer Winkel (`45`, `360`, `'abc'`)
+ * gilt dabei wie ein fehlender, also `0`: ihn weiterzureichen hieße, ihn zu
+ * speichern, und genau das verweigert `handleTokenRotate` auf der anderen
+ * Seite. `360` ist auch kein Sonderfall, sondern wie eine viermal gedrehte
+ * Karte heute aussieht – Karten drehen bis heute ohne Begrenzung, und das
+ * bleibt so, bis jemand belegt, dass keine gespeicherte Partie davon springt.
+ *
+ * `step` ist `+90` oder `−90`; alles andere gibt den ausgelegten Winkel zurück.
+ */
+export function nextRotation(current, step) {
+  const from = rotationOf(current) ?? 0;
+  if (step !== 90 && step !== -90) return from;
+  return (from + step + 360) % 360;
+}
+
+/**
  * Die eine Definition davon, was Umdrehen heißt (Spec M3d): `faceDown` setzen
  * UND `imageUrl` zwischen Vorder- und Rückseite tauschen. Nur `faceDown` zu
  * kippen ließe das alte Bild stehen.
