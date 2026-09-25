@@ -3733,6 +3733,14 @@ gibt es nur in der Dorfphase."
 **Abnahme.** Während ein Bösewicht-Tableau ausliegt, zieht der Knopf keine
 Karte und meldet den Grund. Ohne Tableau zieht er wie bisher.
 
+**Nachtrag aus der Umsetzung.** Umgesetzt in *TFT Kurzpartie* **und** in
+*TFT Grundaufbau (Dorfphase)* — beide haben die Aktion und beide haben die Zone
+`Bösewicht-Tableau`, die Sperre gehört in beide. Nebenbefund am Grundaufbau,
+nicht angefasst, weil er zu M11.2/M12.3 gehört: dessen „Kampf beginnen" trägt
+**keine** `require_zone` (die Kurzpartie schon), und eine Aktion „Dorfphase
+beginnen" gibt es dort überhaupt nicht — der Grundaufbau kennt nur „Kampf
+beginnen" und „Dorfereignis ziehen".
+
 ### M14.2 — Benutzte Dorf-Ereignisse werden nie abgeräumt
 
 **Befund (B2).** §4 Schritt 2 verlangt: Ereignis ziehen, laut auflösen,
@@ -3756,6 +3764,27 @@ und gehört gesagt, statt eine zweite Räumung danebenzustellen.
 abgeräumten Karten liegen unter dem Ereignisstapel. Drei Runden hintereinander
 lassen sich Ereignisse ziehen, ohne dass eine Zone volläuft.
 
+**Nachtrag aus der Umsetzung.**
+
+1. **Die befürchtete Hürde gibt es nicht.** `clear_zone` erreicht die drei
+   Zonen ohne Weiteres: „Hand Dörfler 1–3" sind gewöhnliche Zonen
+   (`layout: row`, `capacity: 3`, `accepts: ['card']`, **ohne Anker**, also nie
+   `facingAway`). Einen Zonentyp „Hand" kennt die Engine gar nicht — `state.hand`
+   ist eine andere Liste, in der diese Karten nie landen; `deal_to_zone` legt
+   sie als lose Karten in `state.cards`, und genau dort sieht sie
+   `objectsInZone`. Geprüft vor dem Bau, bestätigt am Tisch: Stapel 77 → 80
+   nach dem Durchlauf.
+2. **Die Spec zeigt auf einen Schritt, den es nicht gibt.** „in denselben
+   Vorab-Abschnitt wie `clear_zone Ladenauslage`" — eine Zone „Ladenauslage"
+   existiert nicht (sie heißt `Nachschub-Auslage`), und „Dorfphase beginnen"
+   räumt sie überhaupt nicht ab; das tut „Kampf beginnen". Die drei Schritte
+   stehen deshalb am Ende des vorhandenen Räumblocks, hinter `clear_zone
+   Ablage` und vor `clear_grid` — vor dem Auffüllen, wie verlangt.
+3. `faceDown: true`, weil der Ereignisstapel verdeckt liegt und die Karten
+   offen gezogen wurden.
+4. **Grundaufbau:** nichts einzutragen — er hat keine Aktion „Dorfphase
+   beginnen" (siehe Nachtrag zu M14.1).
+
 ### M14.3 — Die Bösewicht-Zähler überstehen die Dorfphase
 
 **Befund (U6).** Nach „Dorfphase beginnen" stehen „Bösewicht: Bewegung 6" und
@@ -3767,6 +3796,12 @@ Dorf wie ein angeschlagener Gegner, den es nicht mehr gibt.
 Bösewichtmaterial wegräumt.
 
 **Abnahme.** Nach „Dorfphase beginnen" stehen beide Bösewicht-Zähler auf 0.
+
+**Nachtrag aus der Umsetzung.** Eingefügt hinter `remove_stack Verhaltensdeck`,
+also im Räumabschnitt wie verlangt. `value` ist die **JSON-Zahl** `0`, nicht
+`"0"` und nicht `"+0"` — nach `counterValueForm` heißt eine geschriebene Zahl
+„auf", ein geschriebenes Vorzeichen „um". Grundaufbau: nichts einzutragen,
+keine Aktion „Dorfphase beginnen".
 
 ### M14.4 — Ein frischer Aufbau bringt keine einzige Ansicht mit
 
@@ -3784,6 +3819,29 @@ es kostet, sie in den Aufbau zu nehmen.
 
 **Abnahme.** Ein frisch geladener Aufbau bietet im Views-Menü „Schlachtfeld"
 und „Dörfler" an; jede zeigt, was ihr Name sagt, vollständig.
+
+**Nachtrag aus der Umsetzung.**
+
+1. **Ansichten liegen im Spielstand, nicht im Browser** — also war M14.4 reine
+   Datenarbeit und ist umgesetzt. `getGameState()` schreibt `views`,
+   `loadGameState()` liest `normalizeViews(state.views)`, und der Setup-Ladeweg
+   in `GameTable.jsx` läuft durch dieselbe Funktion. Ein `views`-Array in
+   `setups.state_data` übersteht `executeSequence` unangetastet (die Ausführung
+   klont den ganzen Zustand und rührt unbekannte Felder nicht an). Nichts davon
+   ist `localStorage`.
+2. **Aber die Zahlen hängen am Fenster.** Eine Ansicht speichert `cam`, und
+   `worldAt` liest sie als *Weltmitte = Containermitte − cam*, wobei die
+   Containermitte die halbe Fenstergröße ist. Die beiden Ansichten sind für
+   **831 × 794** gerechnet (das Fenster der sechsten Partie); in einem anderen
+   Fenster verschiebt sich der Ausschnitt um die halbe Differenz. Das lässt
+   sich mit Daten nicht beheben — wer es sauber will, legt in `tableViews.js`
+   eine Weltmitte statt einer Kameraposition ab (Code, nicht Daten).
+3. Gewählt: **Schlachtfeld** `cam (−444, −163)`, Zoom 0,54 — der ganze
+   Hauptplan (Raster A–S / 1–14) samt Bösewicht-Leiste und Sideboard mit den
+   beiden Bösewicht-Zählern. **Dörfler** `cam (−734, −1278)`, Zoom 0,41 — drei
+   Tableaus, zwölf Attributzähler, Ausrüstungszonen und der Münztopf.
+4. Beide Aufbauten tragen dieselbe Weltgeometrie, also stehen **dieselben zwei
+   Ansichten auch im Grundaufbau**.
 
 ### M14.5 — Die beiden Leisten fangen Klicks auf dem Tisch ab
 
@@ -3893,6 +3951,18 @@ Wurf zu erkennen.
 
 - **K1** Die Marker auf den Dörfler-Leisten heißen „Marker N: Treffer", der
   Zähler daneben „Präzision" — zwei Namen für dieselbe Leiste. **Daten.**
+
+  **Nachtrag aus der Umsetzung.** „Präzision" gewinnt: so heißt PRZ in
+  `docs/tft-regeln.md` (Begriffstabelle, Accuracy/ACC), „Treffer" stand nur am
+  Marker und an der Zone. Umbenannt an **18 Stellen** — 3 Namen in
+  `table_assets`, 3 Zonenlabels `Dörfler N: Treffer`, 6 Vorkommen in
+  `sequence_data` und 6 in `action_data`; nach M13.6 wurden beide Bindungen
+  geprüft (Name **und** Zonenziel je Schritt), eine reine Textsuche hätte die
+  `action_data` der Aktion „Dorfphase beginnen" gefunden, aber nicht gezeigt,
+  dass dort **zwei** Felder je Schritt hängen. Betrifft nur *TFT Kurzpartie* —
+  der Grundaufbau hat weder Marker noch Leistenzonen. **Nicht** angefasst: die
+  drei `save_states` (Protokolle gespielter Partien) und die Kartenkategorie
+  „Kritischer Treffer", die zufällig dasselbe Wort trägt.
 - **K2** Die Vorbedingungsmeldung zeigt Innereien: `require_zone`,
   `[in zone: …]`, „16 further steps skipped". Der deutsche Satz in der Mitte ist
   richtig, das Drumherum gehört nicht vor einen Spieler.
