@@ -55,16 +55,28 @@ export const STACK_OFFSET = 6;
  * Ablagestapel verlöre seine unterste Karte an den Tisch. Ein Viertel der
  * kürzeren Seite liegt auch in einem Kreis und in einem Sechseck noch drin.
  *
- * ponytail: ab etwa neun Karten laufen die weiteren auf den Deckel und liegen
- * wieder deckungsgleich. Die oberste bleibt greifbar (höchster zIndex), und
- * ein Ablagestapel mit zehn sichtbar getrennten Karten wäre breiter als seine
- * Zone. Wer mehr braucht, fächert in zwei Richtungen statt in eine.
+ * **K4: der Deckel kennt jetzt die Form.** Der Bericht der sechsten Partie:
+ * „nach etwa sechs Karten liegt alles deckungsgleich … was bei Karten wie
+ * BÖSEWICHTSCHÄDEL (‚6 oder mehr Bösewicht-Aktionen auf dem Ablagestapel')
+ * regelrelevant ist." Bei `min(w,h)/4` waren es für die 200×280 große `Ablage`
+ * neun Lagen — knapp an der Zahl, auf die es ankommt.
+ *
+ * `/4` ist der Wert, der auch in einem Kreis und in einem Sechseck trägt. In
+ * einem **Rechteck** liegt der Mittelpunkt noch bis knapp unter `min(w,h)/2`
+ * drin; `0,45` lässt einen Rand und verdoppelt die Lagen. Die Form stand
+ * ohnehin schon da, der Deckel hat nur nicht danach gefragt.
+ *
+ * ponytail: über dem Deckel laufen die weiteren Karten wieder deckungsgleich —
+ * in einem Rechteck ab der fünfzehnten, im Kreis ab der neunten. Die oberste
+ * bleibt greifbar (höchster zIndex). Wer mehr braucht, fächert in zwei
+ * Richtungen statt in eine.
  */
 export function stackPoint(zone, n = 0) {
   const c = zoneCenter(zone);
   const b = box(zone);
   const i = Number.isFinite(Number(n)) && Number(n) > 0 ? Math.floor(Number(n)) : 0;
-  const d = Math.min(i * STACK_OFFSET, Math.min(b.w, b.h) / 4);
+  const share = String(zone?.shape || 'rect') === 'rect' ? 0.45 : 0.25;
+  const d = Math.min(i * STACK_OFFSET, Math.min(b.w, b.h) * share);
   return { x: c.x + d, y: c.y + d };
 }
 

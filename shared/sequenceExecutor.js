@@ -513,6 +513,13 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // abgeschafft (die Schritte hinter der Wache bekommen keine eigene),
       // hier kommt ein Halbsatz an die eine, die bleibt.
       if (!step.message) return halt(`zone "${zone.label}" is ${inside ? `not empty (${inside})` : 'empty'}`);
+      // K2: der Satz, der für den Spieler geschrieben ist, steht zusätzlich für
+      // sich. `reason` bleibt Wort für Wort, was es war — es ist die Diagnose
+      // und gehört ins Protokoll; der Spieler bekommt nur `message` zu sehen
+      // (`issueLine` in `client/src/utils/setupActions.js`). In der sechsten
+      // Partie stand vor ihm „#1 require_zone … [in zone: …] (16 further steps
+      // skipped)" um einen richtigen deutschen Satz herum.
+      entry.message = step.message;
       return halt(`${step.message} [${zoneContents(zone, state)}]`);
     }
 

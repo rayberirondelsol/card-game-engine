@@ -44,3 +44,24 @@ export function canStartPan(target, canvas, container, { button = 0, panMode = f
   if (target !== canvas && target !== container) return false;
   return !target.closest('[data-ui-element]') && !target.closest('[data-table-card]');
 }
+
+/**
+ * Welchen Zeiger der Tisch zeigt (Spec M14.8).
+ *
+ * Der Befund der sechsten Solopartie: nach einem Schwenk blieb „Pan" aktiv,
+ * drei Figurenzüge hintereinander taten nichts, und **es gab keine Meldung**.
+ * Nur der blau markierte Knopf in der Werkzeugleiste verriet den Grund — den
+ * sieht man erst, wenn man ihn sucht.
+ *
+ * Bisher wechselte der Zeiger nur *während* eines laufenden Schwenks, an vier
+ * Stellen mit vier ausgeschriebenen Zeichenketten. Der eingeschaltete Modus
+ * selbst war unsichtbar. Hier steht die Antwort einmal.
+ *
+ * @param {boolean} panMode Der Schwenkmodus aus der Werkzeugleiste.
+ * @param {boolean} panning Läuft gerade ein Schwenk?
+ * @returns {'grabbing'|'grab'|'default'}
+ */
+export function panCursor(panMode, panning) {
+  if (panning) return 'grabbing';
+  return panMode ? 'grab' : 'default';
+}

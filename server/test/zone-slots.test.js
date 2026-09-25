@@ -255,3 +255,51 @@ test('M12.5: auch von Hand abgelegt staffelt der Ablagestapel', () => {
   assert.equal(new Set(punkte).size, 4, `nur ${new Set(punkte).size} Stellen: ${punkte.join(' ')}`);
   assert.deepEqual(punkte[0], `${zoneCenter(STAPEL).x}/${zoneCenter(STAPEL).y}`, 'die erste liegt auf der Mitte');
 });
+
+// ── K4 / AN3 – der Ablagestapel staffelt länger ─────────────────────────────
+//
+// Der Bericht der sechsten Solopartie: „Die Staffelung des Ablagestapels läuft
+// nach etwa sechs Karten aus; alle weiteren liegen deckungsgleich. Ab da ist
+// nicht mehr zu sehen, wie viele Aktionen schon gelaufen sind — was bei Karten
+// wie BÖSEWICHTSCHÄDEL (‚6 oder mehr Bösewicht-Aktionen auf dem Ablagestapel')
+// regelrelevant ist."
+//
+// **Die Grenze war Absicht**, und sie lag bei neun, nicht bei sechs: der
+// Deckel `min(w,h)/4` hält den Mittelpunkt der Karte in der Zone, damit
+// `zoneContains` sie weiter findet — sonst verlöre der Ablagestapel seine
+// unterste Karte an den Tisch. `/4` ist der Wert, der auch in einem Kreis und
+// in einem Sechseck trägt.
+//
+// In einem **Rechteck** trägt viel mehr: dort liegt der Mittelpunkt noch bis
+// knapp unter `min(w,h)/2` drin. Die Form weiß der Deckel ohnehin schon, er
+// hat nur nicht danach gefragt. Begründung in `docs/tasks-partie6.md`, „Wo die
+// Spec nicht stimmt", Punkt 7.
+
+test('K4: eine rechteckige Ablage zeigt mindestens zwölf Lagen', () => {
+  const punkte = Array.from({ length: 12 }, (_, i) => stackPoint(STAPEL, i));
+  const eindeutig = new Set(punkte.map(p => `${p.x}/${p.y}`));
+  assert.equal(eindeutig.size, 12, `nur ${eindeutig.size} unterscheidbare Stellen`);
+});
+
+test('K4: der Deckel bleibt ein Deckel – in jeder Form', () => {
+  for (const shape of ['rect', 'circle', 'hex', undefined]) {
+    const zone = { ...STAPEL, shape };
+    for (const n of [1, 5, 12, 40, 100, 10000]) {
+      const p = stackPoint(zone, n);
+      assert.ok(zoneContains(zone, p.x, p.y),
+        `${shape || 'rect'}, Karte ${n}: ${JSON.stringify(p)} liegt nicht mehr in der Zone`);
+    }
+  }
+});
+
+test('K4: eine runde oder sechseckige Ablage bleibt so vorsichtig wie bisher', () => {
+  // Dort ist `min(w,h)/4` die Zahl, die trägt – daran wird nichts geschraubt,
+  // nur das Rechteck bekommt, was ihm zusteht.
+  for (const shape of ['circle', 'hex']) {
+    const zone = { ...STAPEL, shape };
+    assert.deepEqual(stackPoint(zone, 100), stackPoint(zone, 1000),
+      `${shape}: der Deckel greift nicht mehr`);
+    const p = stackPoint(zone, 1000);
+    assert.equal(Math.round(p.x - zoneCenter(zone).x), Math.min(STAPEL.width, STAPEL.height) / 4);
+  }
+});

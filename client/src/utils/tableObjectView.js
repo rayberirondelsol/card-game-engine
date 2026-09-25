@@ -75,3 +75,46 @@ export function tokenPreview(token) {
   const h = Number(token.height) || Number(token.size) || w;
   return { src, caption: tableObjectView(token, 'Token').caption, ratio: { w, h } };
 }
+
+/**
+ * Wie hoch die Beschriftung unter einer Vorschau baut, in Pixeln (M14.6).
+ *
+ * Name und Schließhinweis, je eine Zeile, mit ihren Abständen. Gemessen am
+ * gezeichneten Block (`mt-3` + Textzeile + `mt-1` + Pille), nicht geraten —
+ * und ausgeschrieben, weil `calc()` im Stil sonst zum zweiten Mal dastünde.
+ */
+export const PREVIEW_CHROME_PX = 88;
+
+/**
+ * Der Kasten einer Vorschau (Spec M14.6).
+ *
+ * Der Befund der sechsten Solopartie: über „Enlarge" war das Bösewicht-Tableau
+ * nicht zu entziffern; der Umweg war der Tischzoom auf 151 %. **Die Spec
+ * vermutet eine feste Breite von ~400 px. Es waren 74 vh.** Beide Vorschauen
+ * rechneten bereits mit dem Fenster — nur ließen sie ein Viertel der Höhe
+ * ungenutzt, und `maxWidth: 92vw` greift bei einem hochkant stehenden Stück
+ * nie.
+ *
+ * **Einpassen allein reicht nicht.** Ein 1:2-Tableau, das ganz ins Fenster
+ * passen soll, wird bei 794 px Höhe höchstens rund 350 px breit — weniger als
+ * die 453 px des Umwegs. Deshalb zwei Stellungen:
+ *
+ *   `zoomed = false`  so groß wie möglich, nichts läuft über (Abnahme: das
+ *                     Stück füllt die Fensterhöhe abzüglich Beschriftung)
+ *   `zoomed = true`   so breit wie das Fenster erlaubt, senkrecht gescrollt
+ *
+ * Eine Stelle für beide Vorschauen (Token M11.6, Karte M10.2); vorher standen
+ * dieselben Zahlen zweimal im JSX.
+ *
+ * @param {{w: number, h: number}|null} ratio Seitenverhältnis des Stücks.
+ * @param {boolean} [zoomed=false]
+ * @returns {object} ein Stil-Objekt für das Bildelement
+ */
+export function previewBox(ratio, zoomed = false) {
+  const w = Number(ratio?.w) > 0 ? Number(ratio.w) : 1;
+  const h = Number(ratio?.h) > 0 ? Number(ratio.h) : 1;
+  const aspectRatio = `${w} / ${h}`;
+  if (zoomed) return { aspectRatio, width: '92vw', maxWidth: '92vw' };
+  const fit = `calc(100vh - ${PREVIEW_CHROME_PX}px)`;
+  return { aspectRatio, height: fit, maxHeight: fit, maxWidth: '92vw' };
+}

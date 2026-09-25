@@ -9,6 +9,8 @@
 // Geprüft in server/test/object-types.test.js (der Client hat keine
 // Testinfrastruktur, siehe CLAUDE.md).
 
+import { tableObjectView } from './tableObjectView.js';
+
 /** Typ → Zustandsliste. `state` sind die Arrays aus GameTable. */
 export function objectLists(state) {
   return {
@@ -78,3 +80,37 @@ export function moveObject(list, id, x, y) {
 
 /** Die eine Liste. Abgeleitet, damit sie nicht neben `objectLists` verwelkt. */
 export const TABLE_OBJECT_TYPES = Object.keys(objectLists({}));
+
+/**
+ * Wie eine Sorte heißt, wenn das Stück selbst keinen Namen trägt (M14.7).
+ *
+ * Abgeleitet aus derselben Liste wie alles andere hier — ein Typ, der später
+ * dazukommt, fällt in `object-types.test.js` auf, statt in der Löschabfrage
+ * „undefined" zu heißen.
+ */
+export const DELETE_FALLBACKS = {
+  counter: 'Counter',
+  die: 'Die',
+  customDie: 'Die',
+  hitDie: 'Die',
+  note: 'Note',
+  token: 'Token',
+  board: 'Board',
+  textField: 'Text',
+};
+
+/**
+ * Der Name, unter dem ein Stück in der Löschabfrage steht (Spec M14.7).
+ *
+ * Der Befund der sechsten Solopartie: „Delete" liegt bei einem Token
+ * unmittelbar unter „Enlarge", und ein danebengezielter Klick hat ein
+ * Dörfler-Tableau endgültig entfernt. Die Abfrage davor muss sagen, **was**
+ * gelöscht wird, sonst ist sie nur eine Verzögerung.
+ *
+ * Über `tableObjectView` und nicht über `obj.label`: sonst verriete
+ * ausgerechnet der Löschdialog den Namen eines verdeckt liegenden Stücks
+ * (Spec-Abschnitt 6).
+ */
+export function deleteLabel(objType, obj) {
+  return tableObjectView(obj, DELETE_FALLBACKS[objType] || 'Object').caption;
+}

@@ -57,6 +57,7 @@ test('the list itself is sane: no duplicates, all non-empty strings', () => {
 test('the exact order from the spec', () => {
   assert.deepEqual(ESCAPE_LAYERS, [
     'cardPreview',
+    'deleteModal',
     'contextMenu',
     'splitModal',
     'saveModal',

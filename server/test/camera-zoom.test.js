@@ -114,3 +114,69 @@ test('ein unbrauchbarer Zoom laesst die Kamera unveraendert, statt NaN zu setzen
   nahe(wieder.x, zeiger.x, 'x bleibt');
   nahe(wieder.y, zeiger.y, 'y bleibt');
 });
+
+// ── M14.9 / AJ – eine Mausradrastung zoomt spürbar ──────────────────────────
+//
+// Der Befund der sechsten Solopartie: der Weg von 48 % auf 151 % (um ein
+// Tableau zu lesen) und zurück kostet je 40–50 Rastungen — bei jedem Tableau,
+// jedes Mal.
+//
+// **Die Spec sagt, der Schritt gehöre in `zoomAt`. Er stand nirgends hier.**
+// `zoomAt` bekommt den *gewünschten* Zoom und klemmt ihn; der Schritt stand
+// zweimal ausgeschrieben in `GameTable.jsx` (nativer und React-Radhorcher),
+// als `0.9` bzw. `1.1` — dieselbe Doppelung, gegen die M10.2 den Rest der
+// Rechnung überhaupt hierher geholt hat. Nebenbefund: `0,9 · 1,1 = 0,99`, die
+// beiden Richtungen waren nicht zueinander invers.
+//
+// Begründung in `docs/tasks-partie6.md`, „Wo die Spec nicht stimmt", Punkt 5.
+
+const { ZOOM_WHEEL_STEP, wheelZoom } = await import('../../client/src/utils/cameraZoom.js');
+
+test('AJ1 Abnahme 1: fünf Rastungen decken den Weg von 50 % auf 100 %', () => {
+  assert.ok(ZOOM_WHEEL_STEP ** 5 >= 2,
+    `fünf Rastungen bringen nur das ${(ZOOM_WHEEL_STEP ** 5).toFixed(2)}-fache`);
+  let cam = { x: 0, y: 0, zoom: 0.5 };
+  for (let i = 0; i < 5; i++) cam = wheelZoom(cam, -1, { x: 0, y: 0 }, { x: 0, y: 0 });
+  assert.ok(cam.zoom >= 1, `nach fünf Rastungen erst bei ${Math.round(cam.zoom * 100)} %`);
+});
+
+test('AJ1 Abnahme 2: hinein und wieder heraus landet beim Ausgangswert', () => {
+  const mitte = { x: 500, y: 300 };
+  const zeiger = { x: 820, y: 140 };
+  const cam = { x: 10, y: 20, zoom: 1 };
+  const hin = wheelZoom(cam, -1, zeiger, mitte);
+  const zurueck = wheelZoom(hin, +1, zeiger, mitte);
+  nahe(zurueck.zoom, cam.zoom, 'der Zoom');
+  nahe(zurueck.x, cam.x, 'die Kamera x');
+  nahe(zurueck.y, cam.y, 'die Kamera y');
+});
+
+test('AJ1 Abnahme 3: die Anschläge gelten unverändert', () => {
+  const mitte = { x: 0, y: 0 };
+  let cam = { x: 0, y: 0, zoom: ZOOM_MAX };
+  assert.equal(wheelZoom(cam, -1, mitte, mitte).zoom, ZOOM_MAX);
+  cam = { x: 0, y: 0, zoom: ZOOM_MIN };
+  assert.equal(wheelZoom(cam, +1, mitte, mitte).zoom, ZOOM_MIN);
+});
+
+test('AJ1: der Zeiger bleibt auch beim Radzoom stehen', () => {
+  // `wheelZoom` reicht an `zoomAt` weiter, statt die Rechnung zu wiederholen.
+  const mitte = { x: 500, y: 300 };
+  const zeiger = { x: 300, y: 480 };
+  const cam = { x: -40, y: 75, zoom: 0.8 };
+  const ziel = worldAt(cam, zeiger, mitte);
+  const danach = wheelZoom(cam, -1, zeiger, mitte);
+  const wieder = screenOf(ziel, danach, mitte);
+  nahe(wieder.x, zeiger.x, 'x bleibt');
+  nahe(wieder.y, zeiger.y, 'y bleibt');
+});
+
+test('AJ1 Abnahme 4: der Faktor steht nicht mehr im JSX', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const src = readFileSync(
+    fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8');
+  assert.doesNotMatch(src, /0\.9 : 1\.1|1\.1 : 0\.9/, 'der Rastungsschritt steht wieder im JSX');
+  // Beide Radhorcher – der native und der von React – fragen dieselbe Stelle.
+  assert.equal((src.match(/wheelZoom\(/g) || []).length, 2, 'nicht beide Radhorcher benutzen `wheelZoom`');
+});

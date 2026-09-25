@@ -1594,8 +1594,13 @@ export default function GameDetail() {
                             />
                           ) : (
                             <div className="flex items-center gap-1 group/name">
+                              {/* K3: `truncate` ist einzeilig und endet in
+                                  einer Auslassung - „WEDELNDER SCHW…", und das
+                                  ★ der Beutekarte fiel weg. Zwei Zeilen mit
+                                  Umbruch statt einer mit Schere; `break-words`
+                                  fuer Namen ohne Leerzeichen. */}
                               <p
-                                className="text-xs text-[var(--color-text)] truncate font-medium flex-1 cursor-pointer hover:text-[var(--color-primary)]"
+                                className="text-xs text-[var(--color-text)] line-clamp-2 break-words font-medium flex-1 cursor-pointer hover:text-[var(--color-primary)]"
                                 data-testid={`card-name-${card.id}`}
                                 title={`${card.name} (click to edit)`}
                                 onClick={() => startEditCardName(card)}

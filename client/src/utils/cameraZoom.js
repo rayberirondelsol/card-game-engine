@@ -77,3 +77,38 @@ export function zoomAt(camera, cursor, center, zoom) {
     zoom: z1,
   };
 }
+
+/**
+ * Was eine Mausradrastung am Zoom aendert (Spec M14.9).
+ *
+ * Der Befund der sechsten Solopartie: der Weg von 48 % auf 151 % und zurueck
+ * kostet je 40–50 Rastungen — bei jedem Tableau, das man lesen will, jedes Mal.
+ *
+ * Der Schritt stand bis hierher **zweimal** ausgeschrieben in `GameTable.jsx`
+ * (nativer und React-Radhorcher), als `0.9` bzw. `1.1`: dieselbe Doppelung,
+ * gegen die M10.2 den Rest der Rechnung ueberhaupt hierher geholt hat. Und die
+ * beiden Zahlen waren nicht zueinander invers — `0,9 · 1,1 = 0,99`, hinein und
+ * wieder heraus landete jedes Mal ein Prozent tiefer.
+ *
+ * `1.15` ist die kleinste bequeme Zahl, die die Abnahme traegt: fuenf
+ * Rastungen sind `1,15⁵ = 2,01`, also der Weg von 50 % auf 100 %.
+ */
+export const ZOOM_WHEEL_STEP = 1.15;
+
+/**
+ * Die neue Kamera nach einer Mausradrastung.
+ *
+ * Eine Rastung hinaus ist genau der Kehrwert einer Rastung hinein. Gerechnet
+ * wird nicht hier, sondern in `zoomAt` — sonst stuende die Verankerung am
+ * Zeiger zum vierten Mal irgendwo.
+ *
+ * @param {{x: number, y: number, zoom: number}} camera
+ * @param {number} deltaY Vorzeichen des Rades; positiv heisst heraus.
+ * @param {{x: number, y: number}} cursor Zeiger, relativ zum Container.
+ * @param {{x: number, y: number}} center Halbe Containergroesse.
+ */
+export function wheelZoom(camera, deltaY, cursor, center) {
+  const z0 = Number(camera?.zoom) || 1;
+  const step = deltaY > 0 ? 1 / ZOOM_WHEEL_STEP : ZOOM_WHEEL_STEP;
+  return zoomAt(camera, cursor, center, z0 * step);
+}

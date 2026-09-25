@@ -176,3 +176,35 @@ test('ohne Menue und ohne Ziel bleibt es beim Schliessen', () => {
   assert.equal(closesMenu(null, node()), true);
   assert.equal(closesMenu(null, null), true);
 });
+
+// ── M14.10 / AM – das Kontextmenü bleibt im Fenster ──────────────────────────
+//
+// Der Bericht der sechsten Solopartie: „Rechtsklick auf das Verhaltensdeck
+// öffnet 23 Einträge, der letzte liegt bei y≈888 in einem 794 px hohen
+// Fenster … nicht erreichbar, ohne vorher den Tisch zu verschieben."
+//
+// **Nachgemessen am laufenden Tisch ist das nicht so.** Bei Fensterhöhe 300:
+// `top 8`, `bottom 292`, `maxHeight "284px"`, `scrollHeight 369` — das Menü
+// bleibt im Fenster und scrollt. `getBoundingClientRect` eines Kindes gibt
+// seine Layoutlage zurück, nicht die sichtbare; ein Eintrag unterhalb der
+// Kante meldet weiterhin `y≈888`, erreichbar ist er trotzdem.
+//
+// Gebaut ist also nichts nachzuholen — die **Rechnung** steht seit M2.9 hier
+// und ist oben geprüft. Ungeschützt war ihre **Anwendung**: die eine Zeile im
+// JSX, die `maxHeight` setzt. Begründung in `docs/tasks-partie6.md`, „Wo die
+// Spec nicht stimmt", Punkt 2.
+
+test('AM1: das Kontextmenü benutzt `maxHeight` und scrollt darin', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const src = readFileSync(
+    fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8');
+  const lines = src.split('\n');
+  const i = lines.findIndex(l => l.includes('data-testid="context-menu"'));
+  assert.ok(i >= 0, 'das Kontextmenü gibt es nicht mehr');
+  const el = lines.slice(Math.max(0, i - 22), i + 2).join('\n');
+  assert.match(el, /maxHeight: menuPlace/, `das Menü kappt seine Höhe nicht mehr:\n${el}`);
+  assert.match(el, /overflow: 'auto'/, `ohne overflow ist der gekappte Rest unerreichbar:\n${el}`);
+  // Gemessen wird ungekappt – sonst beantwortet sich „passt es?" selbst mit ja.
+  assert.match(src, /height: rect\.height/, 'das Menü misst nicht mehr seine eigene Höhe');
+});

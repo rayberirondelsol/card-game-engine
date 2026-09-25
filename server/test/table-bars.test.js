@@ -108,3 +108,51 @@ test('M12.1 Abnahme 3: das × jedes Bandes bleibt klickbar', () => {
       `das × von ${band} nimmt keine Klicks mehr an:\n${schliessen[0]}`);
   }
 });
+
+// ── M14.5 – die beiden Leisten über dem Tisch (AF) ───────────────────────────
+//
+// Die sechste Solopartie: der Bösewicht stand auf `H13:I14` und damit auf
+// Bildschirmhöhe von „Dorfereignis ziehen". Der Zug bewegte ihn nicht, sondern
+// feuerte den Knopf — zweimal unbemerkt, je drei Ereigniskarten. Dasselbe
+// unten: ein Würfel unter der Werkzeugleiste war nicht mehr anklickbar.
+//
+// Zwei getrennte Dinge, deshalb zwei Tests:
+//
+//   AF1  Die Werkzeugleiste steht nicht in der M12.1-Konvention. Ihr
+//        Pillenkörper nimmt Zeiger auf seiner ganzen Fläche an — auch auf den
+//        12 px Innenabstand und in den Lücken zwischen den Knöpfen.
+//   AF2  Die Konvention allein löst den Befund **nicht**: der Druck landete
+//        auf dem Knopf selbst. Was ihn löst, ist die Unterscheidung Klick
+//        gegen Zug (`barPassthrough.js`), und die muss verdrahtet sein.
+//
+// Begründung in `docs/tasks-partie6.md`, „Wo die Spec nicht stimmt", Punkt 1.
+
+test('AF1: der Körper der Werkzeugleiste nimmt keine Züge mehr an', () => {
+  const lines = source.split('\n');
+  const i = lines.findIndex(l => l.includes('data-testid="floating-toolbar"'));
+  assert.ok(i >= 0, 'floating-toolbar gibt es nicht mehr');
+  // Die Pille ist das Element darunter, das den dunklen Hintergrund trägt.
+  const j = lines.findIndex((l, k) => k > i && l.includes('bg-black/70 backdrop-blur-md rounded-xl'));
+  assert.ok(j > i, 'die Pille der Werkzeugleiste gibt es nicht mehr');
+  const pille = lines[j];
+  assert.match(pille, /pointer-events-none/, `der Pillenkörper schluckt Züge:\n${pille}`);
+  assert.match(pille, /pointer-events-auto/, `dann nimmt kein Knopf mehr Klicks an:\n${pille}`);
+});
+
+test('AF2: beide Leisten sind als Überlagerung gekennzeichnet', () => {
+  // Ohne die Kennzeichnung findet `handleGlobalStart` sie nicht – und eine
+  // dritte Leiste, die später dazukommt, fällt hier auf.
+  const marken = source.split('\n').filter(l => l.includes('data-bar-overlay'));
+  assert.ok(marken.length >= 2, `nur ${marken.length} gekennzeichnete Leiste(n)`);
+});
+
+test('AF2: der Zug auf einer Leiste ist verdrahtet', () => {
+  assert.match(source, /from '\.\.\/utils\/barPassthrough\.js'/, 'die Schwelle wird nicht benutzt');
+  assert.match(source, /passedSlop\(/, '`passedSlop` wird nirgends gefragt');
+  // Die Auswahl läuft über die Daten, also über dieselbe Ordnung, die auch
+  // zeichnet – nicht über eine zweite danebengestellte.
+  assert.match(source, /barObjectAt\(/, 'es gibt keine Auswahl unter der Leiste');
+  // Und der `click`, der auf so einen Zug folgt, wird verworfen – sonst
+  // feuerte der Knopf weiterhin (das war der halbe Befund).
+  assert.match(source, /onClickCapture=/, 'der Klick nach dem Zug wird nicht verworfen');
+});

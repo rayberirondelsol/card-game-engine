@@ -118,3 +118,71 @@ test('moveObject löst ein Token von seiner Karte – und nur ein Token', () => 
   const die = moveObject([{ id: 'd', x: 0, y: 0 }], 'd', 5, 6)[0];
   assert.ok(!('attachedTo' in die), 'ein Würfel bekommt kein attachedTo');
 });
+
+// ── M14.7 / AH – Löschen fragt nach ──────────────────────────────────────────
+//
+// Der Befund der sechsten Solopartie: beim Zielen im Kontextmenü wurde ein
+// Dörfler-Tableau gelöscht — ohne Rückfrage, ohne Rückgängig. „Enlarge" und
+// „Delete" liegen bei einem Token Zeile auf Zeile; der eine Eintrag ist
+// harmlos, der andere endgültig.
+//
+// Die Abfrage nennt das Stück beim Namen, und zwar über `tableObjectView` —
+// sonst verriete ausgerechnet der Löschdialog den Namen eines verdeckt
+// liegenden Stücks (Spec-Abschnitt 6, „Verdeckt heißt überall verdeckt").
+
+const { deleteLabel, DELETE_FALLBACKS } = await import('../../client/src/utils/objectTypes.js');
+const { HIDDEN_CAPTION } = await import('../../client/src/utils/tableObjectView.js');
+
+test('AH1: die Abfrage nennt das Stück beim Namen', () => {
+  assert.equal(deleteLabel('token', { label: 'Tableau: Deputy Waggums' }), 'Tableau: Deputy Waggums');
+  assert.equal(deleteLabel('board', { name: 'Hauptplan' }), 'Hauptplan');
+});
+
+test('AH1: ein verdecktes Stück verrät seinen Namen auch hier nicht', () => {
+  assert.equal(deleteLabel('token', { label: 'Bösewicht', faceDown: true }), HIDDEN_CAPTION);
+});
+
+test('AH1: ohne eigenen Namen steht die Sorte da', () => {
+  assert.equal(deleteLabel('die', {}), 'Die');
+  assert.equal(deleteLabel('counter', {}), 'Counter');
+  // Jeder löschbare Typ hat einen Rückfall – sonst hieße einer „undefined".
+  for (const t of TABLE_OBJECT_TYPES) {
+    assert.equal(typeof DELETE_FALLBACKS[t], 'string', `${t} hat keinen Rückfall`);
+    assert.ok(DELETE_FALLBACKS[t].length > 0, `${t} hat einen leeren Rückfall`);
+  }
+});
+
+test('AH1: ein unbekannter Typ oder kein Objekt stürzt nicht ab', () => {
+  assert.equal(typeof deleteLabel('gibtsnicht', { label: 'X' }), 'string');
+  assert.equal(typeof deleteLabel('token', null), 'string');
+  assert.equal(typeof deleteLabel(undefined, undefined), 'string');
+});
+
+// Die Verdrahtung. Der Client hat keine Testinfrastruktur (CLAUDE.md), also
+// wird die Quelle gelesen – Muster `table-bars.test.js`.
+const { readFileSync } = await import('node:fs');
+const { fileURLToPath } = await import('node:url');
+const gameTable = readFileSync(
+  fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8');
+
+test('AH1: der Menüeintrag löscht nicht mehr selbst, sondern fragt', () => {
+  const lines = gameTable.split('\n');
+  const i = lines.findIndex(l => l.includes('data-testid="context-delete"'));
+  assert.ok(i >= 0, 'den Löscheintrag gibt es nicht mehr');
+  const el = lines.slice(Math.max(0, i - 20), i).join('\n');
+  assert.match(el, /setDeleteTarget\(/, `der Eintrag fragt nicht nach:\n${el}`);
+  assert.doesNotMatch(el, /objDeleters\[/, `der Eintrag löscht weiterhin sofort:\n${el}`);
+});
+
+test('AH1: die Rückfrage ist ein Dialog im JSX, kein Browserdialog', () => {
+  for (const id of ['object-delete-modal', 'object-delete-name',
+                    'object-delete-confirm-btn', 'object-delete-cancel-btn']) {
+    assert.ok(gameTable.includes(`data-testid="${id}"`), `${id} fehlt`);
+  }
+  // Fingergroß, wie jeder Knopf am Tisch. (Dass `confirm` nicht vorkommt, hält
+  // `client-hygiene.test.js` – hier steht nur die positive Hälfte.)
+  const lines = gameTable.split('\n');
+  const i = lines.findIndex(l => l.includes('data-testid="object-delete-confirm-btn"'));
+  assert.match(lines.slice(i - 4, i + 3).join('\n'), /min-h-\[44px\]/,
+    'der Bestätigungsknopf ist zu klein für einen Finger');
+});

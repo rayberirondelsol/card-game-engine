@@ -14,6 +14,10 @@ export const ESCAPE_LAYERS = [
   // damit über allem, auch über dem Kontextmenü, aus dem sie geöffnet wird. Sie
   // ging bisher nur mit einem Klick irgendwohin zu.
   'cardPreview',
+  // M14.7: die Rückfrage vor dem Löschen. Sie steht über dem Kontextmenü, aus
+  // dem sie kommt, und sie verlangt eine Entscheidung — genau das, wofür
+  // M2.10 eine Schicht vorsieht.
+  'deleteModal',
   'contextMenu',
   'splitModal',
   'saveModal',

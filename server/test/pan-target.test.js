@@ -117,3 +117,42 @@ test('U1 Abnahme 4: ohne Optionen antwortet die Funktion wie vorher', () => {
   assert.equal(canStartPan(target(UI), canvas, container, {}), false);
   assert.equal(canStartPan(target(LOCKED, UI), canvas, container, {}), true);
 });
+
+// ── M14.8 / AK – der Schwenkmodus ist am Zeiger zu sehen ─────────────────────
+//
+// Der Befund der sechsten Solopartie: nach einem Schwenk blieb „Pan" aktiv.
+// Drei aufeinanderfolgende Figurenzüge taten nichts, ohne Meldung; nur der
+// blau markierte Knopf in der Werkzeugleiste verriet den Grund.
+//
+// Der Zeiger wechselte bisher nur **während** eines laufenden Schwenks auf
+// `grabbing` – an vier Stellen, jede mit ihrer eigenen Zeichenkette. Der Modus
+// selbst war unsichtbar.
+
+const { panCursor } = await import('../../client/src/utils/panTarget.js');
+
+test('AK1: im Schwenkmodus ist der Zeiger eine Hand', () => {
+  assert.equal(panCursor(true, false), 'grab');
+});
+
+test('AK1: während des Schwenks greift die Hand zu', () => {
+  assert.equal(panCursor(true, true), 'grabbing');
+  // Auch ohne Modus: die mittlere Maustaste und der Zug auf dem Hintergrund
+  // schwenken weiterhin (M2.13/M10.7).
+  assert.equal(panCursor(false, true), 'grabbing');
+});
+
+test('AK1: sonst bleibt der Zeiger, was er war', () => {
+  assert.equal(panCursor(false, false), 'default');
+});
+
+test('AK1: der Zeiger des Tisches kommt nur noch aus `panCursor`', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const src = readFileSync(
+    fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8');
+  const zeilen = src.split('\n').filter(l => l.includes('style.cursor ='));
+  assert.ok(zeilen.length >= 4, `nur ${zeilen.length} Stellen setzen den Zeiger`);
+  for (const l of zeilen) {
+    assert.match(l, /panCursor\(/, `eine ausgeschriebene Zeichenkette ist zurueck:\n${l.trim()}`);
+  }
+});

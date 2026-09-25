@@ -16,7 +16,7 @@ import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
-import { tableObjectView, tokenPreview } from '../utils/tableObjectView';
+import { tableObjectView, tokenPreview, previewBox } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
 import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
@@ -27,8 +27,9 @@ import { revealZones, revealPlan } from '../utils/revealToZone.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
-import { objectLists, objectDeleters, objectSetters, moveObject } from '../utils/objectTypes.js';
-import { canStartPan } from '../utils/panTarget.js';
+import { objectLists, objectDeleters, objectSetters, moveObject, deleteLabel } from '../utils/objectTypes.js';
+import { canStartPan, panCursor } from '../utils/panTarget.js';
+import { issueLine } from '../utils/setupActions.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
@@ -36,7 +37,8 @@ import { stackAt, stackCandidates, looseCandidates } from '../utils/cardDrop.js'
 import { normalizeViews, putView, removeView, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
-import { zoomAt, worldAt, ZOOM_MIN, ZOOM_MAX } from '../utils/cameraZoom.js';
+import { zoomAt, worldAt, wheelZoom, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
+import { passedSlop } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 
@@ -401,11 +403,19 @@ export default function GameTable({ room = null }) {
   const [showViews, setShowViews] = useState(false);
   // M12.2: der eigene Dialog fuer den Namen einer Ansicht, statt `window.prompt`.
   const [showViewSaveModal, setShowViewSaveModal] = useState(false);
+  // M14.7: was gelöscht werden soll, solange die Rückfrage offen ist.
+  // `{ objType, objId }` – der Name wird erst im Dialog nachgeschlagen, damit
+  // ein umbenanntes Stück nicht unter altem Namen dasteht.
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewName, setViewName] = useState('');
   // M11.6: die Vergroesserung eines Tokens. Eigene Id neben
   // `longPressPreviewCard`, weil ein Token in einer anderen Liste liegt; was
   // *gezeigt* wird, entscheidet `tokenPreview` an einer Stelle.
   const [previewToken, setPreviewToken] = useState(null);
+  // M14.6/AG2: zweite Stellung der Vorschau - Fensterbreite statt eingepasst.
+  // Beim Schliessen faellt sie zurueck, sonst oeffnete das naechste Stueck
+  // gescrollt.
+  const [previewZoomed, setPreviewZoomed] = useState(false);
 
   // Save state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -460,6 +470,13 @@ export default function GameTable({ room = null }) {
   // Die nativen Horcher haengen in einem `useEffect` und sehen `panMode` nicht.
   const panModeRef = useRef(false);
   panModeRef.current = panMode;
+  // M14.8: der eingeschaltete Modus muss am Zeiger zu sehen sein, nicht erst
+  // beim naechsten Schwenk. Die vier Stellen unten setzen den Zeiger jeweils
+  // beim Beginn und Ende eines Zuges; das Umschalten selbst ist keiner.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) canvas.style.cursor = panCursor(panMode, isPanningRef.current);
+  }, [panMode]);
   const isPinchingRef = useRef(false);
   const pinchStartDistanceRef = useRef(0);
   const pinchStartZoomRef = useRef(1);
@@ -639,6 +656,14 @@ export default function GameTable({ room = null }) {
   // Drag state for objects
   const [draggingObj, setDraggingObj] = useState(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+
+  // M14.5: ein Druck, der auf einer Bedienleiste begonnen hat, und noch nicht
+  // entschieden ist. Bleibt er in Ruhe, gehört er dem Knopf; wandert er über
+  // `BAR_SLOP`, gehört er dem Stück darunter. `barClickRef` merkt sich den
+  // zweiten Teil davon: der `click`, der auf so einen Zug folgt, darf den
+  // Knopf nicht mehr auslösen – das war die Hälfte des Befundes.
+  const barGestureRef = useRef(null);
+  const barClickRef = useRef(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -957,12 +982,14 @@ export default function GameTable({ room = null }) {
       // M10.2 Regel 2: der Zoom folgt dem Mauszeiger. Die Rechnung steht in
       // `cameraZoom.js` – hier stand sie mit umgekehrtem Vorzeichen, und das
       // Ziel flog beim Zoomen doppelt so schnell aus dem Bild.
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      Object.assign(camera, zoomAt(
+      // M14.9: und der Schritt je Rastung steht jetzt dort ebenfalls. Er stand
+      // hier und im React-Horcher zweimal ausgeschrieben, und `0,9`/`1,1` waren
+      // nicht zueinander invers.
+      Object.assign(camera, wheelZoom(
         camera,
+        e.deltaY,
         { x: e.clientX - rect.left, y: e.clientY - rect.top },
         { x: rect.width / 2, y: rect.height / 2 },
-        camera.zoom * delta,
       ));
 
       setZoomDisplay(Math.round(camera.zoom * 100));
@@ -991,7 +1018,7 @@ export default function GameTable({ room = null }) {
           camX: cameraRef.current.x,
           camY: cameraRef.current.y,
         };
-        canvas.style.cursor = 'grabbing';
+        canvas.style.cursor = panCursor(panModeRef.current, true);
       }
       // Right click
       if (e.button === 2) {
@@ -1014,7 +1041,7 @@ export default function GameTable({ room = null }) {
     function handleMouseUp(e) {
       if (isPanningRef.current) {
         isPanningRef.current = false;
-        canvas.style.cursor = 'default';
+        canvas.style.cursor = panCursor(panModeRef.current, false);
       }
     }
 
@@ -1067,6 +1094,7 @@ export default function GameTable({ room = null }) {
           // Nur, solange es auch zu sehen ist: die Klappliste haengt an der
           // Werkzeugleiste, und Escape soll nichts schlucken, was niemand sieht.
           viewsMenu: showViews && showToolbar,
+          deleteModal: deleteTarget,
           contextMenu, splitModal: showSplitModal, saveModal: showSaveModal,
           setupSaveModal: showSetupSaveModal, viewSaveModal: showViewSaveModal,
           counterModal: showCounterModal,
@@ -1078,8 +1106,9 @@ export default function GameTable({ room = null }) {
         if (!target) return; // keine Schicht offen: Escape nicht schlucken
         e.preventDefault();
         switch (target) {
-          case 'cardPreview': setLongPressPreviewCard(null); setPreviewToken(null); break;
+          case 'cardPreview': setLongPressPreviewCard(null); setPreviewToken(null); setPreviewZoomed(false); break;
           case 'viewsMenu': setShowViews(false); break;
+          case 'deleteModal': setDeleteTarget(null); break;
           case 'contextMenu': setContextMenu(null); break;
           case 'splitModal': dismissSplitModal(); break;
           case 'saveModal': dismissSaveModal(); break;
@@ -2104,7 +2133,12 @@ export default function GameTable({ room = null }) {
       // `canvas.width / 2` war eine Bildschirmbreite als Weltkoordinate, und
       // der Zufall daneben verhinderte kein Uebereinanderliegen.
       ...spawnSlot(viewCenter(), dieSpots()),
+      // M14.11: wie oft dieser Wuerfel schon gerollt hat. Die Wurfanimation
+      // dauert 800 ms und ist danach spurlos - faellt zweimal dieselbe Zahl,
+      // war in der sechsten Partie nicht mehr feststellbar, ob der Klick
+      // angekommen ist. Der Zaehler beantwortet das auch spaeter noch.
       rolling: false,
+      rolls: 0,
     };
     setDice(prev => [...prev, newDie]);
     setShowDiceModal(false);
@@ -2125,7 +2159,9 @@ export default function GameTable({ room = null }) {
       if (count >= 10) {
         clearInterval(interval);
         setDice(prev => prev.map(d =>
-          d.id === dieId ? { ...d, rolling: false, value: Math.floor(Math.random() * d.maxValue) + 1 } : d
+          d.id === dieId
+            ? { ...d, rolling: false, rolls: (d.rolls || 0) + 1, value: Math.floor(Math.random() * d.maxValue) + 1 }
+            : d
         ));
       }
     }, 80);
@@ -2147,6 +2183,7 @@ export default function GameTable({ room = null }) {
       // M10.5/J5, siehe createDie.
       ...spawnSlot(viewCenter(), dieSpots()),
       rolling: false,
+      rolls: 0,   // M14.11, siehe createDie
       locked: false,
     };
     setCustomDiceOnTable(prev => [...prev, newDie]);
@@ -2169,7 +2206,7 @@ export default function GameTable({ room = null }) {
           if (d.id !== dieId) return d;
           const face = Math.floor(Math.random() * d.faceImages.length);
           if (room) room.sendAction({ type: 'custom_die_roll', die_id: dieId, currentFace: face });
-          return { ...d, rolling: false, currentFace: face };
+          return { ...d, rolling: false, rolls: (d.rolls || 0) + 1, currentFace: face };
         }));
       }
     }, 80);
@@ -2203,6 +2240,7 @@ export default function GameTable({ room = null }) {
       // M10.5/J5, siehe createDie.
       ...spawnSlot(viewCenter(), dieSpots()),
       rolling: false,
+      rolls: 0,   // M14.11, siehe createDie
       locked: false,
     };
     setHitDice(prev => [...prev, newDie]);
@@ -2225,7 +2263,9 @@ export default function GameTable({ room = null }) {
       if (count >= 10) {
         clearInterval(interval);
         setHitDice(prev => prev.map(d =>
-          d.id === dieId ? { ...d, rolling: false, value: rollHitFace(d.hitType) } : d
+          d.id === dieId
+            ? { ...d, rolling: false, rolls: (d.rolls || 0) + 1, value: rollHitFace(d.hitType) }
+            : d
         ));
       }
     }, 80);
@@ -2252,6 +2292,65 @@ export default function GameTable({ room = null }) {
   });
 
   // Drag handlers for floating objects (counters, dice, hitDice, notes, tokens, textFields)
+  /**
+   * M14.5: welches Tischstück liegt unter einem Bildschirmpunkt?
+   *
+   * Dieselbe Liste, die `layerZ` ordnet, nur zusätzlich mit `x`/`y` – die
+   * Zeichenreihenfolge **ist** die Trefferreihenfolge (`tokenLayer.js`), und
+   * eine zweite Liste wäre eine zweite Antwort. Der Schlüssel ist hier die
+   * Position in der Liste, damit die Id unangetastet zurückkommt: ältere
+   * Spielstände tragen nicht überall Zeichenketten.
+   *
+   * Über die **Daten**, nicht über `elementFromPoint`: am DOM liegt die Leiste
+   * obenauf, und sie wegzuschalten, um darunter zu messen, wäre eine zweite
+   * Mechanik neben `pickTopmost`.
+   */
+  function barObjectAt(clientX, clientY) {
+    const p = screenToWorld(clientX, clientY);
+    const items = [];
+    const add = (type, o, box) => items.push({ key: String(items.length), type, obj: o, x: o.x, y: o.y, ...box });
+
+    tokens.forEach(t => add('token', t, { width: t.width, height: t.height, size: t.size }));
+    [...tableCards]
+      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+      .forEach(c => { const { w, h } = getCardDims(c); add('card', c, { width: w, height: h }); });
+    counters.forEach(c => add('counter', c, WIDGET_BOX.counter));
+    notes.forEach(n => add('note', n, WIDGET_BOX.note));
+    textFields.forEach(tf => add('textField', tf, WIDGET_BOX.textField));
+    customDiceOnTable.forEach(d => add('customDie', d, WIDGET_BOX.customDie));
+    hitDice.forEach(d => add('hitDie', d, WIDGET_BOX.hitDie));
+    dice.forEach(d => add('die', d, WIDGET_BOX.die));
+
+    const key = pickTopmost(p, items);
+    return key == null ? null : items[Number(key)];
+  }
+
+  /**
+   * M14.5: der angefangene Druck auf einer Leiste ist ein Zug geworden – gib
+   * ihn an das Stück darunter weiter.
+   *
+   * Der Zug beginnt mit dem **Bewegungsereignis**, nicht mit dem ursprünglichen
+   * Druck: nur so kennt `handleObjDragStart` die Taste und den Finger, die
+   * gerade wirklich unterwegs sind. Der Versatz ist dadurch um bis zu `BAR_SLOP`
+   * daneben – das ist genau der Weg, den der Zeiger schon zurückgelegt hat, und
+   * er lässt das Stück ruhig stehen statt zu springen.
+   */
+  function passBarGestureToTable(e) {
+    const start = barGestureRef.current;
+    if (!start) return;
+    const pointer = getPointerPosition(e);
+    if (!passedSlop(start, pointer)) return;
+    barGestureRef.current = null;
+
+    const hit = barObjectAt(start.clientX, start.clientY);
+    if (!hit) return;
+    // Was jetzt kommt, ist ein Zug – der `click` beim Loslassen gehört nicht
+    // mehr dem Knopf.
+    barClickRef.current = true;
+    if (hit.type === 'card') actualCardDragStart(e, hit.obj.tableId);
+    else handleObjDragStart(e, hit.type, hit.obj.id);
+  }
+
   function handleObjDragStart(e, objType, objId) {
     // Only start drag on left mouse button
     if (!isTouchEvent(e) && e.button !== 0) return;
@@ -2603,6 +2702,11 @@ export default function GameTable({ room = null }) {
 
     const pointer = getPointerPosition(e);
 
+    // M14.5: hat ein Druck auf einer Bedienleiste angefangen zu wandern? Dann
+    // gehört er dem Stück darunter. Vor allem anderen, weil danach `draggingObj`
+    // gesetzt ist und der nächste Durchlauf hier nichts mehr zu entscheiden hat.
+    if (barGestureRef.current) passBarGestureToTable(e);
+
     // M2.11: wandert der Finger, ist es ein Zug – kein Langdruck.
     if (longPressMenuTimerRef.current) {
       const dx = Math.abs(pointer.clientX - longPressMenuTouchPosRef.current.x);
@@ -2698,9 +2802,12 @@ export default function GameTable({ room = null }) {
 
   // Combined end handler (works for both mouse and touch)
   function handleGlobalEnd(e) {
+    // M14.5: losgelassen ohne zu wandern – der Druck war ein Klick und gehört
+    // dem Knopf, der ihn ohnehin gleich bekommt.
+    barGestureRef.current = null;
     if (isPanningRef.current) {
       isPanningRef.current = false;
-      if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+      if (canvasRef.current) canvasRef.current.style.cursor = panCursor(panModeRef.current, false);
     }
     if (draggingCard) {
       handleCardDragEnd();
@@ -2805,7 +2912,7 @@ export default function GameTable({ room = null }) {
 
     // 6. Reset panning state
     isPanningRef.current = false;
-    if (canvasRef.current) canvasRef.current.style.cursor = 'default';
+    if (canvasRef.current) canvasRef.current.style.cursor = panCursor(panModeRef.current, false);
 
     // 7. Reset hand card drag
     if (draggingHandCard) {
@@ -3869,6 +3976,7 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         rolling: false,
+        rolls: d.rolls || 0,   // M14.11: der Zaehler ueberlebt das Laden
         locked: d.locked || false,
       })));
     } else {
@@ -3885,6 +3993,7 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         rolling: false,
+        rolls: d.rolls || 0,   // M14.11
         locked: d.locked || false,
       })));
     } else {
@@ -3903,6 +4012,7 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         rolling: false,
+        rolls: d.rolls || 0,   // M14.11
         locked: d.locked || false,
       })));
     } else {
@@ -4277,17 +4387,19 @@ export default function GameTable({ room = null }) {
     const container = containerRef.current;
     const rect = container ? container.getBoundingClientRect() : null;
 
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
     if (rect) {
-      // M10.2 Regel 2, dieselbe Rechnung wie im nativen Horcher oben.
-      Object.assign(camera, zoomAt(
+      // M10.2 Regel 2 / M14.9, dieselbe Rechnung und derselbe Schritt wie im
+      // nativen Horcher oben.
+      Object.assign(camera, wheelZoom(
         camera,
+        e.deltaY,
         { x: e.clientX - rect.left, y: e.clientY - rect.top },
         { x: rect.width / 2, y: rect.height / 2 },
-        camera.zoom * delta,
       ));
     } else {
-      camera.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.zoom * delta));
+      // Ohne Container gibt es keinen Zeigerpunkt – nur der Schritt gilt.
+      const step = e.deltaY > 0 ? 1 / ZOOM_WHEEL_STEP : ZOOM_WHEEL_STEP;
+      camera.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.zoom * step));
     }
 
     setZoomDisplay(Math.round(camera.zoom * 100));
@@ -4303,6 +4415,20 @@ export default function GameTable({ room = null }) {
     }
 
     const pointer = getPointerPosition(e);
+
+    // M14.5: liegt der Druck auf einer der beiden Leisten, ist noch nicht
+    // entschieden, wem er gehört. Gemerkt wird er hier, entschieden in
+    // `handleGlobalMove`: bleibt er in Ruhe, feuert der Knopf wie bisher.
+    //
+    // Hier faellt auch ein uebriggebliebenes Klick-Veto: ein Zug auf Touch
+    // endet ohne `click`, das Veto von eben stuende sonst noch, wenn der
+    // naechste Klick kommt. Ein neuer Druck loescht es, bevor irgendein Klick
+    // dieser Geste entstehen kann.
+    barClickRef.current = false;
+    barGestureRef.current = e.target?.closest?.('[data-bar-overlay]')
+      ? { clientX: pointer.clientX, clientY: pointer.clientY }
+      : null;
+
     // M2.13: same rule as the native mouse handler above – the background pans,
     // and so does a locked object, which no drag would pick up anyway.
     // M10.7/U1: dazu die mittlere Maustaste und der Schwenkmodus, in derselben
@@ -4323,7 +4449,7 @@ export default function GameTable({ room = null }) {
         camX: cameraRef.current.x,
         camY: cameraRef.current.y,
       };
-      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
+      if (canvasRef.current) canvasRef.current.style.cursor = panCursor(panModeRef.current, true);
     }
   }
 
@@ -4552,6 +4678,17 @@ export default function GameTable({ room = null }) {
       onTouchEnd={(e) => { handleDrawerSwipeTouchEnd(e); handleGlobalTouchEnd(e); }}
       onTouchCancel={handleGlobalTouchCancel}
       onWheel={handleGlobalWheel}
+      /* M14.5: Druck und Loslassen auf demselben Knopf ergeben einen `click` –
+         auch dann, wenn dazwischen ein Stück über den Tisch gezogen wurde, denn
+         ein 142 px breiter Knopf ist breiter als drei Rasterfelder. Genau so
+         sind in der sechsten Partie sechs Dorf-Ereignisse gezogen worden.
+         In der Capture-Phase, also bevor der Knopf ihn sieht. */
+      onClickCapture={(e) => {
+        if (!barClickRef.current) return;
+        barClickRef.current = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }}
       onClick={handleTableClick}
       onContextMenu={(e) => {
         // Only show table context menu if clicking on canvas/background (not on a card)
@@ -5017,8 +5154,15 @@ export default function GameTable({ room = null }) {
             className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`}
             style={{ minWidth: '70px' }}
           >
-            <div className="sm:text-[10px] text-xs text-slate-400 uppercase font-bold mb-0.5">
-              {die.type}
+            {/* M14.11: die Wurfanimation ist nach 800 ms spurlos. Fiel zweimal
+                dieselbe Zahl, war nicht mehr feststellbar, ob der Klick
+                angekommen ist - der Spieler hat konservativ und zu seinen
+                Ungunsten entschieden. Der Zaehler steht auch spaeter noch da. */}
+            <div className="sm:text-[10px] text-xs text-slate-400 uppercase font-bold mb-0.5 flex items-center justify-center gap-1">
+              <span>{die.type}</span>
+              <span className="text-slate-500 normal-case font-normal" data-testid={`die-rolls-${die.id}`}>
+                #{die.rolls || 0}
+              </span>
             </div>
             <div
               className={`text-2xl font-mono font-bold text-white ${die.rolling ? 'text-yellow-400' : ''}`}
@@ -5054,7 +5198,13 @@ export default function GameTable({ room = null }) {
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'customDie', objId: die.id, cardTableId: null, stackId: null }); }}
         >
           <div className={`bg-slate-800/90 backdrop-blur-sm rounded-xl border border-slate-600 p-2 shadow-xl text-center ${die.rolling ? 'animate-bounce' : ''}`} style={{ width: '80px' }}>
-            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 truncate" title={die.name}>{die.name}</div>
+            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 truncate" title={die.name}>
+              {die.name}
+              {/* M14.11, siehe Standardwuerfel. */}
+              <span className="text-slate-500 normal-case font-normal ml-1" data-testid={`die-rolls-${die.id}`}>
+                #{die.rolls || 0}
+              </span>
+            </div>
             {die.faceImages[die.currentFace] ? (
               <div className="w-12 h-12 mx-auto rounded-lg overflow-hidden bg-slate-700 border border-slate-500 mb-1">
                 <img
@@ -5128,6 +5278,10 @@ export default function GameTable({ room = null }) {
               }} />
               <div className="text-[10px] uppercase font-bold mb-0.5" style={{ color: colors.border, letterSpacing: '0.05em' }}>
                 {colors.label}
+                {/* M14.11, siehe Standardwuerfel. */}
+                <span className="normal-case font-normal ml-1 opacity-70" data-testid={`die-rolls-${die.id}`}>
+                  #{die.rolls || 0}
+                </span>
               </div>
               <div
                 className={`text-3xl font-bold leading-none ${die.rolling ? 'opacity-50' : ''}`}
@@ -5414,7 +5568,7 @@ export default function GameTable({ room = null }) {
       </div>{/* End world-space transform wrapper */}
 
       {/* Top bar with game name and back button - compact in landscape */}
-      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-layout-mode={layoutMode}>
+      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none safe-area-top transition-all duration-300 ease-in-out" data-ui-element="true" data-bar-overlay="true" data-layout-mode={layoutMode}>
         {showTopBar && (<>
         <div className={`flex items-center justify-between transition-all duration-300 ease-in-out ${isMobileLandscape ? 'p-1.5' : 'p-3'}`} style={{ paddingLeft: isMobileLandscape ? 'max(0.5rem, env(safe-area-inset-left, 0px))' : 'max(0.75rem, env(safe-area-inset-left, 0px))', paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
           <div className={`flex items-center ${isMobileLandscape ? 'gap-1.5' : 'gap-3'} pointer-events-auto`}>
@@ -5716,10 +5870,13 @@ export default function GameTable({ room = null }) {
                     {setupIssues.length} action{setupIssues.length > 1 ? 's' : ''} did not work
                   </div>
                   <ul className="space-y-0.5 text-white/90">
+                    {/* K2: der Satz, der fuer den Spieler geschrieben ist,
+                        steht allein da. Die Diagnose (Schrittnummer, Typ,
+                        Ziel, Status, `[in zone: …]`, „16 further steps
+                        skipped") bleibt im Protokoll - `issueLine`
+                        entscheidet, was hier ankommt. */}
                     {setupIssues.map(e => (
-                      <li key={e.index}>
-                        #{e.index + 1} {e.type}{e.target ? ' "' + e.target + '"' : ''} &mdash; {e.status}: {e.reason}
-                      </li>
+                      <li key={e.index}>{issueLine(e)}</li>
                     ))}
                   </ul>
                 </div>
@@ -6096,8 +6253,14 @@ export default function GameTable({ room = null }) {
           }
           data-testid="floating-toolbar"
           data-ui-element="true"
+          data-bar-overlay="true"
         >
-          <div className={`flex ${isMobileLandscape ? 'flex-col' : 'flex-row'} items-center gap-0.5 bg-black/70 backdrop-blur-md rounded-xl ${isMobileLandscape ? 'px-1 py-2' : 'px-3 py-2'} shadow-2xl border border-white/10`}>
+          {/* M14.5/AF1: dieselbe Konvention wie bei den Meldebändern (M12.1) –
+              der Körper der Pille lässt Zeiger durch, ihre Knöpfe nehmen sie an.
+              Das gewinnt den Innenabstand und die Lücken zurück; der Knopf
+              selbst bleibt ein Knopf, dafür steht die Zug-Erkennung in
+              `handleGlobalMove`. */}
+          <div className={`flex ${isMobileLandscape ? 'flex-col' : 'flex-row'} items-center gap-0.5 bg-black/70 backdrop-blur-md rounded-xl ${isMobileLandscape ? 'px-1 py-2' : 'px-3 py-2'} shadow-2xl border border-white/10 pointer-events-none [&>*]:pointer-events-auto`}>
             {/* Counter button */}
             <button
               onClick={() => setShowCounterModal(true)}
@@ -6885,6 +7048,42 @@ export default function GameTable({ room = null }) {
         </div>
       </SwipeModal>
 
+      {/* M14.7: die Rückfrage vor dem Löschen. Kein `window.confirm` — die
+          Umgebung beantwortet Browserdialoge am Tisch nicht (M12.2,
+          `client-hygiene.test.js`); dieselbe Bauform wie „Save current view".
+          Der Name kommt aus `deleteLabel`, also aus `tableObjectView`: ein
+          verdeckt liegendes Stück verrät seinen Namen auch hier nicht. */}
+      <SwipeModal isOpen={!!deleteTarget} onDismiss={() => setDeleteTarget(null)} testId="object-delete-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="object-delete-modal">
+          <h3 className="text-white font-semibold mb-3">Delete from table?</h3>
+          <p className="text-slate-300 text-sm mb-4">
+            <strong className="text-white" data-testid="object-delete-name">
+              {deleteTarget ? deleteLabel(deleteTarget.objType, (objLists[deleteTarget.objType] || []).find(o => o.id === deleteTarget.objId)) : ''}
+            </strong>
+            {' '}is removed for good — there is no undo.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              data-testid="object-delete-cancel-btn"
+              className="px-4 py-2 min-h-[44px] text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                objDeleters[deleteTarget.objType]?.(deleteTarget.objId);
+                setDeleteTarget(null);
+              }}
+              data-testid="object-delete-confirm-btn"
+              className="px-4 py-2 min-h-[44px] bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
       {/* Save Setup Modal */}
       <SwipeModal isOpen={showSetupSaveModal} onDismiss={dismissSetupSaveModal} testId="setup-save-modal-swipe">
         <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="setup-save-modal">
@@ -7635,10 +7834,16 @@ export default function GameTable({ room = null }) {
                   onClick={() => {
                     // M2.11: einziger Löschweg. Die Tabelle steht in
                     // utils/objectTypes.js und ist dort unter Test.
+                    // M14.7: und er führt nicht mehr direkt ins Löschen. Bei
+                    // einem Token liegt dieser Eintrag Zeile auf Zeile unter
+                    // „Enlarge"; in der sechsten Partie ist so ein
+                    // Dörfler-Tableau verlorengegangen, ohne Rückfrage und
+                    // ohne Rückgängig.
                     const { objType, objId } = contextMenu;
-                    objDeleters[objType]?.(objId);
+                    setDeleteTarget({ objType, objId });
                     setContextMenu(null);
                   }}
+                  data-testid="context-delete"
                   className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
                 >
                   Delete
@@ -7935,25 +8140,35 @@ export default function GameTable({ room = null }) {
           <div
             className="fixed inset-0 z-[70] flex items-center justify-center"
             data-testid="token-preview-overlay"
-            onTouchStart={(e) => { e.stopPropagation(); setPreviewToken(null); }}
-            onClick={() => setPreviewToken(null)}
+            onTouchStart={(e) => { e.stopPropagation(); setPreviewToken(null); setPreviewZoomed(false); }}
+            onClick={() => { setPreviewToken(null); setPreviewZoomed(false); }}
           >
             <div className="absolute inset-0 bg-black/50" />
-            <div className="relative z-10" data-testid="token-preview">
+            <div className="relative z-10 max-h-screen overflow-auto" data-testid="token-preview">
               <img
                 src={view.src}
                 alt={view.caption}
                 className="rounded-xl border-2 border-cyan-400 shadow-2xl shadow-black/60 object-contain bg-white"
-                style={{
-                  aspectRatio: `${view.ratio.w} / ${view.ratio.h}`,
-                  // 74vh wie bei der Karte: darunter stehen Name und Hinweis.
-                  height: '74vh', maxHeight: '74vh', maxWidth: '92vw',
-                }}
+                style={previewBox(view.ratio, previewZoomed)}
               />
               <div className="text-center mt-3 text-white text-base font-medium px-4 truncate">
                 {view.caption}
               </div>
-              <div className="text-center mt-1">
+              {/* M14.6/AG2: eingepasst bleibt ein 1:2-Tableau in einem 794 px
+                  hohen Fenster rund 350 px breit - schmaler als der Umweg über
+                  den Tischzoom, mit dem der Spieler es gelesen hat. Die zweite
+                  Stellung gibt ihm die Fensterbreite und scrollt senkrecht.
+                  Ein echter Knopf, fingergross: damit ist es zugleich der
+                  Tastaturweg. */}
+              <div className="text-center mt-1 flex items-center justify-center gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPreviewZoomed(z => !z); }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  data-testid="token-preview-zoom-btn"
+                  className="min-w-[44px] min-h-[44px] px-4 text-white/80 hover:text-white text-xs bg-black/60 rounded-full backdrop-blur-sm border border-white/20"
+                >
+                  {previewZoomed ? 'Fit to window' : 'Fill width'}
+                </button>
                 <span className="text-white/60 text-xs bg-black/60 px-3 py-1 rounded-full backdrop-blur-sm">
                   Click anywhere to close
                 </span>
@@ -7996,14 +8211,7 @@ export default function GameTable({ room = null }) {
             >
               <div
                 className="rounded-xl overflow-hidden border-2 border-cyan-400 shadow-2xl shadow-black/60"
-                style={{
-                  aspectRatio: `${previewRatio.w} / ${previewRatio.h}`,
-                  // 74vh und nicht 100: darunter stehen Name und Schliesshinweis.
-                  height: '74vh',
-                  maxHeight: '74vh',
-                  maxWidth: '92vw',
-                  backgroundColor: '#fff',
-                }}
+                style={{ ...previewBox(previewRatio), backgroundColor: '#fff' }}
               >
                 {previewCard.faceDown ? (
                   previewCard.card_back_id && cardBackMap[previewCard.card_back_id] ? (

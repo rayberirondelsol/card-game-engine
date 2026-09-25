@@ -51,3 +51,31 @@ export function actionSteps(actions, id) {
   const found = list(actions).find(a => a.id === id);
   return Array.isArray(found?.steps) ? found.steps : [];
 }
+
+/**
+ * Was ein Spieler von einem fehlgeschlagenen Schritt zu lesen bekommt (K2).
+ *
+ * Der Befund der sechsten Solopartie:
+ *
+ *     #1 require_zone „Bösewicht-Tableau" — skipped: Erst die Dorfphase
+ *     beginnen — der vorige Kampf steht noch. [in zone: Tableau: Deputy
+ *     Waggums] (16 further steps skipped)
+ *
+ * Der deutsche Satz in der Mitte ist genau richtig — er steht als
+ * `step.message` im Aufbau und ist für den Spieler geschrieben. Alles andere
+ * ist Diagnose: Schrittnummer, Typ, Ziel, Status, der Halbsatz aus M12.3 und
+ * die Zahl aus M9.3. Die bleibt im Protokoll (`entry.reason`), sie ist das
+ * Werkzeug, mit dem jeder dieser Berichte entsteht. Sie gehört nur nicht vor
+ * einen Spieler.
+ *
+ * @param {{index?: number, type?: string, target?: string|null, status?: string,
+ *          reason?: string|null, message?: string|null}|null} entry
+ * @returns {string}
+ */
+export function issueLine(entry) {
+  const message = typeof entry?.message === 'string' ? entry.message.trim() : '';
+  if (message) return message;
+  const nr = Number.isFinite(Number(entry?.index)) ? `#${Number(entry.index) + 1} ` : '';
+  const ziel = entry?.target ? ` "${entry.target}"` : '';
+  return `${nr}${entry?.type || '(step)'}${ziel} — ${entry?.status || 'failed'}: ${entry?.reason || ''}`;
+}
