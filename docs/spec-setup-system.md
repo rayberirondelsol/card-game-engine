@@ -3501,3 +3501,68 @@ nicht fest genug für eine Abnahme:
 
 Erhoben wird das in `docs/befund-beute-und-aufstellbares.md`. Erst danach
 bekommen M13.2 und M13.3 eine Abnahme.
+
+### M13.4 — Ein gedrehter Zaun wird auf ein Viertel gestaucht
+
+**Befund (aus der Umsetzung von M13.1, `docs/tasks-drehen.md`, Abweichung 3).**
+Ein `Holzzaun` misst 200×50. Nach 90° am Tisch steht er quer — aber nur
+12,5×50 groß, ein Viertel seiner Länge. Nachgerechnet: `object-fit: contain`
+passt ein 4∶1-Bild in einen 1∶4-Kasten ein.
+
+**Warum das keine Renderfehlkorrektur ist.** Ein gedrehtes langes Teil passt
+nicht in seinen ungedrehten Kasten — kein Einpassungsmodus ändert das. Entweder
+es läuft heraus oder es schrumpft. **Der Kasten muss mitdrehen.**
+
+**Und der Renderer ist dafür schon richtig gebaut.** `TokenShape` gibt dem
+`<img>` bei 90/270 die *getauschten* Maße und dreht es; steht der Kasten auf
+50×200, bekommt das Bild 200×50, wird gedreht und füllt ihn genau. Die
+`swap`-Zeile aus M7.1 ist korrekt — ihr fehlt nur ein Kasten, der sich
+mitgedreht hat. **An `TokenShape` ist darum nichts zu ändern.**
+
+**Was M13.1 richtig entschieden hat und was nicht.** Richtig: `width`/`height`
+blind zu tauschen wäre falsch gewesen, weil es die Feldbelegung ändert. Der
+Schluss daraus — „also gar nicht" — war es nicht: bei einem nicht
+quadratischen Teil *soll* sich die Feldbelegung ändern. Ein Zaun, der über vier
+Felder liegt, liegt nach der Drehung über vier andere. Bei einem quadratischen
+Token (Bösewicht 2×2, die meisten Geländeteile) ist der Tausch ein Nullzug —
+**Abnahme 3 aus M13.1 bleibt damit unberührt**.
+
+**Was gebaut wird.** Eine reine Funktion **`rotatePlacement(token, { grids, step })`**
+in `shared/` — sie gibt zurück, was nach der Drehung am Token gilt:
+`rotation`, `width`, `height` und, wo ein Raster darunter liegt, `x`, `y`,
+`gridId`, `cell`, `offGrid`.
+
+- Bei `±90` tauscht sie `width` und `height`, bei `180` nicht.
+- Sie **rechnet die Feldbelegung nicht selbst**, sondern fragt `snapInto` mit
+  den getauschten Maßen und **ohne** den alten Feldnamen — `rangeAt` zentriert
+  den Bereich um den Punkt, genau wie beim Ziehen von Hand. Es gibt weiterhin
+  **eine** Einrastrechnung; eine zweite daneben wäre der Fehler, den M6
+  ausdrücklich verbietet.
+- Läuft der gedrehte Bereich über den Rasterrand, antwortet `snapInto` nicht
+  eingerastet. Dann gilt dasselbe wie beim Ziehen über den Rand (M10.10):
+  `offGrid`, sichtbar markiert — **nicht** zurückspringen, **nicht** die
+  Drehung verweigern.
+- Liegt das Token an einer Karte (`attachedTo`) oder auf keinem Raster, dreht
+  nur das Bild und die Maße tauschen; Ort und Feldname bleiben.
+
+Tisch **und** Raum benutzen dieselbe Funktion. `token_rotate` überträgt darum
+nicht nur den Winkel, sondern die Platzierung, die dabei herauskommt — wie
+`token_move` seine Adresse überträgt.
+
+**Nicht in dieser Aufgabe.** Ein Bereichsname, der sich um seinen eigenen
+Mittelpunkt transponiert (bei gerader/ungerader Feldzahl gibt es keinen
+ganzzahligen Mittelpunkt — deshalb übernimmt `snapInto`), und 45°-Schritte.
+
+**Abnahme.**
+1. Ein `Holzzaun` (200×50) auf einem 50er-Raster liegt nach 90° über **vier
+   Felder in der Senkrechten** und ist in voller Länge zu sehen — nicht
+   gestaucht.
+2. Zweimal 90° bringt ihn in die Waagerechte zurück, mit `width` 200 und
+   `height` 50.
+3. Ein Bösewicht auf 100×100 liegt nach jeder Drehung auf **denselben vier
+   Feldern** (M13.1, Abnahme 3, gilt unverändert).
+4. Ein Token, dessen gedrehter Bereich über den Rasterrand liefe, wird gedreht
+   und als `offGrid` markiert; der Winkel steht.
+5. Ein Token an einer Karte behält Ort und Bindung.
+6. Nach Speichern und Laden steht die gedrehte Lage noch; im Raum sieht der
+   zweite Platz dieselbe.
