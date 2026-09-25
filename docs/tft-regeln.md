@@ -447,10 +447,15 @@ Quelle jeweils das Tableau. Deutsche Namen aus den deutschen Aktionsdecks.
 | Ms. Falls & Co. | Rosa Voir & die WG | 4/4/5/5 | 13/17/20/23 (die „Company" beginnt mit **3 LEB je Dörfler** und ist das eigentliche Angriffsziel) | „Shocking Guests" |
 | Patches | Fleckchen | 7/8/8/9 | 1/2/2/3 (Kostümteile ersetzen LEB) | „9 lives" |
 
-`⚠️ UNSICHER:` Die Zuordnung *Deputy Waggums = Willi Wedler* und
-*Handsy = Truthand* ist aus der Bedeutung erschlossen (wag → wedeln; Hand →
-Truthand), nicht direkt belegt. Alle übrigen Zuordnungen sind über Artwork,
-Aktionstexte oder Story eindeutig.
+`✅ BELEGT:` Die Zuordnung *Deputy Waggums = Willi Wedler* und
+*Handsy = Truthand* war lange nur aus der Bedeutung erschlossen (wag → wedeln;
+Hand → Truthand). Sie ist jetzt direkt belegt: jede Bösewicht-Beutekarte trägt
+den **deutschen Bösewichtnamen senkrecht am linken Kartenrand**. „WEDELNDER
+SCHWANZ" (= *Distracting Tail* ★ auf Deputy Waggums' Tableau) trägt
+„WILLI WEDLER", „DICKE HANDSCHUHE" / „ZAHNSCHNABEL" (= *Oversized Gloves* ★ /
+*Handsy's Beak*) tragen „TRUTHAND"
+(`docs/befund-beute-und-aufstellbares.md` §2.4). Alle übrigen Zuordnungen sind
+über Artwork, Aktionstexte oder Story eindeutig.
 
 ---
 
@@ -879,8 +884,9 @@ der Tüftler-Rolle"), **Sticker** am Partieende (Sieg **oder** Niederlage), und
 |---|---|
 | Odd-Jobs-Nachschubdeck **Nr. 1–30** als Laden | Expeditionen, Orte, Vorbereitungen |
 | **Rollen** und Rollenkarten | Sticker am Partieende |
-| **Aufstellbare** | Journaleinträge („Lies Journal XX") |
-| Odd-Jobs-Verzehrbares, Karren-Ereignis-Ausrüstung | **Freischalten** und **Entsorgen** von Ausrüstung |
+| Odd-Jobs-Verzehrbares, Karren-Ereignis-Ausrüstung | Journaleinträge („Lies Journal XX") |
+| | **Aufstellbare** — Regel §9.3 ist vollständig umsetzbar, die Karten sind aber **unerreichbar**: alle 24 Aufstellbar-Karten tragen die Nummern **73–161** und liegen damit im gesperrten Deck. In einer Erstpartie kann kein Aufstellbares gekauft werden (`docs/befund-beute-und-aufstellbares.md` §3.1). |
+| | **Freischalten** und **Entsorgen** von Ausrüstung |
 | Schlüssel/Reparatur/Graben **als Gegenstandstypen** | deren Auslösewirkung (verweist auf Journal-Nummern) |
 
 **Praktische Folge:** Der Kartenpool bleibt **dauerhaft bei Nr. 1–30**; es gibt
@@ -1126,9 +1132,12 @@ RUNDE r = 1..4
 6. **Deutsche Namen von Yancy Plover und Quintus** sind nicht zugeordnet; die
    Zuordnungen von Georgie Irongut, Blopsy Twins und Judy Marks sind aus der
    Bedeutung erschlossen, nicht direkt belegt.
-7. **Deutsche Namen von Deputy Waggums und Handsy** (Willi Wedler / Truthand)
-   sind ebenfalls nur erschlossen; die übrigen 10 Basis-Zuordnungen sind über
-   Story und Aktionstexte eindeutig.
+7. ~~**Deutsche Namen von Deputy Waggums und Handsy** (Willi Wedler /
+   Truthand) sind ebenfalls nur erschlossen~~ — **erledigt.** Belegt über den
+   senkrechten Bösewichtnamen auf den Beutekarten, siehe §5.5 und
+   `docs/befund-beute-und-aufstellbares.md` §2.4. Dort ebenfalls belegt:
+   *Tartar Fishboy = Fritze Fisch**kopp*** und
+   *The Door Knockers = Die weissen Herren*.
 8. **Terrainkarten-Details.** Die 20 Basis- + 13 FN-Terrainkarten wurden nicht
    einzeln erfasst; nur die im Video gezeigten (Hohler Heuhaufen, Matschiger
    Graben, Holzzaun, TNT + Zünder, Plumpsklo, Werkzeugschuppen, Arzthütte,
