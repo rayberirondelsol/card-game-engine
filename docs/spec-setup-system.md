@@ -3610,3 +3610,41 @@ Gerechnet wird mit dem, was da ist — `cellRange`, `rangeLabel`, `rangeCenter`,
    Winkel steht.
 5. Ein Token ohne Rasteradresse und ein Token an einer Karte verhalten sich wie
    in M13.4.
+
+### M13.6 — Der Laden lag ein zweites Mal falsch, in `state_data`
+
+**Befund, gefunden bei der Umsetzung von M13.2.** M12.6 hat den Ladenstapel auf
+Nr. 1–30 umgehängt — aber nur an **einer** von zwei Stellen. Die Suche damals
+ging über den **Kategorienamen** durch alle JSON-Spalten und meldete genau eine
+Fundstelle. Die vorgebauten Stapel in `setups.state_data` binden Karten aber
+über **`card_ids`**, nicht über die Kategorie. Der Name stand dort nie, also
+fand die Suche ihn nicht.
+
+Gemessen lag in **beiden** Aufbauten ein fertiger Stapel `Nachschub (Tante
+Emma)` mit **133 Karten-IDs** — dem gesperrten Deck Nr. 31–162.
+
+- *TFT Kurzpartie* fiel es nicht auf: ihre Sequenz wirft den Stapel mit
+  `remove_stack` weg und baut ihn mit `place_stack` aus der Kategorie neu. Der
+  Endzustand war richtig, der Startzustand nicht.
+- *TFT Grundaufbau (Dorfphase)* hat diesen Austausch **nicht**. Er teilte seine
+  zehn Ladenkarten direkt aus dem gesperrten Deck aus — der Fehler aus M12.6,
+  unverändert, nur an der anderen Stelle.
+
+**Änderung.** In beiden Aufbauten die drei gleichlangen Felder des Stapels
+(`card_ids`, `table_ids`, `cards`) aus den 30 Karten der Kategorie
+`Toller Trödel: Nachschub (Nr. 1-30)` neu gebaut: frische `tableId` je Karte,
+`card_back_id` von der Karte (Rückseiten hängen an `cards`, nicht an der
+Kategorie), `faceDown: true`, Ort und Maße wie gehabt. 133 → 30 in beiden.
+
+**Die Lehre, und sie gilt über diese Stelle hinaus.** Eine Kategorie wird an
+zwei Arten gebunden: **beim Namen** (`place_stack.category` in `sequence_data`)
+und **bei den Karten** (`card_ids` in `state_data`). Wer eine Kategorie
+umhängt, muss beide prüfen. Eine Textsuche über die JSON-Spalten findet nur die
+erste.
+
+**Abnahme.**
+1. In beiden Aufbauten hat der Stapel `Nachschub (Tante Emma)` 30 Karten, alle
+   aus `Toller Trödel: Nachschub (Nr. 1-30)`.
+2. `card_ids`, `table_ids` und `cards` sind gleich lang.
+3. Nach „Dorfphase beginnen" liegen zehn Ladenkarten aus Nr. 1–30 aus; die
+   Trennkarte „HALT STOP!" taucht nicht auf.
