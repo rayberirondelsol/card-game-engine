@@ -495,3 +495,19 @@ zehntausendsten Karte.
   Zone oder ein Raster.** Wer unter einer Leiste eine *leere* Stelle greift,
   schwenkt weiterhin nicht — dort liegt kein Stück, und der Knopf behält den
   Druck. Das ist der Fall, den niemand gemeldet hat.
+
+### 6. Nachtrag aus der Sichtprüfung: eine Rastung zoomte dreimal
+
+Am laufenden Tisch gemessen: **eine** Rastung brachte von 66 % auf 100 %, also
+das 1,52-fache — genau `ZOOM_WHEEL_STEP³`. Der native Radhorcher hängt an
+`canvas` **und** an `container` (ein Rad über dem Tisch blubbert durch beide),
+und darüber liegt noch der React-`onWheel`. Drei Anwendungen je Rastung, seit
+jeher.
+
+Mit `0,9`/`1,1` fiel das nicht auf — `1,1³ = 1,33` ist fein genug, um als „zu
+fein" durchzugehen, und erklärt zugleich, warum keine Zahl im Bericht zum Code
+passte. Mit einem brauchbaren Schritt ist es die Hälfte des Zooms.
+
+`claimWheel(nativeEvent)` in `cameraZoom.js` merkt sich am Ereignis, dass es
+schon gezoomt hat; alle drei Horcher sehen dasselbe Objekt. Keine Zeitschwelle
+— die wäre geraten und würde schnelles Drehen verschlucken.

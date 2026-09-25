@@ -112,3 +112,30 @@ export function wheelZoom(camera, deltaY, cursor, center) {
   const step = deltaY > 0 ? 1 / ZOOM_WHEEL_STEP : ZOOM_WHEEL_STEP;
   return zoomAt(camera, cursor, center, z0 * step);
 }
+
+/**
+ * Gehoert dieses Rad-Ereignis noch keinem Zoomschritt? (Spec M14.9, Nachtrag)
+ *
+ * Am laufenden Tisch nachgemessen: **eine** Rastung brachte von 66 % auf 100 %,
+ * also `ZOOM_WHEEL_STEP³`. Derselbe native Horcher haengt an `canvas` **und**
+ * an `container` – ein Rad ueber dem Tisch blubbert durch beide –, und darueber
+ * liegt noch der React-`onWheel` ("backup for native event approach"). Drei
+ * Anwendungen je Rastung.
+ *
+ * Mit `0.9`/`1.1` fiel das nicht auf (`1,1³ = 1,33`, unangenehm fein genug, um
+ * als "zu fein" durchzugehen). Mit einem brauchbaren Schritt ist es die Haelfte
+ * des Zooms, und die Abnahme waere um das Dreifache uebererfuellt.
+ *
+ * Gemerkt wird es am Ereignis und nicht an einer Uhr: die drei Horcher sehen
+ * **dasselbe** Objekt, das naechste Rad bringt ein eigenes. Eine Zeitschwelle
+ * waere geraten und wuerde schnelles Drehen verschlucken.
+ *
+ * @param {object|null} nativeEvent Das native `WheelEvent` (bei React
+ *   `e.nativeEvent`).
+ * @returns {boolean} true genau beim ersten Aufruf je Ereignis.
+ */
+export function claimWheel(nativeEvent) {
+  if (!nativeEvent || nativeEvent.__cgeZoomed) return false;
+  nativeEvent.__cgeZoomed = true;
+  return true;
+}

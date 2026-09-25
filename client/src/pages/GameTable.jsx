@@ -37,7 +37,7 @@ import { stackAt, stackCandidates, looseCandidates } from '../utils/cardDrop.js'
 import { normalizeViews, putView, removeView, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
-import { zoomAt, worldAt, wheelZoom, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
+import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
@@ -975,6 +975,10 @@ export default function GameTable({ room = null }) {
       // auch ohne den Zoom darunter. Nicht `data-ui-element` fragen: das tragen
       // Boards und Token selbst (M2.13), das Rad ueber dem Hauptplan zoomt.
       if (!canZoomTable(e.target, containerRef.current)) return;
+      // M14.9 Nachtrag: dieser Horcher haengt an `canvas` **und** an
+      // `container`, und darunter liegt noch der React-`onWheel`. Ohne die
+      // Anmeldung zoomt eine Rastung dreimal.
+      if (!claimWheel(e)) return;
       e.preventDefault();
       const camera = cameraRef.current;
       const rect = canvas.getBoundingClientRect();
@@ -4382,6 +4386,8 @@ export default function GameTable({ room = null }) {
     // M8.5 Regel 3: dieselbe Frage wie im nativen Horcher oben, fuer Panels,
     // die kein data-ui-element tragen.
     if (!canZoomTable(e.target, containerRef.current)) return;
+    // M14.9 Nachtrag, siehe nativer Horcher: ein Rad-Ereignis, ein Schritt.
+    if (!claimWheel(e.nativeEvent)) return;
 
     const camera = cameraRef.current;
     const container = containerRef.current;

@@ -180,3 +180,32 @@ test('AJ1 Abnahme 4: der Faktor steht nicht mehr im JSX', async () => {
   // Beide Radhorcher – der native und der von React – fragen dieselbe Stelle.
   assert.equal((src.match(/wheelZoom\(/g) || []).length, 2, 'nicht beide Radhorcher benutzen `wheelZoom`');
 });
+
+test('AJ1 Nachtrag: ein Rad-Ereignis ergibt genau einen Zoomschritt', async () => {
+  // Am laufenden Tisch nachgemessen: **eine** Rastung brachte von 66 % auf
+  // 100 %, also das 1,52-fache — `ZOOM_WHEEL_STEP³`. Derselbe Horcher hängt an
+  // `canvas` **und** an `container` (das Ereignis blubbert durch beide), und
+  // darüber liegt noch der React-`onWheel`. Drei Anwendungen je Rastung.
+  //
+  // Mit 0,9/1,1 fiel das nicht auf; mit einem brauchbaren Schritt ist es die
+  // Hälfte des Zooms. Das Ereignis selbst merkt sich deshalb, dass es schon
+  // gezoomt hat — es ist in allen drei Fällen dasselbe Objekt.
+  const { claimWheel } = await import('../../client/src/utils/cameraZoom.js');
+  const ereignis = {};
+  assert.equal(claimWheel(ereignis), true, 'der erste Horcher bekommt es');
+  assert.equal(claimWheel(ereignis), false, 'der zweite zoomt noch einmal');
+  assert.equal(claimWheel(ereignis), false, 'der dritte auch');
+  // Das nächste Rad-Ereignis ist ein eigenes.
+  assert.equal(claimWheel({}), true);
+  assert.equal(claimWheel(null), false, 'ohne Ereignis kein Zoom');
+});
+
+test('AJ1 Nachtrag: das JSX fragt bei jedem Radweg nach', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const src = readFileSync(
+    fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8');
+  // Zwei Horcher – der native (an zwei Elementen) und der von React.
+  assert.equal((src.match(/claimWheel\(/g) || []).length, 2,
+    'nicht jeder Radweg meldet sein Ereignis an');
+});
