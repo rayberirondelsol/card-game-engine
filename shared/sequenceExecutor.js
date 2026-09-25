@@ -22,7 +22,7 @@
  *                                        rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
-import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone } from './zoneGeometry.js';
+import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone, freeSlots } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
@@ -313,11 +313,11 @@ function baseName(name) {
 /**
  * Split candidate zones into the ones that take one more object of `kind` and
  * the reasons the others do not. `free` is how many more each usable zone
- * holds, `occupied` how many sit there already (= the next free place).
+ * holds, `occupied` how many sit there already, `spots` the free places (M11.8).
  */
 function zoneRoom(state, targetZones, kind) {
   const usable = [], problems = [];
-  const free = new Map(), occupied = new Map();
+  const free = new Map(), occupied = new Map(), spots = new Map();
   for (const zone of targetZones) {
     const taken = occupancy(state, zone);
     const refusal = zoneRejects(zone, kind, taken);
@@ -326,8 +326,29 @@ function zoneRoom(state, targetZones, kind) {
     usable.push(zone);
     occupied.set(zone, taken);
     free.set(zone, cap === null ? Infinity : cap - taken);
+    // M11.8: die **freien Plaetze**, nicht die Zahl der belegten. Bisher war
+    // `occupied` zugleich der Index des naechsten Platzes - das stimmt nur,
+    // solange die Belegung von vorn nach hinten laeuft und nichts danebenliegt.
+    // Eine fremde Karte im Rechteck machte daraus einen Versatz, und der
+    // Klammergriff `Math.min(start + i, slots.length - 1)` legte die
+    // ueberzaehligen Karten deckungsgleich auf den letzten Platz.
+    spots.set(zone, freeSlots(zone, state.cards, state.tokens));
   }
-  return { usable, free, occupied, problems };
+  return { usable, free, occupied, spots, problems };
+}
+
+/**
+ * Wohin das i-te Ding dieser Ausgabe kommt: auf den i-ten freien Platz, sonst
+ * auf den Rueckfall (M11.8).
+ *
+ * `Math.min` bleibt als Notnagel stehen: `zoneRoom` gibt nie mehr Dinge frei,
+ * als es Plaetze gibt, aber eine Zone kann zwischen zwei Schritten voller
+ * werden, und lieber uebereinander als `undefined`.
+ */
+function spotFor(spots, zone, i, fallback) {
+  const free = spots.get(zone);
+  if (!free || !free.length) return fallback;
+  return free[Math.min(i, free.length - 1)];
 }
 
 /** Deal items round robin over the usable zones, stopping at each zone's free count. */
@@ -633,7 +654,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const { card, reason, ambiguous } = findCardByName(cards, step.cardName);
       if (!card) return ambiguous ? fail(reason) : skip(reason);
 
-      const { usable, free, occupied, problems } = zoneRoom(state, [zone], 'card');
+      const { usable, occupied, spots, problems } = zoneRoom(state, [zone], 'card');
       if (!usable.length) return skip(problems.join('; '));
       const start = occupied.get(zone);
 
@@ -644,7 +665,8 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         ...card,
         tableId: crypto.randomUUID(),
         cardId: card.id,
-        ...zoneSlot(zone, start, start + 1),
+        // M11.8: der erste freie Platz, nicht "der Platz hinter den belegten".
+        ...spotFor(spots, zone, 0, zoneSlot(zone, start, start + 1)),
         zIndex: start + 1,
         faceDown: false,
         face_up: true,
@@ -705,7 +727,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // A zone that does not take cards, or that is already full, is not dealt
       // into at all - the cards stay in the stack where they can still be used.
-      const { usable, free, occupied, problems } = zoneRoom(state, targetZones, 'card');
+      const { usable, free, spots, problems } = zoneRoom(state, targetZones, 'card');
       if (!usable.length) return skip(problems.join('; '));
 
       const sorted = [...stack.cards].sort((a, b) => b.zIndex - a.zIndex); // top first
@@ -717,12 +739,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       let z = topZIndex(state);
       const dealt = [];
       for (const [zone, group] of groups) {
-        const slots = zoneSlots(zone);
-        const start = occupied.get(zone);
         group.forEach((card, i) => {
           // Fixed places seat the card on the next free one; a zone without
           // them keeps the old behaviour and drops every card on its centre.
-          const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneCenter(zone);
+          const pos = spotFor(spots, zone, i, zoneCenter(zone));
           // Die ausgeteilte Karte ist die Quellkarte – sie unterscheidet sich
           // nur in Position, Seite und Stapelzugehoerigkeit. Eine feste
           // Feldliste verlor hier `width`/`height` (Spec: Nachtrag zu M2.12).
@@ -871,7 +891,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // Same rule as for cards: a zone that refuses tokens, or is full, is not
       // drawn into. Nothing leaves the pool, so a corrected setup draws again.
-      const { usable, free, occupied, problems } = zoneRoom(state, targetZones, 'asset');
+      const { usable, free, spots, problems } = zoneRoom(state, targetZones, 'asset');
       if (!usable.length) return skip(problems.join('; '));
 
       const wanted = Math.max(1, Number(count) || 1);
@@ -893,12 +913,8 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const { groups: perZone, leftovers } = shareOut(placeable, usable, free);
 
       for (const [zone, group] of perZone) {
-        const slots = zoneSlots(zone);
-        const start = occupied.get(zone);
         group.forEach((asset, i) => {
-          const { x, y } = slots
-            ? slots[Math.min(start + i, slots.length - 1)]
-            : zoneSlot(zone, i, group.length);
+          const { x, y } = spotFor(spots, zone, i, zoneSlot(zone, i, group.length));
           state.tokens.push(assetToken(asset, x, y, faceDown));
         });
       }
@@ -1024,12 +1040,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         const blocked = rooms.filter(r => !r.usable.length);
         if (blocked.length) return skip(blocked.flatMap(r => r.problems).join('; '));
 
-        const { free, occupied } = rooms[0];
+        const { free, spots } = rooms[0];
         const { groups, leftovers } = shareOut(movable, [target], free);
-        const slots = zoneSlots(target);
-        const start = occupied.get(target);
         groups.get(target).forEach((obj, i) => {
-          const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneCenter(target);
+          const pos = spotFor(spots, target, i, zoneCenter(target));
           obj.x = pos.x;
           obj.y = pos.y;
         });
@@ -1330,15 +1344,14 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         else if (found.length) {
           // Dieselbe Rechnung wie bei `draw_assets`: die Zone sagt, ob sie
           // Karten nimmt und wie viele, und verteilt sie der Reihe nach.
-          const { usable, free, occupied, problems } = zoneRoom(state, [zone], 'card');
+          const { usable, free, occupied, spots, problems } = zoneRoom(state, [zone], 'card');
           if (!usable.length) notes.push(...problems);
           else {
             const { groups, leftovers } = shareOut(found, usable, free);
             const group = groups.get(zone);
-            const slots = zoneSlots(zone);
             const start = occupied.get(zone);
             group.forEach((card, i) => {
-              const pos = slots ? slots[Math.min(start + i, slots.length - 1)] : zoneSlot(zone, i, group.length);
+              const pos = spotFor(spots, zone, i, zoneSlot(zone, i, group.length));
               // Per Spread aus der Bibliothekszeile, nicht ueber eine
               // aufgezaehlte Feldliste - die hat hier schon zweimal
               // `width`/`height` verschluckt (Nachtrag zu M2.12, M4a).
@@ -1398,7 +1411,12 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (!Number.isFinite(x) || !Number.isFinite(y)) {
         return skip(`no position given for counter "${name}"`);
       }
-      state.counters.push(normalizeCounter({ name, value: step.value, max: step.max, x, y }));
+      // M11.4: `base` ist der Ausgangswert, auf den `set_counter value: "base"`
+      // zurücksetzt. Er wird **nicht** aus `value` erfunden: ein Zähler ohne
+      // Ausgangswert soll sich unverändert verhalten (Abnahme 3), und ein
+      // stillschweigend gesetzter machte aus jedem Münztopf einen, den die
+      // Dorfphase auf seinen Anfangsstand zurückdrehen könnte.
+      state.counters.push(normalizeCounter({ name, value: step.value, max: step.max, base: step.base, x, y }));
       return state;
     }
 

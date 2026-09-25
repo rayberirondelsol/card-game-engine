@@ -140,9 +140,52 @@ export function zoneRejects(zone, kind, occupied = 0) {
  * board is not a place where the board lies. Counting it would make a boss bar
  * with four places hold three as soon as the board's centre happens to fall
  * inside it – and the step protocol would blame a full zone.
+ *
+ * M11.8: **hat die Zone feste Plätze, zählen die belegten Plätze** – nicht,
+ * was im Rechteck liegt. Eine beiseitegelegte Bösewicht-Aktionskarte, die
+ * geometrisch in der Heldentaten-Auslage lag, aber auf keinem ihrer sechs
+ * Plätze, machte die Auslage um eins voller, als sie war, und verschob die
+ * Platzsuche. Dieselbe Familie wie M8.1 („in einem Stapel liegt nichts frei")
+ * und M9.4 („ein Stapel ist ein Ding"): gezählt wird, was einen Platz einnimmt.
+ *
+ * `objectsInZone` bleibt, wie es ist. Es beantwortet die andere Frage – *was*
+ * liegt hier –, und `clear_zone` soll die fremde Karte sehr wohl mitnehmen.
  */
 export function countInZone(zone, ...lists) {
-  return objectsInZone(zone, ...lists).length;
+  const free = freeSlots(zone, ...lists);
+  return free === null ? objectsInZone(zone, ...lists).length : zoneSlots(zone).length - free.length;
+}
+
+/**
+ * Liegt dieses Objekt **auf** diesem Platz? (M11.8)
+ *
+ * Dieselbe Prüfung, die `snapPoint` seit jeher für `taken` benutzt: ein Platz
+ * ist ein Punkt, und belegt ist er von dem, was genau dort liegt. Hier steht
+ * sie einmal, statt zweimal mit zwei Toleranzen – eine zweite Zahl wäre eine
+ * zweite Antwort darauf, was „auf einem Platz" heißt.
+ *
+ * Dass die Toleranz so eng ist, ist kein Versehen: jeder Weg, der etwas auf
+ * einen Platz legt (`zoneSlotFor`, `zoneSlotNumbered`, `snapPoint`), rechnet
+ * denselben Punkt aus. Was danebenliegt, hat ihn nicht bekommen, sondern liegt
+ * daneben – und das ist genau der Befund.
+ */
+const onSlot = (slot, o) => Math.abs(o?.x - slot.x) < 0.5 && Math.abs(o?.y - slot.y) < 0.5;
+
+/**
+ * Die Plätze der Zone, auf denen nichts liegt – oder `null`, wenn die Frage
+ * keine ist (M11.8).
+ *
+ * `null` heißt „diese Zone hat keine Plätze zu vergeben": entweder hat sie gar
+ * keine (`free`, kein Layout, kein `capacity`), oder sie ist ein Ablagestapel,
+ * und dessen einer Platz nimmt beliebig viele Karten – jede deckt die vorige
+ * zu, das ist der Zweck. Beide Fälle verhalten sich danach wie bisher.
+ */
+export function freeSlots(zone, ...lists) {
+  if (zone?.layout === 'stack') return null;
+  const slots = zoneSlots(zone);
+  if (!slots || !slots.length) return null;
+  const objects = objectsInZone(zone, ...lists);
+  return slots.filter(s => !objects.some(o => onSlot(s, o)));
 }
 
 /** The objects themselves, same rule – for steps that need one, not a number. */
@@ -292,8 +335,7 @@ export function snapPoint(zone, x, y, taken = []) {
   const slots = zoneSlots(zone);
   if (!slots || !slots.length) return { x, y };
 
-  const isTaken = (s) => taken.some(t => Math.abs(t.x - s.x) < 0.5 && Math.abs(t.y - s.y) < 0.5);
-  const free = slots.filter(s => !isTaken(s));
+  const free = slots.filter(s => !taken.some(t => onSlot(s, t)));
   const pool = free.length ? free : slots;
   const dist = (s) => (s.x - x) ** 2 + (s.y - y) ** 2;
   return pool.reduce((best, s) => (dist(s) < dist(best) ? s : best), pool[0]);

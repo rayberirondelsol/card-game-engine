@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { assetBox, anchorBoxes, resolveZones, setAnchor } = await import('../../shared/anchoring.js');
-const { zoneAt, zoneRejects, objectsInZone, countInZone } = await import('../../shared/zoneGeometry.js');
+const { zoneAt, zoneRejects, objectsInZone, countInZone, zoneSlots } = await import('../../shared/zoneGeometry.js');
 const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures: das Zusatz-Brett und die drei Zonen darauf ─────────────────────
@@ -131,8 +131,11 @@ test('zoneRejects nennt den Grund (Abnahme 4)', () => {
 });
 
 test('objectsInZone zaehlt nichts in einer abgewandten Zone', () => {
-  const card = { tableId: 'c1', x: 930, y: 1000 - 499.5 + 0.579 * 999 + 40 };
   const [here, away] = resolved(true, [auslage, ablage]);
+  // M11.8: die Auslage hat zehn Plaetze, also zaehlt sie belegte Plaetze. Die
+  // Karte liegt deshalb auf einem - ein Punkt irgendwo im Rechteck zaehlte
+  // vorher als Belegung und tut es seither nicht mehr (M11.8 Abnahme 1).
+  const card = { tableId: 'c1', ...zoneSlots(here)[0] };
   assert.equal(countInZone(here, [card]), 1);
   assert.equal(objectsInZone(away, [card]).length, 0, 'sonst fegt clear_zone Ablage die Ladenkarten weg');
 });

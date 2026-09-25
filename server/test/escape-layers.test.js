@@ -56,6 +56,7 @@ test('the list itself is sane: no duplicates, all non-empty strings', () => {
 
 test('the exact order from the spec', () => {
   assert.deepEqual(ESCAPE_LAYERS, [
+    'cardPreview',
     'contextMenu',
     'splitModal',
     'saveModal',
@@ -69,6 +70,7 @@ test('the exact order from the spec', () => {
     'shortcuts',
     'bgPicker',
     'cardDrawer',
+    'viewsMenu',
   ]);
 });
 
@@ -79,4 +81,28 @@ test('legend, toolbar, sequence editor and setup mode stay out of the list', () 
   for (const name of ['legend', 'toolbar', 'sequenceEditor', 'setupMode']) {
     assert.ok(!ESCAPE_LAYERS.includes(name), `${name} must not be an Escape layer`);
   }
+});
+
+// ── M11.7: zwei Schichten, die Escape nicht kannte ───────────────────────────
+
+test('die Vergrößerung und das Views-Menü stehen in der Liste', () => {
+  assert.ok(ESCAPE_LAYERS.includes('cardPreview'), 'Escape schließt die Vergrößerung nicht');
+  assert.ok(ESCAPE_LAYERS.includes('viewsMenu'), 'Escape schließt das Views-Menü nicht');
+});
+
+test('die Reihenfolge der vorhandenen dreizehn bleibt unverändert (Abnahme 3)', () => {
+  const before = [
+    'contextMenu', 'splitModal', 'saveModal', 'setupSaveModal', 'counterModal',
+    'diceModal', 'noteModal', 'tokenModal', 'textFieldModal', 'editingTextField',
+    'shortcuts', 'bgPicker', 'cardDrawer',
+  ];
+  assert.deepEqual(ESCAPE_LAYERS.filter(n => before.includes(n)), before);
+});
+
+test('die Vergrößerung liegt über dem Kontextmenü – sie deckt den ganzen Bildschirm', () => {
+  assert.equal(escapeTarget({ cardPreview: true, contextMenu: true }), 'cardPreview');
+  // Das Views-Menü ist eine Klappliste an der Werkzeugleiste, also unter allem,
+  // was eine Entscheidung verlangt.
+  assert.equal(escapeTarget({ viewsMenu: true, cardDrawer: true }), 'cardDrawer');
+  assert.equal(escapeTarget({ viewsMenu: true }), 'viewsMenu');
 });

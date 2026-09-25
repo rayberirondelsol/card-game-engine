@@ -678,3 +678,43 @@ test('jedes Feld des Vokabulars hat im Editor einen Renderer', async () => {
     }
   }
 });
+
+// ── M11.4: der Ausgangswert im Editor ────────────────────────────────────────
+
+test('place_counter bietet den Ausgangswert an, set_counter nicht', () => {
+  // `base` gehört dem Zähler, nicht dem Schreibenden - genau wie `max` (R1).
+  assert.ok(stepFields('place_counter').includes('base'), 'place_counter braucht base');
+  assert.ok(!stepFields('set_counter').includes('base'), 'set_counter darf kein base anbieten');
+});
+
+test('ein frischer place_counter-Schritt trägt keinen Ausgangswert', () => {
+  // Wie `max`: nicht geraten. Ein erfundener Ausgangswert stünde still falsch
+  // in jedem Zähler, den die Dorfphase anfasst.
+  assert.equal('base' in defaultStep('place_counter', {}), false);
+});
+
+test('ein Ausgangswert, der keine Zahl ist, wird im Editor gemeldet', () => {
+  const ctx = { stackLabels: [], zoneLabels: [], pools: [], assetNames: [] };
+  const step = { type: 'place_counter', name: 'Granny: BEW', value: 4, x: 0, y: 0 };
+  assert.deepEqual(validateStep({ ...step, base: 4 }, ctx), []);
+  assert.deepEqual(validateStep({ ...step, base: '' }, ctx), [], 'leer ist die gültige Vorgabe');
+  assert.ok(validateStep({ ...step, base: 'vier' }, ctx).some(p => /base/i.test(p)));
+});
+
+test('set_counter nimmt "base" als fünfte Lesart an und sagt sie in der Zeile', () => {
+  const ctx = { stackLabels: [], zoneLabels: [], pools: [], assetNames: [] };
+  assert.deepEqual(validateStep({ type: 'set_counter', name: 'Granny: BEW', value: 'base' }, ctx), []);
+  // Die Meldung über eine unlesbare Eingabe zählt alle Lesarten auf.
+  const bad = validateStep({ type: 'set_counter', name: 'x', value: 'irgendwas' }, ctx);
+  assert.ok(bad.some(p => /base/.test(p)), `nennt "base" nicht: ${bad.join('; ')}`);
+  assert.match(describeStep({ type: 'set_counter', name: 'Granny: BEW', value: 'base' }), /starting value/i);
+});
+
+test('die Zeile eines place_counter nennt den Ausgangswert, wenn er abweicht', () => {
+  const line = describeStep({ type: 'place_counter', name: 'Granny: BEW', value: 4, base: 4, max: 6, x: 1, y: 2 });
+  assert.match(line, /4 \/ 6/);
+  assert.match(line, /from 4/i);
+  // Ohne Ausgangswert steht nichts davon da - die Zeile ist eine
+  // Zusammenfassung, kein Feldabzug.
+  assert.ok(!/from/i.test(describeStep({ type: 'place_counter', name: 'Münzen', value: 0, x: 1, y: 2 })));
+});

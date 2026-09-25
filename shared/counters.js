@@ -30,10 +30,21 @@ export function normalizeCounter(c = {}) {
   };
   const max = counterMax(c.max);
   if (max !== undefined) counter.max = max;
+  // M11.4: der Ausgangswert steht neben der Obergrenze und wird mit derselben
+  // Funktion gelesen – beide sind „eine Zahl oder gar nichts", und zwei
+  // Prüfungen wären zwei Antworten auf dieselbe Frage. Fehlt er, fehlt das
+  // Feld: ein Zähler ohne Ausgangswert verhält sich unverändert (Abnahme 3),
+  // und ein erfundener 0-Startwert setzte die Dorfphase auf null zurück.
+  const base = counterMax(c.base);
+  if (base !== undefined) counter.base = base;
   return counter;
 }
 
-/** Eine brauchbare Obergrenze als Zahl, sonst `undefined`. */
+/**
+ * Eine brauchbare Obergrenze **oder** ein brauchbarer Ausgangswert als Zahl,
+ * sonst `undefined` (M4a, M11.4). Eine Funktion für beide Felder: sie stellen
+ * dieselbe Frage, und `''`/`null`/„vier" ist bei beiden dasselbe Nichts.
+ */
 export function counterMax(value) {
   if (value === null || value === undefined || value === '') return undefined;
   const n = Number(value);
@@ -55,8 +66,11 @@ export function counterMax(value) {
  * zusichert, der im Schritt steht. Die Regel gilt für den Zähler, den ein
  * Mensch über die Oberfläche anlegt, also entscheidet der Aufrufer.
  */
-export function newCounterValue(max) {
-  return counterMax(max) ?? 0;
+export function newCounterValue(max, base) {
+  // M11.4: ohne Obergrenze zaehlt der Ausgangswert. „Ein Vorrat ist beim
+  // Anlegen voll" und „ein Zaehler faengt bei seinem Ausgangswert an" sind
+  // derselbe Satz; wo beides dasteht, ist das Maximum der vollere Vorrat.
+  return counterMax(max) ?? counterMax(base) ?? 0;
 }
 
 /** Was am Tisch im Zählerfeld steht: `2 / 3` mit Obergrenze, sonst `2`. */
@@ -84,6 +98,10 @@ export function counterValueForm(raw) {
   const s = String(raw ?? '').trim();
   if (!s) return null;
   if (s.toLowerCase() === 'max') return 'max';
+  // M11.4: die fuenfte Lesart. Sie steht hier und nicht als eigener Schritt,
+  // weil `set_counter` schon der Schritt ist, der einen Wert setzt - ein
+  // zweiter daneben waere eine zweite Rechnung fuer dieselbe Tat.
+  if (s.toLowerCase() === 'base') return 'base';
   if (!Number.isFinite(Number(s))) return null;
   return s[0] === '+' || s[0] === '-' ? 'add' : 'set';
 }
@@ -96,9 +114,9 @@ export function counterValueForm(raw) {
 export function counterValue(counter, raw) {
   const form = counterValueForm(raw);
   if (form === null) return null;
-  if (form === 'max') {
-    const max = counterMax(counter?.max);
-    return max === undefined ? null : max;
+  if (form === 'max' || form === 'base') {
+    const n = counterMax(form === 'max' ? counter?.max : counter?.base);
+    return n === undefined ? null : n;
   }
   const n = Number(typeof raw === 'number' ? raw : String(raw).trim());
   return form === 'add' ? Number(counter?.value ?? 0) + n : n;
@@ -123,8 +141,8 @@ export function counterEdit(counter, raw) {
   const value = counterValue(counter, raw);
   if (value !== null) return { value };
   const written = String(raw ?? '').trim();
-  if (counterValueForm(raw) === 'max') {
-    return { reason: `counter has no maximum` };
-  }
-  return { reason: `cannot read "${written}" – type 21, +21, -21 or max` };
+  const form = counterValueForm(raw);
+  if (form === 'max') return { reason: `counter has no maximum` };
+  if (form === 'base') return { reason: `counter has no starting value` };
+  return { reason: `cannot read "${written}" – type 21, +21, -21, max or base` };
 }

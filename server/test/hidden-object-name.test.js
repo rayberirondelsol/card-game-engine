@@ -133,3 +133,39 @@ test('faceDown is read as a flag, not as truthiness of a name', () => {
   assert.equal(tableObjectView({ name: 'A', faceDown: false }).hidden, false);
   assert.equal(tableObjectView({ name: 'A', faceDown: true }).hidden, true);
 });
+
+// ── M11.6: „Enlarge" gibt es auch für Tokens ─────────────────────────────────
+
+test('die Vergrößerung eines Tokens zeigt die Seite, die oben liegt (Abnahme 3)', async () => {
+  const { tokenPreview } = await import('../../client/src/utils/tableObjectView.js');
+  const tok = {
+    shape: 'image', label: 'Bösewicht: Patches', width: 300, height: 420,
+    imageUrl: '/uploads/front.png', frontImageUrl: '/uploads/front.png', backImageUrl: '/uploads/back.png',
+    faceDown: false,
+  };
+  // `imageUrl` *ist* die obenliegende Seite - `assetFace` tauscht sie beim
+  // Umdrehen. Eine zweite Fallunterscheidung hier wäre eine zweite Antwort.
+  assert.equal(tokenPreview(tok).src, '/uploads/front.png');
+  assert.equal(tokenPreview({ ...tok, faceDown: true, imageUrl: '/uploads/back.png' }).src, '/uploads/back.png');
+});
+
+test('die Vergrößerung behält das Seitenverhältnis des Tokens', () => {
+  return import('../../client/src/utils/tableObjectView.js').then(({ tokenPreview }) => {
+    assert.deepEqual(tokenPreview({ shape: 'image', imageUrl: '/a.png', width: 300, height: 420 }).ratio, { w: 300, h: 420 });
+    // Alte Token tragen nur `size`, und ohne alles ist es ein Quadrat.
+    assert.deepEqual(tokenPreview({ shape: 'image', imageUrl: '/a.png', size: 60 }).ratio, { w: 60, h: 60 });
+    assert.deepEqual(tokenPreview({ shape: 'image', imageUrl: '/a.png' }).ratio, { w: 1, h: 1 });
+  });
+});
+
+test('ein Token ohne Bild lässt sich nicht vergrößern – der Eintrag erscheint nicht', async () => {
+  const { tokenPreview } = await import('../../client/src/utils/tableObjectView.js');
+  assert.equal(tokenPreview({ shape: 'circle', color: 'red', label: 'Marke' }), null);
+  assert.equal(tokenPreview(null), null);
+});
+
+test('ein verdecktes Token verrät seinen Namen auch in der Vergrößerung nicht', async () => {
+  const { tokenPreview, HIDDEN_CAPTION } = await import('../../client/src/utils/tableObjectView.js');
+  const view = tokenPreview({ shape: 'image', label: 'Bösewicht: Patches', imageUrl: '/b.png', faceDown: true });
+  assert.equal(view.caption, HIDDEN_CAPTION);
+});

@@ -10,6 +10,10 @@
  * eine Zeile; `server/test/escape-layers.test.js` hält dagegen.
  */
 export const ESCAPE_LAYERS = [
+  // M11.7: die Vergrößerung („Enlarge") deckt den ganzen Bildschirm ab und liegt
+  // damit über allem, auch über dem Kontextmenü, aus dem sie geöffnet wird. Sie
+  // ging bisher nur mit einem Klick irgendwohin zu.
+  'cardPreview',
   'contextMenu',
   'splitModal',
   'saveModal',
@@ -23,6 +27,11 @@ export const ESCAPE_LAYERS = [
   'shortcuts',
   'bgPicker',
   'cardDrawer',
+  // M11.7: das Views-Menü, eine Klappliste an der Werkzeugleiste. Es steht
+  // zuletzt, weil es die schwächste der Schichten ist - es verlangt keine
+  // Entscheidung, es steht nur im Weg. Die Werkzeugleiste selbst bleibt
+  // draußen: auf ihr arbeitet man, sie ist keine Schicht (M2.10).
+  'viewsMenu',
 ];
 
 /**

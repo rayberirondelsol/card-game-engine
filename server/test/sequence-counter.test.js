@@ -85,11 +85,13 @@ test('der Protokolleintrag nennt den Zähler beim Namen', () => {
 
 // ── Das Schrittvokabular kennt den Typ ───────────────────────────────────────
 
-test('place_counter steht im Schrittvokabular mit seinen fünf Feldern', () => {
+test('place_counter steht im Schrittvokabular mit seinen sechs Feldern', () => {
+  // M11.4 hat `base` dazugelegt: den Ausgangswert, auf den `set_counter` mit
+  // `value: "base"` zurueckstellt.
   const spec = STEP_TYPES.find(t => t.value === 'place_counter');
   assert.ok(spec, 'place_counter fehlt in STEP_TYPES – der Editor böte den Schritt nicht an');
-  assert.deepEqual(spec.fields, ['name', 'value', 'max', 'x', 'y']);
-  assert.deepEqual(stepFields({ type: 'place_counter' }), ['name', 'value', 'max', 'x', 'y']);
+  assert.deepEqual(spec.fields, ['name', 'value', 'max', 'base', 'x', 'y']);
+  assert.deepEqual(stepFields({ type: 'place_counter' }), ['name', 'value', 'max', 'base', 'x', 'y']);
 });
 
 test('ein frischer place_counter-Schritt ist bis auf den Namen ausgefüllt', () => {

@@ -99,3 +99,35 @@ test('eine leere Liste und ein kaputter Punkt werfen nicht', () => {
   assert.equal(pickTopmost({ x: 0, y: 0 }, null), null);
   assert.equal(pickTopmost(null, [fig('a', 0, 0)]), null);
 });
+
+// ── M11.9: der Griff in die Mitte des grossen Stuecks ────────────────────────
+//
+// Nach dem Nachtrag zu M7.2/M7.3 sind die Doerfler 1x1 (50x50), der Boesewicht
+// bleibt 2x2 (100x100). Sein Mittelpunkt liegt damit auf dem Kreuz zwischen
+// vier Feldern – also genau auf der **Ecke** des Kastens jedes Doerflers, der
+// auf einem dieser Felder steht. Dort gewann bisher der Doerfler, weil er die
+// kleinere Flaeche hat.
+
+const F = 50;
+const boss = { key: 'boss', x: 500, y: 500, width: 2 * F, height: 2 * F };
+// Doerfler auf dem Feld rechts unten unter dem Boesewicht: Feldmitte, also
+// (25, 25) vom Kreuz aus.
+const doerfler = { key: 'granny', x: 500 + F / 2, y: 500 + F / 2, width: F, height: F };
+
+test('Abnahme 1: der Griff in die Mitte des Boesewichts nimmt den Boesewicht', () => {
+  assert.equal(pickTopmost({ x: 500, y: 500 }, [boss, doerfler]), 'boss');
+  // Und auch knapp daneben, solange man naeher an seinem Mittelpunkt ist.
+  assert.equal(pickTopmost({ x: 505, y: 505 }, [boss, doerfler]), 'boss');
+});
+
+test('Abnahme 2: der Griff auf dem Feld des Doerflers nimmt den Doerfler', () => {
+  assert.equal(pickTopmost({ x: doerfler.x, y: doerfler.y }, [boss, doerfler]), 'granny');
+  // Der aeussere Teil seines Feldes erst recht.
+  assert.equal(pickTopmost({ x: 540, y: 540 }, [boss, doerfler]), 'granny');
+});
+
+test('die drei anderen Felder des Boesewichts bleiben seine', () => {
+  for (const [dx, dy] of [[-F / 2, -F / 2], [F / 2, -F / 2], [-F / 2, F / 2]]) {
+    assert.equal(pickTopmost({ x: 500 + dx, y: 500 + dy }, [boss, doerfler]), 'boss', `${dx}/${dy}`);
+  }
+});

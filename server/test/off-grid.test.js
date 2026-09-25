@@ -151,3 +151,38 @@ test('ein Zug zurueck aufs Feld nimmt die Marke im Raum wieder weg', () => {
   assert.equal(room.boardState.tokens[0].offGrid, false);
   assert.equal(room.boardState.tokens[0].cell, 'K11');
 });
+
+// ── M11.9, zweite Hälfte: der gestrichelte Rand in einer Zone ────────────────
+//
+// „Der gestrichelte Rand aus M10.10 erscheint nicht, wenn das Stück in einer
+// Zone landet. Vermutung des Spielers, ungeprüft." Hier steht die Prüfung.
+// Ergebnis: die Vermutung trifft **nicht** zu, und der eine Fall, in dem der
+// Rand ausbleibt, ist der, in dem er ausbleiben soll.
+
+test('eine Zone ohne Plätze nimmt dem Stück den Rasterplatz und der Rand erscheint', () => {
+  // `snapInto` fragt `zone.snap && zoneSlots(zone)`. Eine Zone ohne Anordnung
+  // (oder ohne `snap`) beansprucht den Wurf nicht, das Raster darunter
+  // entscheidet - und wo keins liegt, ist das Stück vom Raster.
+  const zone = { label: 'Beiseite', x: 0, y: 0, width: 400, height: 400, snap: true, layout: 'free' };
+  const hit = snapInto(600, 600, { zone, grids: [] });
+  assert.equal(hit.snapped, false);
+  assert.equal(offGrid({ gridId: 'g1', cell: 'C7' }, hit), true, 'in einer Zone bliebe der Rand aus');
+});
+
+test('eine Zone mit Plätzen gibt dem Stück einen Platz – dann ist kein Rand richtig', () => {
+  // Das ist der einzige Fall, in dem der Rand in einer Zone ausbleibt, und er
+  // ist kein Fehler: das Stück hat einen Platz bekommen, nur keinen des
+  // Rasters. `offGrid` heißt „hat seinen Platz verloren", nicht „steht nicht
+  // auf einem Rasterfeld" - sonst trüge jedes Boss-Tableau auf seiner Leiste
+  // dauerhaft einen Warnrand.
+  const zone = { label: 'Bosseleiste', x: 0, y: 0, width: 400, height: 100, snap: true, layout: 'row', capacity: 4 };
+  const hit = snapInto(210, 60, { zone, grids: [] });
+  assert.equal(hit.snapped, true);
+  assert.equal(offGrid({ gridId: 'g1', cell: 'C7' }, hit), false);
+});
+
+test('ein Stück ohne vorherigen Rasterplatz bekommt in einer Zone keinen Rand', () => {
+  const zone = { label: 'Beiseite', x: 0, y: 0, width: 400, height: 400, snap: true, layout: 'free' };
+  const hit = snapInto(600, 600, { zone, grids: [] });
+  assert.equal(offGrid({}, hit), false);
+});

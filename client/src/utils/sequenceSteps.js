@@ -51,7 +51,12 @@ export const STEP_TYPES = [
   { value: 'set_asset_face', label: 'Set Asset Face', fields: ['assetName', 'faceDown'] },
   { value: 'lock_asset', label: 'Lock Asset', fields: ['assetName'] },
   { value: 'unlock_asset', label: 'Unlock Asset', fields: ['assetName'] },
-  { value: 'place_counter', label: 'Place Counter', fields: ['name', 'value', 'max', 'x', 'y'] },
+  // M11.4: `base` ist der Ausgangswert, auf den `set_counter value: "base"`
+  // zurueckstellt. Er steht hier und nicht an `set_counter`: der Ausgangswert
+  // gehoert dem Zaehler, nicht dem Schreibenden - dieselbe Trennung wie bei
+  // `max`. Leer heisst "hat keinen", und ein Zaehler ohne Ausgangswert
+  // verhaelt sich unveraendert.
+  { value: 'place_counter', label: 'Place Counter', fields: ['name', 'value', 'max', 'base', 'x', 'y'] },
   // R1/M8.4: der Gegenschritt zu `place_counter` - er schreibt in einen
   // vorhandenen Zaehler statt einen zweiten anzulegen. Weder Stelle noch `max`:
   // beides gehoert dem Zaehler, nicht dem Schreibenden.
@@ -289,7 +294,11 @@ export function describeStep(step) {
       // Die Obergrenze steht so da, wie sie am Tisch steht: "2 / 3".
       const max = counterMax(step?.max);
       const start = max === undefined ? `${step?.value ?? 0}` : `${step?.value ?? 0} / ${max}`;
-      return `Place counter ${q(step.name)} at ${step.x ?? 0}, ${step.y ?? 0} starting at ${start}`;
+      // M11.4: der Ausgangswert steht nur da, wenn es einen gibt - sonst waere
+      // "from 0" an jedem Zaehler Rauschen, den die Dorfphase nie anfasst.
+      const base = counterMax(step?.base);
+      const from = base === undefined ? '' : `, back from ${base}`;
+      return `Place counter ${q(step.name)} at ${step.x ?? 0}, ${step.y ?? 0} starting at ${start}${from}`;
     }
     // R1: die Zeile sagt, **welche** der vier Lesarten von `value` gilt - „+18"
     // und „18" sehen nebeneinander gleich aus und tun Verschiedenes.
@@ -297,6 +306,7 @@ export function describeStep(step) {
       const form = counterValueForm(step?.value);
       const n = Number(String(step?.value ?? '').trim());
       const what = form === 'max' ? 'to its maximum'
+        : form === 'base' ? 'to its starting value'
         : form === 'add' ? `by ${n}`
         : form === 'set' ? `to ${n}`
         : `to ${q(step?.value, '(nothing)')}`;
@@ -457,7 +467,7 @@ export function validateStep(step, ctx = {}) {
   // nicht betroffen: sein `value` ist ein Zahlenfeld und der Startwert.
   if (typeOf(step) === 'set_counter' && !hasPlaceholder(step?.value)
     && counterValueForm(step?.value) === null) {
-    problems.push(`"${String(step?.value ?? '').trim()}" is not a value: a number, "+6", "-6" or "max"`);
+    problems.push(`"${String(step?.value ?? '').trim()}" is not a value: a number, "+6", "-6", "max" or "base"`);
   }
   // Nur hier: `move` darf x oder y weglassen (dann bleibt die Koordinate, wie
   // sie ist), und `place_asset`/`place_stack` mit Zone zeigen x/y gar nicht an.
@@ -470,6 +480,13 @@ export function validateStep(step, ctx = {}) {
   if (fields.has('max') && step?.max !== undefined && step?.max !== null && step?.max !== ''
     && counterMax(step.max) === undefined) {
     problems.push('max must be a number');
+  }
+  // M11.4: derselbe Satz fuer den Ausgangswert, dieselbe Pruefung (`counterMax`
+  // liest beide Felder). Leer ist die gueltige Vorgabe - ein Zaehler ohne
+  // Ausgangswert verhaelt sich unveraendert.
+  if (fields.has('base') && step?.base !== undefined && step?.base !== null && step?.base !== ''
+    && counterMax(step.base) === undefined) {
+    problems.push('base must be a number');
   }
   // M8.10/L3: ein Platz wird bei seiner Nummer genannt, und die ist eine ganze
   // Zahl (die Accuracy-Leiste zaehlt von -4, also auch negativ). Leer ist die

@@ -112,3 +112,31 @@ test('Plan + Executor legen die oberste Karte offen auf die Ablage', () => {
   assert.equal(state.cards[0].faceDown, false);
   assert.equal(state.stacks[0].cards.length, 1, 'der Rest bleibt liegen');
 });
+
+// ── M11.5: das Menü fragt die Seite ──────────────────────────────────────────
+
+test('Zonen der abgewandten Brettseite stehen nicht im Aufdeck-Menü', () => {
+  // Der Befund: waehrend das Zusatz-Brett die Dorfphase zeigte, bot der
+  // Rechtsklick „Reveal Top Card to Aktionen" und „… Ablage" an - beide auf der
+  // Kampfseite - und nicht die Ladenauslage. Das Ablegen respektiert die Seite
+  // seit M10.13 (`zoneRejects`), nur die Menueliste fragte nicht.
+  const shop = { label: 'Nachschub-Auslage', layout: 'slots', slots: [{ relX: 0.5, relY: 0.5 }] };
+  const actions = { label: 'Aktionen', layout: 'stack', facingAway: true };
+  const discard = { label: 'Ablage', layout: 'stack', facingAway: true };
+
+  const offered = revealZones([shop, actions, discard]).map(z => z.label);
+  assert.deepEqual(offered, ['Nachschub-Auslage']);
+});
+
+test('zeigt der Anker die andere Seite, ist es umgekehrt', () => {
+  const shop = { label: 'Nachschub-Auslage', layout: 'slots', slots: [{ relX: 0.5, relY: 0.5 }], facingAway: true };
+  const actions = { label: 'Aktionen', layout: 'stack' };
+  const discard = { label: 'Ablage', layout: 'stack' };
+
+  assert.deepEqual(revealZones([shop, actions, discard]).map(z => z.label), ['Aktionen', 'Ablage']);
+});
+
+test('eine Zone ohne Seitenangabe steht immer drin', () => {
+  const plain = { label: 'Ablage', layout: 'stack' };
+  assert.deepEqual(revealZones([plain]).map(z => z.label), ['Ablage']);
+});

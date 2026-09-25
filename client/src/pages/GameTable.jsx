@@ -16,7 +16,7 @@ import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
-import { tableObjectView } from '../utils/tableObjectView';
+import { tableObjectView, tokenPreview } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
 import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
@@ -399,6 +399,10 @@ export default function GameTable({ room = null }) {
   // M10.6/U4: die benannten Ansichten dieses Spielstands.
   const [views, setViews] = useState([]);
   const [showViews, setShowViews] = useState(false);
+  // M11.6: die Vergroesserung eines Tokens. Eigene Id neben
+  // `longPressPreviewCard`, weil ein Token in einer anderen Liste liegt; was
+  // *gezeigt* wird, entscheidet `tokenPreview` an einer Stelle.
+  const [previewToken, setPreviewToken] = useState(null);
 
   // Save state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -605,6 +609,11 @@ export default function GameTable({ room = null }) {
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [newCounterName, setNewCounterName] = useState('');
   const [newCounterMax, setNewCounterMax] = useState('');
+  // M11.4: derselbe Dialog legt an *und* bearbeitet. Ein zweiter „Max
+  // nachtragen"-Dialog waere ein zweiter Weg zu denselben drei Feldern; hier
+  // sagt genau diese Id, welcher der beiden Faelle gilt.
+  const [editingCounterMetaId, setEditingCounterMetaId] = useState(null);
+  const [newCounterBase, setNewCounterBase] = useState('');
   const [newDiceType, setNewDiceType] = useState('d6');
   const [newNoteText, setNewNoteText] = useState('');
   const [newTokenShape, setNewTokenShape] = useState('circle');
@@ -1050,6 +1059,11 @@ export default function GameTable({ room = null }) {
       // dort, Escape käme sonst nie an.
       if (e.key === 'Escape') {
         const target = escapeTarget({
+          // M11.7: die beiden Schichten, die M2.10 nicht kannte.
+          cardPreview: longPressPreviewCard || previewToken,
+          // Nur, solange es auch zu sehen ist: die Klappliste haengt an der
+          // Werkzeugleiste, und Escape soll nichts schlucken, was niemand sieht.
+          viewsMenu: showViews && showToolbar,
           contextMenu, splitModal: showSplitModal, saveModal: showSaveModal,
           setupSaveModal: showSetupSaveModal, counterModal: showCounterModal,
           diceModal: showDiceModal, noteModal: showNoteModal,
@@ -1060,6 +1074,8 @@ export default function GameTable({ room = null }) {
         if (!target) return; // keine Schicht offen: Escape nicht schlucken
         e.preventDefault();
         switch (target) {
+          case 'cardPreview': setLongPressPreviewCard(null); setPreviewToken(null); break;
+          case 'viewsMenu': setShowViews(false); break;
           case 'contextMenu': setContextMenu(null); break;
           case 'splitModal': dismissSplitModal(); break;
           case 'saveModal': dismissSaveModal(); break;
@@ -1208,7 +1224,9 @@ export default function GameTable({ room = null }) {
       // M2.10: der Handler liest den Zustand direkt, er wird bei Änderung neu registriert
       contextMenu, showSplitModal, showSaveModal, showSetupSaveModal, showCounterModal,
       showDiceModal, showNoteModal, showTokenModal, showTextFieldModal,
-      editingTextFieldId, showShortcuts, showBgPicker, showCardDrawer]);
+      editingTextFieldId, showShortcuts, showBgPicker, showCardDrawer,
+      // M11.7: die beiden neuen Schichten gehoeren in dieselbe Liste
+      longPressPreviewCard, previewToken, showViews]);
 
   // ===== CARD FUNCTIONS =====
 
@@ -1905,7 +1923,7 @@ export default function GameTable({ room = null }) {
   }
 
   // Counter functions
-  function createCounter(name, max) {
+  function createCounter(name, max, base) {
     // max kommt aus dem Dialog und ist optional - leer heisst "keine Obergrenze"
     // (normalizeCounter wirft es dann weg).
     //
@@ -1920,14 +1938,53 @@ export default function GameTable({ room = null }) {
     // bleiben ist mehr wert als ueberschneidungsfrei zu liegen.
     const newCounter = normalizeCounter({
       name: name || 'Counter',
-      value: newCounterValue(max),
+      value: newCounterValue(max, base),
       max,
+      base,
       ...shelfSlot(counters.length),
     });
     setCounters(prev => [...prev, newCounter]);
-    setShowCounterModal(false);
-    setNewCounterName('');
-    setNewCounterMax('');
+    dismissCounterModal();
+  }
+
+  /**
+   * M11.4: Name, Maximum und Ausgangswert eines vorhandenen Zaehlers aendern.
+   *
+   * „Ausruestung mit +1 Max LEB ist am Tisch nicht darstellbar" und „die
+   * Dorfphase wirft dauerhafte Boni weg" sind derselbe Befund: beide Zahlen
+   * standen fest. Der **Wert** bleibt unangetastet - den aendert das
+   * Eingabefeld am Zaehler, und ihn hier mitzuschreiben hiesse, zwei Wege zu
+   * derselben Zahl zu haben.
+   */
+  function saveCounterMeta(counterId, name, max, base) {
+    setCounters(prev => prev.map(c => (
+      c.id === counterId
+        ? normalizeCounter({ ...c, name: name || c.name, max, base })
+        : c
+    )));
+    dismissCounterModal();
+  }
+
+  /**
+   * Der eine Knopf des Dialogs. Welche der beiden Taten er ausloest, entscheidet
+   * `editingCounterMetaId` - nicht drei Aufrufstellen, die es je selbst
+   * nachsehen (M11.4).
+   */
+  function submitCounterModal() {
+    const name = newCounterName.trim();
+    if (!name) return;
+    if (editingCounterMetaId) saveCounterMeta(editingCounterMetaId, name, newCounterMax, newCounterBase);
+    else createCounter(name, newCounterMax, newCounterBase);
+  }
+
+  /** Den Dialog mit dem oeffnen, was am Zaehler steht (M11.4). */
+  function startCounterMetaEdit(counter) {
+    if (!counter) return;
+    setEditingCounterMetaId(counter.id);
+    setNewCounterName(counter.name || '');
+    setNewCounterMax(counter.max === undefined ? '' : String(counter.max));
+    setNewCounterBase(counter.base === undefined ? '' : String(counter.base));
+    setShowCounterModal(true);
   }
 
   function incrementCounter(counterId) {
@@ -4375,7 +4432,13 @@ export default function GameTable({ room = null }) {
   }
 
   // ===== MODAL DISMISS HELPERS =====
-  function dismissCounterModal() { setShowCounterModal(false); setNewCounterName(''); setNewCounterMax(''); }
+  function dismissCounterModal() {
+    setShowCounterModal(false);
+    setNewCounterName('');
+    setNewCounterMax('');
+    setNewCounterBase('');
+    setEditingCounterMetaId(null);
+  }
   function dismissDiceModal() { setShowDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
   function dismissTokenModal() { setShowTokenModal(false); }
@@ -4846,8 +4909,8 @@ export default function GameTable({ room = null }) {
                      `-2-3`, und das ist keine Zahl. Regel 3 steht daneben im
                      Platzhalter und im Titel. */
                   onFocus={(e) => e.target.select()}
-                  placeholder="21, +21, -21, max"
-                  title="A plain number sets the value, +n and -n add, max fills up"
+                  placeholder="21, +21, -21, max, base"
+                  title="A plain number sets the value, +n and -n add, max fills up, base resets"
                   onChange={(e) => setEditingCounterText(e.target.value)}
                   onMouseDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
@@ -4865,7 +4928,7 @@ export default function GameTable({ room = null }) {
                 <span
                   className="text-xl font-mono font-bold text-white min-w-[40px] text-center cursor-text"
                   data-testid={`counter-value-${counter.id}`}
-                  title="Click to set a value (21, +21, -21, max)"
+                  title="Click to set a value (21, +21, -21, max, base)"
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); startCounterEdit(counter); }}
                 >
@@ -6281,7 +6344,12 @@ export default function GameTable({ room = null }) {
       {/* Counter Creation Modal */}
       <SwipeModal isOpen={showCounterModal} onDismiss={dismissCounterModal} testId="counter-modal-swipe">
         <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="counter-modal">
-          <h3 className="text-white font-semibold mb-3">Create Counter</h3>
+          {/* M11.4: derselbe Dialog legt an und bearbeitet. `editingCounterMetaId`
+              sagt, welcher Fall gilt - ein zweiter Dialog waere ein zweiter Weg
+              zu denselben drei Feldern. */}
+          <h3 className="text-white font-semibold mb-3">
+            {editingCounterMetaId ? 'Edit Counter' : 'Create Counter'}
+          </h3>
           <input
             type="text"
             value={newCounterName}
@@ -6291,14 +6359,14 @@ export default function GameTable({ room = null }) {
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && newCounterName.trim()) {
-                createCounter(newCounterName.trim(), newCounterMax);
-              }
+              if (e.key === 'Enter' && newCounterName.trim()) submitCounterModal();
             }}
           />
           {/* M4a: die Obergrenze gehoert in denselben Dialog - ein eigener Weg
               "Max nachtragen" waere ein zweiter Knopf fuer ein Feld. Leer heisst
-              keine Obergrenze, und erzwungen wird sie nie. */}
+              keine Obergrenze, und erzwungen wird sie nie.
+              M11.4: und sie ist aenderbar, weil Ausruestung sie hebt ("+1 Max
+              LEB"). Ohne das zeigte der Zaehler `4 / 3` und log. */}
           <input
             type="number"
             value={newCounterMax}
@@ -6307,9 +6375,23 @@ export default function GameTable({ room = null }) {
             data-testid="counter-max-input"
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && newCounterName.trim()) {
-                createCounter(newCounterName.trim(), newCounterMax);
-              }
+              if (e.key === 'Enter' && newCounterName.trim()) submitCounterModal();
+            }}
+          />
+          {/* M11.4: der Ausgangswert. Die Dorfphase stellt darauf zurueck
+              (`set_counter value: "base"`), und wer Ausruestung anlegt, die
+              einen Wert dauerhaft hebt, hebt ihn hier von Hand - wie am echten
+              Tisch, wo die Karte neben dem Tableau liegen bleibt. */}
+          <input
+            type="number"
+            value={newCounterBase}
+            onChange={(e) => setNewCounterBase(e.target.value)}
+            placeholder="Starting value (optional, e.g. 4)"
+            title="What the village phase resets this counter to"
+            data-testid="counter-base-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newCounterName.trim()) submitCounterModal();
             }}
           />
           <div className="flex gap-2 justify-end">
@@ -6320,12 +6402,12 @@ export default function GameTable({ room = null }) {
               Cancel
             </button>
             <button
-              onClick={() => createCounter(newCounterName.trim(), newCounterMax)}
+              onClick={submitCounterModal}
               disabled={!newCounterName.trim()}
               data-testid="counter-create-btn"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create
+              {editingCounterMetaId ? 'Save' : 'Create'}
             </button>
           </div>
         </div>
@@ -7217,7 +7299,12 @@ export default function GameTable({ room = null }) {
                         ohnehin offen ist: die Wahl der Zone *ist* der Klick,
                         der sonst "Reveal" hiesse. Liegt ein Ablagestapel im
                         Setup (layout: "stack"), steht genau einer da. */}
-                    {revealZones(zones).map(zone => (
+                    {/* M11.5: `tableZones`, nicht `zones`. `facingAway` ist ein
+                        Befund von `resolveZones` - die rohe Liste weiss nichts
+                        von Vorder- und Rueckseite, und genau darum bot das
+                        Menue die beiden Buchseiten an, waehrend das Brett die
+                        Dorfphase zeigte. */}
+                    {revealZones(tableZones).map(zone => (
                       <button
                         key={zone.label}
                         onClick={() => {
@@ -7348,6 +7435,38 @@ export default function GameTable({ room = null }) {
                     </button>
                   );
                 })()}
+                {/* M11.6: „Enlarge" fuer Tokens. Das Boesewicht-Tableau ist
+                    das textreichste Stueck im Kampf und ist ein Token - dieselbe
+                    Not wie M10.2 bei Karten, nur eine Objektart weiter. Nur wo
+                    es ein Bild gibt: `tokenPreview` antwortet sonst `null`, und
+                    ein Eintrag, der eine leere Flaeche oeffnet, ist der Fehler
+                    aus docs/audit-dead-controls.md. */}
+                {contextMenu.objType === 'token' && tokenPreview(tokens.find(t => t.id === contextMenu.objId)) && (
+                  <button
+                    onClick={() => { setPreviewToken(contextMenu.objId); setContextMenu(null); }}
+                    data-testid="context-token-enlarge"
+                    className="w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    Enlarge
+                  </button>
+                )}
+                {/* M11.4: Maximum und Ausgangswert eines Zaehlers aendern. Sie
+                    stehen nicht am Widget selbst - das traegt schon Name, Wert
+                    und zwei 44-px-Knoepfe, und zwei weitere Eingabefelder
+                    machten es auf dem Tastfeld unbedienbar. Derselbe Dialog wie
+                    beim Anlegen, nur gefuellt. */}
+                {contextMenu.objType === 'counter' && (
+                  <button
+                    onClick={() => {
+                      startCounterMetaEdit(counters.find(c => c.id === contextMenu.objId));
+                      setContextMenu(null);
+                    }}
+                    data-testid="context-counter-edit"
+                    className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    Edit Name / Max / Start
+                  </button>
+                )}
                 {contextMenu.objType === 'textField' && (
                   <button
                     onClick={() => {
@@ -7657,6 +7776,45 @@ export default function GameTable({ room = null }) {
       />
 
       {/* Hover-to-enlarge preview removed - use ALT key for card zoom instead */}
+
+      {/* M11.6: dieselbe Ansicht fuer ein Token. Bildschirmfuellend, mit dem
+          Seitenverhaeltnis des Stuecks und der Seite, die oben liegt -
+          `tokenPreview` beantwortet alle drei Fragen an einer Stelle.
+          Schliessen wie bei der Karte: Klick, Beruehrung oder Escape (M11.7). */}
+      {previewToken && (() => {
+        const view = tokenPreview(tokens.find(t => t.id === previewToken));
+        if (!view) return null;
+        return (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center"
+            data-testid="token-preview-overlay"
+            onTouchStart={(e) => { e.stopPropagation(); setPreviewToken(null); }}
+            onClick={() => setPreviewToken(null)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative z-10" data-testid="token-preview">
+              <img
+                src={view.src}
+                alt={view.caption}
+                className="rounded-xl border-2 border-cyan-400 shadow-2xl shadow-black/60 object-contain bg-white"
+                style={{
+                  aspectRatio: `${view.ratio.w} / ${view.ratio.h}`,
+                  // 74vh wie bei der Karte: darunter stehen Name und Hinweis.
+                  height: '74vh', maxHeight: '74vh', maxWidth: '92vw',
+                }}
+              />
+              <div className="text-center mt-3 text-white text-base font-medium px-4 truncate">
+                {view.caption}
+              </div>
+              <div className="text-center mt-1">
+                <span className="text-white/60 text-xs bg-black/60 px-3 py-1 rounded-full backdrop-blur-sm">
+                  Click anywhere to close
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Long-press card preview popup for touch devices (Feature #58) */}
       {longPressPreviewCard && (() => {

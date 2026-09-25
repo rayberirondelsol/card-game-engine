@@ -15,7 +15,7 @@
  * Reine Logik, keine React-Abhaengigkeit: der Client hat keine
  * Testinfrastruktur, geprueft wird das aus `server/test/reveal-to-zone.test.js`.
  */
-import { zoneAccepts } from '../../../shared/zoneGeometry.js';
+import { zoneRejects } from '../../../shared/zoneGeometry.js';
 
 /**
  * Die Zonen, die am Stapel zur Wahl stehen.
@@ -34,8 +34,20 @@ import { zoneAccepts } from '../../../shared/zoneGeometry.js';
 export function revealZones(zones) {
   // Ein Schritt adressiert eine Zone ueber ihren Namen. Eine namenlose Zone
   // ist damit nicht adressierbar und gehoert nicht ins Menue.
+  //
+  // M11.5: und eine Zone der abgewandten Brettseite ist gar nicht da. Gefragt
+  // wird `zoneRejects` - dieselbe Wache, die das Ablegen seit M10.13 schon
+  // fragt und die `deal_to_zone` gleich danach noch einmal fragen wird. Eine
+  // eigene `facingAway`-Abfrage hier waere eine zweite Lesart derselben
+  // Auskunft; so faellt eine Zone aus dem Menue, wenn und nur wenn der Schritt
+  // dahinter an ihr scheitern wuerde.
+  //
+  // **Der Aufrufer muss aufgeloeste Zonen uebergeben** (`resolveZones`, in
+  // GameTable `tableZones`): `facingAway` ist ein Befund der Aufloesung, kein
+  // Feld, das im Setup steht. Genau das war der Befund - das Menue las die
+  // rohe Liste.
   const cardZones = (Array.isArray(zones) ? zones : [])
-    .filter(z => String(z?.label ?? '').trim() && zoneAccepts(z, 'card'));
+    .filter(z => String(z?.label ?? '').trim() && !zoneRejects(z, 'card'));
   const piles = cardZones.filter(z => z?.layout === 'stack');
   return piles.length ? piles : cardZones;
 }

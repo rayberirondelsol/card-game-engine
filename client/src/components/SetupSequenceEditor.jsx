@@ -362,6 +362,22 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         data-testid={`step-${index}-counter-max`}
       />),
 
+    // M11.4: der Ausgangswert, auf den `set_counter value: "base"` zurückstellt.
+    // Leer heißt „hat keinen", und dann verhält sich der Zähler unverändert -
+    // dieselbe Vorgabe und dieselbe Schreibweise wie bei `max`.
+    base: () => field('Start',
+      <input
+        type="number"
+        value={step.base ?? ''}
+        placeholder="none"
+        onChange={e => {
+          const n = parseInt(e.target.value, 10);
+          set({ base: Number.isFinite(n) ? n : undefined });
+        }}
+        className={`w-20 ${INPUT}`}
+        data-testid={`step-${index}-counter-base`}
+      />),
+
     // Beim Zurücklegen in einen Stapel hat die Seite drei Antworten, nicht
     // zwei: verdeckt, offen - oder "so wie sie liegt". Ein Häkchen kennt die
     // dritte nicht, und geraten wird nicht (M5.1).

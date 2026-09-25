@@ -41,3 +41,37 @@ export function tableObjectView(obj, fallback = '') {
     caption: hidden ? HIDDEN_CAPTION : (name || fallback),
   };
 }
+
+/**
+ * Was die Vergrößerung eines Tokens zeigt – oder `null`, wenn es nichts zu
+ * zeigen gibt (Spec M11.6).
+ *
+ * Der Befund der vierten Solopartie: das Bösewicht-Tableau ist das textreichste
+ * Stück im Kampf – Stufenfähigkeiten, Schwäche, Beute – und ist ein **Token**.
+ * Sein Menü kannte nur Lock, Flip und Close; lesen hieß auf 250 % zoomen und
+ * zweimal schwenken, also genau die Prozedur von vor M10.2, nur für Tokens.
+ *
+ * **Welche Seite, entscheidet hier nichts.** `imageUrl` trägt bereits die
+ * obenliegende Seite: `assetFace` (shared/assetToken.js) tauscht sie beim
+ * Umdrehen, und das ist seit M3d die eine Definition davon, was Umdrehen heißt.
+ * Eine zweite Fallunterscheidung wäre eine zweite Antwort darauf, was oben
+ * liegt – und die beiden könnten auseinanderlaufen.
+ *
+ * `null` für ein Token ohne Bild: geometrische Token (Kreis, Quadrat, Farbe)
+ * bildschirmfüllend zu zeigen bringt nichts, und ein Menüeintrag, der eine
+ * leere Fläche öffnet, ist der Fehler aus docs/audit-dead-controls.md.
+ *
+ * Die Bildunterschrift kommt aus `tableObjectView`, also gilt auch hier
+ * „verdeckt heißt überall verdeckt" (Spec Abschnitt 6).
+ *
+ * @returns {{src: string, caption: string, ratio: {w: number, h: number}}|null}
+ */
+export function tokenPreview(token) {
+  const src = token?.imageUrl;
+  if (!src) return null;
+  // Dieselben Rückfälle wie beim Zeichnen am Tisch (`token.width || token.size`),
+  // damit die Vergrößerung dieselbe Form hat wie das Stück darunter.
+  const w = Number(token.width) || Number(token.size) || 1;
+  const h = Number(token.height) || Number(token.size) || w;
+  return { src, caption: tableObjectView(token, 'Token').caption, ratio: { w, h } };
+}

@@ -149,7 +149,8 @@ export function pickTopmost(point, items) {
   const py = Number(point?.y);
   if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
 
-  let best = null;
+  // Erster Durchgang: wer liegt ueberhaupt unter dem Zeiger.
+  const under = [];
   (Array.isArray(items) ? items : []).forEach((item, index) => {
     if (item?.key == null) return;
     const w = Number(item.width) || Number(item.size) || 30;
@@ -160,19 +161,58 @@ export function pickTopmost(point, items) {
     const dx = px - x;
     const dy = py - y;
     if (Math.abs(dx) > w / 2 || Math.abs(dy) > h / 2) return;
-
-    const area = w * h;
-    const dist = dx * dx + dy * dy;
-    // Kleinere Flaeche zuerst (M8.2/M9.1), dann naeherer Mittelpunkt (M10.1),
-    // dann der spaetere in der Liste – das bisherige Verhalten.
-    if (
-      best === null ||
-      area < best.area ||
-      (area === best.area && (dist < best.dist || (dist === best.dist && index > best.index)))
-    ) {
-      best = { key: item.key, area, dist, index };
-    }
+    under.push({
+      key: item.key, index,
+      area: w * h,
+      dist: dx * dx + dy * dy,
+      // Der Abstand in Feldern gemessen, nicht in Luftlinie: „in der Mitte"
+      // heisst auf einem Raster „nicht mehr als ein halbes Feld daneben", und
+      // das ist eine Frage je Achse.
+      reach: Math.max(Math.abs(dx), Math.abs(dy)),
+      side: Math.min(w, h),
+    });
   });
+  if (!under.length) return null;
 
-  return best && best.key;
+  // M11.9: **in der Mitte eines Stuecks gewinnt dieses Stueck.**
+  //
+  // Der Befund: greift man den Boesewicht (2x2 Felder) in seinem Mittelpunkt,
+  // waehrend ein Doerfler (1x1) auf einem seiner vier Felder steht, erwischt
+  // man den Doerfler – die Ordnung oben laesst die kleinere Flaeche gewinnen,
+  // und der Mittelpunkt des Boesewichts liegt auf dem Kreuz zwischen den vier
+  // Feldern, also **genau auf der Ecke** des Doerflerkastens.
+  //
+  // Als Mass dient ein halbes Feld. Ein Feld kennt diese Funktion nicht – sie
+  // sieht nur Kaesten –, aber das kleinste Stueck unter dem Zeiger *ist* in
+  // der Praxis das Feldmass: eine Figur steht auf einem Feld. Mehr als ein
+  // Laengenmass gibt es hier nicht, und ein geratenes waere eines zuviel.
+  //
+  // **Was das bei einem 1x1-Stueck anrichtet: nichts.** Es ist selbst das Mass,
+  // seine „Mitte" ist damit sein ganzer Kasten bis auf den Rand – also genau
+  // der Bereich, den es vorher schon gewonnen hat. Neu ist allein, dass ein
+  // groesseres Stueck um seinen eigenen Mittelpunkt herum mitreden darf, und
+  // dort entscheidet der naehere Mittelpunkt. Das ist dieselbe Teilung, die
+  // M10.1 zwischen zwei gleich grossen Figuren schon vornimmt ("jede Haelfte
+  // gehoert der naeheren"), nur ueber die Flaechengrenze hinweg.
+  //
+  // **Der Preis, ausgesprochen:** das Viertel des Doerflerfeldes, das am
+  // Mittelpunkt des Boesewichts liegt, gehoert jetzt dem Boesewicht. Wer
+  // genau dort greifen will, greift eine Handbreit weiter aussen.
+  //
+  // M8.2 bleibt unberuehrt: eine Figur auf einem Gelaendeteil hat dessen
+  // Mittelpunkt nur dann naeher als ihren eigenen, wenn sie gar nicht darauf
+  // steht – und bei gleichem Abstand (beide Mittelpunkte aufeinander)
+  // entscheidet weiterhin die kleinere Flaeche.
+  const half = Math.min(...under.map(u => u.side)) / 2;
+  const middle = under.filter(u => u.reach < half);
+
+  // Innerhalb der Mitten entscheidet der naehere Mittelpunkt, bei Gleichstand
+  // wieder die kleinere Flaeche und dann die Zeichenreihenfolge. Gibt es keine
+  // Mitte, bleibt die Ordnung von M8.2/M9.1/M10.1 unveraendert.
+  const pool = middle.length ? middle : under;
+  const better = middle.length
+    ? (a, b) => a.dist < b.dist || (a.dist === b.dist && (a.area < b.area || (a.area === b.area && a.index > b.index)))
+    : (a, b) => a.area < b.area || (a.area === b.area && (a.dist < b.dist || (a.dist === b.dist && a.index > b.index)));
+
+  return pool.reduce((best, u) => (better(u, best) ? u : best), pool[0]).key;
 }
