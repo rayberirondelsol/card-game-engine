@@ -3735,11 +3735,12 @@ Karte und meldet den Grund. Ohne Tableau zieht er wie bisher.
 
 **Nachtrag aus der Umsetzung.** Umgesetzt in *TFT Kurzpartie* **und** in
 *TFT Grundaufbau (Dorfphase)* — beide haben die Aktion und beide haben die Zone
-`Bösewicht-Tableau`, die Sperre gehört in beide. Nebenbefund am Grundaufbau,
-nicht angefasst, weil er zu M11.2/M12.3 gehört: dessen „Kampf beginnen" trägt
-**keine** `require_zone` (die Kurzpartie schon), und eine Aktion „Dorfphase
-beginnen" gibt es dort überhaupt nicht — der Grundaufbau kennt nur „Kampf
-beginnen" und „Dorfereignis ziehen".
+`Bösewicht-Tableau`, die Sperre gehört in beide. Nebenbefund am Grundaufbau:
+dessen „Kampf beginnen" trägt **keine** `require_zone` (die Kurzpartie schon),
+und eine Aktion „Dorfphase beginnen" gibt es dort überhaupt nicht. Das sah nach
+derselben Lücke aus — ist aber keine, siehe **M14.12**: der Grundaufbau ist ein
+Baustein, sein „Kampf beginnen" räumte selbst auf, und eine `require_zone` davor
+hätte ihn nach dem ersten Kampf festgefahren.
 
 ### M14.2 — Benutzte Dorf-Ereignisse werden nie abgeräumt
 
@@ -3971,3 +3972,105 @@ Wurf zu erkennen.
 - **K4** Die Staffelung des Ablagestapels (M12.5) läuft nach etwa sechs Karten
   aus; danach liegt alles deckungsgleich. Das ist regelrelevant: BÖSEWICHTSCHÄDEL
   zählt „6 oder mehr Bösewicht-Aktionen auf dem Ablagestapel".
+
+### M14.12 — *TFT Grundaufbau (Dorfphase)* ist ein Baustein, kein Aufbau zum Spielen
+
+**Befund.** Bei M14.1 fiel auf: dem Grundaufbau fehlt die `require_zone` auf
+„Kampf beginnen", und eine Aktion „Dorfphase beginnen" hat er gar nicht. Das war
+der vierte Befund derselben Bauart („die Korrektur landete nur in der
+Kurzpartie") — und diesmal ist es **keiner**. Belegt an den Daten:
+
+1. **Sein Zonenbestand ist eine echte Teilmenge.** 11 Zonen gegen 30; keine
+   einzige hat er, die der Kurzpartie fehlt. Es fehlen genau die, an denen ein
+   Kampf hängt: `Aktionen` und `Ablage` (das Verhaltensdeck hätte keinen Platz),
+   `Bösewicht: Bewegung` / `Bösewicht: Leben`, die zwölf Attributleisten
+   `Dörfler N: …` und die drei `Ausrüstung Dörfler N`.
+2. **`scenario_data` ist `{}`.** `build_scenario` hätte nichts zu bauen: kein
+   Terrain, keine Startfelder, keine BEW/LEB-Spalte je Spielerzahl. Und es ließe
+   sich auch nicht nachtragen — seine Sequenz zieht mit
+   `draw_assets pool: "Bösewichte", count: 4` **vier zufällige** Bösewichte aus
+   dem ganzen Vorrat (die lange Variante, ohne Kurzpartie-Marker). Szenariodaten
+   bräuchte er dann für alle zwanzig.
+3. **Seine Zähler tragen keinen `base`-Wert** (M11.4). Die Rücksetzschritte der
+   Kurzpartie (`set_counter … "base"`) liefen hier zwölfmal ins Leere.
+4. **Kein Kampfmaterial in der Sequenz**: keine Startausrüstung, keine Marker
+   auf den Leisten, keine Bösewicht-Zähler, nichts auf dem Raster.
+5. **Sein `state_data` ist genauso lang wie das der Kurzpartie** (83 606 Zeichen,
+   andere IDs) — die Kurzpartie ist aus ihm hervorgegangen, nicht umgekehrt.
+6. **Sein „Kampf beginnen" räumte selbst auf** (`clear_zone Bösewicht-Platz`,
+   `clear_zone Bösewicht-Tableau` als Schritt 2 und 3). Das ist die **ältere**
+   Bauform, von vor M11.2/M12.3, die die beiden Knöpfe noch nicht
+   gegeneinander verriegelt hat. Eine `require_zone … empty` davor hätte ihn
+   nach dem ersten Kampf endgültig festgefahren: nichts sonst hätte das Tableau
+   je wieder weggeräumt. Die „fehlende" Vorbedingung war also keine Lücke.
+
+Der Name sagt es mit: *Grundaufbau (**Dorfphase**)*. Er stellt das Dorf und
+sonst nichts.
+
+**Änderung.** Er bleibt ein Baustein — aber ohne die Falle. „Kampf beginnen"
+war ein Knopf, der einen Kampf verspricht, den dieser Aufbau nicht stellen kann
+(Tableau bleibt sogar verdeckt liegen, weil ihm auch das abschließende
+`set_asset_face` fehlt), und von dem kein Weg zurück in die Dorfphase führt.
+Die Aktion ist **entfernt**; „Dorfereignis ziehen" bleibt und behält seine
+Wache aus M14.1 — die Zone `Bösewicht-Tableau` gibt es, und ein von Hand dorthin
+gelegtes Tableau soll auch hier das Ereignisziehen sperren.
+
+Die sechs entfernten Schritte, damit sie nicht verloren sind:
+`clear_zone Nachschub-Auslage → Stapel "Nachschub (Tante Emma)" (verdeckt)`,
+`clear_zone Bösewicht-Platz → Zone "Besiegte Bösewichte"`,
+`clear_zone Bösewicht-Tableau → (vom Tisch)`,
+`reveal_next Bösewicht-Leiste → Bösewicht-Platz`,
+`set_asset_face Sideboard (offen)`,
+`place_asset "Tableau: $revealedBase" → Bösewicht-Tableau (verdeckt)`.
+
+**Nicht** geändert, mit Grund: kein „Dorfphase beginnen" nachgebaut. Es hätte
+in diesem Aufbau nichts zu räumen (kein Verhaltensdeck, kein Terrain, kein
+Raster belegt), nichts zurückzusetzen (keine `base`-Werte, keine
+Bösewicht-Zähler) und nichts aufzustellen (keine Marker, keine Leisten) — von
+seinen 41 Schritten in der Kurzpartie blieben eine Handvoll übrig, und die
+räumten ein Dorf auf, das nie verlassen wurde.
+
+**Abnahme.**
+1. *TFT Grundaufbau (Dorfphase)* zeigt in der oberen Leiste genau **einen**
+   Knopf: „Dorfereignis ziehen".
+2. Er zieht wie bisher drei Ereignisse in die drei Handzonen.
+3. *TFT Kurzpartie* bleibt unverändert dreiknöpfig.
+
+### M14.13 — Eine gespeicherte Ansicht gilt nur für die Fenstergröße, in der sie entstand
+
+**Befund, gefunden bei der Umsetzung von M14.4.** Eine Ansicht speichert
+`{label, x, y, zoom}`, und `x`/`y` sind die **Kameraposition**, nicht die Stelle
+am Tisch. `worldAt` in `client/src/utils/cameraZoom.js` liest sie als
+
+    Weltmitte = Containermitte − cam
+
+und die Containermitte ist die **halbe Fenstergröße**. Damit zeigt dieselbe
+gespeicherte Ansicht in einem anderen Fenster auf eine andere Stelle: die halbe
+Differenz der Fenstermaße, in Weltpunkten. Zwischen dem Fenster der sechsten
+Partie (831 × 794) und einem gewöhnlichen Vollbild (etwa 1920 × 1080) sind das
+über 500 Punkte nach links und 140 nach oben — bei der Ansicht „Dörfler" rutscht
+der Münztopf damit aus dem Bild.
+
+Das trifft jede von Hand gespeicherte Ansicht genauso; es fiel nur nicht auf,
+weil bisher jede im selben Fenster gespeichert und benutzt wurde. Die beiden
+Ansichten aus M14.4 sind für 831 × 794 gerechnet und stehen in den Daten — mit
+Daten ist das nicht zu beheben.
+
+**Änderung.** Eine Ansicht merkt sich die **Stelle am Tisch**, nicht die
+Kamera: `putView` rechnet die Weltmitte aus der Kamera und der aktuellen
+Containergröße aus und legt sie ab, `goToView` rechnet sie zurück. Beides in
+`client/src/utils/tableViews.js`, wo die Kameraregeln schon stehen — keine
+zweite Umrechnung neben `worldAt`, sondern dieselbe.
+
+Alte Einträge tragen nur `x`/`y` als Kameraposition. `normalizeViews` liest sie
+weiter so (ein Feld unterscheidet die beiden Lesarten), sonst springt jede
+gespeicherte Ansicht beim ersten Laden um ihren eigenen Versatz.
+
+**Abnahme.**
+1. Eine in einem 830 × 790 großen Fenster gespeicherte Ansicht zeigt nach dem
+   Wechsel auf 1920 × 1080 **dieselbe Stelle** des Tisches, mittig, nur mehr
+   Rand drumherum.
+2. Eine vor der Änderung gespeicherte Ansicht springt im Fenster, in dem sie
+   entstand, weiterhin genau dorthin, wo sie entstand.
+3. Geprüft aus `server/test/table-views.test.js` gegen dieselbe Transformation,
+   die `camera-zoom.test.js` benutzt — nicht gegen die eigene Umkehrfunktion.
