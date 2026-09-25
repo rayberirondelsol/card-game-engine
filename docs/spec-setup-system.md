@@ -3566,3 +3566,47 @@ ganzzahligen Mittelpunkt — deshalb übernimmt `snapInto`), und 45°-Schritte.
 5. Ein Token an einer Karte behält Ort und Bindung.
 6. Nach Speichern und Laden steht die gedrehte Lage noch; im Raum sieht der
    zweite Platz dieselbe.
+
+### M13.5 — Ein gedrehter Zaun wandert
+
+**Befund (aus der Umsetzung von M13.4, `docs/tasks-kasten.md`).** Zweimal 90°
+bringt einen `Holzzaun` nicht dorthin zurück, wo er lag: `A3:D3` → `C2:C5` →
+`B4:E4`, ein halbes Feld je Drehung. Die Maße stimmen wieder, der Ort nicht.
+
+**Ursache, und sie ist keine Nachlässigkeit.** M13.4 dreht den Bereich um
+**seinen Mittelpunkt** und lässt `snapInto` das Ergebnis einrasten. Bei
+wechselnder Parität — ein 4×1-Bereich hat seine Mitte auf einer Feldgrenze, ein
+1×4-Bereich auf einer Feldmitte — liegt der gedrehte Kasten notwendig um ein
+halbes Feld versetzt, und das Runden in `rangeAt` macht daraus einen echten
+Versatz. Am wirklichen Tisch passiert dasselbe; dort schiebt man das Teil
+zurecht. Am Bildschirm ist es ein Ärgernis, weil es sich bei jeder Drehung
+wiederholt und nie zurückfindet.
+
+**Die Auflösung: nicht um die Mitte drehen, sondern um die Ecke.** Der Bereich
+behält `col` und `row` und tauscht `cols` und `rows`. `A3:D3` wird `A3:A6`, und
+noch einmal gedreht wieder `A3:D3` — **umkehrbar**, was die Mittelpunktdrehung
+nicht sein kann.
+
+- Für ein quadratisches Token (Bösewicht 2×2) ist der Tausch ein Nullzug.
+  **M13.1 Abnahme 3 und M13.4 Abnahme 3 bleiben unberührt.**
+- ↺ und ↻ ergeben denselben Feldbereich und unterscheiden sich nur im
+  Bilderwinkel. Das ist richtig: ein 1×4-Fußabdruck ist in beide Richtungen
+  gedreht ein 4×1-Fußabdruck.
+- Liefe der getauschte Bereich über den Rasterrand, gilt weiter M10.10:
+  gedreht, `offGrid` markiert, kein Zurückspringen.
+
+Gerechnet wird mit dem, was da ist — `cellRange`, `rangeLabel`, `rangeCenter`,
+`rangeBox`. **Keine zweite Bereichsrechnung.**
+
+**Abnahme.**
+1. Ein `Holzzaun` auf `A3:D3` liegt nach 90° auf `A3:A6` und nach einer
+   weiteren 90°-Drehung wieder auf **`A3:D3`**, mit `width` 200 und `height` 50.
+   (Das ist Abnahme 2 aus M13.4, jetzt erfüllbar.)
+2. Viermal in dieselbe Richtung gedreht: Feldbereich, Maße **und** Winkel wie
+   am Anfang.
+3. Ein Bösewicht auf 100×100 liegt nach jeder Drehung auf denselben vier
+   Feldern.
+4. Ein Bereich, der getauscht über den Rand liefe, wird `offGrid` markiert; der
+   Winkel steht.
+5. Ein Token ohne Rasteradresse und ein Token an einer Karte verhalten sich wie
+   in M13.4.
