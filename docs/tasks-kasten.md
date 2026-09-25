@@ -270,3 +270,167 @@ sie das tut, ist der Kern der Sache.
 
 **Abnahme.** `cd server && npm test` ist vollständig grün, und kein Test
 behauptet mehr, der Kasten bleibe beim Drehen stehen.
+
+---
+
+# Nachtrag: um die Ecke statt um die Mitte (Spec M13.5)
+
+Abweichung 3 oben ist eine eigene Aufgabe geworden: **M13.5**. Der Bereich wird
+nicht mehr um seinen Mittelpunkt gedreht, sondern um seine **linke obere Ecke** —
+`col` und `row` bleiben, `cols` und `rows` tauschen. `A3:D3` → `A3:A6` → `A3:D3`.
+
+Damit fällt **Abnahme 2' wieder weg**: es gilt wieder die ursprüngliche Abnahme 2
+aus M13.4 („zweimal 90° bringt ihn in die Waagerechte zurück"), und sie ist jetzt
+erfüllbar — nachgerechnet kommt sogar der Ort zurück, nicht nur die Maße. Der
+Abschnitt „Abweichung 3" oben bleibt als Begründung stehen; sein Schluss
+„behebbar nur über die Transposition um den eigenen Mittelpunkt" war zu eng: um
+die **Ecke** transponiert braucht es keinen ganzzahligen Mittelpunkt.
+
+Tests: Stand vorher **994 grün**.
+
+## Wo die Spec nicht stimmt (M13.5)
+
+### Was stimmt
+
+1. **`cellRange`, `rangeLabel`, `rangeCenter` und `rangeBox` reichen.**
+   Nachgerechnet: `cellRange(grid, 'A3:D3')` gibt `{col:0,row:2,cols:4,rows:1,
+   ranged:true}` — ein Bereichsname mit Doppelpunkt geht unverändert durch,
+   ohne Größenrechnung. `{...r, cols: r.rows, rows: r.cols}` ist der ganze
+   Eckentausch, `rangeLabel` macht den Namen daraus, `rangeBox` die Fläche und
+   `rangeCenter` die Mitte. **Eine Zeile Rechnung, keine zweite
+   Bereichsrechnung.**
+2. **↺ und ↻ ergeben denselben Feldbereich** — und dafür gibt es einen
+   stärkeren Grund als den der Spec („ein 1×4-Fußabdruck ist in beide
+   Richtungen gedreht ein 4×1-Fußabdruck"): **Umkehrbarkeit gemischter
+   Richtungen.** Wären sie verschieden (etwa an verschiedenen Ecken verankert),
+   käme ein ↻ gefolgt von einem ↺ nicht dorthin zurück, wo das Stück lag.
+   Zweimal tauschen ist die Identität — nur so ist *jede* Folge umkehrbar, nicht
+   nur die gleichgerichtete.
+3. **Ein quadratisches Token ist ein Nullzug.** `C3:D4` getauscht ist `C3:D4`,
+   gleiche Mitte, gleiche Maße. M13.1-Abnahme 3 und M13.4-Abnahme 3 bleiben
+   Wort für Wort stehen.
+
+### Antwort — die Randbedingung steht schon in `rangeLabel`, aber die Reihenfolge zählt
+
+Die Rasterausdehnung steht in `dims(grid)` (`cols`/`rows`), geprüft wird sie in
+`inside(grid, col, row)`. Erreichbar ist das über `rangeLabel`: es fragt
+`cellLabel` für **beide** Ecken, und `cellLabel` gibt `null`, sobald eine davon
+kein Feld dieses Rasters ist. Eine eigene Prüfung auf `col + cols - 1` wäre eine
+zweite Lesart derselben Frage.
+
+**`rangeBox` prüft dagegen nichts.** Nachgerechnet: für einen Bereich, der unten
+herausragt, liefert es klaglos Koordinaten (`A8:D8` getauscht → `rangeLabel` ist
+`null`, `rangeBox` gibt trotzdem `y: 350, height: 200` auf einem Raster, das bei
+500 endet). Also **erst den Namen bilden, dann die Fläche** — wer die Fläche
+zuerst nimmt, legt ein Stück still neben das Raster.
+
+### Antwort — `grids` ist schon aufgelöst, `resolveGrids` gehört nicht hinein
+
+Geprüft statt angenommen: `GameTable.jsx:534` hält
+`const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors])`
+und gibt genau das an `snapInto`, `placeOnGrids` und seit KA2 an
+`rotatePlacement`. Die Auflösung ist Sache des Aufrufers, und sie braucht
+`anchors`, die `rotatePlacement` gar nicht bekommt — ein `resolveGrids` darin
+wäre eine zweite Auflösung mit schlechteren Daten. Das Raster wird deshalb
+genauso gesucht wie in `placeOnGrids`: `grids.find(g => g?.id === o.gridId)`.
+
+### Entscheidung — `snapInto` scheidet aus `rotatePlacement` aus
+
+Beides nebeneinander wären zwei Antworten auf dieselbe Drehung. Getrennt wird
+nach der Frage, die die beiden Rechnungen beantworten:
+
+- `snapInto` beantwortet **„wo landet ein Wurf"** — ein Punkt, um den herum ein
+  gleich großer Bereich neu zentriert wird. Genau daher kam der Versatz.
+- Der Eckentausch beantwortet **„was wird aus einem Bereich, der schon liegt"**.
+  Eine Drehung ist kein Wurf: das Stück hat seinen Platz bereits, und der Platz
+  wird umgeformt, nicht neu gesucht.
+
+Für ein Token **mit** Rasteradresse ersetzt der Eckentausch `snapInto`
+vollständig. Für das Ziehen von Hand bleibt `snapInto` unverändert die eine
+Einrastrechnung — dort *ist* es ein Wurf.
+
+### Abweichung 1 — was bei fehlendem Raster gilt, sagt die Spec nicht
+
+Ein Token kann eine `gridId` tragen, deren Raster nicht in `grids` steht (Raster
+gelöscht, Anker weg), oder eine `cell`, die auf diesem Raster kein Feld ist.
+Unter M13.4 fiel das durch `snapInto` und wurde `offGrid: true` — die Adresse
+ging verloren, weil das Raster gerade nicht geladen war.
+
+`placeOnGrids` hat für genau diesen Fall längst eine Regel, und eine andere:
+„an object whose grid or field is gone keeps its last coordinates and its
+`cell`" — ein korrigierbarer Fehler, den man nicht verstecken soll.
+**Entschieden:** dasselbe hier. Fehlt das Raster oder der Feldname, dreht nur
+das Bild, die Maße tauschen, und die Adresse bleibt stehen. `offGrid` ist die
+Aussage „hat seinen Platz verloren, und das ist gemeint" (M10.10) — ein nicht
+geladenes Raster ist nicht gemeint.
+
+### Abweichung 2 — Abnahme 4 lässt sich mit dem alten Beispiel nicht mehr belegen
+
+Der Eckentausch macht **weniger** Fälle `offGrid` als die Mittelpunktdrehung,
+und genau das Beispiel aus M13.4 fällt weg: ein Zaun auf `A1:D1` lief um die
+Mitte gedreht über den oberen Rand hinaus (deshalb steht er in KA1 als
+`offGrid`-Beleg), um die Ecke gedreht wird er `A1:A4` und liegt sauber auf dem
+Raster. Der Beleg für Abnahme 4 braucht deshalb ein **neues** Beispiel: `A8:D8`
+auf einem Raster mit zehn Zeilen wird getauscht zu `A8:A11`, und eine elfte
+Zeile gibt es nicht.
+
+---
+
+## KA5 — Der Bereich dreht um seine Ecke
+
+**Befund.** `rotatePlacement` (KA1) fragt `snapInto` mit den getauschten Maßen
+und lässt den Bereich um den Punkt neu zentrieren. Bei wechselnder Parität liegt
+der gedrehte Kasten notwendig um ein halbes Feld versetzt, und das Runden in
+`rangeAt` macht daraus einen echten Versatz: `A3:D3` → `C2:C5` → `B4:E4`. Der
+Zaun findet nie zurück.
+
+**Änderung.** Der Zweig „Token mit Rasteradresse" rechnet statt `snapInto`:
+
+- Raster aus `grids` über `token.gridId` (wie `placeOnGrids`), Bereich über
+  `cellRange(grid, token.cell)`.
+- Fehlt eines von beiden, gilt Abweichung 1: nur drehen, Adresse bleibt.
+- Sonst `{ ...r, cols: r.rows, rows: r.cols }` und daraus `rangeLabel`.
+- `rangeLabel` ist `null` → über den Rand: `gridId: null`, `cell: null`,
+  `offGrid: true`, Winkel und Maße stehen (M10.10).
+- Sonst Mitte und Fläche aus `rangeBox`; die Maße eines **Bereichs** schlagen
+  die getauschten, ein Einzelfeld behält die des Assets — dieselbe Vorrangregel
+  wie in `snapToGrid` und `placeOnGrids`.
+
+`snapInto` und `offGrid` werden von `rotatePlacement` danach nicht mehr
+gerufen; für das Ziehen bleiben sie, was sie waren.
+
+**Abnahme.**
+- `A3:D3` → `A3:A6` (50×200, Mitte 25/200) → `A3:D3` (200×50, Mitte 100/125):
+  Feldbereich, Maße **und** Ort sind wieder die vom Anfang (Spec-Abnahme 1,
+  zugleich M13.4-Abnahme 2 im ursprünglichen Wortlaut).
+- Viermal in dieselbe Richtung: Feldbereich, Maße und Winkel wie am Anfang
+  (Spec-Abnahme 2).
+- ↺ und ↻ geben denselben Feldbereich, und ↻ gefolgt von ↺ gibt den
+  Ausgangszustand.
+- Ein Bösewicht auf `C3:D4` (100×100) liegt nach jeder Drehung auf `C3:D4`
+  (Spec-Abnahme 3).
+- `A8:D8` auf einem 10×10-Raster wird gedreht und `offGrid` markiert; `rotation`
+  steht, `x`/`y` bleiben (Spec-Abnahme 4).
+- `A1:D1` wird `A1:A4` und ist **nicht** mehr `offGrid` — der alte Beleg aus KA1
+  gilt nicht mehr (Abweichung 2).
+- Ein Token an einer Karte, eines ohne Rasteradresse und eines, dessen Raster
+  nicht in `grids` steht, behalten Ort und Bindung (Spec-Abnahme 5,
+  Abweichung 1).
+- Ein Einzelfeld (`C7`) bleibt `C7`.
+
+---
+
+## KA6 — Abnahme 2' zurücknehmen
+
+**Befund.** Der Abschnitt „Abweichung 3" oben formuliert Abnahme 2 neu, weil sie
+mit der Mittelpunktdrehung nicht erfüllbar war. Nach KA5 ist sie erfüllbar, und
+die Neuformulierung wäre eine stehengebliebene Ausnahme, die niemand mehr
+braucht — ein Test, der die Wanderung festschreibt, machte KA5 rückgängig,
+sobald jemand ihn wörtlich nimmt.
+
+**Änderung.** Keine am Code. Der Nachtrag oben nimmt 2' zurück, und die
+Prüfungen aus KA1, die `C2:C5`/`B4:E4` und den `A1:D1`-Rand festschreiben,
+werden auf die Werte aus KA5 umgeschrieben.
+
+**Abnahme.** Kein Test und kein Abschnitt behauptet mehr, der Zaun dürfe
+wandern.

@@ -476,10 +476,26 @@ export function offGrid(obj, hit) {
  * gerade deshalb benutzt, weil es keins hat. Den Winkel holt es sich von dort:
  * es gibt genau **eine** Auslegung eines Winkels.
  *
- * Gerechnet wird die Feldbelegung nicht selbst: `snapInto` bekommt die
- * getauschten Masse und **keinen** Feldnamen, und zentriert den Bereich um den
- * Punkt – genau wie beim Ziehen von Hand. Eine zweite Einrastrechnung waere
- * der Fehler, den M6 verbietet.
+ * GEDREHT WIRD UM DIE ECKE, NICHT UM DIE MITTE (M13.5). Der Bereich behaelt
+ * `col` und `row` und tauscht `cols` und `rows`: `A3:D3` wird `A3:A6` und
+ * wieder `A3:D3`. Um die *Mitte* gedreht (so M13.4) wanderte der Zaun bei
+ * wechselnder Parität je Drehung ein halbes Feld – ein 4x1-Bereich hat seine
+ * Mitte auf einer Feldgrenze, ein 1x4-Bereich auf einer Feldmitte, und das
+ * Runden in `rangeAt` machte daraus einen echten Versatz. Um die Ecke gedreht
+ * braucht es keinen ganzzahligen Mittelpunkt, und die Drehung ist umkehrbar.
+ *
+ * Links und rechts herum geben denselben Feldbereich; nur der Bilderwinkel
+ * unterscheidet sie. Sonst waere ein Rechtsdreh gefolgt von einem Linksdreh
+ * nicht die Identitaet.
+ *
+ * `snapInto` kommt hier deshalb **nicht** vor: es beantwortet „wo landet ein
+ * Wurf“ – ein Punkt, um den herum neu zentriert wird. Eine Drehung ist kein
+ * Wurf; das Stueck liegt schon, sein Platz wird umgeformt. Beides nebeneinander
+ * waeren zwei Antworten auf dieselbe Drehung. Gerechnet wird mit dem, was da
+ * ist: `cellRange`, `rangeLabel`, `rangeBox` – keine zweite Bereichsrechnung.
+ *
+ * `grids` ist bereits aufgeloest, wie bei `snapInto` und `placeOnGrids`: die
+ * Aufloesung braucht `anchors` und ist Sache des Aufrufers.
  *
  * Neu eingerastet wird nur, was eine **Rasteradresse traegt**, nicht was
  * geometrisch ueber einem Raster liegt: ein Stueck auf einem Zonenplatz hat
@@ -500,17 +516,31 @@ export function rotatePlacement(token, { grids = [], step } = {}) {
   // An einer Karte zu haengen ist die genauere Aussage (das Ablegen loescht
   // dabei die Rasteradresse), und ohne Adresse gibt es nichts neu einzurasten.
   if (token?.attachedTo || !token?.gridId || !token?.cell) return turned;
-  const hit = snapInto(token.x, token.y, { grids, size: { width: h, height: w } });
-  // M10.10: der gedrehte Bereich laeuft ueber den Rand. Dasselbe wie beim
-  // Ziehen dorthin – markieren, nicht zurueckspringen und nicht die Drehung
-  // verweigern. Gelesen ueber `offGrid`, nicht ueber ein zweites `snapped`.
-  if (offGrid(token, hit)) return { ...turned, gridId: null, cell: null, offGrid: true };
-  const { snapped: _claimed, ...place } = hit;
-  // Der Treffer liegt **ueber** den getauschten Massen: `snapToGrid` gibt sie
-  // nur bei einem Bereich zurueck, und wo es sie gibt, sind es die des
-  // Rasters – ein 200x50-Zaun ueber einem 60er-Raster wird 60x180. Dieselbe
-  // Vorrangregel wie beim Laden in `placeOnGrids`.
-  return { ...turned, ...place, offGrid: false };
+  const grid = Array.isArray(grids) ? grids.find(g => g?.id === token.gridId) : null;
+  const r = grid && cellRange(grid, token.cell);
+  // Raster weg (geloescht, Anker fehlt) oder ein Feldname, den es hier nicht
+  // gibt: dann bleibt die Adresse stehen, wie in `placeOnGrids`. Ein
+  // korrigierbarer Fehler soll sichtbar bleiben, und `offGrid` hiesse "hat
+  // seinen Platz verloren, und das ist gemeint" – das ist es nicht.
+  if (!r) return turned;
+  const swapped = { ...r, cols: r.rows, rows: r.cols };
+  // Die Randpruefung steht schon in `rangeLabel`: es fragt `cellLabel` fuer
+  // beide Ecken und antwortet `null`, sobald eine davon kein Feld dieses
+  // Rasters ist. Erst der Name, dann die Flaeche – `rangeBox` prueft nichts
+  // und gaebe fuer einen herausragenden Bereich klaglos Koordinaten.
+  const cell = rangeLabel(grid, swapped);
+  // M10.10: markieren, nicht zurueckspringen und nicht die Drehung verweigern.
+  if (!cell) return { ...turned, gridId: null, cell: null, offGrid: true };
+  const box = rangeBox(grid, swapped);
+  const p = boxCenter(box);
+  return {
+    ...turned,
+    // Die Masse eines *Bereichs* kommen aus dem Raster und schlagen die
+    // getauschten – dieselbe Vorrangregel wie in `snapToGrid` und
+    // `placeOnGrids`. Ein Einzelfeld behaelt die Groesse seines Assets.
+    ...(swapped.ranged ? { width: box.width, height: box.height } : {}),
+    x: p.x, y: p.y, gridId: grid.id, cell, offGrid: false,
+  };
 }
 
 /**

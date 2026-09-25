@@ -55,24 +55,62 @@ test('ein 200x50-Zaun liegt nach 90 Grad ueber vier Felder in der Senkrechten', 
   assert.equal(p.rotation, 90);
   assert.equal(p.width, 50);
   assert.equal(p.height, 200);
-  assert.equal(p.cell, 'C2:C5', 'vier Felder in der Senkrechten');
+  // M13.5: um die **Ecke** gedreht – `col`/`row` bleiben, `cols`/`rows`
+  // tauschen. Um die Mitte gedreht waere es `C2:C5`, und der Zaun faende nie
+  // zurueck (siehe docs/tasks-kasten.md, Nachtrag M13.5).
+  assert.equal(p.cell, 'A3:A6', 'vier Felder in der Senkrechten, an derselben Ecke');
   assert.equal(p.gridId, 'g1');
   assert.equal(p.offGrid, false);
+  assert.deepStrictEqual({ x: p.x, y: p.y }, { x: 25, y: 200 }, 'die Mitte des neuen Bereichs');
 });
 
-test('zweimal 90 Grad gibt die Waagerechte zurueck', () => {
-  // Abnahme 2' (siehe docs/tasks-kasten.md, Abweichung 3): die Masse kommen
-  // zurueck, der Ort darf um ein halbes Feld je Drehung gewandert sein – beim
-  // Wechsel zwischen gerader und ungerader Feldzahl gibt es keinen
-  // ganzzahligen Mittelpunkt, und `rangeAt` rundet.
+test('zweimal 90 Grad legt den Zaun genau dorthin zurueck, wo er lag', () => {
+  // Spec-Abnahme 1 aus M13.5, zugleich Abnahme 2 aus M13.4 im urspruenglichen
+  // Wortlaut: der Eckentausch ist umkehrbar, die Mittelpunktdrehung war es
+  // nicht. Zurueck kommt nicht nur die Waagerechte, sondern auch der Ort.
   const zaun = on('A3:D3', 200, 50);
   const quer = { ...zaun, ...rotatePlacement(zaun, { grids: [grid], step: 90 }) };
   const p = rotatePlacement(quer, { grids: [grid], step: 90 });
 
   assert.equal(p.rotation, 180);
-  assert.equal(p.width, 200);
-  assert.equal(p.height, 50);
-  assert.equal(p.cell, 'B4:E4', 'wieder vier Felder waagerecht');
+  assert.deepStrictEqual(
+    { cell: p.cell, width: p.width, height: p.height, x: p.x, y: p.y },
+    { cell: 'A3:D3', width: 200, height: 50, x: zaun.x, y: zaun.y },
+  );
+});
+
+test('viermal in dieselbe Richtung ist der Ausgangszustand', () => {
+  // Spec-Abnahme 2 aus M13.5: Feldbereich, Masse **und** Winkel.
+  for (const step of [90, -90]) {
+    let zaun = on('A3:D3', 200, 50);
+    for (let i = 0; i < 4; i++) zaun = { ...zaun, ...rotatePlacement(zaun, { grids: [grid], step }) };
+    assert.deepStrictEqual(
+      { cell: zaun.cell, width: zaun.width, height: zaun.height, x: zaun.x, y: zaun.y, rotation: zaun.rotation },
+      { cell: 'A3:D3', width: 200, height: 50, x: 100, y: 125, rotation: 0 },
+      `viermal ${step} Grad`,
+    );
+  }
+});
+
+test('links und rechts herum geben denselben Feldbereich', () => {
+  // Ein 1x4-Fussabdruck ist in beide Richtungen gedreht ein 4x1-Fussabdruck.
+  // Der staerkere Grund ist die Umkehrbarkeit **gemischter** Richtungen: waeren
+  // sie verschieden, brauechte ein Rechtsdreh gefolgt von einem Linksdreh nicht
+  // dorthin zurueck, wo das Stueck lag.
+  const zaun = on('A3:D3', 200, 50);
+  const rechts = rotatePlacement(zaun, { grids: [grid], step: 90 });
+  const links = rotatePlacement(zaun, { grids: [grid], step: -90 });
+
+  assert.equal(rechts.cell, links.cell);
+  assert.deepStrictEqual([rechts.x, rechts.y, rechts.width], [links.x, links.y, links.width]);
+  assert.notEqual(rechts.rotation, links.rotation, 'nur der Bilderwinkel unterscheidet sie');
+
+  const hin = { ...zaun, ...rechts };
+  const zurueck = { ...hin, ...rotatePlacement(hin, { grids: [grid], step: -90 }) };
+  assert.deepStrictEqual(
+    { cell: zurueck.cell, width: zurueck.width, x: zurueck.x, y: zurueck.y, rotation: zurueck.rotation },
+    { cell: 'A3:D3', width: 200, x: 100, y: 125, rotation: 0 },
+  );
 });
 
 test('ein 2x2-Boesewicht liegt nach jeder Drehung auf denselben vier Feldern', () => {
@@ -95,7 +133,12 @@ test('ein 2x2-Boesewicht liegt nach jeder Drehung auf denselben vier Feldern', (
 test('laeuft der gedrehte Bereich ueber den Rand, wird gedreht und markiert', () => {
   // Spec-Abnahme 4 – dasselbe wie beim Ziehen ueber den Rand (M10.10):
   // sichtbar markieren, nicht zurueckspringen und nicht die Drehung verweigern.
-  const zaun = on('A1:D1', 200, 50);
+  //
+  // M13.5: das Beispiel musste neu gesucht werden. `A1:D1` lief um die *Mitte*
+  // gedreht ueber den oberen Rand; um die Ecke gedreht wird daraus `A1:A4`, und
+  // das liegt sauber. Ueber den Rand laeuft jetzt, was in den letzten Zeilen
+  // beginnt: `A8:D8` wuerde `A8:A11`, und eine elfte Zeile gibt es nicht.
+  const zaun = on('A8:D8', 200, 50);
   const p = rotatePlacement(zaun, { grids: [grid], step: 90 });
 
   assert.equal(p.rotation, 90, 'die Drehung findet statt');
@@ -105,6 +148,46 @@ test('laeuft der gedrehte Bereich ueber den Rand, wird gedreht und markiert', ()
   assert.equal(p.gridId, null);
   assert.equal(p.cell, null);
   assert.equal(p.x, undefined, 'der Ort bleibt, wo er ist – er wird nicht neu gesetzt');
+});
+
+test('an der obersten Zeile ist nichts mehr zu markieren', () => {
+  // Der Gegenbeleg zum Test darueber: der Eckentausch macht **weniger** Faelle
+  // offGrid als die Mittelpunktdrehung. Genau dieser Fall war unter M13.4 der
+  // Beleg fuer Abnahme 4 und ist es nicht mehr.
+  const p = rotatePlacement(on('A1:D1', 200, 50), { grids: [grid], step: 90 });
+  assert.equal(p.cell, 'A1:A4');
+  assert.equal(p.offGrid, false);
+});
+
+test('ein Einzelfeld bleibt sein Einzelfeld', () => {
+  // Ein 1x1-Bereich getauscht ist derselbe. Die Masse kommen dann nicht aus dem
+  // Raster, sondern bleiben die des Assets – wie in `snapToGrid` und
+  // `placeOnGrids` auch, wo nur ein *Bereich* nachgerechnet wird.
+  const marke = on('C7', 30, 20);
+  const p = rotatePlacement(marke, { grids: [grid], step: 90 });
+  assert.deepStrictEqual(
+    { cell: p.cell, width: p.width, height: p.height, x: p.x, y: p.y },
+    { cell: 'C7', width: 20, height: 30, x: 125, y: 325 },
+  );
+});
+
+test('ist das Raster nicht da, bleibt die Adresse stehen', () => {
+  // Dasselbe wie in `placeOnGrids`: ein Objekt, dessen Raster oder Feld weg
+  // ist, behaelt Koordinaten und `cell` – ein korrigierbarer Fehler, den man
+  // nicht verstecken soll. `offGrid` heisst "hat seinen Platz verloren, und das
+  // ist gemeint" (M10.10); ein nicht geladenes Raster ist nicht gemeint.
+  const zaun = on('A3:D3', 200, 50);
+  for (const grids of [[], [{ ...grid, id: 'ein-anderes' }]]) {
+    assert.deepStrictEqual(
+      rotatePlacement(zaun, { grids, step: 90 }),
+      { rotation: 90, width: 50, height: 200 },
+    );
+  }
+  assert.deepStrictEqual(
+    rotatePlacement({ ...zaun, cell: 'Z99' }, { grids: [grid], step: 90 }),
+    { rotation: 90, width: 50, height: 200 },
+    'und ein Feldname, den dieses Raster nicht kennt, ebenso',
+  );
 });
 
 test('ein Token an einer Karte behaelt Ort und Bindung', () => {
