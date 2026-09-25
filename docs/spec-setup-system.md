@@ -3705,3 +3705,199 @@ Volltext in `docs/befund-beute-und-aufstellbares.md` §5.5. `table_assets`
 2. Der Kartenbestand ist unverändert (1087), keine Karte hat ihre Rückseite
    verloren.
 3. Der Aufbau *TFT Kurzpartie* legt weiterhin seine sechs Startausrüstungen aus.
+
+## M14 — Was die sechste Partie fand
+
+Belegt in `docs/partie6-bericht.md` (Aufbau, Dorfphase Runde 1, sieben
+Kampfrunden gegen Deputy Waggums, Niederlage). Die drei Neuerungen aus M13
+haben gehalten: der Bösewicht dreht sich und bleibt dabei auf seinen vier
+Feldern, die Beute stimmt zum Tableau, der Laden führt nur Nr. 1–30.
+
+M14.1 bis M14.4 sind **Daten** (Aktionen und Aufbau), M14.5 bis M14.11 sind
+**Code**.
+
+### M14.1 — „Dorfereignis ziehen" hat als einziger Knopf keine Vorbedingung
+
+**Befund (B1, Teil 2).** „Kampf beginnen" und „Dorfphase beginnen" sperren sich
+gegenseitig über `require_zone` (M11.2/M12.3). „Dorfereignis ziehen" hat keine
+Vorbedingung — und ist der einzige der drei, der **still Karten verbraucht**. In
+der sechsten Partie wurden mitten im Kampf zweimal unbemerkt je drei Ereignisse
+gezogen, bevor überhaupt eine Meldung kam (erst als die Handzone voll war).
+
+**Änderung.** Dieselbe Vorbedingung, die „Kampf beginnen" umgekehrt hat: ein
+`require_zone` auf `Bösewicht-Tableau`, das verlangt, dass dort **nichts** liegt.
+Liegt ein Tableau, läuft ein Kampf, und ein Dorf-Ereignis gehört nicht gezogen.
+Meldetext im Ton der vorhandenen: „Erst den Kampf beenden — Dorf-Ereignisse
+gibt es nur in der Dorfphase."
+
+**Abnahme.** Während ein Bösewicht-Tableau ausliegt, zieht der Knopf keine
+Karte und meldet den Grund. Ohne Tableau zieht er wie bisher.
+
+### M14.2 — Benutzte Dorf-Ereignisse werden nie abgeräumt
+
+**Befund (B2).** §4 Schritt 2 verlangt: Ereignis ziehen, laut auflösen,
+**abwerfen**. Es gibt keinen Weg zum Abwerfen; die Karte bleibt in
+`Hand Dörfler N` liegen, Kapazität 3. Auch „Dorfphase beginnen" räumt sie nicht
+ab — nach dem Durchlauf lagen alle neun gezogenen Ereignisse unverändert da.
+**Spätestens die vierte Runde kann kein Ereignis mehr ziehen**, mit der Meldung
+„zone is full".
+
+**Änderung.** „Dorfphase beginnen" räumt die drei Handzonen ab, wie es §7.6 für
+das Bösewichtmaterial vorbildlich tut: `clear_zone` je `Hand Dörfler 1–3` mit
+`targetStackLabel: "Dorf-Ereignisse"`. Die Schritte gehören **vor** das
+Auffüllen, in denselben Vorab-Abschnitt wie `clear_zone Ladenauslage`.
+
+**Zu prüfen, bevor gebaut wird:** ob `clear_zone` eine Handzone überhaupt
+erreicht — die Zonen der Dörfler sind Handzonen, und die bisherigen
+`clear_zone`-Ziele waren Auslagen. Wenn nicht, ist das der eigentliche Befund
+und gehört gesagt, statt eine zweite Räumung danebenzustellen.
+
+**Abnahme.** Nach „Dorfphase beginnen" sind alle drei Handzonen leer und die
+abgeräumten Karten liegen unter dem Ereignisstapel. Drei Runden hintereinander
+lassen sich Ereignisse ziehen, ohne dass eine Zone volläuft.
+
+### M14.3 — Die Bösewicht-Zähler überstehen die Dorfphase
+
+**Befund (U6).** Nach „Dorfphase beginnen" stehen „Bösewicht: Bewegung 6" und
+„Bösewicht: Leben 2" weiter da, obwohl Tableau und Verhaltensdeck abgeräumt
+sind. Beim Aufbau standen beide auf 0. Ein stehengebliebenes „2" liest sich im
+Dorf wie ein angeschlagener Gegner, den es nicht mehr gibt.
+
+**Änderung.** Zwei `set_counter`-Schritte auf 0, im selben Abschnitt, der das
+Bösewichtmaterial wegräumt.
+
+**Abnahme.** Nach „Dorfphase beginnen" stehen beide Bösewicht-Zähler auf 0.
+
+### M14.4 — Ein frischer Aufbau bringt keine einzige Ansicht mit
+
+**Befund (U2).** Schlachtfeld und Dörflerwerte passen nicht gleichzeitig ins
+Bild: bei 48 % liegen die Dörflerzähler bei y≈880 in einem 794 px hohen Fenster,
+bei 25 % sind die Rasterfelder 12 px groß. Jeder abgestrichene Lebenspunkt
+kostet damit einen Ansichtswechsel. **Die Ansichten sind die Rettung und haben
+sauber funktioniert** — aber ein frisch geladener Aufbau meldet „Noch keine
+Ansicht gespeichert".
+
+**Änderung.** Zwei Ansichten im Aufbau hinterlegen: **„Schlachtfeld"** und
+**„Dörfler"**. Erst prüfen, wo Ansichten liegen (im Aufbau? im Browser?) —
+liegen sie nur im Browser, ist **das** der Befund, und dann gehört gesagt, was
+es kostet, sie in den Aufbau zu nehmen.
+
+**Abnahme.** Ein frisch geladener Aufbau bietet im Views-Menü „Schlachtfeld"
+und „Dörfler" an; jede zeigt, was ihr Name sagt, vollständig.
+
+### M14.5 — Die beiden Leisten fangen Klicks auf dem Tisch ab
+
+**Befund (B1, Teil 1).** Der Bösewicht stand auf `H13:I14` und lag damit auf
+Bildschirmhöhe der oberen Knopfleiste. Der Zug auf sein Token bewegte ihn nicht,
+sondern **feuerte den Knopf darunter**. Dasselbe unten: ein Würfel unter der
+Werkzeugleiste war nicht mehr anklickbar. Nach „Hide top bar" ließ sich genau
+derselbe Zug auf Anhieb ausführen.
+
+**M12.1 hat das für die Meldebänder schon gelöst** — Band durchlässig, sein ×
+klickbar. Die beiden Leisten stehen nicht in dieser Lösung.
+
+**Änderung.** Dieselbe Behandlung: der **Leistenrahmen** lässt Zeiger durch, die
+**Bedienelemente darin** nehmen sie an. Keine zweite Mechanik daneben — wenn
+M12.1 dafür eine Hilfsfunktion hat, benutzt M14.5 sie.
+
+**Abnahme.**
+1. Ein Token unter der oberen Leiste lässt sich ziehen, ohne dass ein Knopf
+   auslöst.
+2. Die Knöpfe der Leiste lösen weiterhin aus.
+3. Dasselbe für die untere Werkzeugleiste und einen Würfel darunter.
+
+### M14.6 — „Enlarge" zeigt ein Tableau zu klein zum Lesen
+
+**Befund (U1).** Das Bösewicht-Tableau trägt Stufenfähigkeit und Schwäche —
+davon hängt jede Runde ab. „Enlarge" stellt es auf feste ~400 px Breite; die
+Absätze CHUMP/HOOLIGAN/TROUBLEMAKER waren nicht zu entziffern. Umweg:
+Tischzoom auf 151 %, dort gestochen lesbar. **Für Karten reicht „Enlarge", für
+die großen Tableaus nicht** — ein Tableau ist 300×600, eine Karte 744×744.
+
+**Änderung.** Die Vorschau skaliert auf das Fenster statt auf eine feste Breite:
+so groß wie möglich, ohne über den Rand zu laufen, Seitenverhältnis erhalten.
+
+**Abnahme.**
+1. Ein 300×600-Tableau füllt die Höhe des Fensters (abzüglich Rand), die
+   Stufenabsätze sind lesbar.
+2. Eine quadratische Karte wird nicht kleiner dargestellt als bisher.
+3. Bei einem zweiseitigen Token zeigt die Vorschau weiter die obenliegende Seite.
+
+### M14.7 — „Delete" liegt ohne Rückfrage unmittelbar unter „Enlarge"
+
+**Befund.** Beim Zielen im Kontextmenü wurde ein **Dörfler-Tableau gelöscht** —
+ohne Rückfrage, ohne Rückgängig. Am Spieltisch ist das ein echtes Risiko: die
+beiden Einträge liegen direkt übereinander, und der eine ist harmlos, der andere
+endgültig.
+
+**Änderung.** Entweder eine Sicherheitsabfrage vor dem Löschen eines Tokens,
+oder „Delete" räumlich absetzen (Trennlinie und Abstand, wie es gefährliche
+Einträge sonst bekommen). **Die Abfrage ist zu bevorzugen** — Abstand hilft
+nicht dem, der danebenzielt.
+
+**Abnahme.** Ein Token lässt sich nicht in einem einzigen Klick endgültig
+entfernen. Die Abfrage nennt das Token beim Namen.
+
+### M14.8 — Der Pan-Modus verschluckt Züge lautlos
+
+**Befund (U3).** Nach einem Schwenk blieb „Pan" aktiv. Drei aufeinanderfolgende
+Figurenzüge taten nichts, ohne Meldung; nur der blau markierte Knopf in der
+Werkzeugleiste verriet den Grund.
+
+**Änderung.** Über dem Tisch zeigt der Zeiger im Pan-Modus eine Hand
+(`grab`/`grabbing`) statt des Pfeils.
+
+**Abnahme.** Bei aktivem Pan ist der Zeiger über dem Tisch eine Hand, sonst
+nicht.
+
+### M14.9 — Eine Mausradrastung zoomt viel zu wenig
+
+**Befund (U4).** Zwanzig Rastungen bringen von 66 % auf 48 %. Der Weg von 48 %
+auf 151 % und zurück kostet je 40–50 Rastungen — bei einem Tableau, das man
+lesen will, jedes Mal.
+
+**Änderung.** Ein größerer Faktor je Rastung. Reine Rechnung, gehört damit in
+`client/src/utils/cameraZoom.js` zu `zoomAt` und wird aus `server/test/`
+geprüft.
+
+**Abnahme.** Fünf Rastungen decken mindestens den Weg von 50 % auf 100 % ab;
+die Grenzen (Mindest- und Höchstzoom) gelten unverändert.
+
+### M14.10 — Das Kontextmenü eines Stapels ist höher als das Fenster
+
+**Befund (U7).** Rechtsklick auf das Verhaltensdeck öffnet 23 Einträge, der
+letzte liegt bei y≈888 in einem 794 px hohen Fenster. „Lock", „Remove from
+Table" und die „Reveal Top Card to …"-Einträge sind nicht erreichbar, ohne
+vorher den Tisch zu verschieben.
+
+**Änderung.** Das Menü bleibt im Fenster: begrenzte Höhe, innen scrollbar.
+`client/src/utils/menuPlacement.js` rechnet die Lage bereits — die Höhe gehört
+dorthin, nicht in eine zweite Rechnung.
+
+**Abnahme.** Ein Menü mit 23 Einträgen ist vollständig erreichbar, ohne den
+Tisch zu bewegen; der letzte Eintrag liegt im Fenster.
+
+### M14.11 — Man sieht einem Würfel nicht an, ob er gerollt hat
+
+**Befund (U8).** Ein Würfel zeigte vor und nach dem Klick eine 4. Ob der Wurf
+stattfand und wieder 4 fiel oder ob der Klick verlorenging, war nicht
+feststellbar. Der Spieler hat konservativ entschieden — zu seinen Ungunsten.
+
+**Änderung.** Eine kurze sichtbare Rückmeldung beim Wurf (Aufblinken oder eine
+kurze Animation), unabhängig davon, ob sich die Augenzahl ändert.
+
+**Abnahme.** Ein Wurf, der dieselbe Zahl ergibt wie vorher, ist trotzdem als
+Wurf zu erkennen.
+
+### Kleinkram, gesammelt (K1–K4)
+
+- **K1** Die Marker auf den Dörfler-Leisten heißen „Marker N: Treffer", der
+  Zähler daneben „Präzision" — zwei Namen für dieselbe Leiste. **Daten.**
+- **K2** Die Vorbedingungsmeldung zeigt Innereien: `require_zone`,
+  `[in zone: …]`, „16 further steps skipped". Der deutsche Satz in der Mitte ist
+  richtig, das Drumherum gehört nicht vor einen Spieler.
+- **K3** In der Bibliothek sind Kartennamen in der Kachel abgeschnitten
+  („WEDELNDER SCHW…") — gerade das ★ der Beutekarte fällt weg.
+- **K4** Die Staffelung des Ablagestapels (M12.5) läuft nach etwa sechs Karten
+  aus; danach liegt alles deckungsgleich. Das ist regelrelevant: BÖSEWICHTSCHÄDEL
+  zählt „6 oder mehr Bösewicht-Aktionen auf dem Ablagestapel".
