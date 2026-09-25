@@ -112,6 +112,15 @@ verletzte und `snapInto`/`footprint`/`placeOnGrids` doch anfasste.
 > haben will, braucht einen eigenen Befund: „die Drehung dreht den Kasten mit",
 > und der berührt Feldbelegung und Raster.
 
+**Nachtrag.** Den hier geforderten eigenen Befund gibt es: er steht als
+**M13.4** in `docs/spec-setup-system.md` („Ein gedrehter Zaun wird auf ein
+Viertel gestaucht") und ist in `docs/tasks-kasten.md` umgesetzt. Damit ist
+**Abnahme 4' überholt** — der Kasten dreht mit, `width` und `height` tauschen,
+und der Feldbereich wird über `snapInto` neu bestimmt. Was bleibt: der Bösewicht
+auf 2×2 liegt nach wie vor auf denselben vier Feldern (Abnahme 3), weil der
+Tausch bei einem quadratischen Token ein Nullzug ist. Was in DR4 als Prüfung von
+4' stand, ist in `token-rotate.test.js` entsprechend ersetzt (KA4).
+
 ### Lücke — was `nextRotation` bei einem unlesbaren Winkel tut, sagt die Spec nicht
 
 `rotationOf` hat zwei Ausgänge: `0` für „steht nichts da" und **`null`** für

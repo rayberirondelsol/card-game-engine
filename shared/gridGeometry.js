@@ -22,6 +22,7 @@
  */
 
 import { resolveBox, relativeBox } from './anchoring.js';
+import { nextRotation } from './assetToken.js';
 import { zoneSlots, snapPoint } from './zoneGeometry.js';
 
 /**
@@ -456,6 +457,60 @@ export function snapInto(x, y, { zone = null, grids = [], taken = [], cell = nul
  */
 export function offGrid(obj, hit) {
   return !!(obj?.gridId || obj?.cell) && !hit?.snapped;
+}
+
+/**
+ * Was nach einer Vierteldrehung am Token gilt (M13.4).
+ *
+ * Der Befund: bis M13.1 drehte sich nur das Bild. Ein `Holzzaun` von 200x50
+ * stand danach quer, aber auf ein Viertel gestaucht – `object-fit: contain`
+ * passt ein 4:1-Bild in einen 1:4-Kasten ein. Ein gedrehtes langes Teil passt
+ * nicht in seinen ungedrehten Kasten; entweder es laeuft heraus oder es
+ * schrumpft. **Der Kasten muss mitdrehen** – und der Renderer ist dafuer schon
+ * richtig gebaut, seine `swap`-Zeile fuellt einen 50x200-Kasten genau.
+ *
+ * Steht hier und nicht in `assetToken.js`, weil das die Frage nach der
+ * *Platzierung* ist – dieselbe wie bei `snapInto`, `offGrid` und
+ * `placeOnGrids`. `assetToken.js` kennt kein Raster, und es dorthin zu legen
+ * hiesse, Rasterwissen in das Modul zu ziehen, das der „Add Token"-Dialog
+ * gerade deshalb benutzt, weil es keins hat. Den Winkel holt es sich von dort:
+ * es gibt genau **eine** Auslegung eines Winkels.
+ *
+ * Gerechnet wird die Feldbelegung nicht selbst: `snapInto` bekommt die
+ * getauschten Masse und **keinen** Feldnamen, und zentriert den Bereich um den
+ * Punkt – genau wie beim Ziehen von Hand. Eine zweite Einrastrechnung waere
+ * der Fehler, den M6 verbietet.
+ *
+ * Neu eingerastet wird nur, was eine **Rasteradresse traegt**, nicht was
+ * geometrisch ueber einem Raster liegt: ein Stueck auf einem Zonenplatz hat
+ * ausdruecklich `cell: null` (Zonenplaetze schlagen das Raster), und es beim
+ * Drehen auf das Feld darunter springen zu lassen, waere ein neuer Befund.
+ * Deshalb kommen hier auch `zone` und `taken` nicht vor.
+ *
+ * Zurueck kommt nur, was sich aendert – der Aufrufer legt es auf sein Token.
+ */
+export function rotatePlacement(token, { grids = [], step } = {}) {
+  const rotation = nextRotation(token?.rotation, step);
+  // Eine halbe oder gar keine Drehung taucht den Kasten nicht: `nextRotation`
+  // hat den Schritt schon beurteilt, hier steht kein zweites Urteil daneben.
+  if (step !== 90 && step !== -90) return { rotation };
+  const w = num(token?.width, 0) || num(token?.size, 0);
+  const h = num(token?.height, 0) || num(token?.size, 0);
+  const turned = { rotation, width: h, height: w };
+  // An einer Karte zu haengen ist die genauere Aussage (das Ablegen loescht
+  // dabei die Rasteradresse), und ohne Adresse gibt es nichts neu einzurasten.
+  if (token?.attachedTo || !token?.gridId || !token?.cell) return turned;
+  const hit = snapInto(token.x, token.y, { grids, size: { width: h, height: w } });
+  // M10.10: der gedrehte Bereich laeuft ueber den Rand. Dasselbe wie beim
+  // Ziehen dorthin – markieren, nicht zurueckspringen und nicht die Drehung
+  // verweigern. Gelesen ueber `offGrid`, nicht ueber ein zweites `snapped`.
+  if (offGrid(token, hit)) return { ...turned, gridId: null, cell: null, offGrid: true };
+  const { snapped: _claimed, ...place } = hit;
+  // Der Treffer liegt **ueber** den getauschten Massen: `snapToGrid` gibt sie
+  // nur bei einem Bereich zurueck, und wo es sie gibt, sind es die des
+  // Rasters – ein 200x50-Zaun ueber einem 60er-Raster wird 60x180. Dieselbe
+  // Vorrangregel wie beim Laden in `placeOnGrids`.
+  return { ...turned, ...place, offGrid: false };
 }
 
 /**

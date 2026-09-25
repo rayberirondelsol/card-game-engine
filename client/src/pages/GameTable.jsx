@@ -11,13 +11,13 @@ import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/zoneGeometry.js';
-import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid } from '../../../shared/gridGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView, tokenPreview } from '../utils/tableObjectView';
-import { assetToken, assetFace, nextRotation } from '../../../shared/assetToken.js';
+import { assetToken, assetFace } from '../../../shared/assetToken.js';
 import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
@@ -3461,8 +3461,13 @@ export default function GameTable({ room = null }) {
         case 'token_rotate':
           // M13.1: der Server hat den Winkel schon durch `rotationOf` geschickt
           // und Unlesbares verworfen - hier steht darum keine zweite Pruefung.
+          // M13.4: die Drehung dreht den Kasten mit, also kommen Ort und
+          // Adresse mit - sonst saehe dieser Platz den Zaun gedreht, aber in
+          // alter Groesse auf altem Feld.
           setTokens(prev => prev.map(t => (
-            t.id === msg.token_id ? { ...t, rotation: msg.rotation } : t
+            t.id === msg.token_id
+              ? { ...t, rotation: msg.rotation, ...(typeof msg.x === 'number' ? { x: msg.x, y: msg.y } : {}), ...gridAddress(msg) }
+              : t
           )));
           break;
         case 'counter_move':
@@ -7533,15 +7538,29 @@ export default function GameTable({ room = null }) {
                     nicht - eine einseitige Figur laesst sich drehen.
                     `locked` wird absichtlich nicht geprueft: gesperrt heisst
                     unbeweglich, nicht undrehbar, wie schon bei Flip.
-                    Gedreht wird **nur** `rotation`: der Kasten bleibt w x h
-                    (M7.1), daran haengen Trefferflaeche und Feldbelegung. */}
+                    M13.4: gedreht wird **der Kasten mit**. Ein 200x50-Zaun in
+                    einem ungedrehten Kasten wuerde von `object-fit: contain`
+                    auf ein Viertel gestaucht; `rotatePlacement` tauscht darum
+                    die Masse und laesst `snapInto` den Feldbereich neu
+                    bestimmen - dieselbe Einrastrechnung wie beim Ziehen von
+                    Hand. Bei einem quadratischen Token (Boesewicht 2x2) ist
+                    das ein Nullzug: dieselben vier Felder wie vorher. */}
                 {contextMenu.objType === 'token' && (() => {
                   const tok = tokens.find(t => t.id === contextMenu.objId);
                   if (!tok || tok.shape !== 'image') return null;
                   const turn = (step) => {
-                    const rotation = nextRotation(tok.rotation, step);
-                    setTokens(prev => prev.map(t => (t.id === tok.id ? { ...t, rotation } : t)));
-                    if (room) room.sendAction({ type: 'token_rotate', token_id: tok.id, rotation });
+                    const place = rotatePlacement(tok, { grids: tableGrids, step });
+                    setTokens(prev => prev.map(t => (t.id === tok.id ? { ...t, ...place } : t)));
+                    // Die Adresse geht denselben Weg wie bei `token_move` -
+                    // ueber `gridAddress`, damit nicht zwei Feldlisten
+                    // nebeneinander stehen. `x`/`y` nur, wenn die Drehung sie
+                    // gesetzt hat: ein Token, das seinen Platz behaelt, soll
+                    // seinen Ort nicht neu geschickt bekommen.
+                    if (room) room.sendAction({
+                      type: 'token_rotate', token_id: tok.id, rotation: place.rotation,
+                      ...('x' in place ? { x: place.x, y: place.y } : {}),
+                      ...gridAddress(place),
+                    });
                     setContextMenu(null);
                   };
                   return (

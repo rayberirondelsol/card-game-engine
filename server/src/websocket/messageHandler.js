@@ -340,13 +340,23 @@ function handleTokenFlip(room, playerId, { token_id, face_down }, timestamp) {
  * der Server nicht – sonst stuende im Raumzustand ein Wert, den der Renderer
  * nicht kennt (`swap` prueft auf genau 90/270).
  */
-function handleTokenRotate(room, playerId, { token_id, rotation }, timestamp) {
+function handleTokenRotate(room, playerId, payload, timestamp) {
+  const { token_id, rotation, x, y } = payload;
   const angle = rotationOf(rotation);
   if (angle === null) return;
   const token = room.boardState.tokens.find(t => t.id === token_id);
   if (!token) return;
-  token.rotation = angle;
-  broadcast(room, { type: 'token_rotate', token_id, rotation: angle, from_player_id: playerId, timestamp }, playerId);
+  // M13.4: die Drehung dreht den Kasten mit, also bringt sie eine Platzierung
+  // mit - Ort, Feldbereich und dessen Masse. Gerechnet hat das der Tisch
+  // (`rotatePlacement`), wie bei `token_move` auch; der Server kennt weder
+  // Raster noch Bretter. Dieselbe Feldliste, nicht eine zweite daneben.
+  //
+  // Fehlen `x`/`y`, bleiben sie stehen: ein aelterer Client schickt nur den
+  // Winkel, und sein Zug darf den Ort nicht loeschen.
+  const moved = typeof x === 'number' && typeof y === 'number' ? { x, y } : {};
+  const address = gridAddress(payload);
+  Object.assign(token, { rotation: angle }, moved, address);
+  broadcast(room, { type: 'token_rotate', token_id, rotation: angle, ...moved, ...address, from_player_id: playerId, timestamp }, playerId);
 }
 
 function handleTokenDelete(room, playerId, { token_id }, timestamp) {

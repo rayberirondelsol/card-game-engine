@@ -15,7 +15,8 @@
 //     Testinfrastruktur hat – Muster wie `client-hygiene.test.js`)
 //   * DR3: die Serveraktion `token_rotate` – setzt, verwirft Unlesbares,
 //     verrät nichts
-//   * DR4: der Beleg, dass Raster und Kasten nichts zu tun haben
+//   * DR4: der Beleg, dass das Raster nichts zu tun hat – für den Kasten gilt
+//     das seit M13.4 nicht mehr, siehe `rotate-placement.test.js` und KA4
 //
 // Begründung und die Stellen, an denen die Spec nicht stimmt, in
 // `docs/tasks-drehen.md`.
@@ -26,7 +27,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const { assetToken, nextRotation, rotationOf, ROTATIONS } = await import('../../shared/assetToken.js');
-const { snapInto, cellPoint, gridAddress } = await import('../../shared/gridGeometry.js');
+const { snapInto, cellPoint, gridAddress, rotatePlacement } = await import('../../shared/gridGeometry.js');
 const { handleMessage } = await import('../src/websocket/messageHandler.js');
 
 // ── DR1: nextRotation ────────────────────────────────────────────────────────
@@ -95,18 +96,25 @@ test('jedes Ergebnis ist einer der vier erlaubten Winkel', () => {
 
 // ── DR2: die Verdrahtung im Tisch ────────────────────────────────────────────
 
-test('der Tisch dreht über nextRotation und meldet es als token_rotate', () => {
+test('der Tisch dreht über shared/ und meldet es als token_rotate', () => {
   // Der Client hat keine Testinfrastruktur (CLAUDE.md); geprüft wird die
   // Quelle, damit die Verdrahtung nicht still verschwindet. Kommentare zählen
   // nicht – gesucht wird, was aufgerufen wird.
+  //
+  // M13.4 (KA4): gerufen wird seitdem `rotatePlacement`, nicht `nextRotation` –
+  // der Winkel allein reicht nicht mehr, weil der Kasten mitdreht.
+  // `rotatePlacement` rechnet ihn über `nextRotation` aus; die eine
+  // Winkelauslegung steht also weiterhin genau einmal da.
   const src = readFileSync(fileURLToPath(new URL('../../client/src/pages/GameTable.jsx', import.meta.url)), 'utf8')
     .split('\n')
     .filter(line => !/^\s*(?:\/\/|\*|\/\*)/.test(line))
     .join('\n');
 
-  assert.match(src, /nextRotation/, 'der Tisch rechnet den nächsten Winkel nicht selbst');
-  assert.match(src, /import \{[^}]*nextRotation[^}]*\} from '\.\.\/\.\.\/\.\.\/shared\/assetToken\.js'/,
-    'und holt sie aus shared/, nicht aus einer zweiten Auslegung');
+  assert.match(src, /rotatePlacement\(/, 'der Tisch rechnet die Drehung nicht selbst');
+  assert.match(src, /import \{[^}]*rotatePlacement[^}]*\} from '\.\.\/\.\.\/\.\.\/shared\/gridGeometry\.js'/,
+    'und holt sie aus shared/, nicht aus einer zweiten Rechnung');
+  assert.ok(!/nextRotation/.test(src),
+    'eine zweite Winkelrechnung im Tisch wäre genau die, die es nicht geben soll');
   assert.match(src, /type: 'token_rotate'/, 'der zweite Platz erfährt sonst nichts davon');
   assert.match(src, /case 'token_rotate'/, 'und sähe eine fremde Drehung nicht');
 });
@@ -224,24 +232,22 @@ test('ein 2x2-Bösewicht liegt nach dem Drehen auf denselben vier Feldern', () =
   assert.deepStrictEqual(gridAddress(gedreht), gridAddress(token), 'und dieselbe gemeldete Adresse');
 });
 
-test('ein 200x50-Geländeteil behält seinen Kasten über vier Drehungen', () => {
-  // Spec-Abnahme 4' (siehe docs/tasks-drehen.md, „Wo die Spec nicht stimmt"):
-  // der Kasten bleibt 200x50, der Renderer tauscht nur die Bildmasse.
+test('ein 200x50-Geländeteil dreht seinen Kasten mit', () => {
+  // Hier stand bis M13.4 die Abnahme 4' aus `docs/tasks-drehen.md`: „der Kasten
+  // bleibt 200x50". Das war die Entscheidung aus M13.1 – und zugleich der
+  // Befund, der M13.4 geworden ist: `object-fit: contain` staucht ein
+  // 4:1-Bild in einem 1:4-Kasten auf ein Viertel. Was jetzt gilt, prüft
+  // `rotate-placement.test.js` im Einzelnen; hier bleibt die eine Aussage
+  // stehen, die sich umgedreht hat.
   const zaun = {
-    ...assetToken(boardAsset({ id: 'asset-zaun', name: 'Holzzaun', width: 200, height: 50 }), 100, 100, false),
-    gridId: 'g1', cell: 'A1:D1',
+    ...assetToken(boardAsset({ id: 'asset-zaun', name: 'Holzzaun', width: 200, height: 50 }), 100, 125, false),
+    gridId: 'g1', cell: 'A3:D3',
   };
+  const p = rotatePlacement(zaun, { grids: [grid], step: 90 });
 
-  let now = zaun;
-  for (let i = 0; i < 4; i++) {
-    now = { ...now, rotation: nextRotation(now.rotation, 90) };
-    assert.deepStrictEqual(
-      { width: now.width, height: now.height, gridId: now.gridId, cell: now.cell, x: now.x, y: now.y },
-      { width: 200, height: 50, gridId: 'g1', cell: 'A1:D1', x: 100, y: 100 },
-      'nur rotation darf sich ändern',
-    );
-  }
-  assert.equal(now.rotation, 0);
+  assert.equal(p.width, 50, 'die Maße tauschen');
+  assert.equal(p.height, 200);
+  assert.notEqual(p.cell, zaun.cell, 'und der Feldbereich dreht mit');
 });
 
 test('ein Winkel aus nextRotation überlebt Speichern und Laden', () => {
