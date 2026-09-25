@@ -61,6 +61,7 @@ test('the exact order from the spec', () => {
     'splitModal',
     'saveModal',
     'setupSaveModal',
+    'viewSaveModal',
     'counterModal',
     'diceModal',
     'noteModal',

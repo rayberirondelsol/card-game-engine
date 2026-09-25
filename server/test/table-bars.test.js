@@ -41,9 +41,8 @@ test('Regel 1: kein Meldeband steht auf einem geratenen Abstand über der Kopfle
     const el = classAbove(band);
     assert.ok(!/\bfixed\b/.test(el), `${band} liegt wieder fixiert über der Kopfleiste:\n${el}`);
     assert.ok(!/\btop-\d/.test(el), `${band} rechnet wieder mit einem geratenen Abstand:\n${el}`);
-    // Im Fluss der Kopfleiste, die selbst `pointer-events-none` ist – ohne das
-    // wäre das × nicht klickbar.
-    assert.ok(/pointer-events-auto/.test(el), `${band} nimmt keine Klicks an:\n${el}`);
+    // Dass das Band Klicks annimmt, stand hier bis M12.1 – gemeint war, dass
+    // sein × klickbar bleibt. Das steht jetzt weiter unten, am ×.
   }
 });
 
@@ -64,4 +63,48 @@ test('Regel 2: beide Leisten über dem Tisch lassen sich wegräumen und zurückh
 test('der Rückholknopf ist fingergroß – die Engine ist berührungsfähig', () => {
   const el = classAbove('top-bar-show-btn');
   assert.ok(/min-w-\[44px\]/.test(el) && /min-h-\[44px\]/.test(el), `zu klein für einen Finger:\n${el}`);
+});
+
+// ── M12.1 – das Band über dem Schlachtfeld (AA1) ─────────────────────────────
+//
+// Die fünfte Solopartie: ein Zug von `F9` nach `F11` bewegte nichts, weil das
+// Band `setup-issues` von x≈155 bis 650 und y≈160 bis 250 darüber stand. M11.1
+// hat die drei Aktionsknöpfe freigeräumt, den Tisch nicht — und der Tisch ist
+// das größte Bedienelement, das es gibt.
+//
+// Die Bänder hängen im Fluss der Kopfleiste, die `pointer-events-none` ist.
+// Sie setzen sich mit `pointer-events-auto` wieder davor, **für ihren ganzen
+// Körper**. Genau der Körper hat nichts anzunehmen: anzunehmen hat das ×.
+//
+// Warum nicht „verschwindet von selbst" (M12.1 Abnahme 2, erste Hälfte): das
+// Band ist die einzige Stelle, an der das Protokoll eines Aufbaus sichtbar
+// wird, und diese Listen werden lang (M11.2: sechzehn Zeilen). Begründung in
+// `docs/tasks-partie5.md`, „Vorab 2".
+
+/** Der Block eines Bandes: ab seiner `data-testid`-Zeile bis zur nächsten. */
+function bandBlock(testid) {
+  const lines = source.split('\n');
+  const i = lines.findIndex(l => l.includes(`data-testid="${testid}"`));
+  assert.ok(i >= 0, `${testid} gibt es nicht mehr`);
+  const next = lines.findIndex((l, k) => k > i && l.includes('data-testid='));
+  return lines.slice(i, next > i ? next : lines.length);
+}
+
+test('M12.1 Abnahme 1: kein Meldeband nimmt an seinem Körper Klicks an', () => {
+  for (const band of ['setup-issues', 'draw-toast', 'save-toast']) {
+    const el = classAbove(band);
+    assert.ok(!/pointer-events-auto/.test(el),
+      `${band} schluckt wieder Züge auf dem Raster:\n${el}`);
+  }
+});
+
+test('M12.1 Abnahme 3: das × jedes Bandes bleibt klickbar', () => {
+  // Ohne das wäre die Meldung nicht mehr wegzubekommen – und ein Band, das
+  // bleibt, muss weggehen können.
+  for (const band of ['setup-issues', 'save-toast']) {
+    const schliessen = bandBlock(band).filter(l => l.includes('&times;'));
+    assert.equal(schliessen.length, 1, `${band} hat kein eindeutiges ×`);
+    assert.match(schliessen[0], /pointer-events-auto/,
+      `das × von ${band} nimmt keine Klicks mehr an:\n${schliessen[0]}`);
+  }
 });

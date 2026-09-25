@@ -222,3 +222,69 @@ test('die Wache hält nur ihre eigene Sequenz an, nicht den nächsten Aufruf', (
   );
   assert.equal(log[0].status, 'ok', log[0].reason);
 });
+
+// ── M12.3 (AC1/AC2): eine fremde Karte im Rechteck sperrt nichts ─────────────
+//
+// Fünfte Solopartie: der erste Druck auf „Kampf beginnen" meldete „Erst die
+// Dorfphase beginnen — der vorige Kampf steht noch." **Es gab keinen vorigen
+// Kampf** — es lag eine beiseitegelegte Karte im Rechteck des Tableaus.
+//
+// Der Befund vermutet, `column` mit `capacity: 1` habe keine festen Plätze.
+// Es hat einen: `zoneSlots` liefert für `Bösewicht-Tableau` genau (1420, 270),
+// und `countInZone` zählt dort schon heute richtig. Die Ursache ist eine
+// andere und allgemeinere — `require_zone` fragt als einzige Stelle im
+// Executor noch `objectsInZone(…).length`, also das Rechteck. Begründung in
+// `docs/tasks-partie5.md`, „Vorab 1".
+
+/** Eine beiseitegelegte Karte im Rechteck des Tableaus, auf keinem Platz. */
+const FREMDE_KARTE = { tableId: 'fremd', cardId: 'c-fremd', name: 'Bösewicht-Aktion: Hieb', x: 1250, y: 150, zIndex: 3, faceDown: false };
+
+test('M12.3/1: eine Karte im Rechteck, aber auf keinem Platz, sperrt die Zone nicht', () => {
+  const state = tableState();
+  state.cards.push({ ...FREMDE_KARTE });
+
+  const { state: nachher, log } = executeSequenceWithLog(state, KAMPF, ZONES, opts());
+
+  assert.deepEqual(bad(log), [], `die Wache hält ohne Grund an: ${log.map(e => e.reason).join('; ')}`);
+  assert.deepEqual(faceUp(nachher), ['Bösewicht: Klaus'], 'der Kampf läuft wie ohne die Karte');
+  assert.ok(nachher.cards.some(c => c.tableId === 'fremd'), 'die fremde Karte bleibt liegen');
+});
+
+test('M12.3/1: auf dem Platz zählt sie sehr wohl', () => {
+  // Die Gegenprobe zur vorigen – sonst prüfte der Test nur, dass die Wache
+  // nie anhält.
+  const state = tableState();
+  state.cards.push({ ...FREMDE_KARTE, x: 1420, y: 270 });
+
+  const { log } = executeSequenceWithLog(state, KAMPF, ZONES, opts());
+  assert.equal(log.length, 1, 'die Wache hält an');
+  assert.equal(log[0].status, 'skipped');
+});
+
+test('M12.3/2: eine Zone ohne feste Plätze zählt unverändert', () => {
+  // `Ablage` hat `layout: "free"` – dort gibt es keine Plätze, und was im
+  // Rechteck liegt, *ist* die Belegung. Das muss so bleiben.
+  const FREI = [...ZONES, { id: 'z6', label: 'Ablage', x: 2000, y: 0, width: 200, height: 280, layout: 'free', accepts: ['card'] }];
+  const WACHE = [{ type: 'require_zone', zoneLabel: 'Ablage', expect: 'empty', message: 'Erst die Ablage räumen.' }];
+
+  const leer = executeSequenceWithLog(tableState(), WACHE, FREI, opts());
+  assert.equal(leer.log[0].status, 'ok', 'leer ist leer');
+
+  const state = tableState();
+  state.cards.push({ ...FREMDE_KARTE, x: 2050, y: 30 });
+  const belegt = executeSequenceWithLog(state, WACHE, FREI, opts());
+  assert.equal(belegt.log[0].status, 'skipped', 'irgendwo im Rechteck reicht hier');
+});
+
+test('M12.3/3: die Meldung nennt, was tatsächlich in der Zone liegt', () => {
+  const erst = executeSequence(tableState(), KAMPF, ZONES, opts());
+  const { log } = executeSequenceWithLog(erst, KAMPF, ZONES, opts());
+
+  const grund = log[0].reason;
+  assert.ok(grund.includes(MELDUNG), `die Auskunft führt weiterhin: ${grund}`);
+  assert.ok(grund.includes('Tableau: Klaus'), `was dort liegt, fehlt: ${grund}`);
+  // Eine Zeile, nicht sechzehn: M9.3 hat die übersprungenen Schritte
+  // abgeschafft, und daran ändert die Diagnose nichts.
+  assert.equal(log.length, 1);
+  assert.equal(grund.split('\n').length, 1, `die Diagnose macht daraus mehrere Zeilen: ${grund}`);
+});

@@ -17,13 +17,6 @@ export function isTouchDevice() {
   const hasMsMaxTouchPoints = navigator.msMaxTouchPoints > 0;
   const result = hasOntouchstart || hasMaxTouchPoints || hasMsMaxTouchPoints;
 
-  console.log('[TouchDetection] isTouchDevice() called:', {
-    hasOntouchstart,
-    maxTouchPoints: navigator.maxTouchPoints,
-    msMaxTouchPoints: navigator.msMaxTouchPoints,
-    result
-  });
-
   return result;
 }
 
@@ -34,7 +27,6 @@ export function isTouchDevice() {
  */
 export function getPointerPosition(e) {
   let position;
-  let source;
 
   // Handle touch events
   if (e.touches && e.touches.length > 0) {
@@ -45,7 +37,6 @@ export function getPointerPosition(e) {
       pageX: touch.pageX,
       pageY: touch.pageY,
     };
-    source = 'touches';
   }
   // Handle touchend events (use changedTouches)
   else if (e.changedTouches && e.changedTouches.length > 0) {
@@ -56,7 +47,6 @@ export function getPointerPosition(e) {
       pageX: touch.pageX,
       pageY: touch.pageY,
     };
-    source = 'changedTouches';
   }
   // Handle mouse events
   else {
@@ -66,15 +56,7 @@ export function getPointerPosition(e) {
       pageX: e.pageX,
       pageY: e.pageY,
     };
-    source = 'mouse';
   }
-
-  console.log('[TouchDetection] getPointerPosition():', {
-    eventType: e.type,
-    source,
-    position,
-    touchCount: e.touches ? e.touches.length : 0
-  });
 
   return position;
 }
@@ -170,12 +152,6 @@ export function debounce(func, wait) {
  */
 export function isTouchEvent(e) {
   const result = e.type.startsWith('touch');
-  console.log('[TouchDetection] isTouchEvent():', {
-    eventType: e.type,
-    result,
-    hasTouches: !!e.touches,
-    touchCount: e.touches ? e.touches.length : 0
-  });
   return result;
 }
 
@@ -259,15 +235,6 @@ export function isMobileDevice() {
   const shortDim = Math.min(width, height);
   const result = isTouch && shortDim < 768;
 
-  console.log('[TouchDetection] isMobileDevice() called:', {
-    isTouch,
-    windowWidth: width,
-    windowHeight: height,
-    shortDim,
-    threshold: 768,
-    result
-  });
-
   return result;
 }
 
@@ -283,16 +250,6 @@ export function isTabletDevice() {
   const shortDim = Math.min(width, height);
   const result = isTouch && shortDim >= 768 && shortDim < 1024;
 
-  console.log('[TouchDetection] isTabletDevice() called:', {
-    isTouch,
-    windowWidth: width,
-    windowHeight: height,
-    shortDim,
-    minThreshold: 768,
-    maxThreshold: 1024,
-    result
-  });
-
   return result;
 }
 
@@ -307,15 +264,6 @@ export function isSmartphone() {
   // Use the shorter dimension to classify device size correctly in both orientations.
   const shortDim = Math.min(width, height);
   const result = isTouch && shortDim < 768;
-
-  console.log('[TouchDetection] isSmartphone() called:', {
-    isTouch,
-    windowWidth: width,
-    windowHeight: height,
-    shortDim,
-    threshold: 768,
-    result
-  });
 
   return result;
 }
@@ -354,7 +302,7 @@ export function getDeviceInfo() {
     orientation: window.screen.orientation ? window.screen.orientation.type : 'unknown'
   };
 
-  console.log('[TouchDetection] Device Info:', info);
-
+  // M12.4: `getDeviceInfo` gibt sein Objekt zurueck, es schreibt es nicht mehr
+  // in die Konsole. Wer es sehen will, ruft es auf.
   return info;
 }

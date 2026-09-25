@@ -18,6 +18,11 @@ export const ESCAPE_LAYERS = [
   'splitModal',
   'saveModal',
   'setupSaveModal',
+  // M12.2: der Name einer Ansicht. Er steht hier, weil er dieselbe Bauform ist
+  // wie die beiden darueber — ein Modal mit einem Eingabefeld. Er kam dazu, als
+  // `window.prompt` verschwand; ein Dialog, den Escape nicht schliesst, waere
+  // M11.7 zum zweiten Mal.
+  'viewSaveModal',
   'counterModal',
   'diceModal',
   'noteModal',

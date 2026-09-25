@@ -33,6 +33,41 @@ export function zoneCenter(zone) {
   return { x: b.cx, y: b.cy };
 }
 
+/** Wie weit die naechste Karte eines Ablagestapels herausschaut (M12.5). */
+export const STACK_OFFSET = 6;
+
+/**
+ * Der Platz der `n`-ten Karte auf einem Ablagestapel (`layout: 'stack'`, M12.5).
+ *
+ * Auf der `Ablage` lagen sechs Bösewicht-Aktionskarten auf **exakt derselben
+ * Koordinate**; die aufliegende Karte, die beim Mischen draußen bleiben muss,
+ * war nicht mehr herauszugreifen. Übereinanderliegen ist bei `stack` der Zweck
+ * (M8.9 Regel 2) — unsichtbar zu werden ist es nicht. Ein Stapel am Tisch ist
+ * versetzt genug, dass man sieht, wie viele es sind.
+ *
+ * `zIndex` wird hier nicht angefasst: die zuletzt gelegte Karte liegt oben,
+ * weil `topZIndex` (M8.9/D2) ihr den höchsten gibt. Der Versatz trägt das
+ * mit — sie ist zugleich die, die am weitesten heraussteht.
+ *
+ * **Der Deckel ist keine Kosmetik.** Ob eine Karte „in" einer Zone liegt,
+ * entscheidet `zoneContains` über ihren Mittelpunkt. Wandert der aus der Form,
+ * findet `clear_zone` sie nicht mehr und `require_zone` sieht sie nicht — der
+ * Ablagestapel verlöre seine unterste Karte an den Tisch. Ein Viertel der
+ * kürzeren Seite liegt auch in einem Kreis und in einem Sechseck noch drin.
+ *
+ * ponytail: ab etwa neun Karten laufen die weiteren auf den Deckel und liegen
+ * wieder deckungsgleich. Die oberste bleibt greifbar (höchster zIndex), und
+ * ein Ablagestapel mit zehn sichtbar getrennten Karten wäre breiter als seine
+ * Zone. Wer mehr braucht, fächert in zwei Richtungen statt in eine.
+ */
+export function stackPoint(zone, n = 0) {
+  const c = zoneCenter(zone);
+  const b = box(zone);
+  const i = Number.isFinite(Number(n)) && Number(n) > 0 ? Math.floor(Number(n)) : 0;
+  const d = Math.min(i * STACK_OFFSET, Math.min(b.w, b.h) / 4);
+  return { x: c.x + d, y: c.y + d };
+}
+
 /**
  * Is (x, y) inside the zone's shape? Real point-in-shape, not the bounding box:
  * for a circle or a hexagon the box corners stick out well beyond the figure,
@@ -332,6 +367,11 @@ export function zoneSlotFor(zone, i = 0, n = 1) {
  */
 export function snapPoint(zone, x, y, taken = []) {
   if (!zone?.snap) return { x, y };
+  // M12.5: ein Ablagestapel hat **einen** Platz, aber nicht eine Koordinate.
+  // Ohne diese Zeile spraenge eine von Hand hingezogene Karte unter den Faecher
+  // zurueck, den `deal_to_zone` gerade gelegt hat — Tisch und Aufbau saegten
+  // Verschiedenes ueber dieselbe Zone.
+  if (zone.layout === 'stack') return stackPoint(zone, taken.length);
   const slots = zoneSlots(zone);
   if (!slots || !slots.length) return { x, y };
 

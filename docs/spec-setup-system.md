@@ -3266,3 +3266,91 @@ ungeprüft.
    Dörfler auf einem seiner Felder steht.
 2. Ein Griff auf dem Feld, auf dem der Dörfler steht, nimmt den Dörfler.
 3. Ein Stück ohne Rasterplatz hat den gestrichelten Rand, auch in einer Zone.
+
+## M12 — Befunde aus der fünften Solopartie
+
+**Zum ersten Mal ist die Gruppe über Runde 1 hinausgekommen und hat einen
+Bösewicht besiegt.** Der Grund ist M11.4: die Ausrüstungsboni überleben die
+Dorfphase, weil der Ausgangswert von Hand gehoben wurde. Aus einem Dörfler,
+der in Runde 1 eine 8 brauchte, ist einer geworden, der 80 % trifft.
+
+### M12.1 — Das Meldeband liegt jetzt über dem Schlachtfeld
+
+**Befund.** Ein Zug von `F9` nach `F11` bewegte nichts — über der Stelle stand
+das orange Band „1 action did not work" aus einem vorherigen abgelehnten
+Ablegen. Es spannt sich von x ≈ 155 bis 650 und y ≈ 160 bis 250, also **mitten
+über das Brett**. Nach dem Wegklicken funktionierte derselbe Zug sofort.
+
+M11.1 hat die drei Aktionsknöpfe freigeräumt — das ist am Tisch bestätigt.
+**Die Regel „ein Hinweisband darf kein Bedienelement überdecken" gilt für den
+Tisch aber noch nicht**, und der Tisch ist das größte Bedienelement, das es
+gibt.
+
+Dazu: das Band bleibt stehen, bis jemand es wegklickt.
+
+**Abnahme.**
+1. Ein Zug auf dem Raster erreicht das Raster, auch wenn ein Band steht.
+2. Das Band verschwindet von selbst, oder es liegt nicht über dem Tisch.
+3. Die Meldung bleibt lesbar — sie verschwinden zu lassen, ohne sie gezeigt zu
+   haben, wäre schlimmer.
+
+### M12.2 — „Save current view" ruft einen Browserdialog, der abgewiesen wird
+
+**Befund.** Views → „Save current view" tut **nichts** und sagt nichts. In der
+Konsole: `prompt() is not supported`. Der Spieler hat die ganze Partie von Hand
+geschwenkt und gezoomt — sein größter einzelner Zeitfresser.
+
+**Das war in der vierten Partie schon gemeldet und von mir als kosmetisch
+eingestuft.** Es ist die einzige Stelle im ganzen Tisch mit einem
+Browserdialog; „Save Game" daneben hat einen eigenen und funktioniert.
+
+**Abnahme.**
+1. Eine Ansicht lässt sich speichern und anspringen.
+2. Kein `window.prompt`, `confirm` oder `alert` im ganzen Tisch.
+
+### M12.3 — Eine fremde Karte im Rechteck einer Zone sperrt sie weiterhin
+
+**Befund.** Der erste Druck auf „Kampf beginnen" meldete *„Erst die Dorfphase
+beginnen — der vorige Kampf steht noch."* **Es gab keinen vorigen Kampf.** Die
+Ursache war eine Karte, die versehentlich in das Rechteck der Zone
+`Bösewicht-Tableau` geraten war. Nach dem Wegziehen lief die Aktion sofort.
+
+M11.8 hat genau das für Zonen mit **festen Plätzen** behoben. `Bösewicht-Tableau`
+hat `layout: "column"` und `capacity: 1` — dort zählt weiterhin das Rechteck.
+
+Und die Meldung nennt die falsche Ursache: `require_zone` sagt den Satz, der
+für den erwarteten Fall geschrieben wurde, nicht den, der zutrifft.
+
+**Abnahme.**
+1. Eine Karte, die im Rechteck liegt, aber auf keinem Platz, zählt in **keiner**
+   Zone mit festen Plätzen als Belegung.
+2. Eine Zone ohne feste Plätze zählt unverändert.
+3. Die Meldung einer gescheiterten Vorbedingung nennt, was tatsächlich in der
+   Zone liegt.
+
+### M12.4 — Die Konsole ist mit Debugausgaben geflutet
+
+**Befund.** Über **13 500** `[TouchDetection]`-Meldungen in einer Partie; ältere
+Ausgaben wurden aus dem Puffer verdrängt. Das macht die Konsole als
+Diagnosewerkzeug unbrauchbar — und sie ist das Werkzeug, mit dem jeder dieser
+Berichte entstanden ist.
+
+**Abnahme.**
+1. Eine gespielte Runde erzeugt keine Debugausgaben.
+2. Fehler und Warnungen erscheinen weiterhin.
+
+### M12.5 — Karten stapeln sich deckungsgleich, wenn die Plätze voll sind
+
+**Befund.** Auf der `Ablage` lagen sechs Bösewicht-Aktionskarten auf **exakt
+derselben Koordinate**. Als eine Karte verlangte, den Ablagestapel zu mischen,
+war die auliegende Karte, die draußen bleiben muss, nicht mehr herauszugreifen.
+Dasselbe bei „Take Top Card": fünf Karten landeten übereinander.
+
+Bei `layout: "stack"` ist Übereinanderliegen der Zweck (M8.9). **Unsichtbar zu
+werden ist es nicht.** Ein Stapel am Tisch ist versetzt genug, dass man sieht,
+wie viele es sind, und die oberste greifen kann.
+
+**Abnahme.**
+1. Mehrere Karten auf einem Ablagestapel sind als mehrere erkennbar.
+2. Die oberste lässt sich greifen, ohne die darunter zu verschieben.
+3. Eine Zone mit festen Plätzen verhält sich unverändert.

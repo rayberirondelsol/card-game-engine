@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 
 const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 const { stepFields } = await import('../../client/src/utils/sequenceSteps.js');
+const { objectsInZone } = await import('../../shared/zoneGeometry.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -82,8 +83,13 @@ test('M8.9/2: der naechste Griff legt die folgende Karte **darueber**, nicht dar
 
   assert.deepEqual(state.cards.map(c => c.name), ['K3', 'K2'], 'beide liegen da, keine ist verschwunden');
   const [k3, k2] = state.cards;
-  assert.equal(k3.x, k2.x, 'sie liegen uebereinander — das ist ein Ablagestapel');
-  assert.equal(k3.y, k2.y);
+  // Bis M12.5 stand hier `k3.x === k2.x`: deckungsgleich. Sechs so gelegte
+  // Karten waren am Tisch nicht mehr auseinanderzuhalten, und die unterste war
+  // nicht herauszugreifen. Sie decken einander weiterhin zu — das ist ein
+  // Ablagestapel —, aber versetzt.
+  assert.ok(k3.x !== k2.x || k3.y !== k2.y, 'sie liegen deckungsgleich (M12.5)');
+  assert.ok(Math.abs(k2.x - k3.x) < 200 && Math.abs(k2.y - k3.y) < 280,
+    'der Versatz ist kein Auseinanderlegen — die neue Karte deckt die vorige zu');
   assert.ok(k2.zIndex > k3.zIndex,
     `die zuletzt aufgedeckte Karte liegt obenauf (K2 ${k2.zIndex} > K3 ${k3.zIndex})`);
 });
@@ -132,4 +138,33 @@ test('M8.9/4: der Schritt steht im Editor — es ist `deal_to_zone`, kein zweite
   // bleibt derselbe eine Schritt, kein zweiter daneben.
   assert.deepEqual(stepFields('deal_to_zone'), ['stackLabel', 'count', 'fill', 'targetZoneLabel', 'faceDown'],
     'Stapel, Anzahl, Zielzone und Seite — mehr braucht das Aufdecken nicht');
+});
+
+// ── M12.5 (AE1): sechs Karten auf der Ablage ─────────────────────────────────
+
+test('M12.5 Abnahme 1: sechs aufgedeckte Karten liegen auf sechs Stellen', () => {
+  let state = table(deck(6));
+  for (let i = 0; i < 6; i++) state = reveal(state).state;
+
+  assert.equal(state.cards.length, 6);
+  const stellen = new Set(state.cards.map(c => `${c.x}/${c.y}`));
+  assert.equal(stellen.size, 6, `nur ${stellen.size} Stellen: ${[...stellen].join(' ')}`);
+});
+
+test('M12.5 Abnahme 2: die zuletzt aufgedeckte liegt obenauf — der Versatz kippt M8.9 nicht', () => {
+  let state = table(deck(6));
+  for (let i = 0; i < 6; i++) state = reveal(state).state;
+
+  // Aufdeckreihenfolge ist K6, K5, … — `deck` sortiert von unten nach oben.
+  const nach = [...state.cards].sort((a, b) => a.zIndex - b.zIndex).map(c => c.name);
+  assert.deepEqual(nach, ['K6', 'K5', 'K4', 'K3', 'K2', 'K1'],
+    'der zIndex folgt weiterhin der Reihenfolge des Aufdeckens (M8.9/D2)');
+});
+
+test('M12.5: alle sechs liegen weiterhin **in** der Ablage', () => {
+  // Sonst fände `clear_zone Ablage` sie beim nächsten Rundenwechsel nicht mehr.
+  let state = table(deck(6));
+  for (let i = 0; i < 6; i++) state = reveal(state).state;
+
+  assert.equal(objectsInZone(ABLAGE, state.cards).length, 6);
 });

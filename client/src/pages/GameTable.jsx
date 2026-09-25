@@ -399,6 +399,9 @@ export default function GameTable({ room = null }) {
   // M10.6/U4: die benannten Ansichten dieses Spielstands.
   const [views, setViews] = useState([]);
   const [showViews, setShowViews] = useState(false);
+  // M12.2: der eigene Dialog fuer den Namen einer Ansicht, statt `window.prompt`.
+  const [showViewSaveModal, setShowViewSaveModal] = useState(false);
+  const [viewName, setViewName] = useState('');
   // M11.6: die Vergroesserung eines Tokens. Eigene Id neben
   // `longPressPreviewCard`, weil ein Token in einer anderen Liste liegt; was
   // *gezeigt* wird, entscheidet `tokenPreview` an einer Stelle.
@@ -1065,7 +1068,8 @@ export default function GameTable({ room = null }) {
           // Werkzeugleiste, und Escape soll nichts schlucken, was niemand sieht.
           viewsMenu: showViews && showToolbar,
           contextMenu, splitModal: showSplitModal, saveModal: showSaveModal,
-          setupSaveModal: showSetupSaveModal, counterModal: showCounterModal,
+          setupSaveModal: showSetupSaveModal, viewSaveModal: showViewSaveModal,
+          counterModal: showCounterModal,
           diceModal: showDiceModal, noteModal: showNoteModal,
           tokenModal: showTokenModal, textFieldModal: showTextFieldModal,
           editingTextField: editingTextFieldId, shortcuts: showShortcuts,
@@ -1080,6 +1084,7 @@ export default function GameTable({ room = null }) {
           case 'splitModal': dismissSplitModal(); break;
           case 'saveModal': dismissSaveModal(); break;
           case 'setupSaveModal': dismissSetupSaveModal(); break;
+          case 'viewSaveModal': setShowViewSaveModal(false); break;
           case 'counterModal': dismissCounterModal(); break;
           case 'diceModal': dismissDiceModal(); break;
           case 'noteModal': dismissNoteModal(); break;
@@ -2835,11 +2840,21 @@ export default function GameTable({ room = null }) {
     // Only create a new stackId if the split group has 2+ cards
     const newStackId = count >= 2 ? crypto.randomUUID() : null;
 
+    // M12.5: „Take Top Card" ist `performSplit` mit Anzahl 1, und die Stelle
+    // daneben war fest gerechnet - fuenfmal abgehoben waren fuenf Karten auf
+    // einem Punkt. Gefragt wird deshalb `spawnSlot`: erster freier Platz um
+    // die bisherige Stelle herum, dieselbe Antwort, die M10.5 den Wuerfeln
+    // schon gibt. Ist dort nichts, bleibt es genau die bisherige Stelle.
+    const top = sorted[sorted.length - 1];
+    const ziel = spawnSlot({ x: top.x + getCardDims(top).w + 30, y: top.y }, tableCards);
+    const dx = ziel.x - top.x;
+    const dy = ziel.y - top.y;
+
     setTableCards(prev => prev.map(c => {
       if (c.inStack !== stackId) return c;
       if (splitIds.has(c.tableId)) {
         // Split cards: move to new stack (or individual if count=1), offset to the right
-        return { ...c, inStack: newStackId, x: c.x + getCardDims(c).w + 30 };
+        return { ...c, inStack: newStackId, x: c.x + dx, y: c.y + dy };
       }
       // Remaining cards: unstack if only 1 left
       if (remainingCount === 1) {
@@ -3137,13 +3152,31 @@ export default function GameTable({ room = null }) {
     setShowViews(false);
   }
 
-  /** Was man gerade sieht, unter einem Namen ablegen. */
+  /**
+   * Was man gerade sieht, unter einem Namen ablegen (M12.2).
+   *
+   * Hier stand `window.prompt`. Die Umgebung antwortet darauf mit
+   * `prompt() is not supported`, der Rueckgabewert ist `null`, und die
+   * Funktion kehrte still um: keine Ansicht, keine Meldung — der groesste
+   * einzelne Zeitfresser der fuenften Partie.
+   *
+   * Der Dialog ist **kein neuer**: „Save Game" daneben hat einen, der geht,
+   * und es ist derselbe `SwipeModal` mit demselben Eingabefeld. Die Kamera
+   * wird beim Oeffnen nicht festgehalten — sie steht in `cameraRef`, und
+   * waehrend der Dialog offen ist, schwenkt niemand.
+   */
   function saveCurrentView() {
-    // `prompt` statt eines eigenen Dialogs: er geht auf Maus und auf Tastfeld,
-    // und ein Dialog fuer ein Textfeld waere der teurere Weg zum selben Wort.
-    const label = window.prompt('Name der Ansicht (z. B. "Schlachtfeld")');
-    if (label === null) return;
+    setViewName('');
+    setShowViewSaveModal(true);
+  }
+
+  /** Den Namen aus dem Dialog uebernehmen. Die Regeln stehen in `putView`. */
+  function confirmSaveView() {
+    const label = viewName.trim();
+    if (!label) return;
     setViews(prev => putView(prev, label, cameraRef.current));
+    setShowViewSaveModal(false);
+    setShowViews(false);
   }
 
   function getGameState() {
@@ -5625,11 +5658,21 @@ export default function GameTable({ room = null }) {
             Legende schon zweimal behoben hat, und die Abhilfe ist dieselbe:
             eine Zeile im Fluss kann die Zeilen darueber nicht ueberdecken,
             egal wie hoch sie wird. Zuletzt, damit ein auftauchendes Band
-            nichts verschiebt. */}
+            nichts verschiebt.
+
+            M12.1: und sie nehmen **keine Klicks** mehr an. Ein Zug von `F9`
+            nach `F11` bewegte nichts, weil das Band darueber stand — M11.1 hat
+            die drei Aktionsknoepfe freigeraeumt, den Tisch nicht, und der
+            Tisch ist das groesste Bedienelement, das es gibt. Die Koerper sind
+            durchlaessig, `pointer-events-auto` steht nur noch am ×.
+            Nicht „verschwindet von selbst": das Band ist die einzige Stelle,
+            an der das Protokoll eines Aufbaus sichtbar wird, und diese Listen
+            werden lang (M11.2: sechzehn Zeilen). Eine Meldung wegzunehmen,
+            bevor sie gelesen ist, waere schlimmer (M12.1 Abnahme 3). */}
         {saveToast && (
           <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
             <div
-              className="pointer-events-auto bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+              className="bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
               data-testid="save-toast"
               data-ui-element="true"
             >
@@ -5637,7 +5680,7 @@ export default function GameTable({ room = null }) {
                 <path d="M20 6L9 17l-5-5" />
               </svg>
               <span className="text-sm font-medium">{saveToast}</span>
-              <button onClick={() => setSaveToast(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+              <button onClick={() => setSaveToast(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
             </div>
           </div>
         )}
@@ -5646,7 +5689,7 @@ export default function GameTable({ room = null }) {
         {setupIssues && (
           <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
             <div
-              className="pointer-events-auto max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
+              className="max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
               data-testid="setup-issues"
               data-ui-element="true"
             >
@@ -5668,7 +5711,7 @@ export default function GameTable({ room = null }) {
                     ))}
                   </ul>
                 </div>
-                <button onClick={() => setSetupIssues(null)} className="ml-2 text-white/70 hover:text-white">&times;</button>
+                <button onClick={() => setSetupIssues(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
               </div>
             </div>
           </div>
@@ -5678,7 +5721,7 @@ export default function GameTable({ room = null }) {
         {drawToast && (
           <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
             <div
-              className="pointer-events-auto bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
               data-testid="draw-toast"
               data-ui-element="true"
             >
@@ -6790,6 +6833,41 @@ export default function GameTable({ room = null }) {
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* M12.2: Name der Ansicht. Dieselbe Bauform wie „Save Game" darueber —
+          `SwipeModal`, Eingabefeld mit Enter, Abbrechen/Bestaetigen. */}
+      <SwipeModal isOpen={showViewSaveModal} onDismiss={() => setShowViewSaveModal(false)} testId="view-save-modal-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-80 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="view-save-modal">
+          <h3 className="text-white font-semibold mb-3">Save current view</h3>
+          <input
+            type="text"
+            value={viewName}
+            onChange={(e) => setViewName(e.target.value)}
+            placeholder='z. B. "Schlachtfeld"'
+            data-testid="view-name-input"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') confirmSaveView(); }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setShowViewSaveModal(false)}
+              data-testid="view-save-cancel-btn"
+              className="px-4 py-2 min-h-[44px] text-slate-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmSaveView}
+              disabled={!viewName.trim()}
+              data-testid="view-save-confirm-btn"
+              className="px-4 py-2 min-h-[44px] bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
             </button>
           </div>
         </div>

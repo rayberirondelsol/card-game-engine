@@ -22,7 +22,7 @@
  *                                        rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
-import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone, freeSlots } from './zoneGeometry.js';
+import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone, freeSlots, stackPoint } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
@@ -226,6 +226,24 @@ function occupancy(state, zone) {
   return countInZone(zone, state.cards, state.tokens);
 }
 
+/**
+ * Was in dieser Zone liegt, in einem Halbsatz (M12.3).
+ *
+ * Gefragt ist `objectsInZone`, nicht `countInZone`: die Meldung soll sagen,
+ * *was dort liegt*, und die beiseitegelegte Karte, die nur im Rechteck liegt,
+ * ist gerade die, nach der der Spieler sucht. Sie zählt nur nicht mehr als
+ * Belegung — das ist die andere Frage, und die steht drei Zeilen weiter oben.
+ *
+ * Drei Namen reichen: die Zeile ist eine Auskunft, kein Inventar.
+ */
+function zoneContents(zone, state) {
+  const here = objectsInZone(zone, state.cards, state.tokens);
+  if (!here.length) return 'zone is empty';
+  const names = here.slice(0, 3).map(objName);
+  if (here.length > names.length) names.push(`… +${here.length - names.length}`);
+  return `in zone: ${names.join(', ')}`;
+}
+
 /** The zone a step names, or null. */
 function findZone(zones, label) {
   return zones.find(z => norm(z.label) === norm(label)) || null;
@@ -345,10 +363,19 @@ function zoneRoom(state, targetZones, kind) {
  * als es Plaetze gibt, aber eine Zone kann zwischen zwei Schritten voller
  * werden, und lieber uebereinander als `undefined`.
  */
-function spotFor(spots, zone, i, fallback) {
+function spotFor(spots, zone, i, fallback, already = 0) {
   const free = spots.get(zone);
-  if (!free || !free.length) return fallback;
-  return free[Math.min(i, free.length - 1)];
+  if (free && free.length) return free[Math.min(i, free.length - 1)];
+  // M12.5: ein Ablagestapel staffelt, statt deckungsgleich zu liegen. Nur er -
+  // `freeSlots` gibt fuer `layout: 'stack'` absichtlich `null` (ein Platz nimmt
+  // beliebig viele Karten, das ist M8.9 Regel 2), und genau daraus wurden
+  // sechs Karten auf einer Koordinate. Jede andere Zone behaelt ihren
+  // Rueckfall, unveraendert - das ist M12.5 Abnahme 3.
+  //
+  // `already` ist, was schon in der Zone liegt; `zoneRoom` hat die Zahl als
+  // `occupied` ohnehin gerechnet, sie wird durchgereicht statt neu gezaehlt.
+  if (zone?.layout === 'stack') return stackPoint(zone, already + i);
+  return fallback;
 }
 
 /** Deal items round robin over the usable zones, stopping at each zone's free count. */
@@ -463,12 +490,30 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         return halt(`"${step.expect ?? ''}" is not a condition: "empty" or "occupied"`);
       }
 
-      // Dieselbe Zählung wie `clear_zone` und `rotate_zone`, also ohne das
-      // Ankerobjekt: ein Brett mit einer aufgedruckten Zone liegt nicht *in*
-      // ihr, sonst wäre jede solche Zone dauerhaft belegt.
-      const inside = objectsInZone(zone, state.cards, state.tokens).length;
+      // M12.3: **belegt** heißt, was auf einem Platz liegt - nicht, was im
+      // Rechteck liegt. Das ist dieselbe `occupancy`, die jeder Austeilschritt
+      // seit M11.8 befragt; `require_zone` ist als einziger Ort im Executor nie
+      // mitgezogen worden, weil es älter ist als der Fix. Eine beiseitegelegte
+      // Bösewicht-Aktionskarte, die im Rechteck des `Bösewicht-Tableau` lag,
+      // meldete dadurch einen vorigen Kampf, den es nicht gab.
+      //
+      // Der Fall „Zone ohne feste Plätze" ändert sich nicht: `countInZone`
+      // fällt dort auf `objectsInZone` zurück, also auf das Rechteck.
+      // Das Ankerobjekt bleibt außen vor - ein Brett mit einer aufgedruckten
+      // Zone liegt nicht *in* ihr, sonst wäre sie dauerhaft belegt.
+      const inside = countInZone(zone, state.cards, state.tokens);
       if (step.expect === 'empty' ? inside === 0 : inside > 0) return state;
-      return halt(step.message || `zone "${zone.label}" is ${inside ? `not empty (${inside})` : 'empty'}`);
+
+      // M12.3 Abnahme 3: die Auskunft aus den Daten führt, die Diagnose steht
+      // dahinter. Der Satz ist für den erwarteten Fall geschrieben - trifft ein
+      // anderer zu, schickt er den Spieler in die falsche Richtung, und genau
+      // das ist in der Partie passiert.
+      //
+      // Das macht aus der einen Zeile keine sechzehn: M9.3 hat die *Zeilen*
+      // abgeschafft (die Schritte hinter der Wache bekommen keine eigene),
+      // hier kommt ein Halbsatz an die eine, die bleibt.
+      if (!step.message) return halt(`zone "${zone.label}" is ${inside ? `not empty (${inside})` : 'empty'}`);
+      return halt(`${step.message} [${zoneContents(zone, state)}]`);
     }
 
     case 'shuffle': {
@@ -666,7 +711,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         tableId: crypto.randomUUID(),
         cardId: card.id,
         // M11.8: der erste freie Platz, nicht "der Platz hinter den belegten".
-        ...spotFor(spots, zone, 0, zoneSlot(zone, start, start + 1)),
+        ...spotFor(spots, zone, 0, zoneSlot(zone, start, start + 1), start),
         zIndex: start + 1,
         faceDown: false,
         face_up: true,
@@ -727,7 +772,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // A zone that does not take cards, or that is already full, is not dealt
       // into at all - the cards stay in the stack where they can still be used.
-      const { usable, free, spots, problems } = zoneRoom(state, targetZones, 'card');
+      const { usable, free, occupied, spots, problems } = zoneRoom(state, targetZones, 'card');
       if (!usable.length) return skip(problems.join('; '));
 
       const sorted = [...stack.cards].sort((a, b) => b.zIndex - a.zIndex); // top first
@@ -742,7 +787,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         group.forEach((card, i) => {
           // Fixed places seat the card on the next free one; a zone without
           // them keeps the old behaviour and drops every card on its centre.
-          const pos = spotFor(spots, zone, i, zoneCenter(zone));
+          const pos = spotFor(spots, zone, i, zoneCenter(zone), occupied.get(zone));
           // Die ausgeteilte Karte ist die Quellkarte – sie unterscheidet sich
           // nur in Position, Seite und Stapelzugehoerigkeit. Eine feste
           // Feldliste verlor hier `width`/`height` (Spec: Nachtrag zu M2.12).
@@ -891,7 +936,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // Same rule as for cards: a zone that refuses tokens, or is full, is not
       // drawn into. Nothing leaves the pool, so a corrected setup draws again.
-      const { usable, free, spots, problems } = zoneRoom(state, targetZones, 'asset');
+      const { usable, free, occupied, spots, problems } = zoneRoom(state, targetZones, 'asset');
       if (!usable.length) return skip(problems.join('; '));
 
       const wanted = Math.max(1, Number(count) || 1);
@@ -914,7 +959,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       for (const [zone, group] of perZone) {
         group.forEach((asset, i) => {
-          const { x, y } = spotFor(spots, zone, i, zoneSlot(zone, i, group.length));
+          const { x, y } = spotFor(spots, zone, i, zoneSlot(zone, i, group.length), occupied.get(zone));
           state.tokens.push(assetToken(asset, x, y, faceDown));
         });
       }
@@ -1040,10 +1085,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         const blocked = rooms.filter(r => !r.usable.length);
         if (blocked.length) return skip(blocked.flatMap(r => r.problems).join('; '));
 
-        const { free, spots } = rooms[0];
+        const { free, occupied, spots } = rooms[0];
         const { groups, leftovers } = shareOut(movable, [target], free);
         groups.get(target).forEach((obj, i) => {
-          const pos = spotFor(spots, target, i, zoneCenter(target));
+          const pos = spotFor(spots, target, i, zoneCenter(target), occupied.get(target));
           obj.x = pos.x;
           obj.y = pos.y;
         });
@@ -1351,7 +1396,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
             const group = groups.get(zone);
             const start = occupied.get(zone);
             group.forEach((card, i) => {
-              const pos = spotFor(spots, zone, i, zoneSlot(zone, i, group.length));
+              const pos = spotFor(spots, zone, i, zoneSlot(zone, i, group.length), start);
               // Per Spread aus der Bibliothekszeile, nicht ueber eine
               // aufgezaehlte Feldliste - die hat hier schon zweimal
               // `width`/`height` verschluckt (Nachtrag zu M2.12, M4a).
