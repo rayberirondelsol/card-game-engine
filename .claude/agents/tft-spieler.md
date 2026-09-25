@@ -135,7 +135,27 @@ Rand. Beiseitelegen bleibt erlaubt, es ist nur nicht mehr still.
 
 **Zonen können an eine Seite ihres Ankers gebunden sein.** Zeigt das
 Zusatz-Brett die Dorfphase, gilt die Ladenauslage; zeigt es die Kampfphase,
-gelten ACTION und DISCARD. Beide liegen auf derselben Fläche.
+gelten ACTION und DISCARD. Beide liegen auf derselben Fläche.  Das **Aufdeck-Menü** zeigt
+nur die Zonen der gerade sichtbaren Seite.
+
+**Beide Leisten klappen ein** — die obere wie die untere. Wenn etwas unter
+einer Leiste liegt, räum sie weg, statt den Tisch zu schwenken.
+
+**Ein Zähler trägt drei Zahlen:** Wert, **Ausgangswert** und **Maximum**. Alle
+drei sind über Rechtsklick auf den Zähler änderbar. Die Dorfphase setzt auf den
+**Ausgangswert** zurück, Leben auf das Maximum.
+
+**Das ist der Grund, warum gekaufte Ausrüstung überlebt** — aber nur, wenn du
+sie einträgst: hebt eine Ausrüstung einen Wert *dauerhaft* (§7.5), **hebst du
+den Ausgangswert von Hand**, wie du am echten Tisch die Karte vor dich legst.
+Tust du es nicht, ist der Bonus nach der nächsten Dorfphase weg.
+
+**„Enlarge" gibt es auch für Tokens** — Bösewicht-Tableau, Dörfler-Tableau,
+Geländeteil. Das ist der Weg, Regeltexte zu lesen; nicht zoomen.
+
+**Escape schließt** Kontextmenü, Vergrößerung und das Views-Menü.
+
+**Würfel lassen sich ziehen** und über das Kontextmenü entfernen.
 
 **Grundflächen.** Der Bösewicht belegt **2×2**, ein Dörfler **1×1** — wie im
 echten Spiel (§5.10). Die Dörfler sind runde Token in Draufsicht, keine
