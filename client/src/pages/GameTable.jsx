@@ -663,6 +663,20 @@ export default function GameTable({ room = null }) {
   const [draggingObj, setDraggingObj] = useState(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
+  // M16.3/AX1: wird gerade etwas über den Tisch gezogen? Daran hängt, dass
+  // auch die stillgelegten Zonen zu sehen sind — wer nichts trägt, sieht den
+  // sauberen Tisch, wer etwas trägt, sieht, wo es hingehört.
+  //
+  // **Ein** Zustand für vier Zugarten: `draggingCard` (Karte und Stapel),
+  // `draggingObj` (Token, Zähler, Würfel, Notiz, Brett) und `draggingFromHand`
+  // laufen in `handleGlobalMove` zusammen, und dort wird er gesetzt.
+  // `draggingHandCard` gehört nicht dazu: es ordnet in der Handleiste um und
+  // legt nichts auf den Tisch.
+  //
+  // Im Bewegungs-, nicht im Druckereignis: `draggingCard` steht schon beim
+  // Druck, also blitzten die Zonen sonst bei jedem Klick auf eine Karte auf.
+  const [dragActive, setDragActive] = useState(false);
+
   // M14.5: ein Druck, der auf einer Bedienleiste begonnen hat, und noch nicht
   // entschieden ist. Bleibt er in Ruhe, gehört er dem Knopf; wandert er über
   // `BAR_SLOP`, gehört er dem Stück darunter. `barClickRef` merkt sich den
@@ -2754,12 +2768,13 @@ export default function GameTable({ room = null }) {
       camera.y = panStartRef.current.camY + dy / camera.zoom;
       setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
       renderCanvas();
-    } else if (draggingCard || pendingStackRef.current) {
-      handleCardDragMove(e);
-    } else if (draggingObj) {
-      handleObjDragMove(e);
-    } else if (draggingFromHand) {
-      handleHandToTableDragMove(e);
+    } else if (draggingCard || pendingStackRef.current || draggingObj || draggingFromHand) {
+      // M16.3/AX1: ab hier wandert wirklich etwas — die eine Stelle, an der
+      // alle drei Tisch-Zugarten zusammenlaufen, für Maus und Touch.
+      if (!dragActive) setDragActive(true);
+      if (draggingCard || pendingStackRef.current) handleCardDragMove(e);
+      else if (draggingObj) handleObjDragMove(e);
+      else handleHandToTableDragMove(e);
     }
   }
 
@@ -2833,6 +2848,8 @@ export default function GameTable({ room = null }) {
     // M14.5: losgelassen ohne zu wandern – der Druck war ein Klick und gehört
     // dem Knopf, der ihn ohnehin gleich bekommt.
     barGestureRef.current = null;
+    // M16.3/AX1: losgelassen – die Zonen sind wieder so sichtbar wie vorher.
+    setDragActive(false);
     if (isPanningRef.current) {
       isPanningRef.current = false;
       if (canvasRef.current) canvasRef.current.style.cursor = panCursor(panModeRef.current, false);
@@ -2909,6 +2926,9 @@ export default function GameTable({ room = null }) {
     // 1. Drop a pending stack press
     setPressHoldActive(false);
     pendingStackRef.current = null;
+
+    // 1b. M16.3/AX1: ein abgebrochener Zug lässt die Zonen nicht stehen.
+    setDragActive(false);
 
     // 2. Reset pinch zoom state
     isPinchingRef.current = false;
@@ -5935,6 +5955,25 @@ export default function GameTable({ room = null }) {
           </div>
         )}
 
+        </>)}
+
+        {/* M11.1 Regel 2 / M10.8 Abnahme 3: eingeklappt bleibt ein sichtbarer
+            Weg zurueck. Ausserhalb des showTopBar-Zweigs, sonst verschwaende
+            er mit der Leiste. */}
+        {!showTopBar && (
+          <div className="flex justify-end px-3 pt-3" style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
+            <button
+              onClick={() => setShowTopBar(true)}
+              data-testid="top-bar-show-btn"
+              className="pointer-events-auto flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white/70 hover:text-white shadow-2xl"
+              title="Show top bar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6,9 12,15 18,9" />
+              </svg>
+            </button>
+          </div>
+        )}
         {/* M11.1 Befund A: die drei Meldebaender standen als `fixed top-4`
             bzw. `fixed top-16` ueber der Kopfleiste - ein geratener Streifen,
             dessen Hoehe niemand gemessen hat, und `top-16` liegt genau auf der
@@ -5954,7 +5993,16 @@ export default function GameTable({ room = null }) {
             Nicht „verschwindet von selbst": das Band ist die einzige Stelle,
             an der das Protokoll eines Aufbaus sichtbar wird, und diese Listen
             werden lang (M11.2: sechzehn Zeilen). Eine Meldung wegzunehmen,
-            bevor sie gelesen ist, waere schlimmer (M12.1 Abnahme 3). */}
+            bevor sie gelesen ist, waere schlimmer (M12.1 Abnahme 3).
+
+            M16.2/AY1: und sie stehen **ausserhalb** des showTopBar-Zweigs.
+            Bis hierher lagen alle drei darin — eingeklappt wurden sie nicht
+            verdeckt, sie wurden nicht gerendert. Die elfte Ausruestungskarte
+            wurde abgewiesen, „zone ‚Ausruestung Doerfler 1' is full (10)"
+            entstand auch, und niemand sah es (Befund F2). Hinter dem
+            Chevron-Block, damit M11.1 Regel 1 weiter gilt: eine Zeile im Fluss
+            kann die Zeilen darueber nicht ueberdecken. Kein zweiter Meldeweg
+            daneben — das ist der Fehler, den M6 verbietet. */}
         {saveToast && (
           <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
             <div
@@ -6021,25 +6069,6 @@ export default function GameTable({ room = null }) {
               </svg>
               <span className="text-sm font-medium" data-testid="draw-toast-text">{drawToast}</span>
             </div>
-          </div>
-        )}
-        </>)}
-
-        {/* M11.1 Regel 2 / M10.8 Abnahme 3: eingeklappt bleibt ein sichtbarer
-            Weg zurueck. Ausserhalb des showTopBar-Zweigs, sonst verschwaende
-            er mit der Leiste. */}
-        {!showTopBar && (
-          <div className="flex justify-end px-3 pt-3" style={{ paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))' }}>
-            <button
-              onClick={() => setShowTopBar(true)}
-              data-testid="top-bar-show-btn"
-              className="pointer-events-auto flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white/70 hover:text-white shadow-2xl"
-              title="Show top bar"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6,9 12,15 18,9" />
-              </svg>
-            </button>
           </div>
         )}
       </div>
@@ -8399,8 +8428,16 @@ export default function GameTable({ room = null }) {
           zwei Antworten auf dieselbe Frage.
           `zoneShownInPlay` ist die Gegenrichtung desselben Fundes: eine Zone,
           die nur eine aufgedruckte Markerleiste nachzeichnet, wird mit
-          `showInPlay: false` einzeln stillgelegt. */}
-      {!setupMode && tableZones.some(zoneShownInPlay) && (
+          `showInPlay: false` einzeln stillgelegt.
+          M16.3/AX1: **beim Ziehen** werden auch die stillgelegten gezeichnet.
+          Die Spec vermutete, `showInPlay: false` schalte mehr als die
+          Darstellung ab — tut es nicht: eine stillgelegte Zone faengt, zaehlt
+          und rastet wie jede andere (`server/test/zone-drag-visible.test.js`).
+          Was fehlte, war das **Ziel**: Fridgettes BEW-Spur ist 21,7
+          Weltpunkte breit, bei 43 % Arbeitszoom neun Bildschirmpunkte. Das
+          Namensschild bleibt an `zoneShownInPlay` — gezogen wird auf einen
+          Rahmen, nicht auf einen Namen (AS3). */}
+      {!setupMode && tableZones.some(z => dragActive || zoneShownInPlay(z)) && (
         <div
           /* M15.5/AS1: **kein** `overflow-hidden`. Der Behaelter ist
              `inset-0`, sein eigener Kasten also fensterhoch – und die
@@ -8418,7 +8455,10 @@ export default function GameTable({ room = null }) {
             transformOrigin: '50% 50%',
           }}
         >
-          <ZoneOverlay zones={tableZones.filter(zoneShownInPlay)} myColor={room?.myColor ?? null} />
+          {/* `all` ist die ungefilterte Liste: die Lage des Namensschilds
+              (M16.1) wird gegen **alle** Zonen geprueft, auch die
+              stillgelegten — auf denen liegen Stuecke. */}
+          <ZoneOverlay zones={tableZones.filter(z => dragActive || zoneShownInPlay(z))} all={tableZones} myColor={room?.myColor ?? null} />
         </div>
       )}
 

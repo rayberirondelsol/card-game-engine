@@ -147,6 +147,62 @@ export function zoneShownInPlay(zone) {
   return !!zone && zone.showInPlay !== false;
 }
 
+/**
+ * Wo das Namensschild einer Zone hängt (M16.1).
+ *
+ * Bis hierher stand es **im** Kasten oben links, also auf Platz 1. Bei der
+ * `Buyin'/Beatin'-Leiste` verdeckte es 73 % des obersten
+ * Reihenfolge-Plättchens — und auf dieser Leiste steht, wer als Erster dran
+ * ist (Befund F1, `docs/partie8-zonen.md`). Dieselbe Ursache bei vier
+ * weiteren Zonen (55 / 15 / 13 / 9 %).
+ *
+ * `ZONE_LABEL_HEIGHT` ist gemessen, nicht geschätzt: ein einzeiliges Schild
+ * ist am laufenden Tisch 19 Weltpunkte hoch, dazu 2 Punkte Luft. Einzeilig
+ * **muss** es sein — im Kasten brach es um, sobald der Name breiter war als
+ * die Zone, und war dann 33 statt 19 Punkte hoch; mit zwei möglichen Höhen
+ * hätte diese Rechnung zwei Antworten. `ZONE_LABEL_WIDTH` ist die Breite des
+ * Streifens, gegen den geprüft wird: das breiteste Schild des Tisches misst
+ * einzeilig 118 Weltpunkte.
+ */
+export const ZONE_LABEL_GAP = 2;
+export const ZONE_LABEL_HEIGHT = 19 + ZONE_LABEL_GAP;
+export const ZONE_LABEL_WIDTH = 120;
+
+/**
+ * Darf das Schild über den oberen Rand, oder muss es unter den unteren?
+ *
+ * Die Spec wollte „darüber, und wo darüber kein Platz ist (eine Zone am oberen
+ * Rand des Bretts), darunter". Einen oberen Brettrand gibt es nicht: keine
+ * Weltgrenze, keine Kamerabeschränkung, und seit M15.5/AS1 trägt keine
+ * Kameraebene mehr `overflow-hidden` — ein Schild bei negativem `y` wird ganz
+ * normal gezeichnet. Ins Leere stoßen kann es also nicht.
+ *
+ * Der Fall, der stattdessen zählt, ist nachgemessen: der Streifen über einer
+ * Zone kann in die **Fläche einer anderen Zone** fallen, und damit auf ein
+ * Stück, das dort liegt. Über der `Buyin'/Beatin'-Leiste` (y = 212,4) liegt
+ * `Bösewicht-Platz` (y = 149,2 … 198,8) — 7,4 von 49,6 Punkten, also 15 % des
+ * Bösewicht-Plättchens. „Immer oben" tauscht den Fehler aus, statt ihn zu
+ * beheben.
+ *
+ * Gegen Kästen, nicht gegen Formen: das Schild ist ein Rechteck, und ein
+ * Sechseck, dessen Ecke frei ist, wäre eine Genauigkeit, die niemand sieht.
+ * Abgewandte Zonen zählen nicht mit — was nicht da ist, liegt nicht im Weg
+ * (M10.13). Sind beide Seiten besetzt, bleibt es oben: dann ist keine Seite
+ * besser, und oben ist die Regel.
+ */
+export function zoneLabelAbove(zone, zones = []) {
+  if (!zone) return true;
+  const b = box(zone);
+  const strip = (top) => ({ x: b.x, y: top, w: Math.max(b.w, ZONE_LABEL_WIDTH), h: ZONE_LABEL_HEIGHT });
+  const hits = (s) => (Array.isArray(zones) ? zones : []).some((other) => {
+    if (!other || other === zone || (other.id && zone.id && other.id === zone.id)) return false;
+    if (facingAway(other)) return false;
+    const o = box(other);
+    return s.x < o.x + o.w && o.x < s.x + s.w && s.y < o.y + o.h && o.y < s.y + s.h;
+  });
+  return !hits(strip(b.y - ZONE_LABEL_HEIGHT)) || hits(strip(b.y + b.h));
+}
+
 /** The zone under a point, or null. Later zones are drawn on top, so they win. */
 export function zoneAt(zones, x, y) {
   if (!Array.isArray(zones)) return null;
