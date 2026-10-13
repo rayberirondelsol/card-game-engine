@@ -172,6 +172,41 @@ längliches Geländeteil dreht **um seine linke obere Ecke**: ein Zaun auf
 
 **Escape schließt** Kontextmenü, Vergrößerung und das Views-Menü.
 
+## Was seit Partie 6 neu ist (M14)
+
+**Die Leisten schlucken keine Züge mehr.** Oben und unten gilt jetzt: *ruhiger
+Druck → Knopf, wandernder Druck → Stück darunter.* Du kannst also ein Token
+unter der Knopfleiste anfassen und ziehen. **Aber:** ein Zug auf eine *leere*
+Stelle unter einer Leiste schwenkt weiterhin nicht — das ist bekannt und kein
+neuer Befund.
+
+**„Dorfereignis ziehen" ist jetzt gesperrt, solange ein Bösewicht-Tableau
+ausliegt.** Es meldet den Grund, statt still Karten zu verbrauchen.
+
+**„Dorfphase beginnen" räumt die Handzonen ab** — benutzte Dorf-Ereignisse gehen
+unter ihren Stapel zurück, und die Bösewicht-Zähler stehen danach auf 0. Der
+Ereignisstapel ist also wieder bei 80.
+
+**„Enlarge" nutzt das Fenster** und hat zusätzlich einen Umschalter auf
+Fensterbreite („Fill width"). Ein Bösewicht-Tableau ist damit ohne Zoomen
+lesbar — wenn nicht, ist das ein Befund.
+
+**Löschen fragt nach.** Ein Token lässt sich nicht mehr mit einem Klick
+endgültig entfernen.
+
+**Eine Mausradrastung ist ×1,15** und der Rückweg exakt — vorher waren es rund
+40 Rastungen für den Weg, den Du zum Lesen eines Tableaus brauchst.
+
+**Der Aufbau bringt zwei Ansichten mit**, „Schlachtfeld" und „Dörfler". ⚠️ Sie
+wurden bei einer Fenstergröße von **831 × 794** gespeichert, und eine Ansicht
+merkt sich die Kameraposition, nicht die Stelle am Tisch (**M14.13, bekannt und
+offen**). Ist Dein Fenster anders groß, sitzt der Ausschnitt verschoben —
+**speicher sie dann einmal selbst neu und spiel damit weiter.** Das ist kein
+neuer Befund, melde es nicht noch einmal.
+
+**Der Aufbau *TFT Grundaufbau (Dorfphase)* ist ein Baustein, kein Spielstand.**
+Er hat nur noch einen Knopf. Spiel die *TFT Kurzpartie*.
+
 **Würfel lassen sich ziehen** und über das Kontextmenü entfernen.
 
 **Grundflächen.** Der Bösewicht belegt **2×2**, ein Dörfler **1×1** — wie im
