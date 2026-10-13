@@ -404,6 +404,39 @@ Eine `db.transaction`, dann die Kontrollausgabe: 45 Schritte, die vier neuen an
 Bewegung"`, die 41 alten zeichenweise unverändert, die beiden anderen Aktionen
 unberührt, `action_data` 5964 → 6231 Zeichen, alle drei Aufbauten noch da.
 
+**Sichtprüfung am laufenden Tisch** (932 × 790, nach dem Deployment).
+
+- **BC.** `overflow` am Tischrahmen ist `clip`, `scrollTop` bleibt nach einem
+  `focus()` auf einen Zählerknopf bei 0 (vorher: 912,8). „Hide toolbar" klappt
+  die Werkzeugleiste ein und **nur** sie — die Kopfleiste mit den drei
+  Spielknöpfen bleibt stehen, der Griff holt sie zurück, und sie sitzt wieder
+  bei y 689.
+- **BD.** „Browse" auf dem verdeckten Nachschubstapel zeigt alle 20 Karten
+  lesbar und durchnummeriert (ROSTIGES MEDAILLON, ALTE KLAPPERKISTE, …) statt
+  zwanzigmal „Face down". Geschlossen ohne Entnahme: der Stapel zählt weiter
+  20. Mit der **Tastatur** (Fokus auf Kachel 2, Enter) entnommen: ALTE
+  KLAPPERKISTE liegt offen neben dem Stapel, der zählt 19, und zurückgelegt
+  wieder 20.
+- **BE.** Die abgewiesene Ablage meldet unverändert: *„1 action did not work —
+  #1 drop ‚Bösewicht-Tableau' — skipped: zone ‚Bösewicht-Tableau' does not
+  accept cards"*, die Karte springt zurück. Der **Vorrang** selbst ist nur aus
+  den Tests belegt: auf diesem Tisch liegt derzeit kein Stapel im Bereich einer
+  kartenablehnenden Zone (der Nachschubstapel steht bei Weltkoordinate x 1780,
+  die Zone beginnt bei 1900), und einen dorthin zu *ziehen* weist dieselbe
+  Regel zu Recht ab.
+- **BG.** Voller Durchgang: „Kampf beginnen" (Deputy Waggums), eine
+  Aktionskarte vom Verhaltensdeck abgehoben und frei neben den Tisch gelegt —
+  in keiner Zone, auf keinem Raster —, eine Dörflerfigur vom Raster
+  beiseitegestellt (gestrichelter Rand). „Dorfphase beginnen": beide weg, ohne
+  eine einzige Meldung, Schlachtfeld leer, Brett auf der Dorfseite, Laden
+  aufgefüllt. Der folgende „Kampf beginnen" (Virginia Fitz) stellt alle drei
+  Dörfler auf ihre Felder, und auf der ganzen Seite gibt es **keinen einzigen**
+  gestrichelten Rand mehr.
+
+Der Tisch steht danach mitten im Kampf gegen Virginia Fitz, und zwei der drei
+Bösewichte sind verbraucht: die Prüfung hat den Spielstand der neunten Partie
+überschrieben. Der Aufbau baut jederzeit sauber neu.
+
 **Nicht angefasst.** M17.6 (angelegt/weggepackt) und Ä1–Ä6 stehen weiter offen.
 Dazu zwei Beobachtungen aus der Arbeit am Aufbau, die keine Aufgabe hatten:
 
