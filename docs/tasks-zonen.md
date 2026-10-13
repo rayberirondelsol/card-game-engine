@@ -314,3 +314,63 @@ ist der ganze Tisch, nicht diese Zone, und keine Aufgabe aus M16.
    `Ausrüstung Dörfler 1` ziehen → die Karte springt zurück **und** das Band
    steht sichtbar da, mit Zone und Kapazität; ein Klick auf × nimmt es weg
    (Sichtprüfung, Abnahme 3').
+
+---
+
+## Nachträge aus der Umsetzung
+
+### 1. Die Antwort auf die Einrastfrage, mit Zahlen
+
+`showInPlay: false` schaltet **nur** die Darstellung ab — festgehalten in
+`server/test/zone-drag-visible.test.js` gegen die echte Zone
+`Dörfler 2: Bewegung`: `zoneAt` findet sie, `zoneCapacity` gibt 10,
+`zoneSlots` zehn Plätze, `zoneRejects` nichts, `snapPoint`/`snapInto` rasten.
+Am laufenden Tisch gegengeprüft: der BEW-Marker Fridgettes, auf seiner Spur
+gezogen, landete auf 930,291 / 1590,76 — also exakt auf der Spurmitte und
+exakt auf einem Platz, obwohl die Zone still ist.
+
+### 2. Die Schildlage am lebenden Tisch, nachgemessen
+
+Nach dem Deployment: 13 der 14 Schilder sitzen bei `offsetTop = −21`, also über
+dem Rand. Eines sitzt unten: `Buyin'/Beatin'-Leiste` bei `+276`
+(274,4 Zonenhöhe + 2 Punkte Luft), weil `Bösewicht-Platz` darüber liegt — genau
+der Fall aus „Wo die Spec nicht stimmt", 3. Alle Schilder sind einzeilig
+(19 Punkte hoch).
+
+**Gegenprobe über alle Stücke:** 14 Schildrechtecke gegen die 44 Stücke des
+Tisches (Plättchen, Marker, Karten — alles unter 200 × 200 Weltpunkten)
+geschnitten: **null Überschneidungen**. Die vier Treffer auf Bretter und
+Tableaus (je 0–1 % der Brettfläche) bleiben und müssen bleiben: ein Schild muss
+irgendwo liegen, und Abnahme 1 gilt der Fläche, auf der ein **Stück** liegt.
+
+### 3. Sichtbarkeit beim Ziehen, gezählt
+
+In Ruhe 15 gezeichnete Zonen (Dorfseite), während eines Zuges **29**, nach dem
+Loslassen wieder 15. Die Zahl der Namensschilder bleibt durchgehend 14 — die
+vierzehn stillgelegten Leisten erscheinen als Rahmen, nicht als Name. 29 statt
+30, weil `Aktionen` und `Ablage` auf der Dorfseite abgewandt sind und
+`facingAway` sie weiterhin herausfiltert; das ist richtig so (sie nehmen dort
+auch nichts an).
+
+### 4. Das Meldeband bei eingeklappter Leiste
+
+Kopfleiste eingeklappt, eine Karte auf `Bösewicht-Platz` gezogen (die Zone nimmt
+nur Assets): die Karte sprang auf ihren Ausgangspunkt zurück (1368,47 / 219,767
+vorher wie nachher), und das Band stand sichtbar bei (210 | 56), 88 Punkte hoch,
+mit dem Satz *„#1 drop „Bösewicht-Platz" — skipped: zone „Bösewicht-Platz" does
+not accept cards"*. Das × nimmt es weg. Vor der Änderung wäre an dieser Stelle
+nichts gewesen.
+
+### 5. Nicht angefasst
+
+- **Die Sprache der Meldung** (englisch zwischen deutschen Zonennamen, F2
+  „Nebenbei") — das ist der ganze Tisch, nicht diese Zone.
+- **F4** (die Bösewicht-Zähler decken die RUFFIAN-Leisten zu) — der Bericht sagt
+  selbst: keine Zonensache. Die Zähler stehen frei und lassen sich wegziehen.
+- **Eine Hervorhebung der Zone unter dem Zeiger** während des Zuges wurde
+  erwogen und gelassen: der Rahmen ist seit AX1 zu sehen, das Stück hängt am
+  Zeiger darüber, und eine zweite Rückmeldung daneben wäre die zweite Mechanik,
+  die M6 verbietet.
+- **F5** (`Bösewicht-Platz`: Schild breiter als die Zone) — nicht eigens
+  behoben, sondern gegenstandslos: der Überhang liegt jetzt neben der Zone
+  statt über ihrem Inhalt.
