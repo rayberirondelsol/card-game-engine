@@ -207,6 +207,26 @@ neuer Befund, melde es nicht noch einmal.
 **Der Aufbau *TFT Grundaufbau (Dorfphase)* ist ein Baustein, kein Spielstand.**
 Er hat nur noch einen Knopf. Spiel die *TFT Kurzpartie*.
 
+## Zwei Dinge, die zwei Partien verfälscht haben
+
+**Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3: sie
+wird „unter bestimmten Bedingungen — meist durch eine Bösewicht-Aktion —
+aktiviert". **Wende sie nicht an, solange keine Aktion sie aktiviert hat.**
+Partie 6 und Partie 7 haben sie beide zunächst durchgehend angewendet; in
+Partie 7 fiel es erst auf, als eine Aktion ausdrücklich meldete, die Schwäche
+sei „jetzt aktiv".
+
+**„Dorfphase beginnen" dreht die „Wer ist dran?"-Leiste selbst.** Dreh sie
+**nicht** zusätzlich von Hand — §7.7 ist am echten Tisch ein Handgriff, hier
+erledigt ihn die Aktion. Wer beides tut, dreht zweimal und spielt den nächsten
+Kampf in der falschen Reihenfolge. Genau das ist in Partie 7 passiert.
+
+**Eine Karte auf einen *Stapel* gezogen verschmilzt sofort** — die 600 ms
+Halten gelten nur für Karte auf Karte. Ohne das sieht Neumischen unmöglich aus.
+
+**Leg nichts in eine Handzone, was kein Dorf-Ereignis ist.** „Dorfphase
+beginnen" räumt die Handzonen unter den Ereignisstapel ab.
+
 **Würfel lassen sich ziehen** und über das Kontextmenü entfernen.
 
 **Grundflächen.** Der Bösewicht belegt **2×2**, ein Dörfler **1×1** — wie im
