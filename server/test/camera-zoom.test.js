@@ -32,13 +32,10 @@ const { zoomAt, worldAt, ZOOM_MIN, ZOOM_MAX } = await import('../../client/src/u
 
 const MITTE = { x: 500, y: 300 }; // halbe Fenstergroesse 1000 x 600
 
-/** Was der Browser aus einem Weltpunkt macht – die Zeile aus dem JSX. */
-function screenOf(world, camera, center) {
-  return {
-    x: center.x + (world.x + camera.x - center.x) * camera.zoom,
-    y: center.y + (world.y + camera.y - center.y) * camera.zoom,
-  };
-}
+// Die gezeichnete Transformation steht in `drawn-transform.js`, weil
+// `table-views.test.js` sie seit M14.13 ebenfalls braucht – eine Kopie waere
+// zwei Konventionen.
+import { screenOf } from './drawn-transform.js';
 
 const nahe = (a, b, was) => assert.ok(Math.abs(a - b) < 1e-6, `${was}: ${a} != ${b}`);
 

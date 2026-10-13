@@ -99,3 +99,21 @@ test('M12.4 Abnahme 2: Fehler und Warnungen erscheinen weiterhin', () => {
   assert.ok(hits(/console\s*\.\s*(?:warn|error)\s*\(/).length > 0,
     'es steht keine einzige Warnung oder Fehlermeldung mehr im Client');
 });
+
+// ── M14.13: eine Ansicht gilt in jedem Fenster ───────────────────────────────
+
+test('M14.13 Abnahme 1: der Tisch reicht die Containergröße in beide Richtungen herein', () => {
+  const gameTable = readFileSync(path.join(CLIENT_SRC, 'pages/GameTable.jsx'), 'utf8');
+  // Die Rechnung steht in `tableViews.js` und wird von dort geholt – nicht am
+  // Tisch ausgeschrieben, sonst stünde `worldAt` zum zweiten Mal irgendwo.
+  assert.match(gameTable, /viewCamera\(/, '`goToView` holt die Kamera nicht aus `viewCamera`');
+  assert.doesNotMatch(gameTable, /camera\.x\s*=\s*view\.x/,
+    '`goToView` schreibt die gespeicherte Zahl weiter unbesehen in die Kamera');
+  // Und `putView` bekommt die Mitte als vierten Parameter, sonst legt es
+  // stillschweigend wieder eine Kameraposition ab.
+  assert.match(gameTable, /putView\([^;]*,[^;]*,[^;]*,\s*containerCenter\(\)\s*\)/,
+    '`putView` wird ohne Containermitte aufgerufen');
+  // Dieselbe Mitte in beide Richtungen, aus einer Quelle – `getBoundingClientRect`
+  // stand für dieselben zwei Zeilen schon dreimal da.
+  assert.match(gameTable, /function containerCenter\(\)/, 'es gibt keine gemeinsame Containermitte');
+});

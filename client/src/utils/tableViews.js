@@ -29,7 +29,7 @@
  * `server/test/table-views.test.js`. Begruendung in `docs/tasks-ergonomie.md`.
  */
 
-import { ZOOM_MIN, ZOOM_MAX } from './cameraZoom.js';
+import { ZOOM_MIN, ZOOM_MAX, worldAt } from './cameraZoom.js';
 
 /**
  * Wie viele Ansichten hoechstens. Zwei, drei werden gebraucht; acht ist
@@ -42,7 +42,23 @@ function cleanLabel(label) {
   return typeof label === 'string' ? label.trim() : '';
 }
 
-/** Eine Ansicht aus beliebiger Eingabe, oder `null`, wenn nichts Brauchbares. */
+/**
+ * Die halbe Containergroesse, oder `null`. Ohne sie gibt es keine Weltstelle –
+ * eine geratene Mitte waere ein Versatz, den danach niemand mehr findet.
+ */
+function usableCenter(center) {
+  const x = Number(center?.x);
+  const y = Number(center?.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+/**
+ * Eine Ansicht aus beliebiger Eingabe, oder `null`, wenn nichts Brauchbares.
+ *
+ * `space` reicht durch, **ohne** es zu erfinden: was hier nicht steht, ist nach
+ * dem naechsten `normalizeViews` weg – und das laeuft bei jedem Laden *und* in
+ * `putView`. Genau so fiel der Wurfzaehler in M15.6 auf 0.
+ */
 function view(label, camera) {
   const name = cleanLabel(label);
   const x = Number(camera?.x);
@@ -54,7 +70,9 @@ function view(label, camera) {
   const zoom = Number.isFinite(wanted)
     ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, wanted))
     : 1;
-  return { label: name, x, y, zoom };
+  const out = { label: name, x, y, zoom };
+  if (camera?.space === 'world') out.space = 'world';
+  return out;
 }
 
 /**
@@ -73,16 +91,38 @@ export function normalizeViews(raw) {
 }
 
 /**
- * Die Liste mit `label` auf der aktuellen Kamera.
+ * Die Liste mit `label` auf der **Stelle am Tisch**, die gerade mittig steht
+ * (Spec M14.13).
  *
  * Gleicher Name **ersetzt** und bleibt an seiner Stelle: "Schlachtfeld"
  * zweimal in der Auswahl ist derselbe Fehler wie vierzig Zonen, nur kleiner,
  * und wer eine Ansicht nachbessert, sucht sie danach dort, wo sie war.
+ *
+ * Abgelegt wird nicht die Kamera, sondern `worldAt(camera, Mitte, Mitte)` –
+ * die Weltstelle in der Bildmitte – samt `space: 'world'`. Eine Kamera gilt
+ * nur in dem Fenster, in dem sie entstand: `worldAt` liest sie als
+ * *Weltmitte = Containermitte − cam*, und die Containermitte ist die halbe
+ * Fenstergroesse. Zwischen 831 × 794 und 1920 × 1080 sind das 544 Weltpunkte
+ * nach links und 143 nach oben.
+ *
+ * Ohne brauchbares `center` wird wie bisher die Kamera abgelegt, ohne `space`:
+ * eine Ansicht, die in *einem* Fenster stimmt, ist besser als eine mit `NaN`.
+ *
+ * @param {{x: number, y: number}|null} center Die halbe Containergroesse.
  */
-export function putView(views, label, camera) {
+export function putView(views, label, camera, center) {
   const list = normalizeViews(views);
+  // Erst pruefen, dann umrechnen: `worldAt` liest `camera.x || 0` und machte
+  // aus einer unbrauchbaren Kamera sonst stillschweigend die Bildmitte.
   const next = view(label, camera);
   if (!next) return list;
+  const mid = usableCenter(center);
+  if (mid) {
+    const world = worldAt(next, mid, mid);
+    next.x = world.x;
+    next.y = world.y;
+    next.space = 'world';
+  }
 
   const at = list.findIndex(v => v.label === next.label);
   if (at >= 0) return list.map((v, i) => (i === at ? next : v));
@@ -90,6 +130,34 @@ export function putView(views, label, camera) {
   // stillschweigendes Verdraengen waere derselbe Fehler wie M10.4.
   if (list.length >= MAX_VIEWS) return list;
   return [...list, next];
+}
+
+/**
+ * Die Kamera, mit der diese Ansicht in *diesem* Container dieselbe Stelle
+ * mittig zeigt (Spec M14.13).
+ *
+ * **Es ist dieselbe Rechnung wie beim Ablegen, nicht eine zweite.** Aus
+ * `cam = Mitte − Welt` folgt `Welt = Mitte − cam`: die Abbildung ist ihre
+ * eigene Umkehrung, also fuehrt `worldAt(v, Mitte, Mitte)` in beide
+ * Richtungen – je nachdem, ob `v` eine Kamera oder eine Weltstelle traegt.
+ * Der Zoom bleibt dabei aussen vor, weil er bei `screen = Mitte` herausfaellt.
+ *
+ * Eine Ansicht **ohne** `space` ist ein Eintrag von vor M14.13 und traegt eine
+ * Kameraposition: die wird unveraendert zurueckgegeben, sonst sprang jede
+ * gespeicherte Ansicht beim ersten Laden um ihren eigenen Versatz. Fehlt die
+ * Mitte, gilt dasselbe – eine geratene Mitte waere ein geratener Versatz.
+ *
+ * @param {{x: number, y: number, zoom: number, space?: string}|null} v
+ * @param {{x: number, y: number}|null} center Die halbe Containergroesse.
+ * @returns {{x: number, y: number, zoom: number}|null}
+ */
+export function viewCamera(v, center) {
+  if (!v) return null;
+  const zoom = Number(v.zoom) || 1;
+  const mid = usableCenter(center);
+  if (v.space !== 'world' || !mid) return { x: Number(v.x) || 0, y: Number(v.y) || 0, zoom };
+  const cam = worldAt(v, mid, mid);
+  return { x: cam.x, y: cam.y, zoom };
 }
 
 /** Die Liste ohne die Ansicht `label`. */

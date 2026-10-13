@@ -34,7 +34,7 @@ import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
 import { stackAt, stackCandidates, looseCandidates } from '../utils/cardDrop.js';
-import { normalizeViews, putView, removeView, MAX_VIEWS } from '../utils/tableViews.js';
+import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
@@ -503,14 +503,23 @@ export default function GameTable({ room = null }) {
   }
 
   /**
+   * Die halbe Containergroesse, oder `null` (M14.13). Der Container ist das
+   * aeussere `w-screen h-screen`-`div`, also das Fenster – und `worldAt`
+   * braucht diese Mitte in jeder Richtung.
+   */
+  function containerCenter() {
+    const rect = containerRef.current?.getBoundingClientRect();
+    return rect ? { x: rect.width / 2, y: rect.height / 2 } : null;
+  }
+
+  /**
    * Wo der Spieler hinsieht, in Weltkoordinaten (M10.5/J5). Dieselbe eine
    * Umkehrung wie `screenToWorld`; `canvas.width / 2` war eine
    * Bildschirmbreite als Weltkoordinate.
    */
   function viewCenter() {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 600, y: 400 };
-    const center = { x: rect.width / 2, y: rect.height / 2 };
+    const center = containerCenter();
+    if (!center) return { x: 600, y: 400 };
     return worldAt(cameraRef.current, center, center);
   }
 
@@ -3330,12 +3339,21 @@ export default function GameTable({ room = null }) {
   // Zone – die aber jede Zone hat und die niemand entschieden hat. Warum das
   // der falsche Traeger ist, steht in `client/src/utils/tableViews.js`.
 
-  /** Die Kamera auf eine gespeicherte Ansicht setzen. */
+  /**
+   * Die Kamera auf eine gespeicherte Ansicht setzen.
+   *
+   * Die Umrechnung steht in `viewCamera` (M14.13): eine Ansicht merkt sich die
+   * **Stelle am Tisch**, und welche Kamera die mittig zeigt, haengt an der
+   * Containergroesse. Ohne Container ist auch nichts zu zeichnen.
+   */
   function goToView(view) {
+    const center = containerCenter();
+    if (!center) return;
+    const next = viewCamera(view, center);
     const camera = cameraRef.current;
-    camera.x = view.x;
-    camera.y = view.y;
-    camera.zoom = view.zoom;
+    camera.x = next.x;
+    camera.y = next.y;
+    camera.zoom = next.zoom;
     setZoomDisplay(Math.round(camera.zoom * 100));
     setPanPosition({ x: Math.round(camera.x), y: Math.round(camera.y) });
     renderCanvas();
@@ -3364,7 +3382,7 @@ export default function GameTable({ room = null }) {
   function confirmSaveView() {
     const label = viewName.trim();
     if (!label) return;
-    setViews(prev => putView(prev, label, cameraRef.current));
+    setViews(prev => putView(prev, label, cameraRef.current, containerCenter()));
     setShowViewSaveModal(false);
     setShowViews(false);
   }
