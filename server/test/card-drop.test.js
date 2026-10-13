@@ -143,3 +143,48 @@ test('U6: die Kandidaten passen in stackAt – eine Karte auf der anderen trifft
   // Das Nachbarfeld (80 px) trifft nicht, genau wie bei einem Stapel.
   assert.equal(stackAt({ x: 320, y: 300 }, looseCandidates(cards, new Set(['b']))), null);
 });
+
+// ── M17.3/BE: der Stapel schlägt die Zone, die ihn ablehnt ───────────────────
+//
+// Befund F3 der neunten Solopartie, viermal: der Nachschubstapel liegt im
+// Einzugsbereich der Zone `Bösewicht-Tableau` (`accepts: ['asset']`). Jedes
+// Zurücklegen endete mit „zone 'Bösewicht-Tableau' does not accept cards"; eine
+// Karte liegt seither offen daneben, der Vorrat zählt 24 statt 25.
+//
+// Der Karten-Zweig hatte keine Vorrangregel: `zoneAt` zuerst, und eine
+// Abweisung kehrte um, bevor `stackAt` überhaupt gefragt wurde. Der Token-Zweig
+// hat die Regel längst (`findNearestCardCorner` vor `zoneAt`) – das Besondere
+// schlägt das Allgemeine. Keine zweite Regel daneben: `resolveDrop` ersetzt den
+// einen `stackAt`-Aufruf, den `handleCardDragEnd` ohnehin macht.
+
+const { resolveDrop } = await import('../../client/src/utils/cardDrop.js');
+
+test('BE Abnahme 1: ein Stapel unter dem Punkt schlägt die Abweisung', () => {
+  const hit = resolveDrop({
+    point: { x: 400, y: 300 },
+    stacks: [stack('s1', 400, 300)],
+    refusal: 'zone "Bösewicht-Tableau" does not accept cards',
+  });
+  assert.deepEqual(hit, { stack: 's1', refusal: null });
+});
+
+test('BE Abnahme 2: ohne Stapel bleibt die Abweisung stehen', () => {
+  const hit = resolveDrop({
+    point: { x: 320, y: 300 },
+    stacks: [stack('s1', 400, 300)],
+    refusal: 'zone "Bösewicht-Tableau" does not accept cards',
+  });
+  assert.deepEqual(hit, { stack: null, refusal: 'zone "Bösewicht-Tableau" does not accept cards' });
+});
+
+test('BE: ohne Abweisung ändert sich nichts an der bisherigen Antwort', () => {
+  assert.deepEqual(resolveDrop({ point: { x: 400, y: 300 }, stacks: [stack('s1', 400, 300)] }),
+    { stack: 's1', refusal: null });
+  assert.deepEqual(resolveDrop({ point: { x: 320, y: 300 }, stacks: [stack('s1', 400, 300)] }),
+    { stack: null, refusal: null });
+});
+
+test('BE: nichts Lesbares gibt dieselbe Antwort wie stackAt und wirft nicht', () => {
+  assert.deepEqual(resolveDrop({}), { stack: null, refusal: null });
+  assert.deepEqual(resolveDrop({ point: null, stacks: null, refusal: '' }), { stack: null, refusal: null });
+});

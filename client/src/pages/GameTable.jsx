@@ -33,9 +33,10 @@ import { issueLine } from '../utils/setupActions.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { stackAt, stackCandidates, looseCandidates } from '../utils/cardDrop.js';
+import { stackAt, stackCandidates, looseCandidates, resolveDrop } from '../utils/cardDrop.js';
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
+import { takeFromStack } from '../utils/stackTake.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
@@ -1762,8 +1763,14 @@ export default function GameTable({ room = null }) {
     // nothing is indistinguishable from one that worked.
     const dropZone = zoneAt(tableZones, card.x, card.y);
     let hit = null;
+    // M17.3/BE: die Abweisung wird hier **berechnet**, aber noch nicht
+    // ausgefuehrt - erst nach der endgueltigen Stelle entscheidet `resolveDrop`,
+    // ob ein Stapel darunter sie schlaegt. `mine` wird dafuer gebraucht, wenn es
+    // soweit ist.
+    let refusal = null;
+    let mine = new Set([draggingCard]);
     if (dropZone) {
-      const mine = new Set(card.inStack
+      mine = new Set(card.inStack
         ? tableCards.filter(c => c.inStack === card.inStack).map(c => c.tableId)
         : [draggingCard]);
       // M9.4/H2: was schon in der Zone liegt - ein Stapel zaehlt als *ein*
@@ -1771,20 +1778,11 @@ export default function GameTable({ room = null }) {
       // fuenfzehn Belegungen, und eine Zone mit `capacity: 1` wiese jeden
       // weiteren Zug ab, obwohl nur ein Ding darin liegt.
       const others = zoneOccupants(tableCards.filter(c => !mine.has(c.tableId)));
-      const refusal = zoneRejects(dropZone, 'card', countInZone(dropZone, others, tokens));
-      if (refusal) {
-        const { originX, originY } = cardDragOffsetRef.current;
-        const dx = (originX ?? card.x) - card.x;
-        const dy = (originY ?? card.y) - card.y;
-        setTableCards(prev => prev.map(c => (mine.has(c.tableId) ? { ...c, x: c.x + dx, y: c.y + dy } : c)));
-        setSetupIssues([{ index: 0, type: 'drop', target: dropZone.label || null, status: 'skipped', reason: refusal }]);
-        setDraggingCard(null);
-        setGridHighlight(null);
-        setStackDropTarget(null);
-        return;
+      refusal = zoneRejects(dropZone, 'card', countInZone(dropZone, others, tokens));
+      if (!refusal) {
+        const taken = [...others, ...tokens].filter(o => zoneContains(dropZone, o.x, o.y));
+        hit = snapInto(card.x, card.y, { zone: dropZone, grids: tableGrids, taken });
       }
-      const taken = [...others, ...tokens].filter(o => zoneContains(dropZone, o.x, o.y));
-      hit = snapInto(card.x, card.y, { zone: dropZone, grids: tableGrids, taken });
     }
     // Outside any zone a grid still claims the drop (M3b).
     // Beide Aufrufe geben **absichtlich** kein `size` mit (M7.2): eine Karte
@@ -1809,7 +1807,24 @@ export default function GameTable({ room = null }) {
     // Loslassstelle ist weg.
     // M10.4/J2: Karte auf Karte gruendet keinen Stapel mehr. Dafuer gibt es
     // `G` (`groupSelectedCards`) – das Ablegen braucht keine zweite Geste.
-    const targetStack = stackAt({ x: finalX, y: finalY }, dropCandidates(card.inStack));
+    //
+    // M17.3/BE: derselbe eine Aufruf, nur mit der Abweisung daneben - das
+    // Besondere schlaegt das Allgemeine, ein sichtbarer Stapel das unsichtbare
+    // Zonenrechteck darum herum (F3 der neunten Partie).
+    const { stack: targetStack, refusal: finalRefusal } =
+      resolveDrop({ point: { x: finalX, y: finalY }, stacks: dropCandidates(card.inStack), refusal });
+
+    if (finalRefusal) {
+      const { originX, originY } = cardDragOffsetRef.current;
+      const dx = (originX ?? card.x) - card.x;
+      const dy = (originY ?? card.y) - card.y;
+      setTableCards(prev => prev.map(c => (mine.has(c.tableId) ? { ...c, x: c.x + dx, y: c.y + dy } : c)));
+      setSetupIssues([{ index: 0, type: 'drop', target: dropZone?.label || null, status: 'skipped', reason: finalRefusal }]);
+      setDraggingCard(null);
+      setGridHighlight(null);
+      setStackDropTarget(null);
+      return;
+    }
 
     // If dropped on a stack, merge them
     if (targetStack) {
@@ -3061,6 +3076,17 @@ export default function GameTable({ room = null }) {
       }
       return c;
     }));
+  }
+
+  // M17.2/BD: eine einzelne Karte aus dem Durchsehen herausnehmen. Die Stelle
+  // ist dieselbe Frage, die „Take Top Card" schon stellt (`spawnSlot`: erster
+  // freier Platz neben dem Stapel), die Rechnung steht in `stackTake.js`.
+  function takeOneFromStack(tableId) {
+    const card = tableCards.find(c => c.tableId === tableId);
+    if (!card?.inStack) return;
+    const ziel = spawnSlot({ x: card.x + getCardDims(card).w + 30, y: card.y }, tableCards);
+    setTableCards(prev => takeFromStack(prev, tableId, ziel));
+    triggerHaptic('drop');
   }
 
   // ===== HAND FUNCTIONS =====
@@ -4802,7 +4828,16 @@ export default function GameTable({ room = null }) {
   return (
     <div
       ref={containerRef}
-      className="w-screen h-screen relative overflow-hidden select-none"
+      /* M17.1/BC: `overflow-clip`, nicht `overflow-hidden`. Beides schneidet
+         ab, aber `hidden` macht den Rahmen zum **Rollbereich** – und er hat
+         etwas zu rollen: die Tischobjekte liegen im Satzspiegel bei ihren
+         echten Tischkoordinaten, die Kamera ist nur ein `transform`. Gemessen
+         waren das 1703 Punkte Inhalt bei 790 Punkten Fenster. Ein `focus()`
+         auf einen Zaehlerknopf rollte den Rahmen um 912 Punkte, und beide
+         Leisten – `absolute`-Kinder genau dieses Rahmens – wanderten mit aus
+         dem Fenster, ohne Rollbalken zurueck (F1 der neunten Partie).
+         `clip` stellt gar keinen Rollbereich her. */
+      className="w-screen h-screen relative overflow-clip select-none"
       data-testid="game-table-container"
       data-layout-mode={layoutMode}
       data-orientation={isLandscape ? 'landscape' : 'portrait'}
@@ -7372,6 +7407,16 @@ export default function GameTable({ room = null }) {
           setBrowseStackId(null);
           return null;
         }
+        // M17.2/BD: am Hotseat-Tisch ist ein Nachziehstapel **keine verborgene
+        // Information** - es ist der eigene Vorrat, und am echten Tisch
+        // blaettert man ihn durch. Im Raum ist er sehr wohl fremd, und die
+        // Unterscheidung haengt an genau einem Ding: `room` ist am
+        // Hotseat-Tisch `null` (MultiplayerGame.jsx reicht es sonst herein).
+        //
+        // Gezeigt wird eine Karte **ohne** `faceDown`, nicht ein zweiter Begriff
+        // von "verdeckt": `tableObjectView` bleibt die eine Stelle, die
+        // beantwortet, was ein verdecktes Stueck preisgibt (Spec Abschnitt 6).
+        const peek = !room;
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -7397,13 +7442,22 @@ export default function GameTable({ room = null }) {
                   {stackCards.map((card, index) => {
                     // This panel already draws the back of a face-down card -
                     // and then printed its name right underneath it.
-                    const view = tableObjectView(card, 'Card');
+                    const shown = peek ? { ...card, faceDown: false } : card;
+                    const view = tableObjectView(shown, 'Card');
                     const { w: browseW, h: browseH } = getCardDims(card);
                     return (
-                    <div
+                    // M17.2/BD Abnahme 3: ein Knopf, kein `div` - damit gilt die
+                    // Entnahme fuer Maus, Tastatur und Finger, ohne dass hier
+                    // drei Ereignisse haengen. Ohne Durchsicht bleibt das
+                    // Fenster reine Ansicht, und ein gesperrter Knopf sagt das.
+                    <button
                       key={card.tableId}
+                      type="button"
+                      disabled={!peek}
+                      onClick={() => takeOneFromStack(card.tableId)}
+                      title={peek ? `${view.caption} herausnehmen` : view.caption}
                       data-testid={`browse-card-${card.tableId}`}
-                      className="flex flex-col items-center"
+                      className="flex flex-col items-center disabled:cursor-default"
                     >
                       <div className="relative rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors"
                         style={{
@@ -7411,7 +7465,7 @@ export default function GameTable({ room = null }) {
                           height: browseH,
                           backgroundColor: '#fff'
                         }}>
-                        {card.faceDown ? (
+                        {shown.faceDown ? (
                           card.card_back_id && cardBackMap[card.card_back_id] ? (
                             <img src={cardBackMap[card.card_back_id]} alt="Card back" className="w-full h-full object-contain" />
                           ) : (
@@ -7446,7 +7500,7 @@ export default function GameTable({ room = null }) {
                       >
                         {view.caption}
                       </span>
-                    </div>
+                    </button>
                     );
                   })}
                 </div>

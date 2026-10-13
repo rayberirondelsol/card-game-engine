@@ -118,3 +118,34 @@ export function looseCandidates(cards, excludeIds) {
   }
   return out;
 }
+
+/**
+ * Was ein Ablegen am Ende trifft – Stapel oder Zonenabweisung (Spec M17.3).
+ *
+ * Der Befund der neunten Solopartie, viermal: der Nachschubstapel liegt im
+ * Einzugsbereich der Zone `Bösewicht-Tableau`, die keine Karten nimmt. Jedes
+ * Zurücklegen endete mit „zone 'Bösewicht-Tableau' does not accept cards", die
+ * Karte sprang zurück, und eine liegt seither offen daneben – der Vorrat zählt
+ * 24 statt 25. Die Zone gewann gegen den Stapel, obwohl der Stapel das
+ * sichtbare Ziel ist.
+ *
+ * **Das Besondere schlägt das Allgemeine.** Dieselbe Regel, die der Token-Zweig
+ * seit M7 hat (`findNearestCardCorner` vor `zoneAt`): eine Karte ist eine
+ * Stelle, eine Zone eine Fläche. Der Karten-Zweig hatte gar keine Reihenfolge –
+ * er fragte die Zone zuerst und kehrte bei einer Abweisung um, bevor `stackAt`
+ * dran war.
+ *
+ * **Keine zweite Vorrangregel daneben.** `handleCardDragEnd` fragt `stackAt`
+ * genau einmal; dieser eine Aufruf *ist* diese Funktion. Die Abweisung wird
+ * dort weiterhin von `zoneRejects` berechnet und nur später ausgeführt.
+ *
+ * Lehnen Zone *und* Stapel ab – also liegt dort kein Stapel –, bleibt alles wie
+ * bisher: Karte zurück, Meldung.
+ *
+ * @param {{point?: {x: number, y: number}, stacks?: Array, refusal?: string}} q
+ * @returns {{stack: string|null, refusal: string|null}}
+ */
+export function resolveDrop({ point, stacks, refusal } = {}) {
+  const stack = stackAt(point, stacks) || null;
+  return { stack, refusal: stack ? null : (refusal || null) };
+}

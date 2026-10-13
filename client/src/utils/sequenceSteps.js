@@ -72,6 +72,11 @@ export const STEP_TYPES = [
   // das Asset dieses Pools stattdessen in die Zielzone. Ohne beides
   // unveraendert.
   { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel', 'targetZoneLabel', 'pool'] },
+  // M17.4/M17.5/BF: der dritte Raeumschritt - fuer das, was weder in einer Zone
+  // noch auf einem Raster liegt. `category` adressiert Karten, `assetName` ein
+  // benanntes Asset; zusammen gilt die Vereinigung. Ohne beides raeumt der
+  // Schritt nichts (siehe `validateStep`).
+  { value: 'clear_table', label: 'Clear Table', fields: ['category', 'assetName'] },
   // M7/T6: kein `gridLabel` - das Raster steht in den Szenariodaten, nicht am
   // Schritt. Der Schritt hat genau eine Einstellung: ob der Endkampf-Abschnitt
   // dazugehoert.
@@ -244,6 +249,11 @@ export function defaultStep(type, ctx = {}) {
       // Dasselbe fuer beide Ziele - und ohne `faceDown`: die Seite wird nicht
       // geraten, eine frische Vorgabe laesst jede Karte ihre behalten (M5.1).
       return { type, zoneLabel: zone, targetZoneLabel: '', targetStackLabel: '' };
+    case 'clear_table':
+      // Beides leer: der Schritt loescht vom Tisch, und *was* er loescht, ist
+      // die eine Entscheidung, die er nicht vorwegnehmen darf. Eine geratene
+      // Kategorie waere der gefaehrlichste Tippfehler im Vokabular (M17.4/BF).
+      return { type, category: [], assetName: '' };
     default:
       return { type, stackLabel };
   }
@@ -353,6 +363,16 @@ export function describeStep(step) {
       const what = only.length ? ` (only ${only.map(c => `"${c}"`).join(' + ')})` : '';
       return `Clear zone ${q(step.zoneLabel)} ${into}${what}`;
     }
+    // M17.4/BF: beide Hälften in einer Zeile, und „(nothing)" ist eine echte
+    // Auskunft - ohne Angabe räumt der Schritt nichts ab.
+    case 'clear_table': {
+      const cats = categoryList(step?.category);
+      const parts = [
+        ...(cats.length ? [`card categor${cats.length > 1 ? 'ies' : 'y'} ${cats.map(c => `"${c}"`).join(' + ')}`] : []),
+        ...(String(step?.assetName ?? '').trim() ? [`asset ${q(step.assetName)}`] : []),
+      ];
+      return `Clear ${parts.length ? parts.join(' and ') : '(nothing)'} off the table, wherever it lies`;
+    }
     // M15.3/AR1: der verschonte Pool steht nur da, wenn es ein Ziel gibt.
     case 'clear_grid': return step?.targetZoneLabel
       ? `Clear grid ${q(step.gridLabel)} off the table, pool ${q(step.pool)} into zone ${q(step.targetZoneLabel)}`
@@ -401,7 +421,10 @@ export function validateStep(step, ctx = {}) {
     // Ein Platzhalter ($revealed, $revealedTier) steht fuer einen Namen, den
     // erst der Tisch kennt - hier gaebe es dazu nur einen falschen Alarm. Das
     // gilt in jedem Namensfeld, nicht nur hier (M7/T4).
-    if (!step?.assetName) problems.push('no asset chosen');
+    // M17.4/BF: bei `clear_table` ist der Name eine von zwei Angaben, also ist
+    // "keiner" fuer sich allein kein Fehler - der fehlende Filter wird unten
+    // einmal gemeldet, nicht zweimal.
+    if (!step?.assetName) { if (typeOf(step) !== 'clear_table') problems.push('no asset chosen'); }
     else if (!hasPlaceholder(step.assetName) && !known(names, step.assetName)) problems.push(`asset "${step.assetName}" not found`);
   }
   // reveal_next liest die Zone, aus der aufgedeckt wird - anders als bei
@@ -429,6 +452,12 @@ export function validateStep(step, ctx = {}) {
     // ist die gueltige Vorgabe ("alles"). Nur `place_stack` baut aus ihr, dort
     // ist sie Pflicht.
     if (!cats.length && typeOf(step) === 'place_stack') problems.push('no card category chosen');
+    // M17.4/BF: `clear_table` braucht wenigstens eine der beiden Angaben. Ohne
+    // raeumt er nichts - und einen Schritt, der bei leerem Feld den ganzen
+    // Tisch loescht, darf es nicht geben.
+    if (!cats.length && typeOf(step) === 'clear_table' && !String(step?.assetName ?? '').trim()) {
+      problems.push('nothing named to clear: give a card category or an asset');
+    }
     for (const cat of cats) {
       if (!hasPlaceholder(cat) && !known(cardCategories, cat)) problems.push(`card category "${cat}" is empty or unknown`);
     }

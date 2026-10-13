@@ -58,9 +58,14 @@ test('AY1: die Meldung nennt Zone und Kapazität – unverändert aus zoneReject
 test('AY1: das abgewiesene Ziehen meldet weiter über dieselbe Stelle', () => {
   // Es war nie stumm (die Spec vermutete das) – `setSetupIssues` steht im
   // Abweisungszweig des Kartenzugs, direkt neben dem Zurückspringen.
-  const i = source.indexOf("const refusal = zoneRejects(dropZone, 'card'");
+  // M17.3/BE: die Abweisung wird oben **berechnet** und erst nach `resolveDrop`
+  // ausgeführt – ein Stapel unter der Karte schlägt sie. Die Meldung selbst ist
+  // unverändert geblieben, nur ihr Zweig steht eine Rechnung weiter unten.
+  const i = source.indexOf("refusal = zoneRejects(dropZone, 'card'");
   assert.ok(i > 0, 'der Abweisungszweig des Kartenzugs ist weg');
-  const branch = source.slice(i, i + 900);
+  const j = source.indexOf('if (finalRefusal) {', i);
+  assert.ok(j > i, 'die berechnete Abweisung wird nirgends mehr ausgeführt');
+  const branch = source.slice(j, j + 900);
   assert.match(branch, /setSetupIssues\(\[\{ index: 0, type: 'drop'/);
-  assert.match(branch, /reason: refusal/);
+  assert.match(branch, /reason: finalRefusal/);
 });

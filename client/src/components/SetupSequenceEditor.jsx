@@ -49,6 +49,10 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         data-testid={testId}
       >
         {options.length === 0 && <option value="">{emptyHint}</option>}
+        {/* M17.4/BF: ohne Wahl zeigte die Liste den ersten Eintrag, waehrend am
+            Schritt nichts stand - und bei `clear_table` ist "nichts" eine
+            gueltige Haelfte. Die leere Zeile sagt, was wirklich dasteht. */}
+        {!value && options.length > 0 && <option value="">— none —</option>}
         {/* a value that no longer exists stays selectable so it is visible, not silently swapped */}
         {value && !options.includes(value) && <option value={value}>{value} (missing)</option>}
         {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -128,7 +132,8 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     // überhaupt erst eintippbar; über die Auswahlliste war er es nie.
     // M15.1/AQ1: bei `clear_zone` liest derselbe Renderer den **Filter** statt
     // der Bauliste - nur die Beschriftung sagt, in welche Richtung.
-    category: () => field(step.type === 'clear_zone' ? 'Only cards' : 'Cards', (
+    // M17.4/BF: `clear_table` liest ihn ebenfalls als Filter.
+    category: () => field(step.type === 'clear_zone' || step.type === 'clear_table' ? 'Only cards' : 'Cards', (
       <div className="flex-1 space-y-1">
         <textarea
           rows={Math.max(2, categoryLines.length)}

@@ -971,7 +971,12 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         if (!target) return skip(noPos);
         existing.x = target.x;
         existing.y = target.y;
-        Object.assign(existing, onGrid, { rotation });
+        // M17.5/BF: und die Verloren-Marke gilt nicht mehr. `offGrid` sagt seit
+        // M10.10 „hat seinen Platz verloren" und zeichnet einen gestrichelten
+        // Rand; wer hier neu platziert wird, hat wieder einen. `handleObjDragEnd`
+        // macht es beim Ziehen seit jeher so („eingerastet ist gesetzt") - dies
+        // ist dieselbe Zeile an der zweiten Stelle, die Stuecke hinstellt.
+        Object.assign(existing, onGrid, { rotation, offGrid: false });
         return state;
       }
 
@@ -1220,6 +1225,55 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       if (notes.length) return fail([...remarks, ...notes].join('; '));
       if (remarks.length) entry.reason = remarks.join('; ');
+      return state;
+    }
+
+    // M17.4/M17.5 — was vom Tisch soll, egal wo es liegt.
+    //
+    // `clear_zone` raeumt eine Zone, `clear_grid` ein Raster. Was in keinem von
+    // beidem liegt, erreichte bisher kein Schritt: die neunte Partie liess zwei
+    // Boesewicht-Aktionskarten vor den Doerfler-Tableaus liegen (y 1440 und
+    // 1760; die Ausruestungszonen beginnen bei 1808, die Handzonen enden bei
+    // 1310) und drei beiseitegestellte Doerflerfiguren, die `clear_grid` nicht
+    // sieht, weil sie nicht auf dem Raster stehen.
+    //
+    // **Zwei Felder, eine Frage.** `category` adressiert Karten ueber die
+    // Bibliothek (wie bei `clear_zone`, die Kategorie steht nicht an der
+    // Tischkarte), `assetName` ein benanntes Asset (wie bei `place_asset`).
+    // Zusammen gilt die Vereinigung. Ein Pool schiede fuer die Figuren aus: die
+    // Kategorie `Doerfler` enthaelt auch die Leistenplaettchen.
+    //
+    // **Ohne Angabe wird nichts geraeumt** - uebersprungen, mit Grund. Ein
+    // Schritt, der bei leerem Feld den ganzen Tisch loescht, waere der
+    // gefaehrlichste Tippfehler im Vokabular.
+    case 'clear_table': {
+      const wantedCats = categoryList(step.category).map(norm);
+      const wantedAsset = norm(step.assetName);
+      if (!wantedCats.length && !wantedAsset) return skip('no card category and no asset name given');
+
+      // Karten in einem Stapel liegen in `stack.cards` und sind nicht gemeint:
+      // der Stapel wird mit `remove_stack` entfernt, nicht Karte fuer Karte.
+      const hits = [
+        ...(wantedCats.length
+          ? state.cards.filter(o => wantedCats.includes(norm(cards.find(c => String(c.id) === String(o.cardId))?.category)))
+          : []),
+        ...(wantedAsset
+          ? [...state.tokens, ...state.boards].filter(o => norm(objName(o)) === wantedAsset
+              || norm(assets.find(a => String(a.id) === String(o?.assetId))?.name) === wantedAsset)
+          : []),
+      ];
+
+      // Nichts zu raeumen ist gelungen, nicht gescheitert: der gewuenschte
+      // Zustand liegt schon vor (dieselbe Entscheidung wie bei `clear_zone`).
+      if (!hits.length) return state;
+
+      // Gesperrt heisst gesperrt - siehe den `clear_zone`-Zweig oben.
+      const locked = hits.filter(o => o.locked);
+      const gone = new Set(hits.filter(o => !o.locked));
+      state.cards = state.cards.filter(o => !gone.has(o));
+      state.tokens = state.tokens.filter(o => !gone.has(o));
+      state.boards = state.boards.filter(o => !gone.has(o));
+      if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
       return state;
     }
 
