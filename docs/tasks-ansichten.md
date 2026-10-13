@@ -291,3 +291,39 @@ derselben Formel wie im Code (`worldAt`), nicht mit einer zweiten im Skript.
 3. Sichtprüfung im laufenden Fenster (rund 932 × 790, also **nicht** dem, in dem
    die Werte entstanden): „Schlachtfeld" zeigt den Hauptplan mittig,
    „Dörfler" die drei Tableaus mit dem Münztopf im Bild.
+
+---
+
+## Nachträge aus der Umsetzung
+
+**Tests 1114 → 1121, alle grün.** Sechs neue in `server/test/table-views.test.js`
+(AZ) und einer in `server/test/client-hygiene.test.js` (BA). Der Bau bringt
+keine neue Warnung.
+
+**Die gezeichnete Transformation hat ein eigenes Modul bekommen.**
+`screenOf` stand in `camera-zoom.test.js` und wird seit AZ auch von
+`table-views.test.js` gebraucht. Statt sie zu kopieren — und damit zwei
+Konventionen zu haben, gegen die geprüft wird — liegt sie in
+`server/test/drawn-transform.js`. Ohne `.test.js` im Namen, damit
+`node --test "test/**/*.test.js"` sie nicht als Testdatei aufsammelt.
+
+**`containerCenter()` ist eine Kopie weniger, nicht eine mehr.** `rect.width/2,
+rect.height/2` stand in `GameTable.jsx` an drei Stellen; jetzt an einer, und
+`viewCenter` holt sie von dort.
+
+**BB lief durch.** Trockenlauf: beide Aufbauten tragen genau die erwarteten zwei
+Ansichten, keine trägt schon `space`, und außer `views` ändert sich nichts —
+**0 Beanstandungen**. Eine `db.transaction`, dann die Kontrollausgabe: vier
+Einträge mit `space: "world"`, Zoom und Namen unverändert, `state_data`
+83 606 → 83 639 Zeichen (die zwei mal `,"space":"world"` plus die neuen Zahlen),
+alle drei Aufbauten noch da. `TFT Basis-Aufbau` ist unberührt — er hat keine
+Ansicht.
+
+**Sichtprüfung in zwei Fenstergrößen** (Abnahme BA.3). Fenster 932 × 790:
+„Schlachtfeld" setzt die Kamera auf `−393/−165` — das ist `Mitte − Welt` =
+`(466 − 859,5 / 395 − 560)`, also nicht mehr die gespeicherten `−444/−163`,
+sondern die für *dieses* Fenster. Eine dort gespeicherte Ansicht, bei 1920 × 1080
+aufgerufen: Kamera `101/−20` = `(960 − 859,5 / 540 − 560)`, dieselbe Weltstelle
+mittig. Zurück auf 932 × 790: wieder `−393/−165`. „Dörfler" ebenso
+(`−683/−1280` bzw. `−189/−1135`), in beiden Größen mit den drei Tableaus, den
+zwölf Attributzählern und dem Münztopf im Bild.

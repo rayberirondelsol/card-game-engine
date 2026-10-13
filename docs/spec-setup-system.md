@@ -4075,6 +4075,39 @@ gespeicherte Ansicht beim ersten Laden um ihren eigenen Versatz.
 3. Geprüft aus `server/test/table-views.test.js` gegen dieselbe Transformation,
    die `camera-zoom.test.js` benutzt — nicht gegen die eigene Umkehrfunktion.
 
+**Nachtrag aus der Umsetzung.** Aufgaben und die fünf Stellen, an denen die Spec
+nicht stimmte, in `docs/tasks-ansichten.md`.
+
+1. **Das unterscheidende Feld ist `space: 'world'`.** Eine Ansicht ohne das Feld
+   ist von vorher und bleibt eine Kameraposition. Gewählt gegen ein zweites
+   Zahlenpaar `wx`/`wy`, weil `space` die Prüfung von `x`/`y` buchstäblich
+   stehen lässt und genau die eine offene Frage beantwortet: in welchem
+   Bezugssystem die beiden Zahlen gemeint sind.
+2. **`goToView` liegt nicht in `tableViews.js`,** sondern in `GameTable.jsx`, und
+   kann dort nur zum Teil hin: es fasst `cameraRef`, React-State und
+   `renderCanvas` an. Umgezogen ist die Rechnung, als neues `viewCamera(view,
+   center)`. Beide Richtungen benutzen dieselbe `worldAt`-Zeile — aus
+   `cam = Mitte − Welt` folgt `Welt = Mitte − cam`, die Abbildung ist ihre
+   eigene Umkehrung, also gibt es weiterhin genau **eine** Umrechnung.
+3. **„Mit Daten nicht zu beheben" galt nur bis zur Änderung.** Danach sind die
+   beiden mitgelieferten Ansichten umrechenbar, weil beide Größen bekannt sind,
+   und sie **wurden** umgerechnet (`setups.state_data` beider TFT-Aufbauten, eine
+   `db.transaction`, Trockenlauf mit 0 Beanstandungen): Schlachtfeld
+   `cam (−444, −163)` → Welt `(859,5 / 560)`, Dörfler `cam (−734, −1278)` → Welt
+   `(1149,5 / 1675)`, Mitte von 831 × 794. Sonst wären ausgerechnet die zwei
+   Voreinstellungen die einzigen geblieben, die nur in einem Fenster taugen.
+4. **„Der Münztopf rutscht aus dem Bild" trifft für 1920 × 1080 nicht zu.** Der
+   alte Ausschnitt liegt vollständig im neuen; ein größeres Fenster zeigt bei
+   gleichem Zoom mehr, nicht weniger. Der Schaden ist, dass der Inhalt um die
+   halbe Maßdifferenz **daneben** sitzt (544 / 143) — und dass ein kleineres oder
+   anders geformtes Fenster wirklich abschneidet. Abnahme 1 prüft davon
+   das Richtige und bleibt wörtlich stehen.
+5. **Am laufenden Tisch geprüft, zwei Fenstergrößen.** Im Fenster 932 × 790
+   gespeichert, auf 1920 × 1080 gewechselt, Ansicht aufgerufen: dieselbe
+   Weltstelle `(859,5 / 560)` steht mittig (Kamera `−393/−165` bzw. `101/−20` —
+   genau `Mitte − Welt` in beiden Größen). „Dörfler" ebenso, in beiden Größen mit
+   den drei Tableaus, den zwölf Attributzählern und dem Münztopf im Bild.
+
 ## M15 — Was die siebte Partie fand
 
 Belegt in `docs/partie7-bericht.md`: zwei vollständige Runden, beide Kämpfe
