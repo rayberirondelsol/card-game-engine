@@ -61,6 +61,19 @@ test('AS1: der Zonen-Block haengt nicht mehr am Raum', () => {
   assert.doesNotMatch(block, /\{room && \(/, 'der Block haengt weiterhin im room-Zweig');
 });
 
+test('AS1: kein overflow-hidden auf einer Kameraebene', () => {
+  // Der Behaelter ist `inset-0`, sein eigener Kasten also fensterhoch, und die
+  // `transform` schiebt ihn erst danach. Mit `overflow-hidden` schnitt er jede
+  // Zone weg, die in Weltkoordinaten unterhalb der Fensterhoehe liegt — die
+  // Ausruestungszone bei y = 1808 stand im DOM und war nie zu sehen. Die
+  // Tischebene mit den Karten hat aus demselben Grund keines; geklippt wird am
+  // Wurzelbehaelter.
+  assert.equal((source.match(/absolute inset-0 pointer-events-none overflow-hidden/g) || []).length, 0,
+    'eine Kameraebene schneidet weiterhin am Fensterkasten ab');
+  assert.ok((source.match(/className="absolute inset-0 pointer-events-none"/g) || []).length >= 3,
+    'die drei Kameraebenen (Tisch, Zonen, Raster) sind nicht mehr gleich gebaut');
+});
+
 test('AS1: der Raum verhaelt sich unveraendert – die eigene Farbe reist mit', () => {
   const i = source.indexOf('<ZoneOverlay');
   const tag = source.slice(i, source.indexOf('/>', i) + 2);

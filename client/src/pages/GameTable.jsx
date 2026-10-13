@@ -8402,7 +8402,17 @@ export default function GameTable({ room = null }) {
           `showInPlay: false` einzeln stillgelegt. */}
       {!setupMode && tableZones.some(zoneShownInPlay) && (
         <div
-          className="absolute inset-0 pointer-events-none overflow-hidden"
+          /* M15.5/AS1: **kein** `overflow-hidden`. Der Behaelter ist
+             `inset-0`, sein eigener Kasten also fensterhoch – und die
+             `transform` schiebt ihn erst danach. Alles, was jenseits
+             davon in Weltkoordinaten liegt (hier: jede Zone unterhalb
+             von y = Fensterhoehe), wurde weggeschnitten, bevor die Kamera
+             es ueberhaupt ins Bild holte. Genau darum war die
+             Ausruestungszone bei y = 1808 unsichtbar, obwohl sie im DOM
+             stand. Die Tischebene darueber (Zeile ~4815) hat aus
+             demselben Grund keines; geklippt wird am Wurzelbehaelter,
+             der `overflow-hidden` traegt. */
+          className="absolute inset-0 pointer-events-none"
           style={{
             transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
             transformOrigin: '50% 50%',
@@ -8418,7 +8428,17 @@ export default function GameTable({ room = null }) {
           Snapping never depends on this. */}
       {!setupMode && tableGrids.some(g => g.showInPlay) && (
         <div
-          className="absolute inset-0 pointer-events-none overflow-hidden"
+          /* M15.5/AS1: **kein** `overflow-hidden`. Der Behaelter ist
+             `inset-0`, sein eigener Kasten also fensterhoch – und die
+             `transform` schiebt ihn erst danach. Alles, was jenseits
+             davon in Weltkoordinaten liegt (hier: jede Zone unterhalb
+             von y = Fensterhoehe), wurde weggeschnitten, bevor die Kamera
+             es ueberhaupt ins Bild holte. Genau darum war die
+             Ausruestungszone bei y = 1808 unsichtbar, obwohl sie im DOM
+             stand. Die Tischebene darueber (Zeile ~4815) hat aus
+             demselben Grund keines; geklippt wird am Wurzelbehaelter,
+             der `overflow-hidden` traegt. */
+          className="absolute inset-0 pointer-events-none"
           style={{
             transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
             transformOrigin: '50% 50%',
