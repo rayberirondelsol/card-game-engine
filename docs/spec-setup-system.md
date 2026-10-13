@@ -4074,3 +4074,175 @@ gespeicherte Ansicht beim ersten Laden um ihren eigenen Versatz.
    entstand, weiterhin genau dorthin, wo sie entstand.
 3. Geprüft aus `server/test/table-views.test.js` gegen dieselbe Transformation,
    die `camera-zoom.test.js` benutzt — nicht gegen die eigene Umkehrfunktion.
+
+## M15 — Was die siebte Partie fand
+
+Belegt in `docs/partie7-bericht.md`: zwei vollständige Runden, beide Kämpfe
+gewonnen, 48 Würfe am Tisch, Abbruch wegen des Schrittbudgets des Spielers —
+**nicht wegen des Tisches**. Abschnitt 4.1 „Blockiert" ist leer; das ist das
+erste Mal.
+
+Elf der zwölf Punkte aus M14 sind nachweislich weg. Offen blieb U5 (die
+Ausrüstungszone), halb erledigt U2 (die Ansichten).
+
+### M15.1 — `clear_zone` begräbt Fremdkarten im Nachziehstapel
+
+**Befund (N1), und er geht auf meine Rechnung.** M14.2 hat „Dorfphase beginnen"
+drei `clear_zone Hand Dörfler N → Dorf-Ereignisse` gegeben, **ohne zu sagen,
+welche Karten dort hingehören**. Der Spieler legte Grannys *Clown-Kostüm* —
+einzigartige Ausrüstung — mangels sichtbarer Ablagefläche in die Handzone. Der
+Räumschritt hat sie mit unter den Ereignisstapel geschoben. Der zählt seither
+**81 statt 80**, und eine Ausrüstungskarte taucht irgendwann als
+„Dorf-Ereignis" wieder auf. Still, ohne Meldung.
+
+**Änderung.** `clear_zone` bekommt einen optionalen **Kategorienfilter**, wie
+`place_stack` ihn schon trägt (ein Array von Kategorienamen). Gesetzt, räumt der
+Schritt nur Karten dieser Kategorien ab; alles andere **bleibt liegen** und
+steht mit Grund im Protokoll. Die drei Handzonen-Schritte bekommen
+`["Dorf-Ereignisse", "Dorf-Ereignisse (Üble Nachbarn)"]`.
+
+Liegenlassen ist richtiger als Wegräumen: wohin eine fremde Karte gehört, weiß
+der Aufbau nicht, und still in einen Nachziehstapel schieben ist von drei
+Möglichkeiten die schlechteste.
+
+**Abnahme.**
+1. Eine Ausrüstungskarte in einer Handzone überlebt „Dorfphase beginnen" und
+   liegt danach noch dort.
+2. Das Protokoll nennt sie.
+3. Die Ereigniskarten werden weiterhin abgeräumt, der Stapel steht wieder
+   auf 80.
+4. Ein `clear_zone` **ohne** Filter räumt wie bisher alles — kein bestehender
+   Aufbau ändert sein Verhalten.
+
+**Nicht Teil der Aufgabe.** Das *Clown-Kostüm* steckt im **Spielstand** der
+siebten Partie, nicht im Aufbau; ein frisch geladener Aufbau baut den Stapel
+aus den Kategorien neu und ist sauber.
+
+### M15.2 — Die Rolle sagt, man müsse die Leiste von Hand drehen. Die Aktion dreht selbst
+
+**Befund (N2).** „Dorfphase beginnen" rotiert die „Wer ist dran?"-Leiste — so
+steht es seit M9 in dieser Spec. In `.claude/agents/tft-spieler.md` steht §7.7
+dagegen als Handgriff nach dem Kampf. Wer die Regel kennt, dreht also **zweimal**.
+Genau das ist passiert: Kampf 2 lief in falscher Reihenfolge.
+
+**Änderung.** Nur die Rolle: die Drehung ist Sache der Aktion, nicht des
+Spielers. **Kein Code.**
+
+**Abnahme.** Die Rolle nennt die Leistendrehung ausdrücklich als etwas, das die
+Aktion erledigt.
+
+### M15.3 — Der besiegte Bösewicht verschwindet, statt in seine Zone zu wandern
+
+**Befund (N3).** Nach „Dorfphase beginnen" ist das Bösewicht-Plättchen
+**vollständig vom Tisch** — nicht in der Zone `Besiegte Bösewichte`, die der
+Aufbau eigens dafür mitbringt. Am echten Tisch ist die Reihe der erledigten
+Bösewichte der sichtbare Fortschritt der Partie.
+
+**Zu prüfen, bevor gebaut wird:** ob das Wegräumen heute ein `remove_asset` ist
+und ob es einen Schritt gibt, der ein Asset **verschiebt** statt es zu
+entfernen. Fehlt der, ist das der Befund.
+
+**Abnahme.** Nach „Dorfphase beginnen" liegt das Plättchen des besiegten
+Bösewichts in `Besiegte Bösewichte`; nach zwei Kämpfen liegen dort zwei.
+
+### M15.4 — „Shuffle" lässt sich am Tisch nicht überprüfen
+
+**Befund (N4), und er ist regelrelevant.** Zwei Bösewicht-Aktionen verlangen
+ausdrücklich Neumischen. Von vier Versuchen blieb die Kartenreihenfolge
+**dreimal unverändert** — auch nach 0,8 s und 1,5 s und nach einer
+zwischengeschalteten Bedienung; **einmal** war sie nachweislich vollständig
+permutiert. Der Spieler konnte nicht isolieren, woran der Unterschied liegt, und
+hat gespielt, *als hätte* gemischt.
+
+Es gibt keine Rückmeldung: kein Aufblinken, keine Meldung, keinen Zähler. Der
+Stapel sieht vorher und nachher gleich aus.
+
+**Zwei Fragen, in dieser Reihenfolge.** Erst: **mischt es überhaupt
+zuverlässig?** Das ist eine Frage an den Code, nicht an die Oberfläche — und
+wenn die Antwort nein ist, ist die Rückmeldung zweitrangig. Erst danach: eine
+sichtbare Rückmeldung, wie M14.11 sie dem Würfel gegeben hat.
+
+**Abnahme.**
+1. Ein Test weist nach, dass Mischen die Reihenfolge eines Stapels tatsächlich
+   ändert — am Tisch **und** im Raum.
+2. Mischen ist am Tisch ohne Auslesen des Zustands zu erkennen.
+
+### M15.5 — Die Ausrüstungszone ist vier Karten breit, und keine Zone wird gezeichnet
+
+**Befund (N5, verschärft U5 aus Partie 6).** `Ausrüstung Dörfler N` ist am
+Tableau verankert (`relWidth: 1`), also 300 Weltpunkte = **vier Kartenbreiten**.
+Fridgette hatte am Ende von Runde 2 **sieben** Karten. Die fünfte landete bei
+x = 1200 — näher an Grannys Tableau (1310–1610) als an ihrem eigenen
+(730–1030).
+
+Das allein wäre halb so schlimm, wenn man die Grenze sähe. **Am Hotseat-Tisch
+wird keine Zone gezeichnet** (Audit-Fund 8). Der Spieler musste sich zweite und
+dritte Reihen unter den Tableaus bauen und von Hand merken, wem was gehört.
+
+**Änderung, zwei Teile.**
+1. **Zonen werden am Hotseat-Tisch gezeichnet** — dezent, aber sichtbar. Das
+   schließt Audit-Fund 8 und wirkt weit über die Ausrüstung hinaus (M14 hat
+   schon einmal daran gelitten, dass man nicht sieht, wo eine Zone endet).
+2. Die Ausrüstungszone fasst mehr als eine Reihe: entweder ein mehrzeiliges
+   Layout oder eine Zone, die über das Tableau hinausreicht. **Welches von
+   beidem, entscheidet, wer es baut** — und sagt, warum.
+
+**Abnahme.**
+1. Die Zonen sind am Tisch zu sehen, ohne dass man etwas anfasst.
+2. Sieben Ausrüstungskarten eines Dörflers liegen erkennbar bei ihm und ragen
+   nicht in das Feld des Nachbarn.
+
+### M15.6 — Der Wurfzähler des Würfels springt auf 0 zurück
+
+**Befund (N7).** Der „#n"-Zähler aus M14.11 stand nach sieben Würfen auf 7 und
+war beim nächsten Blick 0, bei gleicher Würfel-ID; später noch einmal von 1 auf
+0. Dazwischen lag jeweils das automatische Speichern. Der Zähler überlebt das
+Speichern also nicht.
+
+Für seinen eigentlichen Zweck — zwei gleiche Würfe hintereinander unterscheiden
+— reicht er trotzdem, weil zwischen zwei Würfen selten gespeichert wird.
+Verlässlich zählen kann man damit nicht.
+
+**Abnahme.** Der Wurfzähler überlebt Speichern und Laden.
+
+### M15.7 — Ein Zähler lässt sich nur am Namensstreifen anfassen
+
+**Befund (N8).** Ein Zug, der auf dem **Wert** beginnt, bewegt den Zähler nicht
+— dort öffnet der Klick das Eingabefeld — und tut auch sonst nichts, ohne
+Meldung. Nur der Namensstreifen trägt den Zug: ein Drittel der Höhe, bei 41 %
+Zoom **zehn Bildschirmpunkte**. Der Spieler hat den Münztopf erst 540
+Weltpunkte weit verschleppt und ihn dann dreimal nicht zurückziehen können.
+
+**Änderung.** Dieselbe Unterscheidung, die M14.5 für die Leisten gebaut hat:
+**ruhiger Druck öffnet das Eingabefeld, wandernder Druck zieht den Zähler.**
+Es gibt dafür bereits eine Lösung im Haus — eine zweite danebenzustellen wäre
+der Fehler, den M6 verbietet.
+
+**Abnahme.**
+1. Ein Zug, der auf dem Wert beginnt, bewegt den Zähler.
+2. Ein Klick auf den Wert öffnet weiterhin das Eingabefeld.
+3. Gilt für Maus **und** Finger.
+
+### M15.8 — Zwei weitere Flächen fangen Klicks auf dem Tisch ab
+
+**Befund (N9, N10).** M14.5 hat die beiden Hauptleisten durchlässig gemacht.
+Nicht behandelt sind der **Griff der eingeklappten Werkzeugleiste** und die
+**Kartenbibliothek** — beide liegen über dem Tisch und schlucken Klicks.
+
+**Änderung.** Dieselbe Behandlung wie M14.5, über dieselbe Stelle. Keine dritte
+Mechanik.
+
+**Abnahme.** Ein Stück unter dem eingeklappten Griff und eines unter der
+Bibliothek lassen sich ziehen; beide Flächen bleiben selbst bedienbar.
+
+### Regelkorrektur — die Schwäche des Bösewichts schläft, bis sie aktiviert wird
+
+Kein Engine-Befund, aber er hat **zwei Partien verfälscht**. §5.3 sagt, die
+Schwäche werde „unter bestimmten Bedingungen — meist durch eine
+Bösewicht-Aktion — aktiviert". **Partie 6 hat sie durchgehend angewendet, Partie
+7 zunächst auch**; dort fiel es auf, als eine Aktion ausdrücklich meldete, die
+Schwäche sei „jetzt aktiv". Der Spieler hat die zwei Lebenspunkte
+zurückgegeben.
+
+Gehört in die Rolle, deutlich: **eine Schwäche gilt erst, wenn sie
+scharfgestellt wurde.**
