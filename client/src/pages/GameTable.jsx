@@ -10,7 +10,7 @@ import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
-import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/zoneGeometry.js';
+import { zoneAt, zoneContains, zoneRejects, countInZone, zoneShownInPlay } from '../../../shared/zoneGeometry.js';
 import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
@@ -38,7 +38,7 @@ import { normalizeViews, putView, removeView, MAX_VIEWS } from '../utils/tableVi
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
-import { passedSlop } from '../utils/barPassthrough.js';
+import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 
@@ -670,6 +670,13 @@ export default function GameTable({ room = null }) {
   // Knopf nicht mehr auslösen – das war die Hälfte des Befundes.
   const barGestureRef = useRef(null);
   const barClickRef = useRef(false);
+  // M15.7/AU: wo ein Objektzug angefasst hat. Dieselbe Frage, dieselbe
+  // Schwelle: wandert der Zeiger über `BAR_SLOP`, war es ein Zug, und der
+  // `click`, der beim Loslassen auf dem Knopf darunter entsteht, gehört
+  // niemandem mehr. Ohne das zählte ein Zug am `+` den Zähler mit hoch und ein
+  // Zug am „Roll" würfelte – derselbe Fehler wie auf den Leisten, eine Ebene
+  // tiefer.
+  const objPressRef = useRef(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -2377,6 +2384,11 @@ export default function GameTable({ room = null }) {
     // Get unified pointer position (convert to world coords for offset)
     const pointer = getPointerPosition(e);
 
+    // M15.7/AU: der Druckpunkt, gegen den `handleObjDragMove` die Schwelle
+    // misst. Hier und nicht in `handleGlobalStart`: dort ist noch nicht
+    // entschieden, ob überhaupt ein Objekt angefasst wurde.
+    objPressRef.current = { clientX: pointer.clientX, clientY: pointer.clientY };
+
     // M10.1: welche Figur war gemeint? Das Ereignisziel sagt es nicht – eine
     // Figur belegt zwei mal zwei Felder, zwei benachbarte ueberlappen sich um
     // ein volles Feld, und wer oben liegt, bekaeme den ganzen Streifen. Bei
@@ -2481,6 +2493,12 @@ export default function GameTable({ room = null }) {
     // hiesse "dieser Typ laesst sich nicht ziehen", und im JSX saehe er
     // trotzdem verdrahtet aus - `objectSetters` haelt das unter Test.
     objSetters[draggingObj.type]?.(prev => moveObject(prev, draggingObj.id, newX, newY));
+
+    // M15.7/AU: ab hier ist es ein Zug und kein Klick mehr. Das Veto aus M14.5
+    // nimmt dem Knopf unter dem Zeiger den `click`, der beim Loslassen noch
+    // kommt – gefressen wird er an der einen Stelle, die es dafür gibt
+    // (`onClickCapture` am Tischbehälter).
+    if (passedSlop(objPressRef.current, pointer)) barClickRef.current = true;
   }
 
   function handleObjDragEnd() {
@@ -3417,6 +3435,11 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         locked: d.locked || false,
+        // M15.6/AT: der Wurfzaehler aus M14.11 muss in **beide** Feldlisten.
+        // `loadGameState` las ihn von Anfang an, hier stand er nicht - nach
+        // jedem Laden behauptete der Wuerfel, nie gerollt zu haben (N7).
+        // Dieselbe halbe Feldliste wie bei `rotation` am Token (M7.1).
+        rolls: d.rolls || 0,
       })),
       hitDice: hitDice.map(d => ({
         id: d.id,
@@ -3426,6 +3449,7 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         locked: d.locked || false,
+        rolls: d.rolls || 0,   // M15.6/AT, siehe dice
       })),
       customDice: customDiceOnTable.map(d => ({
         id: d.id,
@@ -3437,6 +3461,7 @@ export default function GameTable({ room = null }) {
         x: d.x,
         y: d.y,
         locked: d.locked || false,
+        rolls: d.rolls || 0,   // M15.6/AT, siehe dice
       })),
       notes: notes.map(n => ({
         id: n.id,
@@ -4484,8 +4509,21 @@ export default function GameTable({ room = null }) {
     // endet ohne `click`, das Veto von eben stuende sonst noch, wenn der
     // naechste Klick kommt. Ein neuer Druck loescht es, bevor irgendein Klick
     // dieser Geste entstehen kann.
+    //
+    // M15.8/AV: welche Flaeche das ist, entscheidet mit. Der Wert von
+    // `data-bar-overlay` unterscheidet eine Leiste (`true`) von einer Flaeche,
+    // die selbst rollt (`scroll`, die Kartenbibliothek) – auf dem Finger *ist*
+    // dort der Zug das Rollen. Und ein Druck, der auf einem Eingabefeld
+    // beginnt, gehoert immer dem Feld, sonst verloere das Suchfeld der
+    // Bibliothek seine Textauswahl. Die Regel steht in `barPassthrough.js`.
     barClickRef.current = false;
-    barGestureRef.current = e.target?.closest?.('[data-bar-overlay]')
+    const overlay = e.target?.closest?.('[data-bar-overlay]');
+    const pass = overlayPassesGesture({
+      kind: overlay?.dataset?.barOverlay,
+      isTouch: isTouchEvent(e),
+      onField: !!e.target?.closest?.('input, textarea, select, [contenteditable="true"]'),
+    });
+    barGestureRef.current = pass
       ? { clientX: pointer.clientX, clientY: pointer.clientY }
       : null;
 
@@ -5182,11 +5220,18 @@ export default function GameTable({ room = null }) {
                   className="w-[72px] px-1 py-0.5 bg-slate-900 border border-blue-400 rounded text-xl font-mono font-bold text-white text-center focus:outline-none"
                 />
               ) : (
+                /* M15.7/AU: **kein** `onMouseDown`-Stopp mehr. Der Wert war die
+                   einzige taube Fläche des Zählers — ein Zug, der dort begann,
+                   bewegte nichts und meldete nichts (N8: der Münztopf ließ sich
+                   dreimal nicht zurückziehen). Auf dem Finger zog er schon
+                   immer, weil hier nur `mousedown` gestoppt wurde.
+                   Der Klick bleibt dem Wert; dass er nach einem **Zug** nicht
+                   mehr feuert, erledigt das Veto aus M14.5 in
+                   `handleObjDragMove`. */
                 <span
                   className="text-xl font-mono font-bold text-white min-w-[40px] text-center cursor-text"
                   data-testid={`counter-value-${counter.id}`}
                   title="Click to set a value (21, +21, -21, max, base)"
-                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); startCounterEdit(counter); }}
                 >
                   {/* M4a: mit Obergrenze steht hier "2 / 3". Erzwungen wird sie
@@ -6049,6 +6094,11 @@ export default function GameTable({ room = null }) {
             transform: isSwipingDrawer && drawerSwipeOffset < 0 ? `translateX(${-drawerSwipeOffset}px)` : 'translateX(0)',
             transition: isSwipingDrawer ? 'none' : 'transform 0.3s ease-out',
           }}
+          /* M15.8/AV: die Schublade liegt ueber dem Tisch und schluckte jeden
+             Druck (N10). `scroll` statt `true`, weil sie selbst rollt: mit der
+             Maus gibt sie einen Zug an den Tisch weiter, auf dem Finger behaelt
+             sie ihn fuer die Kartenliste. Begruendung in `barPassthrough.js`. */
+          data-bar-overlay="scroll"
           data-testid="card-drawer"
           data-ui-element="true"
         >
@@ -6543,6 +6593,11 @@ export default function GameTable({ room = null }) {
           onClick={() => setShowToolbar(true)}
           data-testid="toolbar-show-btn"
           data-ui-element="true"
+          /* M15.8/AV: derselbe Griff wie die Leiste, die er zurueckholt – also
+             auch dieselbe Durchlaessigkeit. Ein Rechtsklick auf die Karte
+             darunter traf bis hierher nur diesen Knopf (N9); jetzt laesst sich
+             die Karte wenigstens wegziehen. */
+          data-bar-overlay="true"
           className={`absolute z-30 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white/70 hover:text-white shadow-2xl ${
             isMobileLandscape ? 'top-1/2 -translate-y-1/2 left-0' : 'left-1/2 -translate-x-1/2'
           }`}
@@ -8333,18 +8388,28 @@ export default function GameTable({ room = null }) {
             })()}
             players={room.players || []}
           />
-          {zones.length > 0 && (
-            <div
-              className="absolute inset-0 pointer-events-none overflow-hidden"
-              style={{
-                transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
-                transformOrigin: '50% 50%',
-              }}
-            >
-              <ZoneOverlay zones={tableZones} myColor={room.myColor} />
-            </div>
-          )}
         </>
+      )}
+
+      {/* M15.5/AS1: die Zonen, und zwar am Hotseat-Tisch genauso wie im Raum.
+          Bis hierher hing dieser Block im `room`-Zweig darüber — die
+          Solopartie, für die der ganze Aufbau gebaut ist, sah keine einzige
+          ihrer dreißig Zonen (Audit-Fund 8, Befund N5). Im Setup-Modus
+          zeichnet `ZoneEditor` sie samt Namen; zwei Ebenen übereinander wären
+          zwei Antworten auf dieselbe Frage.
+          `zoneShownInPlay` ist die Gegenrichtung desselben Fundes: eine Zone,
+          die nur eine aufgedruckte Markerleiste nachzeichnet, wird mit
+          `showInPlay: false` einzeln stillgelegt. */}
+      {!setupMode && tableZones.some(zoneShownInPlay) && (
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+          style={{
+            transform: `scale(${zoomDisplay / 100}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+            transformOrigin: '50% 50%',
+          }}
+        >
+          <ZoneOverlay zones={tableZones.filter(zoneShownInPlay)} myColor={room?.myColor ?? null} />
+        </div>
       )}
 
       {/* A grid is line art over a board that usually has one printed on it,

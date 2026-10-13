@@ -123,6 +123,30 @@ export function zoneContains(zone, x, y) {
  */
 const facingAway = (zone) => zone?.facingAway === true;
 
+/**
+ * Wird diese Zone beim Spielen gezeichnet? (M15.5)
+ *
+ * Bis M15.5 wurden Zonen **nur im Mehrspielerraum** gezeichnet — am
+ * Hotseat-Tisch war keine der dreissig sichtbar, weder Rahmen noch
+ * Namensschild (Audit-Fund 8, Befund N5: der Spieler musste sich von Hand
+ * merken, wem welche Ausruestungskarte gehoert). Umgekehrt zeichnete der Raum
+ * **alle**, auch die sechzehn, die nur eine aufgedruckte Markerleiste
+ * nachzeichnen und deren Namensschild breiter ist als die Zone selbst.
+ *
+ * Dasselbe Feld, das Raster seit M3b haben — mit dem **umgekehrten
+ * Vorgabewert**, und das ist kein Versehen: ein Raster liegt ueber einem Brett,
+ * auf dem meist schon eines aufgedruckt ist, eine Zone ueber nichts. „Feld
+ * fehlt" heisst beim Raster darum „nicht zeichnen" und bei der Zone
+ * „zeichnen". Beide Vorgaben geben das bisherige Verhalten wieder, wie jedes
+ * neue Feld in dieser Datei.
+ *
+ * Nur ein ausdrueckliches `false` legt eine Zone still. Aus einer Zeichenkette
+ * wird nicht geschlossen: still zu raten waere schlimmer als zu zeichnen.
+ */
+export function zoneShownInPlay(zone) {
+  return !!zone && zone.showInPlay !== false;
+}
+
 /** The zone under a point, or null. Later zones are drawn on top, so they win. */
 export function zoneAt(zones, x, y) {
   if (!Array.isArray(zones)) return null;

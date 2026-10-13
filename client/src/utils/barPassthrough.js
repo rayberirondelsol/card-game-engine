@@ -55,3 +55,34 @@ export function passedSlop(start, point, slop = BAR_SLOP) {
   if (!Number.isFinite(dx) || !Number.isFinite(dy)) return false;
   return Math.abs(dx) > slop || Math.abs(dy) > slop;
 }
+
+/**
+ * Darf ein Druck, der auf dieser Fläche beginnt, überhaupt an den Tisch
+ * weitergegeben werden? (Spec M15.8)
+ *
+ * M14.5 hat die beiden Leisten durchlässig gemacht; der **Griff der
+ * eingeklappten Werkzeugleiste** und die **Kartenbibliothek** blieben übrig
+ * (N9, N10) und waren einfach nie markiert. Der Griff ist ein Knopf wie die
+ * anderen und braucht nur das Attribut.
+ *
+ * **Die Bibliothek ist keine Leiste.** Sie hat einen Rollbereich und ein
+ * Suchfeld, und beides lebt von einem wandernden Druck: auf dem Finger rollt
+ * man damit die Kartenliste, mit der Maus markiert man Text. Gäbe man ihr
+ * dieselbe Behandlung wie einer Leiste, zöge ein Rollen das Stück darunter über
+ * den Tisch. Darum trägt `data-bar-overlay` einen **Wert** — `true` für eine
+ * Leiste, `scroll` für eine Fläche, die selbst rollt —, und ein Druck auf einem
+ * Eingabefeld wird nie weitergegeben. Keine zweite Mechanik: dieselbe Stelle,
+ * ein Wert mehr.
+ *
+ * Auf dem Finger kostet das fast nichts: die Schublade ist dort entweder
+ * fensterbreit oder 192 Punkte schmal, es liegt also kaum Tisch darunter.
+ *
+ * @param {{kind?: string|null, isTouch?: boolean, onField?: boolean}} [g]
+ *   `kind` ist der Wert von `data-bar-overlay` der nächsten markierten Fläche
+ *   über dem Druckpunkt (fehlt sie: keine Fläche), `onField` sagt, ob der Druck
+ *   auf einem Eingabefeld begann.
+ */
+export function overlayPassesGesture({ kind = null, isTouch = false, onField = false } = {}) {
+  if (!kind || onField) return false;
+  return !(isTouch && kind === 'scroll');
+}

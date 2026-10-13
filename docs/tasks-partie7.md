@@ -1,12 +1,13 @@
-# Aufgaben: Korrektheitsbefunde der siebten Solopartie (Spec M15.1, M15.3, M15.4)
+# Aufgaben: Befunde der siebten Solopartie (Spec M15.1, M15.3–M15.8)
 
 Vertrag ist `docs/spec-setup-system.md`, Abschnitt **M15**. Der Spielbericht
-steht in `docs/partie7-bericht.md`, §4.2 (N1, N3) und §4.3 (N4).
+steht in `docs/partie7-bericht.md`, §4.2 (N1, N3) und §4.3 (N4, N5, N7–N10).
 
-**Zuschnitt.** Diese Datei deckt **M15.1, M15.3 und M15.4** ab — die drei
-Punkte, bei denen der Tisch etwas anderes tut, als er soll. M15.2 ist nur die
-Rolle (kein Code). Die Bedienungsbefunde M15.5–M15.8 werden getrennt bearbeitet
-und stehen nicht hier.
+**Zuschnitt.** **Teil 1** (unten bis „Nachträge aus der Umsetzung") deckt
+**M15.1, M15.3 und M15.4** ab — die drei Punkte, bei denen der Tisch etwas
+anderes tut, als er soll. **Teil 2** (ab „Die Bedienungsbefunde") deckt
+**M15.5–M15.8** ab, die Bedienungsbefunde; beide Teile wurden getrennt
+bearbeitet. M15.2 ist nur die Rolle (kein Code).
 
 **Aufgabenbuchstaben.** `AA`–`AE` sind in `docs/tasks-partie5.md`, `AF`–`AN` in
 `docs/tasks-partie6.md` vergeben. Hier geht es mit `AP` weiter (`O` bleibt
@@ -372,3 +373,343 @@ die Bauliste. Die Prüfung hängt jetzt am Schritttyp.
 - **Das Clown-Kostüm im Ereignisstapel** steckt im Spielstand der siebten
   Partie, nicht im Aufbau. Ein frisch geladener Aufbau baut den Stapel aus den
   Kategorien neu und ist sauber.
+
+---
+---
+
+# Teil 2: Die Bedienungsbefunde (Spec M15.5–M15.8)
+
+Derselbe Vertrag, dieselben Belege: `docs/partie7-bericht.md` §4.3 (N5, N7, N8,
+N9, N10) und `docs/audit-dead-controls.md` Fund 8. Teil 1 oben deckt die
+Korrektheitsbefunde M15.1/M15.3/M15.4 ab (Commit `5fe704b`) und wird hier nicht
+mehr angefasst.
+
+**Aufgabenbuchstaben.** `AA`–`AE` in `docs/tasks-partie5.md`, `AF`–`AN` in
+`docs/tasks-partie6.md`, `AP`–`AR` oben. Hier geht es mit `AS` weiter.
+
+**Gilt für jede Aufgabe.** Erst der rote Test, dann die kleinste Änderung, die
+ihn grün macht. Tests: `cd server && npm test` (Stand vorher: **1078**, alle
+grün). Bau: `cd client && npx vite build` — keine **neue** Warnung (zwei sind
+vorbestehend). Der Client hat keine Testinfrastruktur: reine Logik gehört nach
+`shared/` oder `client/src/utils/` und wird aus `server/test/` geprüft,
+Verdrahtung über einen Quellentest nach dem Muster von `table-bars.test.js` und
+`die-rolls.test.js`. Jede Geste gilt für **Maus, Tastatur und Finger**.
+
+---
+
+## Wo die Spec nicht stimmt (Teil 2)
+
+Sieben Stellen. Zwei ändern eine Abnahme, eine nimmt einer Aufgabe die halbe
+Begründung.
+
+### 6. M15.5 — die Zone ist **drei** Kartenbreiten breit, nicht vier
+
+`relWidth: 1` stimmt, und die Tableaus sind 300 × 400 (`table_assets`), die Zone
+also 300 × 132 Weltpunkte (`relHeight: 0.33`, `resolveBox`). Nur ist eine Karte
+am Tisch **100 × 140** groß, nicht 75 × 105: `getCardDims` passt jedes
+Kartenbild in `CARD_WIDTH`/`CARD_HEIGHT` = 100 × 140 ein
+(`client/src/utils/cardDims.js`), und alle Karten dieses Spiels sind hochkant.
+300 Punkte sind damit **drei** Kartenbreiten.
+
+Und die Zone ist **132 Punkte hoch** — eine Karte ist 140 hoch. Schon die
+*erste* Ausrüstungskarte ragt oben und unten aus ihrer Zone heraus. Das ist der
+eigentliche Grund, warum man die Grenze nicht erahnen kann: sie liegt nicht um
+die Karten herum, sondern mitten durch sie hindurch.
+
+### 7. M15.5 — die Zone drängt heute **nichts** zur Seite
+
+Der Bericht liest sich, als hätte der Tisch die fünfte Karte nach x = 1200
+geschoben. Das hat er nicht. `Ausrüstung Dörfler N` hat `capacity: null` und
+`layout: "row"`; `zoneSlots` gibt für `row` **ohne** `capacity` absichtlich
+`null` zurück (Begründung steht dort), also hat die Zone keine Plätze,
+`snapPoint` liefert den Loslasspunkt zurück und `zoneRejects` weist nie etwas
+ab. Die Karten lagen genau dort, wo der Spieler sie hingezogen hat — mit seinem
+eigenen Abstand von rund 100 Punkten, weshalb die fünfte bei 1200 landete.
+
+**Folge für den Zuschnitt.** Der Befund ist vollständig ein Befund über die
+**unsichtbare Grenze** und über eine Zone, die für ihren Inhalt zu klein
+gezeichnet ist. Es gibt keinen Mechanismus zu reparieren. Umgekehrt heißt das:
+die Zone größer zu machen reicht nicht, solange sie keine Plätze hat — sie wird
+erst dann zu einer Ordnung, wenn sie eine `capacity` bekommt. Beides gehört in
+dieselbe Datenänderung.
+
+### 8. M15.5 — am Hotseat-Tisch fehlt die Darstellung, sie ist nicht beschränkt
+
+Geprüft: `ZoneOverlay` steht in `GameTable.jsx` genau einmal, im
+`{room && (…)}`-Zweig. Es gibt keine Bedingung, keinen Kommentar und keinen
+Schalter, der das begründete — Fund 8 des Audits ist richtig, und er nennt auch
+die Gegenrichtung: im Raum werden **alle** Zonen gezeichnet, auch die, die nur
+eine aufgedruckte Markerleiste nachzeichnen. Von den 30 Zonen des Aufbaus
+*TFT Kurzpartie* sind 16 solche Leisten (`layout: "slots"`, an ein Tableau oder
+den Hauptplan geheftet, 28–40 Punkte breit). Deren Namensschild
+(„Dörfler 1: Präzision") ist breiter als die Zone.
+
+**Folge.** Zonen brauchen dasselbe, was Raster seit M3b haben: ein
+`showInPlay`. Mit dem umgekehrten Vorgabewert, und das ist kein Versehen — ein
+Raster liegt über einem Brett, auf dem meist schon eines **aufgedruckt** ist,
+eine Zone über nichts. „Feld fehlt" heißt beim Raster deshalb „nicht zeichnen"
+und bei der Zone „zeichnen". Beide Vorgaben geben das bisherige Verhalten
+wieder (`shared/zoneGeometry.js`: „every default reproduces the old behaviour"),
+und eine Zone, die stört, wird mit `showInPlay: false` einzeln stillgelegt.
+
+### 9. M15.6 — der Zähler springt nicht auf 0, er wird nur nicht mitgeschrieben
+
+Die Ursache ist die, die der Vorgänger schon notiert hat, und sie ist genau eine
+Hälfte: `getGameState` führt für `dice`, `hitDice` und `customDice` je eine
+aufgezählte Feldliste, und `rolls` steht in keiner der drei. `loadGameState`
+liest es dagegen an allen drei Stellen (`rolls: d.rolls || 0`) — dieselbe
+Einseitigkeit wie bei `category` (Punkt 2) und bei `rotation` am Token (M7.1).
+
+**Die Mechanik im Bericht stimmt aber nicht.** `performAutoSave` *schreibt* nur
+(`POST /api/games/:id/saves/auto`); es lädt nichts zurück, und nichts anderes
+tut das nach einer Auto-Speicherung. Der Zähler **am Bildschirm** fällt also
+nicht auf 0 — er stand weiter auf 7. Auf 0 stand er in dem, was der Spieler
+gelesen hat: dem gespeicherten Zustand. Dasselbe Messproblem wie bei N4 („was
+der Spieler gemessen hat, war der gespeicherte Zustand"), nur hier mit einem
+echten Fehler darunter.
+
+Die Abnahme („Der Wurfzähler überlebt Speichern und Laden") bleibt damit
+wortgleich richtig und ist ein Quellentest über die beiden Feldlisten.
+
+### 10. M15.7 — der Wert sperrt nur die **Maus**, und er ist nicht die einzige Stelle
+
+Zwei Fehler in einem Satz.
+
+**Erstens:** die Wertanzeige stoppt `onMouseDown`, aber **nicht**
+`onTouchStart`. Ein Finger, der auf dem Wert beginnt, zieht den Zähler darum
+schon heute — der Druck erreicht über die Blase den `onTouchStart` der
+Zählerkachel. Der Befund ist ein **Mausbefund**. Abnahme 3 („gilt für Maus und
+Finger") ist auf der Fingerseite bereits erfüllt und bleibt als
+Regressionsschutz stehen.
+
+**Zweitens:** „nur der Namensstreifen trägt den Zug" ist falsch. Die Knöpfe `−`
+und `+` stoppen nur `onClick`, nicht `onMouseDown` — von ihnen aus zieht der
+Zähler ebenfalls. Taub ist genau die Wertanzeige, 40–72 Punkte breit. Die
+Angabe „ein Drittel der Höhe, bei 41 % Zoom zehn Bildschirmpunkte" beschreibt
+den Namensstreifen richtig, aber nicht die ziehbare Fläche.
+
+**Und der Fehler daneben, den niemand gemeldet hat.** Weil `−`, `+` und der
+„Roll"-Knopf jedes Würfels den Druck durchlassen, den Klick aber annehmen,
+**zählt ein Zug an ihnen den Zähler mit hoch** bzw. würfelt den Würfel: Druck
+und Loslassen liegen auf demselben Knopf, also entsteht ein `click` — genau die
+Begründung, die in `barPassthrough.js` für die Leisten steht. Das ist dieselbe
+Ursache, eine Ebene tiefer, und sie wird mit derselben Änderung erledigt statt
+mit einer zweiten.
+
+**Was von M14.5 passt und was nicht.** `passedSlop` passt — die Schwelle ist
+dieselbe Frage. Die zweite Hälfte von M14.5 (`data-bar-overlay` + `barObjectAt`
++ `pickTopmost`) passt **nicht**: die fragt „welches Stück liegt *unter* dieser
+Leiste". Hier liegt nichts darunter, der Druck liegt auf dem Zähler selbst, und
+es ist nichts zu treffen. Was zusätzlich wiederverwendet wird, ist das
+**Klick-Veto**: `barClickRef` und das eine `onClickCapture` am Tischbehälter.
+Damit bleibt es bei einer Stelle je Sache.
+
+### 11. M15.8 — die Durchlässigkeit trägt Züge, nicht Klicks
+
+Die Stelle, die M14.5 durchlässig gemacht hat, ist das Attribut
+`data-bar-overlay` plus `handleGlobalStart` (merkt den Druck),
+`handleGlobalMove` und `passBarGestureToTable` (entscheidet beim Wandern). Nur
+zwei Elemente tragen das Attribut: die Kopfleiste und die schwebende
+Werkzeugleiste. Der eingeklappte Griff (`toolbar-show-btn`) und die
+Kartenbibliothek (`card-drawer`) wurden einfach nie markiert. Insoweit stimmt
+die Spec.
+
+**Aber die Mechanik kann N10 nicht erfüllen.** Was der Spieler dort wollte, war
+ein **Klick** auf „Roll" unter der Schublade — drei ruhige Klicks. Ein ruhiger
+Druck gehört nach M14.5 der Fläche, und das ist Absicht, sonst verlöre jeder
+Knopf seinen Klick. Dasselbe gilt für den Rechtsklick in N9. Die Abnahme von
+M15.8 verlangt ausdrücklich nur, dass sich ein Stück **ziehen** lässt; das ist
+erfüllbar und wird gebaut. Dass ein Knopf unter der Bibliothek weiter
+unerreichbar bleibt, ist die bewusste Grenze dieser Mechanik und keine Lücke in
+der Umsetzung. Der Weg dorthin bleibt, das Stück aus dem Weg zu ziehen — was
+nach dieser Änderung geht.
+
+### 12. M15.8 — die Bibliothek ist keine Leiste, und das kostet eine Unterscheidung
+
+Die beiden Leisten sind dünne Pillen ohne eigenen Zug. Die Bibliothek ist eine
+Schublade mit einem **Rollbereich** (`flex-1 overflow-y-auto`) und einem
+**Suchfeld**. Beides lebt von einem wandernden Druck: auf dem Finger rollt man
+die Kartenliste, mit der Maus markiert man Text im Suchfeld. Gäbe man der
+Schublade dieselbe Behandlung wie einer Leiste, zöge ein Rollen an der
+Kartenliste das Stück darunter über den Tisch.
+
+Deshalb trägt das Attribut einen **Wert**: `true` für eine Leiste, `scroll` für
+eine Fläche, die selbst rollt — und ein Druck, der auf einem Eingabefeld
+beginnt, wird nie weitergegeben. Keine zweite Mechanik, ein Wert mehr an
+derselben Stelle, und die Entscheidung steht als reine Funktion in
+`barPassthrough.js`. Auf dem Finger verliert das fast nichts: die Schublade ist
+dort entweder fensterbreit (`w-full`) oder 192 Punkte schmal.
+
+---
+
+## AS — Zonen sind am Tisch zu sehen, und die Ausrüstung passt hinein (M15.5)
+
+### AS1 — Der Hotseat-Tisch zeichnet seine Zonen
+
+**Befund (N5, Audit-Fund 8).** `ZoneOverlay` hängt ausschließlich im
+`{room && (…)}`-Zweig. Am Hotseat-Tisch ist keine der 30 Zonen sichtbar, weder
+Rahmen noch Namensschild. Der Spieler musste sich merken, wem welche
+Ausrüstungskarte gehört.
+
+**Änderung.** `shared/zoneGeometry.js` bekommt `zoneShownInPlay(zone)`: eine
+Zone wird beim Spielen gezeichnet, solange sie nicht `showInPlay: false` trägt.
+Der Zonen-Block in `GameTable.jsx` wandert aus dem `room`-Zweig heraus und
+hängt an `!setupMode` — im Setup-Modus zeichnet `ZoneEditor` alle Zonen samt
+Namen, zwei Ebenen übereinander wären zwei Antworten. `myColor` kommt aus
+`room?.myColor ?? null`, der Raum verhält sich also unverändert.
+
+**Abnahme.**
+1. `zoneShownInPlay` ist für eine Zone ohne Feld, mit `true` und mit
+   `undefined` wahr und nur für `showInPlay: false` falsch (Test).
+2. Quellentest: `ZoneOverlay` steht **nicht** mehr innerhalb des
+   `room`-Zweigs, der Block ist mit `!setupMode` bewacht und filtert über
+   `zoneShownInPlay`.
+3. `cd client && npx vite build` bringt keine neue Warnung.
+4. Am Tisch sind die Zonen zu sehen, ohne dass man etwas anfasst
+   (Sichtprüfung).
+
+### AS2 — Die Ausrüstungszone fasst zwei Reihen (Daten, kein Code)
+
+**Befund (N5).** `Ausrüstung Dörfler N` ist 300 × 132 Weltpunkte groß, also
+drei Karten breit und weniger hoch als eine Karte (siehe „Wo die Spec nicht
+stimmt", 6). Sieben Karten passen dort unter keinen Umständen hinein.
+
+**Entscheidung: die größere Zone, nicht das mehrzeilige Layout** — und zwar
+beides, weil das eine ohne das andere nichts nützt. Begründung in Zahlen:
+
+- Die drei Tableaus stehen auf x = 300, 880, 1460 (Mitten), sind 300 breit und
+  haben damit **580 Punkte Abstand von Mitte zu Mitte**. Eine Zone von 580
+  Breite, am linken Tableaurand beginnend, reicht genau bis zum linken Rand des
+  nächsten Tableaus — die drei Zonen **stoßen aneinander und überlappen nie**.
+  Grannys Zone endet bei 1890, die nächste Zone (`Bösewicht-Tableau`) beginnt
+  bei 1900.
+- 580 × 280 mit `layout: "grid"` und `capacity: 10` ergibt über die vorhandene
+  Rechnung in `zoneSlots` **5 Spalten × 2 Reihen**: Plätze im Abstand 116
+  (Karte 100 breit) und 140 (Karte 140 hoch). Die zehn Karten liegen damit
+  lückenlos und **ohne Überlappung** in der Zone, und die Zone umschließt sie.
+- Ein mehrzeiliges Layout **innerhalb** der heutigen 300 × 132 gäbe es nicht:
+  drei Reihen à drei Karten bräuchten 420 Punkte Höhe und reichten 140 Punkte
+  tiefer nach unten als die breite Variante — und nach unten ist der Platz der
+  knappe (N6: die Ausrüstungsreihe lag schon unter dem Fensterrand).
+
+Also: `relWidth: 1.9333333333333333` (= 580/300), `relHeight: 0.7` (= 280/400),
+`layout: "grid"`, `capacity: 10`. `relX`/`relY`, `accepts`, `snap` und `anchor`
+bleiben.
+
+Dass `capacity` dabei von „unbegrenzt" auf 10 geht, ist Absicht: erst damit hat
+die Zone Plätze, erst damit rastet eine abgelegte Karte ein, und erst damit
+kann der Tisch eine elfte Karte überhaupt melden. Sieben war das beobachtete
+Maximum, zehn ist der Spielraum darüber.
+
+**Abnahme.**
+1. Trockenlauf vorab: die drei Zonen-IDs, ihre Anker-Asset-IDs und ihre
+   heutigen Werte stimmen mit diesem Text überein, 0 Beanstandungen.
+2. Kontrollausgabe nach dem Schreiben: die drei Zonen tragen die neuen Werte,
+   alle 30 Zonen sind noch da, nichts anderes hat sich geändert.
+3. Sieben Ausrüstungskarten eines Dörflers liegen erkennbar bei ihm und ragen
+   nicht in das Feld des Nachbarn (Sichtprüfung).
+
+### AS3 — Die aufgedruckten Leisten bleiben aus dem Spielbild
+
+**Befund.** 16 der 30 Zonen zeichnen nur eine aufgedruckte Markerleiste nach
+(`layout: "slots"`, 28–40 Punkte breit, an ein Tableau oder den Hauptplan
+geheftet). Ihr Namensschild ist breiter als die Zone selbst; zu zwölft über
+drei Tableaus gelegt verdecken sie den Aufdruck, den sie beschreiben.
+
+**Änderung.** Daten: `showInPlay: false` an den Zonen, die sich in der
+Sichtprüfung als störend erweisen. **Nach** AS1 und AS2 und nach einem Blick
+auf den echten Tisch entschieden — welche im Bild zu viel sind, ist eine Frage
+an das Bild, nicht an die Datenbank. Ohne diese Änderung ist AS1 erfüllt, nur
+unruhiger.
+
+**Abnahme.** Die Zonen, auf die es beim Spielen ankommt (Hände, Auslagen,
+Ausrüstung, Bösewicht-Plätze), sind zu sehen; die Markerleisten auf den
+Tableaus verdecken ihren Aufdruck nicht.
+
+---
+
+## AT — Der Wurfzähler übersteht das Speichern (M15.6)
+
+**Befund (N7).** `getGameState` schreibt `rolls` in keiner seiner drei
+Würfel-Feldlisten; `loadGameState` liest es in allen drei. Der Zähler ist nach
+einem Laden auf 0 — und im gespeicherten Zustand, in dem der Spieler
+nachgesehen hat, war er es immer (siehe „Wo die Spec nicht stimmt", 9).
+
+**Änderung.** `rolls: d.rolls || 0` in die drei Feldlisten von `getGameState`
+(`dice`, `hitDice`, `customDice`). Dasselbe, was der Mischzähler aus AP3 von
+Anfang an richtig macht.
+
+**Abnahme.**
+1. Quellentest: in beiden Richtungen steht `rolls` an allen drei Würfelarten —
+   `getGameState` schreibt es, `loadGameState` liest es.
+2. `cd client && npx vite build` bringt keine neue Warnung.
+
+---
+
+## AU — Ein Zug auf dem Zählerwert zieht den Zähler (M15.7)
+
+**Befund (N8).** Die Wertanzeige des Zählers stoppt `onMouseDown`; ein Zug, der
+mit der Maus dort beginnt, bewegt nichts und meldet nichts. Umgekehrt feuern
+`−`, `+` und der „Roll"-Knopf eines Würfels am Ende eines Zuges mit, weil Druck
+und Loslassen auf demselben Knopf liegen (siehe „Wo die Spec nicht stimmt",
+10). Beides ist dieselbe Ursache: niemand unterscheidet an einem Tischobjekt
+ruhigen von wanderndem Druck.
+
+**Änderung, zwei Stellen.**
+1. Die Wertanzeige stoppt `onMouseDown` nicht mehr. Damit erreicht der Druck
+   den `onMouseDown` der Zählerkachel, und `handleObjDragStart` zieht — genau
+   wie es auf dem Finger schon ist.
+2. `handleObjDragStart` merkt sich den Druckpunkt, `handleObjDragMove` setzt
+   `barClickRef.current = true`, sobald `passedSlop` überschritten ist. Damit
+   frisst das vorhandene `onClickCapture` am Tischbehälter den Klick, der nach
+   einem Zug noch kommt — dieselbe Stelle und dasselbe Veto wie bei M14.5, für
+   jedes Objekt statt nur für die Leisten.
+
+Das Eingabefeld selbst stoppt `onMouseDown` und `onTouchStart` weiterhin: wer
+im Feld tippt, soll nicht den Zähler verschieben.
+
+**Abnahme.**
+1. Quellentest: die Wertanzeige (`counter-value-`) hat kein
+   `onMouseDown`-`stopPropagation` mehr, das Eingabefeld
+   (`counter-value-input-`) schon.
+2. Quellentest: `handleObjDragStart` schreibt den Druckpunkt, und
+   `handleObjDragMove` setzt das Klick-Veto über `passedSlop`.
+3. Ein Zug, der auf dem Wert beginnt, bewegt den Zähler; ein Klick auf den Wert
+   öffnet weiterhin das Eingabefeld; ein Zug, der auf `+` beginnt, bewegt den
+   Zähler **ohne** hochzuzählen (Sichtprüfung, Maus und Finger).
+4. `cd client && npx vite build` bringt keine neue Warnung.
+
+---
+
+## AV — Griff und Bibliothek lassen den Zug durch (M15.8)
+
+**Befund (N9, N10).** Der Griff der eingeklappten Werkzeugleiste (44 × 44,
+mittig am unteren Rand) und die geöffnete Kartenbibliothek (192–256 Punkte am
+rechten Rand) liegen über dem Tisch und tragen kein `data-bar-overlay`. Ein
+Zug, der dort beginnt, bewegt nichts.
+
+**Änderung.**
+1. `client/src/utils/barPassthrough.js` bekommt
+   `overlayPassesGesture({ kind, isTouch, onField })`: ein Druck wird
+   weitergegeben, wenn er auf einer markierten Fläche beginnt, **nicht** auf
+   einem Eingabefeld, und **nicht** mit dem Finger auf einer Fläche, die selbst
+   rollt (`kind === 'scroll'`). Begründung in „Wo die Spec nicht stimmt", 12.
+2. `handleGlobalStart` fragt diese Funktion statt nur `closest(…)`.
+3. Der Griff bekommt `data-bar-overlay="true"`, die Schublade
+   `data-bar-overlay="scroll"`.
+
+**Abnahme.**
+1. `overlayPassesGesture` gibt die vier Fälle richtig: ohne Fläche nein, Leiste
+   mit Maus und mit Finger ja, Rollfläche mit Maus ja und mit Finger nein,
+   Eingabefeld immer nein (Test).
+2. Quellentest: Griff und Schublade tragen das Attribut, und
+   `handleGlobalStart` entscheidet über `overlayPassesGesture`.
+3. Ein Stück unter dem eingeklappten Griff und eines unter der Bibliothek
+   lassen sich mit der Maus ziehen; der Griff klappt die Leiste weiter aus, die
+   Bibliothek rollt und legt weiter Karten ab (Sichtprüfung).
+4. `cd client && npx vite build` bringt keine neue Warnung.
+
+**Nicht Teil der Aufgabe.** Ein **Klick** auf einen Knopf unter der Bibliothek
+(N10 wörtlich) und ein **Rechtsklick** auf ein Stück unter dem Griff (N9
+wörtlich). Ein ruhiger Druck gehört der Fläche, und das ist die Entscheidung
+von M14.5. Begründung in „Wo die Spec nicht stimmt", 11.
