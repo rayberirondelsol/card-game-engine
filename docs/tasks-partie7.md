@@ -713,3 +713,78 @@ Zug, der dort beginnt, bewegt nichts.
 (N10 wörtlich) und ein **Rechtsklick** auf ein Stück unter dem Griff (N9
 wörtlich). Ein ruhiger Druck gehört der Fläche, und das ist die Entscheidung
 von M14.5. Begründung in „Wo die Spec nicht stimmt", 11.
+
+---
+
+## Nachträge aus der Umsetzung (Teil 2)
+
+### 1. AS1 — die Zonen standen im DOM und waren trotzdem unsichtbar
+
+Nach der ersten Fassung war alles richtig verdrahtet: dreißig Zonen-Elemente im
+DOM, an den richtigen Weltkoordinaten (`left: 730px; top: 1808px; width: 580px;
+height: 280px`), `display: block`, `visibility: visible`, `opacity: 1` — und am
+Bildschirm nichts. Auch nicht, als der Rahmen versuchsweise 20 Punkte breit und
+rot war.
+
+**Ursache: `overflow-hidden` auf der Kameraebene.** Der Behälter ist
+`absolute inset-0`, sein eigener Kasten also fensterhoch, und die `transform`
+mit der Kamera wirkt erst *danach*. Mit `overflow-hidden` schneidet er alles
+weg, was in **Weltkoordinaten** jenseits der Fenstergröße liegt — und die
+Ausrüstungszone liegt bei y = 1808, also weit unterhalb von 790. Sie hatte nie
+eine Chance, egal wohin man die Kamera schob.
+
+Die Tischebene mit Karten und Token (dieselbe `inset-0`, dieselbe `transform`)
+hat aus genau diesem Grund **kein** `overflow-hidden`; geklippt wird am
+Wurzelbehälter, der es trägt. Jetzt sind alle drei Ebenen gleich gebaut.
+
+**Das Raster litt daran mit.** Dieselbe Zeile stand an der Rasterebene, also war
+auch jedes Rasterfeld unterhalb der Fensterhöhe abgeschnitten. Mitbehoben, weil
+es dieselbe Zeile ist.
+
+Festgehalten in `server/test/zone-in-play.test.js`: keine Kameraebene trägt
+`overflow-hidden`, und alle drei sind gleich gebaut.
+
+### 2. AS3 — vierzehn Leisten sind still, drei bleiben sichtbar
+
+Nach dem Blick auf den echten Tisch: die vier Namensschilder je Tableau
+(`Dörfler N: Leben/Bewegung/Mumm/Präzision`) überlappten sich zu einem
+unleserlichen grauen Fleck über genau dem Aufdruck, den sie beschreiben — drei
+Tableaus, zwölf Schilder. Dazu `Bösewicht: Bewegung` und `Bösewicht: Leben` auf
+dem Sideboard. Diese **vierzehn** tragen jetzt `showInPlay: false`.
+
+Sichtbar bleiben **sechzehn**, darunter die drei Leisten auf dem Hauptplan
+(`Bösewicht-Platz`, `Bösewicht-Leiste`, `Buyin'/Beatin'-Leiste`): sie sind
+Ablageplätze, ihr Name hilft, und ihre Schilder überlappen sich nicht. Beide
+Datenänderungen (AS2 und AS3) liefen je mit einem Trockenlauf vorab
+(**0 Beanstandungen**) und einer einzigen `db.transaction(...)`.
+
+### 3. AU — der Fehler daneben ist mit erledigt
+
+Am laufenden Tisch geprüft: ein Zug, der auf dem **Wert** beginnt, zieht den
+Zähler (Münztopf-Befund weg), ein ruhiger Klick auf den Wert öffnet weiterhin
+das Eingabefeld, und ein Zug, der auf **`+`** beginnt, zieht den Zähler, **ohne
+hochzuzählen**. Das letzte war nie gemeldet und fiel mit derselben Änderung.
+
+### 4. AV — die Mechanik trägt, was sie tragen kann
+
+Am laufenden Tisch geprüft: ein Zähler unter dem eingeklappten Griff lässt sich
+wegziehen, und der Griff klappt die Leiste danach weiter aus (ruhiger Klick).
+Ein Zähler unter der Kartenbibliothek lässt sich ebenso wegziehen, während
+Suchfeld und Kategorienliste der Schublade unverändert bedienbar bleiben.
+
+Unverändert bleibt, was M14.5 nicht leisten kann und soll: ein **Klick** auf
+einen Knopf unter der Schublade (N10) und ein **Rechtsklick** unter dem Griff
+(N9). Der Weg dorthin ist jetzt, das Stück wegzuziehen.
+
+### 5. Nicht angefasst
+
+- **N6** (Brett, Zähler und Ausrüstung passen in keine Ansicht) — eigener
+  Befund, nicht Teil von M15. Die Ausrüstungszone reicht durch AS2 jetzt 148
+  Punkte tiefer nach unten; das ist der bewusst in Kauf genommene Preis für
+  zwei volle Reihen, siehe die Rechnung in AS2.
+- **Die Darstellung der Zonen im Mehrspielerraum** ist unverändert, nur dass
+  `showInPlay` dort jetzt genauso gilt — das war die Gegenrichtung von
+  Audit-Fund 8 und ist damit mit erledigt.
+- **Nebenwirkung der Sichtprüfung:** der Auto-Speicherstand des Spiels trägt
+  jetzt einen frisch aufgebauten Tisch statt des Standes der siebten Partie.
+  Benannte Spielstände sind unberührt.
