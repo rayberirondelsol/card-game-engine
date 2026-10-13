@@ -4246,3 +4246,96 @@ zurückgegeben.
 
 Gehört in die Rolle, deutlich: **eine Schwäche gilt erst, wenn sie
 scharfgestellt wurde.**
+
+## M16 — Was der Zonen-Durchgang fand
+
+Belegt in `docs/partie8-zonen.md` — ein verkürzter achter Durchgang mit einem
+einzigen Schwerpunkt, weil an den Zonen viel auf einmal geändert worden war,
+ohne dass es jemand in Benutzung gesehen hatte.
+
+**Das Meiste hält.** Zonen werden gezeichnet, keine überlappt eine andere, die
+Seitenbindung schaltet in beide Richtungen (Dorfseite 14 Zonen mit
+`Nachschub-Auslage`, Kampfseite 15 mit `Aktionen` und `Ablage`), das
+Aufdeck-Menü listet nur Zonen der sichtbaren Seite und nur kartenannehmende. Die
+Ausrüstungszone misst 580 × 280, fünf Spalten, die zweite Reihe rastet, zehn
+Plätze — zehn Karten bei einem Dörfler, nichts rutscht zum Nachbarn. **N5 und
+N3 aus Partie 7 sind damit erledigt.**
+
+### M16.1 — Das Namensschild einer Zone sitzt auf ihrem ersten Platz
+
+**Befund, und er ist der schwerste.** Das Schild steht **innerhalb** der Zone
+oben links — also genau auf Platz 1. Gemessen, wie viel es vom Stück auf diesem
+Platz verdeckt:
+
+| Zone | verdeckt |
+|---|---|
+| `Buyin'/Beatin'-Leiste` | **73 %** |
+| `Bösewicht-Leiste` | 55 % |
+| `Besiegte Bösewichte` | 15 % |
+| `Heldentaten-Auslage` | 13 % |
+| `Nachschub-Auslage` | 9 % |
+
+Bei der ersten ist das kein Schönheitsfehler: auf dieser Leiste steht die
+Reihenfolge der Dörfler, und **wer als Erster dran ist, lässt sich nicht mehr
+ablesen**. Genau diese Leiste hat in Partie 7 schon einmal einen Kampf in
+falscher Reihenfolge verursacht (M15.2).
+
+**Eine Ursache, eine Korrektur.** Das Schild gehört **außerhalb** der Zone —
+über ihren oberen Rand gesetzt, wie eine Beschriftung am Rahmen und nicht im
+Bild. Wo darüber kein Platz ist (eine Zone am oberen Rand des Bretts), darunter.
+
+**Nicht gewollt:** das Schild durchsichtig machen oder verkleinern. Beides
+verdeckt weiterhin, nur weniger — und 9 % Verdeckung auf einem Kartennamen sind
+dieselbe Art Fehler wie 73 % auf einem Plättchen.
+
+**Abnahme.**
+1. Kein Namensschild überlappt die Fläche, auf der ein Stück in dieser Zone
+   liegt.
+2. Das oberste Plättchen der `Buyin'/Beatin'-Leiste` ist vollständig zu sehen.
+3. Die Schilder bleiben lesbar und ihrer Zone eindeutig zuzuordnen.
+
+### M16.2 — Eine volle Zone meldet sich dorthin, wo niemand hinsieht
+
+**Befund.** Legt man eine elfte Karte in eine Zone mit zehn Plätzen, erscheint
+„zone is full (10)" im **einklappbaren Kopfbereich**. Die Rolle empfiehlt, die
+Leisten einzuklappen, damit sie den Tisch nicht verdecken — wer das tut, sieht
+die Meldung nie. Beim Ziehen springt die Karte **stumm** zurück; der Stapel
+bleibt einfach stehen.
+
+Das ist dasselbe Muster wie B1 aus Partie 6: eine Wirkung tritt ein, und die
+Begründung landet an einer Stelle, die gerade nicht sichtbar ist.
+
+**Änderung.** Eine abgewiesene Ablage meldet sich **am Ort des Geschehens** —
+sichtbar auch bei eingeklappter Leiste. Es gibt dafür schon die Meldebänder
+(M12.1); eine zweite Meldewege daneben wäre der Fehler, den M6 verbietet.
+
+**Abnahme.**
+1. Bei eingeklappter Leiste ist zu sehen, dass und warum eine Ablage abgewiesen
+   wurde.
+2. Die Meldung nennt die Zone und ihre Kapazität.
+3. Sie verschwindet von selbst und blockiert den Tisch nicht.
+
+### M16.3 — Die unsichtbaren Leisten sind ein blindes Ziel
+
+**Befund.** Die vierzehn reinen Markerleisten wurden in M15.5 absichtlich auf
+unsichtbar gestellt, weil ihre Schilder den Tableau-Aufdruck überdeckten. Das
+war richtig — aber jetzt legt man dort blind ab: **neun Bildschirmpunkte neben
+der Spur blieb der Marker lose auf dem Tableau liegen, ohne Einrasten und ohne
+Hinweis.** Bei 43 % Zoom ist die Spur zwölf Bildschirmpunkte breit.
+
+**Änderung, und sie löst beides.** **Während eines Zuges werden die Zonen
+sichtbar** — auch die, die `showInPlay: false` tragen. Wer nichts in der Hand
+hat, sieht den sauberen Tisch; wer etwas trägt, sieht, wo es hingehört. Die
+Zonen bleiben im Ruhezustand genau so, wie M15.5 sie eingestellt hat.
+
+**Zu prüfen, bevor gebaut wird:** ob das Einrasten bei einer unsichtbaren Zone
+überhaupt stattfindet — der Befund („blieb lose liegen") könnte heißen, dass
+`showInPlay: false` nicht nur die Darstellung abschaltet. Dann ist **das** der
+Fehler, und die Sichtbarkeit beim Ziehen ist nur die halbe Antwort.
+
+**Abnahme.**
+1. Während ein Stück gezogen wird, sind alle Zonen zu sehen, die es annehmen
+   könnten — auch die unsichtbar gestellten.
+2. Nach dem Loslassen sind sie wieder so sichtbar wie vorher.
+3. Ein Marker, der neun Punkte neben seiner Spur losgelassen wird, rastet
+   darauf ein.
