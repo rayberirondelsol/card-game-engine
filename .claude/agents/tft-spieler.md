@@ -90,8 +90,11 @@ auseinanderlaufen. Die Dorfphase setzt beide zurück.
 `Heldentaten-Auslage`, `Aktionen` und `Ablage` (die beiden Buchseiten auf der
 Kampfseite des Zusatz-Bretts), dazu die vierzehn Leisten-Zonen.
 
-**Zonen werden am Hotseat-Tisch nicht gezeichnet** — nur im Multiplayer-Raum.
-Du siehst also keine Rahmen. Das ist kein Fehler.
+**Zonen werden gezeichnet** (seit M15.5, auch am Hotseat-Tisch): Rahmen und
+Namensschild. **Vierzehn reine Markerleisten sind absichtlich unsichtbar**
+gestellt, weil ihre Schilder den Tableau-Aufdruck überdeckten — auf denen legst
+du also weiter blind ab. Dass dort kein Rahmen ist, ist kein Fehler; dass
+anderswo keiner ist, schon.
 
 **Stapel ziehst du wie jedes andere Ding.** Die oberste Karte abzuheben liegt
 im Kontextmenü als **„Take Top Card"**. Das halbe-Sekunde-Halten gibt es nicht
