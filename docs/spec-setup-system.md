@@ -4372,3 +4372,148 @@ Fehler, und die Sichtbarkeit beim Ziehen ist nur die halbe Antwort.
 2. Nach dem Loslassen sind sie wieder so sichtbar wie vorher.
 3. Ein Marker, der neun Punkte neben seiner Spur losgelassen wird, rastet
    darauf ein.
+
+## M17 — Was die neunte Partie fand
+
+Belegt in `docs/partie9-bericht.md`: eine vollständige Runde — Dorfphase ganz,
+dann neun Kampfrunden gegen Deputy Waggums mit dreizehn Bösewicht-Aktionen,
+**verloren**, alle drei Dörfler ausgeschaltet.
+
+**Sechs der sieben Reparaturen halten im laufenden Spiel.** Namensschilder
+verdecken nichts, die abgewiesene Ablage meldet sich auch bei eingeklappter
+Kopfleiste, das Misch-Abzeichen zählt, der Zähler lässt sich am Wert ziehen,
+„Dorfphase beginnen" räumt ohne Fremdes mitzunehmen und setzt die
+Bösewicht-Zähler auf 0, der besiegte Bösewicht landet in seiner Zone, beide
+Ansichten sitzen richtig. Punkt 2 (Zonen während des Ziehens) ließ sich **nicht
+prüfen** — das Werkzeug des Spielers kann kein Bild *während* eines Zuges
+machen. Das bleibt offen, nicht widerlegt.
+
+### M17.1 — „Hide toolbar" macht die Spielführung unerreichbar
+
+**Befund (F1), ein Blocker.** Ein Klick auf das Chevron der Werkzeugleiste
+klappt **beide** Leisten ein, und die gesamte Bedienebene sitzt danach rund
+**300 px zu hoch**: die Werkzeugleiste schwebt in der Bildmitte (y ≈ 400 statt
+710), die Kopfleiste mit den drei Spielknöpfen steht bei y ≈ −250 außerhalb des
+Fensters. Der eingeblendete Griff holt nur die Werkzeugleiste zurück, und auch
+die sitzt dann mittig. Fenstergröße ändern half nicht.
+
+Der Spieler kam nur über die **Tastatur** zurück: mit Shift+Tab auf „Kampf
+beginnen" und Enter — beim Neuzeichnen rückt die Oberfläche von selbst zurecht.
+Das ist ein Hinweis auf die Ursache, kein Umweg, den man jemandem zumuten kann.
+
+**Zur Abgrenzung: „Hide top bar" ist tadellos** — es klappt nur die Kopfleiste
+ein und hinterlässt einen Griff, der sie zurückholt. Der Fehler steckt im
+Zusammenspiel von „Hide toolbar" mit der Kopfleiste.
+
+**Zu prüfen, bevor gebaut wird:** warum das Neuzeichnen die Lage repariert. Wenn
+die Leisten ihre Lage aus einer Messung beziehen, die beim Einklappen veraltet,
+ist **das** der Fehler — und nicht die Sichtbarkeit.
+
+**Abnahme.**
+1. „Hide toolbar" klappt die Werkzeugleiste ein und **nur** sie.
+2. Beide Leisten sitzen vorher und nachher an ihrem Platz.
+3. Jede eingeklappte Leiste hat einen sichtbaren Griff, der sie zurückholt.
+
+### M17.2 — Ein verdeckter Stapel lässt sich nicht durchsuchen
+
+**Befund (F2), ein Blocker für mindestens fünf Karten dieser Partie.**
+„Browse" auf dem Nachschubstapel zeigt 25 identische Rückseiten, jede mit
+„Face down" beschriftet; Klicken tut nichts. Der Effekt von *Ausbuddeln!*
+(„nimm das erste *Mitbringsel* vom Nachschub") ließ sich darum nicht ausführen
+und **ist verfallen**. Dieselbe Suche verlangen *Harrys Secondhandladen*,
+*Wunschbrunnen*, *Verwahrlostes Picknick* und *Überwuchertes Maisfeld*.
+
+Der Umweg „Take Top Card" scheitert doppelt: die abgehobenen Karten liegen
+ebenfalls verdeckt und müssen einzeln umgedreht werden, und die
+Stapelreihenfolge ist danach zerstört.
+
+**Der Kern.** Ein Nachziehstapel am Solotisch ist **keine verborgene
+Information** — es ist der eigene Vorrat, und am echten Tisch blättert man ihn
+durch. Dass „Browse" die Rückseite zeigt, verwechselt *verdeckt liegen* mit
+*geheim sein*.
+
+**Änderung.** „Browse" zeigt die Karten **lesbar**, unabhängig von `faceDown`,
+in Stapelreihenfolge. Die Reihenfolge bleibt beim Schließen unverändert.
+
+**Zu entscheiden, von dem der es baut:** ob das für jeden Stapel gilt oder nur
+am Hotseat-Tisch. Im Mehrspielerraum ist ein verdeckter Stapel sehr wohl
+geheim — begründe die Entscheidung und sag, woran sie hängt.
+
+**Abnahme.**
+1. „Browse" auf einem verdeckten Stapel zeigt die Kartenbilder lesbar und in
+   Stapelreihenfolge.
+2. Nach dem Schließen liegt der Stapel unverändert, verdeckt und in derselben
+   Reihenfolge.
+3. Eine einzelne Karte lässt sich von dort entnehmen, ohne den Rest zu stören.
+
+### M17.3 — Die Zone gewinnt gegen den Stapel, der das sichtbare Ziel ist
+
+**Befund (F3), viermal.** Der Nachschubstapel liegt im Einzugsbereich der Zone
+`Bösewicht-Tableau`. Jeder Versuch, eine Karte dorthin zurückzulegen, endet mit
+*„zone 'Bösewicht-Tableau' does not accept cards"*; die Karte springt zurück.
+Zwei von drei Karten gingen nur durch knappe Zufallstreffer daneben doch noch
+auf den Stapel, **eine liegt seither offen daneben** — der Vorrat zählt 24 statt
+25.
+
+**Der Kern.** Beim Ablegen schlägt die Zone den Stapel. Das ist genau
+andersherum als beim Anlegen an eine Karte, wo M7-Logik sagt: *das Besondere
+schlägt das Allgemeine* — eine Karte ist eine Stelle, eine Zone eine Fläche.
+Ein Stapel, den man sieht, ist das genauere Ziel als eine Zone, die man nicht
+sieht.
+
+**Änderung.** Liegt unter dem Loslasspunkt ein **Stapel, der die Karte
+annimmt**, gewinnt er gegen eine Zone, die sie ablehnt. Lehnen beide ab, bleibt
+die Meldung wie bisher.
+
+**Abnahme.**
+1. Eine Karte auf einen Stapel gelegt, der im Bereich einer kartenablehnenden
+   Zone liegt, landet auf dem Stapel.
+2. Dieselbe Karte neben den Stapel in dieselbe Zone gelegt, wird weiterhin
+   abgewiesen, mit Meldung.
+3. Eine Zone mit Plätzen verhält sich unverändert.
+
+### M17.4 — Ausliegende Bösewicht-Aktionskarten bleiben liegen
+
+**Befund (L3).** *Welpenblick* und *Fährte aufnehmen* lagen regelgemäß offen vor
+ihren Zielen. „Dorfphase beginnen" entfernt Verhaltensdeck und Ablage, **lässt
+diese beiden aber liegen** — §7.6 verlangt, dass das Bösewichtmaterial
+verschwindet.
+
+**Abnahme.** Nach „Dorfphase beginnen" liegt keine Bösewicht-Aktionskarte mehr
+auf dem Tisch, auch keine vor einem Dörfler.
+
+### M17.5 — Ausgeschaltete Dörfler stellt die Dorfphase nicht zurück
+
+**Befund (L2).** Ihre Figuren bleiben mit gestricheltem Rand dort liegen, wo
+sie beiseitegelegt wurden; zurück auf die Leiste muss man sie von Hand stellen.
+*(Der gestrichelte Rand selbst ist richtig und hilfreich — das ist M10.10.)*
+
+**Abnahme.** Nach „Dorfphase beginnen" stehen alle drei Dörfler wieder auf
+ihren Plätzen, ohne Markierung.
+
+### M17.6 — „Angelegt" und „weggepackt" gibt es am Tisch nicht
+
+**Befund (L1), und es ist kein Fehler, sondern eine fehlende Fähigkeit.** Es
+gibt keine Ausrüstungsplätze (Kopf/Brust/Beine/Zubehör/Hände) und keinen Zustand
+„weggepackt". Alles, was die Regeln daran hängen, ist Kopfarbeit: *Mitleid*
+(„packe 1 angelegte Waffe weg"), *Verbuddeln*, die Heldentaten *Nackedei* und
+*Anpassungsfähig*, Ausrüstungstausch. Der Spieler behalf sich mit Drehen der
+Karte; bei 41 % Zoom ist davon praktisch nichts zu sehen, und eine Heldentat hat
+er deshalb nicht verfolgt.
+
+**Das ist ein eigener Meilenstein**, kein Anhängsel — es berührt Zonen, Zustand
+einer Karte und die Darstellung. Hier steht es nur, damit es nicht verlorengeht.
+
+### Kleinkram (Ä1–Ä6)
+
+- **Ä1** Das Stapel-Kontextmenü (18 Einträge) füllt bei 932 × 790 den ganzen
+  Bildschirm; während der Auswahl sieht man vom Tisch nichts. Einmal pro
+  Bösewicht-Zug.
+- **Ä2** Das Kontextmenü nennt den Namen des angefassten Stücks nicht. Bei acht
+  gleichen Rückseiten kostet jede Identifizierung zwei Klicks über „Enlarge".
+- **Ä3** Die beiden Bösewicht-Zähler stehen 25 px untereinander mit winziger
+  Beschriftung — einmal wurde BEW statt LEB gesenkt.
+- **Ä4** „Remove from Table" fragt bei einer **Karte** nicht nach, bei einem
+  Token schon (M14.7). Ein Fehlgriff wäre unumkehrbar.
+- **Ä5** Zähler am unteren Rand liegen regelmäßig unter der Werkzeugleiste.
+- **Ä6** Die Abweisungsmeldung ist englisch, der Rest deutsch.
