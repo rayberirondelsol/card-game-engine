@@ -11,6 +11,9 @@ import { gridAddress } from '../../../shared/gridGeometry.js';
 // Ein Winkel wird genau einmal ausgelegt (M7.1/M13.1) - der Server liest ihn
 // mit derselben Funktion wie Tisch, Editor und Executor.
 import { rotationOf } from '../../../shared/assetToken.js';
+// M15.4/AP1: es gibt genau eine Mischung, und sie liegt in shared/ - Tisch,
+// Raum und Executor benutzen dieselbe.
+import { shuffleStack } from '../../../shared/sequenceExecutor.js';
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -230,15 +233,39 @@ function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestam
   }, playerId);
 }
 
-function handleStackShuffle(room, playerId, { stack_id }, timestamp) {
+/**
+ * M15.4/AP1+AP2: Mischen im Raum.
+ *
+ * Bisher permutierte das nur die Array-Reihenfolge von `stack.cards` und liess
+ * `zIndex` stehen - und die Reihenfolge eines Stapels ist ueberall `zIndex`.
+ * Der Raum mischte also wirkungslos. Gemischt wird jetzt mit `shuffleStack` aus
+ * shared/, derselben Funktion, die Tisch und Executor benutzen.
+ *
+ * `order` ist die Reihenfolge, die der mischende Tisch schon gewuerfelt hat
+ * (`tableId` von unten nach oben) - sonst mischte jeder Tisch fuer sich und die
+ * Stapel liefen auseinander. Passt sie nicht genau auf den Stapel, mischt der
+ * Server selbst; weitergerufen wird in beiden Faellen die **tatsaechlich
+ * angewandte** Reihenfolge, damit alle dasselbe uebernehmen.
+ */
+function handleStackShuffle(room, playerId, { stack_id, order }, timestamp) {
   const stack = findStack(room, stack_id);
-  if (stack) {
-    for (let i = stack.cards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [stack.cards[i], stack.cards[j]] = [stack.cards[j], stack.cards[i]];
+  let applied = null;
+  if (stack && Array.isArray(stack.cards)) {
+    const byId = new Map(stack.cards.map(c => [c.tableId, c]));
+    const wanted = Array.isArray(order) && order.length === stack.cards.length
+      ? order.map(id => byId.get(id))
+      : null;
+    if (wanted && wanted.every(Boolean) && new Set(order).size === order.length) {
+      stack.cards = wanted;
+      stack.cards.forEach((c, i) => { c.zIndex = i + 1; });
+    } else {
+      shuffleStack(stack.cards);
     }
+    stack.card_ids = stack.cards.map(c => c.cardId);
+    stack.table_ids = stack.cards.map(c => c.tableId);
+    applied = stack.cards.map(c => c.tableId);
   }
-  broadcast(room, { type: 'stack_shuffle', stack_id, from_player_id: playerId, timestamp }, playerId);
+  broadcast(room, { type: 'stack_shuffle', stack_id, order: applied, from_player_id: playerId, timestamp }, playerId);
 }
 
 // ─── Private hand draw ────────────────────────────────────────────────────────

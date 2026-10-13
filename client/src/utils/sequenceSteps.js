@@ -64,8 +64,14 @@ export const STEP_TYPES = [
   { value: 'reveal_next', label: 'Reveal Next', fields: ['zoneLabel', 'targetZoneLabel'] },
   // R2/M8.4: die Leiste rueckt auf. Kein Ziel - gedreht wird *in* der Zone.
   { value: 'rotate_zone', label: 'Rotate Zone', fields: ['zoneLabel'] },
-  { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
-  { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel'] },
+  // M15.1/AQ1: `category` ist der Kategorienfilter - gesetzt, raeumt der
+  // Schritt nur Karten dieser Kategorien ab und laesst alles andere liegen.
+  // Dieselbe Liste wie bei `place_stack`, nur in der anderen Richtung gelesen.
+  { value: 'clear_zone', label: 'Clear Zone', fields: ['zoneLabel', 'category', 'targetZoneLabel', 'targetStackLabel', 'faceDown'] },
+  // M15.3/AR1: `clear_grid` loescht - mit `targetZoneLabel` + `pool` wandert
+  // das Asset dieses Pools stattdessen in die Zielzone. Ohne beides
+  // unveraendert.
+  { value: 'clear_grid', label: 'Clear Grid', fields: ['gridLabel', 'targetZoneLabel', 'pool'] },
   // M7/T6: kein `gridLabel` - das Raster steht in den Szenariodaten, nicht am
   // Schritt. Der Schritt hat genau eine Einstellung: ob der Endkampf-Abschnitt
   // dazugehoert.
@@ -111,6 +117,12 @@ export function stepFields(step) {
   // zurückgehen. Ohne Stapelziel wäre sie eine Einstellung ohne Wirkung.
   if (spec.value === 'clear_zone' && typeof step === 'object' && !step?.targetStackLabel) {
     return spec.fields.filter(f => f !== 'faceDown');
+  }
+  // M15.3/AR1: derselbe Satz für `clear_grid` - der Pool sagt, *was* verschont
+  // wird, und ohne Zielzone wird nichts verschont. Ein Feld ohne Wirkung ist
+  // ein Versprechen, das der Aufbau nicht hält.
+  if (spec.value === 'clear_grid' && typeof step === 'object' && !step?.targetZoneLabel) {
+    return spec.fields.filter(f => f !== 'pool');
   }
   return [...spec.fields];
 }
@@ -335,9 +347,16 @@ export function describeStep(step) {
       const into = step?.targetZoneLabel ? `into zone ${q(step.targetZoneLabel)}`
         : step?.targetStackLabel ? `under stack ${q(step.targetStackLabel)}${side}`
         : 'off the table';
-      return `Clear zone ${q(step.zoneLabel)} ${into}`;
+      // M15.1/AQ1: der Filter steht nur da, wenn es einen gibt - ohne ihn
+      // raeumt der Schritt alles ab, und das ist das bisherige Verhalten.
+      const only = categoryList(step?.category);
+      const what = only.length ? ` (only ${only.map(c => `"${c}"`).join(' + ')})` : '';
+      return `Clear zone ${q(step.zoneLabel)} ${into}${what}`;
     }
-    case 'clear_grid': return `Clear grid ${q(step.gridLabel)} off the table`;
+    // M15.3/AR1: der verschonte Pool steht nur da, wenn es ein Ziel gibt.
+    case 'clear_grid': return step?.targetZoneLabel
+      ? `Clear grid ${q(step.gridLabel)} off the table, pool ${q(step.pool)} into zone ${q(step.targetZoneLabel)}`
+      : `Clear grid ${q(step.gridLabel)} off the table`;
     case 'build_scenario': {
       const when = step?.final === true || step?.final === 'true' ? 'with the final fight section'
         : step?.final === false || step?.final === 'false' ? 'without the final fight section'
@@ -406,7 +425,10 @@ export function validateStep(step, ctx = {}) {
   // gemeldet - am Tisch ist er nach Regel 2 nur noch eine Zeile im Protokoll.
   if (fields.has('category')) {
     const cats = categoryList(step?.category);
-    if (!cats.length) problems.push('no card category chosen');
+    // M15.1/AQ1: bei `clear_zone` ist die Kategorie der **Filter**, und keiner
+    // ist die gueltige Vorgabe ("alles"). Nur `place_stack` baut aus ihr, dort
+    // ist sie Pflicht.
+    if (!cats.length && typeOf(step) === 'place_stack') problems.push('no card category chosen');
     for (const cat of cats) {
       if (!hasPlaceholder(cat) && !known(cardCategories, cat)) problems.push(`card category "${cat}" is empty or unknown`);
     }

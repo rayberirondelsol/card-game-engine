@@ -14,7 +14,7 @@ import { zoneAt, zoneContains, zoneRejects, countInZone } from '../../../shared/
 import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
-import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
+import { executeSequenceWithLog, shuffleStack } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
 import { tableObjectView, tokenPreview, previewBox } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
@@ -612,6 +612,12 @@ export default function GameTable({ room = null }) {
   const [mergeTarget, setMergeTarget] = useState(null);
   const mergeHoldRef = useRef({ x: 0, y: 0, timer: null });
   const [stackNames, setStackNames] = useState({}); // stackId → name for named stacks
+  // M15.4/AP3: wie oft dieser Stapel gemischt wurde. Mischen sah vorher und
+  // nachher gleich aus - der Spieler konnte in Partie 7 nicht pruefen, ob sein
+  // Griff angekommen ist (N4). Dieselbe Spur wie beim Wuerfel (M14.11), und sie
+  // reist im Spielstand mit, damit die naechste Auto-Speicherung sie nicht auf
+  // 0 zuruecksetzt.
+  const [stackShuffles, setStackShuffles] = useState({}); // stackId → Anzahl Mischungen
   const [hoveredTableCard, setHoveredTableCard] = useState(null); // tableId of card being hovered
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 }); // mouse position for hover preview
   const [altKeyHeld, setAltKeyHeld] = useState(false); // whether ALT key is currently held
@@ -2937,6 +2943,41 @@ export default function GameTable({ room = null }) {
 
   // ===== STACK FUNCTIONS =====
 
+  /**
+   * M15.4/AP2: eine Stapelreihenfolge anlegen - `zIndex` 1..N nach dieser
+   * Liste von `tableId`. Der eigene Griff und die Nachricht aus dem Raum laufen
+   * beide hierher; sonst waere "gemischt" zweimal verschieden gerechnet.
+   */
+  function applyStackOrder(stackId, order) {
+    const place = new Map(order.map((tid, i) => [tid, i + 1]));
+    setTableCards(prev => prev.map(c => (
+      c.inStack === stackId && place.has(c.tableId) ? { ...c, zIndex: place.get(c.tableId) } : c
+    )));
+    setStackShuffles(prev => ({ ...prev, [stackId]: (prev[stackId] || 0) + 1 }));
+  }
+
+  /**
+   * M15.4/AP1: einen Stapel am Tisch mischen.
+   *
+   * Es gab das zweimal buchstabengleich (Kontextmenue und `MobileActionBar`)
+   * und ein drittes Mal anders im Raum. Gemischt wird jetzt ueberall mit
+   * `shuffleStack` aus shared/ - derselben Funktion, die der `shuffle`-Schritt
+   * benutzt.
+   *
+   * Die Reihenfolge wird **vor** dem Setzen gewuerfelt, nicht im Updater von
+   * `setTableCards`: der laeuft erst beim naechsten Rendern, und die Nachricht
+   * an den Raum ginge dann ohne Reihenfolge raus. Im Raum geht sie mit -
+   * mischte jeder Tisch fuer sich, liefen die Stapel auseinander.
+   */
+  function shuffleStackOnTable(stackId) {
+    if (!stackId) return;
+    const stackCards = tableCards.filter(c => c.inStack === stackId).sort((a, b) => a.zIndex - b.zIndex);
+    if (stackCards.length < 2) return;
+    const order = shuffleStack(stackCards.map(c => ({ ...c }))).map(c => c.tableId);
+    applyStackOrder(stackId, order);
+    if (room) room.sendAction({ type: 'stack_shuffle', stack_id: stackId, order });
+  }
+
   // Split a stack: take top N cards and make a new stack
   function performSplit(stackId, count) {
     const stackCards = tableCards.filter(c => c.inStack === stackId);
@@ -3456,6 +3497,10 @@ export default function GameTable({ room = null }) {
         locked: tf.locked || false,
       })),
       stackNames: stackNames,
+      // M15.4/AP3: der Mischzaehler reist mit `stackNames` - ohne das faellt er
+      // bei der naechsten Auto-Speicherung auf 0 (derselbe Fehler wie N7 am
+      // Wuerfel).
+      stackShuffles,
       maxZIndex: maxZIndex,
       // M10.6/U4: die benannten Ansichten reisen im Spielstand mit – dort, wo
       // `camera`, `background` und `stackNames` schon stehen. `state_data` ist
@@ -3501,6 +3546,11 @@ export default function GameTable({ room = null }) {
               return [...withoutOld, { ...msg.card, tableId: msg.card.tableId, inStack: null }];
             });
           }
+          break;
+        // M15.4/AP2: die Reihenfolge, die der Server angewandt hat - `zIndex`
+        // ist die Stapelreihenfolge, also wird sie daraus neu gesetzt.
+        case 'stack_shuffle':
+          if (Array.isArray(msg.order)) applyStackOrder(msg.stack_id, msg.order);
           break;
         case 'stack_removed':
           setTableCards(prev => prev.filter(c => c.inStack !== msg.stack_id));
@@ -4127,6 +4177,10 @@ export default function GameTable({ room = null }) {
     } else {
       setStackNames(newStackNames);
     }
+
+    // M15.4/AP3: ein Stand ohne Zaehler ist einer ohne Mischungen, nicht einer
+    // mit stehengebliebenen - darum {} statt des alten Werts.
+    setStackShuffles(state.stackShuffles && typeof state.stackShuffles === 'object' ? state.stackShuffles : {});
 
     // Trigger canvas re-render
     setTimeout(() => renderCanvas(), 100);
@@ -4979,6 +5033,21 @@ export default function GameTable({ room = null }) {
                   className="absolute -top-2 -right-2 min-w-[20px] h-5 rounded-full bg-yellow-500 text-black sm:text-[10px] text-xs font-bold flex items-center justify-center px-1 shadow-lg z-10"
                 >
                   {stackSize}
+                </div>
+              )}
+
+              {/* M15.4/AP3: wie oft dieser Stapel gemischt wurde. Der Stapel sah
+                  vorher und nachher gleich aus, es gab keine Animation, keine
+                  Meldung, keinen Zaehler - der Spieler hat in Partie 7 gespielt,
+                  *als haette* gemischt (N4). Dieselbe Spur wie am Wuerfel
+                  (M14.11): sie steht auch spaeter noch da. */}
+              {isStack && stackShuffles[stackId] > 0 && (
+                <div
+                  data-testid={`stack-shuffles-${stackId}`}
+                  title={`${stackShuffles[stackId]}× gemischt`}
+                  className="absolute -top-2 -left-2 min-w-[20px] h-5 rounded-full bg-slate-900/90 text-slate-200 border border-slate-500 sm:text-[10px] text-xs font-bold flex items-center justify-center px-1 shadow-lg z-10"
+                >
+                  #{stackShuffles[stackId]}
                 </div>
               )}
 
@@ -7496,18 +7565,7 @@ export default function GameTable({ room = null }) {
                     </div>
                     <button
                       onClick={() => {
-                        const sid = contextMenu.stackId;
-                        setTableCards(prev => {
-                          const stackCards = prev.filter(c => c.inStack === sid);
-                          const otherCards = prev.filter(c => c.inStack !== sid);
-                          for (let i = stackCards.length - 1; i > 0; i--) {
-                            const j = Math.floor(Math.random() * (i + 1));
-                            const tempZ = stackCards[i].zIndex;
-                            stackCards[i] = { ...stackCards[i], zIndex: stackCards[j].zIndex };
-                            stackCards[j] = { ...stackCards[j], zIndex: tempZ };
-                          }
-                          return [...otherCards, ...stackCards];
-                        });
+                        shuffleStackOnTable(contextMenu.stackId);
                         setContextMenu(null);
                       }}
                       data-testid="context-shuffle"
@@ -8078,23 +8136,10 @@ export default function GameTable({ room = null }) {
           }
         }}
         onShuffle={() => {
-          let stackId = null;
           for (const tid of selectedCards) {
             const card = tableCards.find(c => c.tableId === tid);
-            if (card?.inStack) { stackId = card.inStack; break; }
+            if (card?.inStack) { shuffleStackOnTable(card.inStack); return; }
           }
-          if (!stackId) return;
-          setTableCards(prev => {
-            const stackCards = prev.filter(c => c.inStack === stackId);
-            const otherCards = prev.filter(c => c.inStack !== stackId);
-            for (let i = stackCards.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              const tempZ = stackCards[i].zIndex;
-              stackCards[i] = { ...stackCards[i], zIndex: stackCards[j].zIndex };
-              stackCards[j] = { ...stackCards[j], zIndex: tempZ };
-            }
-            return [...otherCards, ...stackCards];
-          });
         }}
         onSplitStack={() => {
           let stackId = null;

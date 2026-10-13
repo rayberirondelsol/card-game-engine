@@ -486,7 +486,8 @@ test('clear_zone is offered with the fields its handler reads', () => {
   const ctx = { zoneLabels: ZONES.map(z => z.label) };
 
   assert.ok(STEP_TYPES.some(t => t.value === 'clear_zone'), 'clear_zone missing from STEP_TYPES');
-  assert.deepEqual(stepFields('clear_zone'), ['zoneLabel', 'targetZoneLabel', 'targetStackLabel', 'faceDown']);
+  // M15.1/AQ1: `category` ist dazugekommen - der Kategorienfilter.
+  assert.deepEqual(stepFields('clear_zone'), ['zoneLabel', 'category', 'targetZoneLabel', 'targetStackLabel', 'faceDown']);
 
   const fresh = defaultStep('clear_zone', ctx);
   assert.equal(fresh.type, 'clear_zone');

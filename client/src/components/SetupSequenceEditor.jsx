@@ -126,7 +126,9 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     // Tippfehler, den Regel 2 am Tisch nur noch ins Protokoll schreibt.
     // Nebenbei wird ein Platzhalter (`Aktionen: $revealedBase`) damit
     // überhaupt erst eintippbar; über die Auswahlliste war er es nie.
-    category: () => field('Cards', (
+    // M15.1/AQ1: bei `clear_zone` liest derselbe Renderer den **Filter** statt
+    // der Bauliste - nur die Beschriftung sagt, in welche Richtung.
+    category: () => field(step.type === 'clear_zone' ? 'Only cards' : 'Cards', (
       <div className="flex-1 space-y-1">
         <textarea
           rows={Math.max(2, categoryLines.length)}

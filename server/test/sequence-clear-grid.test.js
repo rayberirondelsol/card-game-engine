@@ -244,7 +244,10 @@ test('clear_grid is offered with the fields its handler reads', () => {
   const ctx = { grids: gridFixture() };
 
   assert.ok(STEP_TYPES.some(t => t.value === 'clear_grid'), 'clear_grid missing from STEP_TYPES');
-  assert.deepEqual(stepFields('clear_grid'), ['gridLabel']);
+  // M15.3/AR1: Ziel und Pool sind dazugekommen - was verschont wird und wohin.
+  assert.deepEqual(stepFields('clear_grid'), ['gridLabel', 'targetZoneLabel', 'pool']);
+  assert.deepEqual(stepFields({ type: 'clear_grid', gridLabel: 'Kampffeld' }), ['gridLabel', 'targetZoneLabel'],
+    'ohne Zielzone verschont nichts, also kein Pool');
 
   const fresh = defaultStep('clear_grid', ctx);
   assert.deepEqual(fresh, { type: 'clear_grid', gridLabel: 'Kampffeld' }, 'prefilled with the first grid');

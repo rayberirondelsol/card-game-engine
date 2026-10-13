@@ -148,6 +148,28 @@ function reassignZIndices(cards) {
 }
 
 /**
+ * M15.4/AP1: **die** Mischung eines Kartenstapels - Liste permutieren *und*
+ * `zIndex` nachziehen, in dieser Reihenfolge.
+ *
+ * Beides gehoert zusammen, und genau daran ist der Raum gescheitert:
+ * `handleStackShuffle` permutierte nur die Liste. Die Reihenfolge eines Stapels
+ * ist aber ueberall `zIndex` - `loadGameState` liest ihn, die Darstellung
+ * sortiert danach, `getGameState` schreibt danach. Der Raum mischte also eine
+ * Reihenfolge, die niemand liest (Partie 7, N4).
+ *
+ * Darum ist das hier exportiert: Tisch (`GameTable.jsx`), Raum
+ * (`messageHandler.js`) und der `shuffle`-Schritt mischen mit derselben
+ * Funktion. Eine vierte Mischung waere eine vierte Antwort darauf, was
+ * „gemischt" heisst.
+ */
+export function shuffleStack(cards, rng = Math.random) {
+  if (!Array.isArray(cards)) return cards;
+  shuffleArray(cards, rng);
+  reassignZIndices(cards);
+  return cards;
+}
+
+/**
  * Der hoechste zIndex, der am Tisch schon vergeben ist (M8.9/D2).
  *
  * Eine Karte, die einen Stapel verlaesst, bringt ihren zIndex *aus dem Stapel*
@@ -378,6 +400,36 @@ function spotFor(spots, zone, i, fallback, already = 0) {
   return fallback;
 }
 
+/**
+ * Objekte in eine Zielzone schieben - die Haelfte, die `clear_zone` und
+ * `clear_grid` teilen (M15.3/AR1). Vorher stand sie nur im `clear_zone`-Zweig;
+ * sie zweimal hinzuschreiben waeren zwei Antworten darauf, wie ein Objekt in
+ * eine Zone kommt.
+ *
+ * Eine Zone kann Karten und Assets halten; `accepts` gilt je Sorte, die
+ * Kapazitaet teilen sie sich (`occupancy` zaehlt beide). Darum einmal
+ * `zoneRoom` pro Sorte, gerechnet wird mit dem ersten Ergebnis.
+ *
+ * @returns {{refusal: ?string, leftovers: Array, free: ?Map}} - `refusal`
+ *   gesetzt heisst: die Zone nimmt diese Sorte gar nicht, der Schritt gehoert
+ *   uebersprungen. `leftovers` sind die, fuer die kein Platz war.
+ */
+function moveIntoZone(state, objs, target) {
+  const rooms = [...new Set(objs.map(kindOf))].map(k => zoneRoom(state, [target], k));
+  const blocked = rooms.filter(r => !r.usable.length);
+  if (blocked.length) {
+    return { refusal: blocked.flatMap(r => r.problems).join('; '), leftovers: objs, free: null };
+  }
+  const { free, occupied, spots } = rooms[0];
+  const { groups, leftovers } = shareOut(objs, [target], free);
+  groups.get(target).forEach((obj, i) => {
+    const pos = spotFor(spots, target, i, zoneCenter(target), occupied.get(target));
+    obj.x = pos.x;
+    obj.y = pos.y;
+  });
+  return { refusal: null, leftovers, free };
+}
+
 /** Deal items round robin over the usable zones, stopping at each zone's free count. */
 function shareOut(items, usable, free) {
   const groups = new Map(usable.map(z => [z, []]));
@@ -526,8 +578,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     case 'shuffle': {
       const stack = idx.get(step.stackLabel);
       if (!stack) return skip(`stack "${step.stackLabel}" not found`);
-      shuffleArray(stack.cards, rng);
-      reassignZIndices(stack.cards);
+      shuffleStack(stack.cards, rng);
       return state;
     }
 
@@ -1070,8 +1121,35 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // das Schloss ausgerechnet gegen das Löschen wirkungslos zu machen wäre
       // die falsche Richtung.
       const locked = inside.filter(o => o.locked);
-      const movable = inside.filter(o => !o.locked);
+      let movable = inside.filter(o => !o.locked);
       const notes = locked.length ? [`left in place, locked: ${locked.map(objName).join(', ')}`] : [];
+
+      // M15.1/AQ1: der Kategorienfilter. Gesetzt, raeumt der Schritt nur Karten
+      // dieser Kategorien ab; alles andere bleibt liegen und steht mit Namen im
+      // Protokoll. In Partie 7 hat dieser Schritt eine einzigartige
+      // Ausruestungskarte unter den Dorf-Ereignis-Stapel geschoben (N1) - der
+      // Aufbau weiss nicht, wohin eine fremde Karte gehoert, und still in einen
+      // Nachziehstapel schieben ist von drei Moeglichkeiten die schlechteste.
+      //
+      // Die Kategorie steht **nicht** an der Tischkarte: `getGameState` und
+      // `loadGameState` fuehren eine aufgezaehlte Feldliste ohne `category`.
+      // Sie wird ueber `cardId` in der Bibliothek nachgeschlagen, derselben,
+      // die `place_stack` liest - Tisch und Raum geben sie gleich mit.
+      //
+      // Ein Token ist keine Karte dieser Kategorien und bleibt darum auch
+      // liegen. Das ist derselbe Satz, nur fuer die andere Sorte.
+      const wantedCats = categoryList(step.category).map(norm);
+      if (wantedCats.length) {
+        const fits = (o) => kindOf(o) === 'card'
+          && wantedCats.includes(norm(cards.find(c => String(c.id) === String(o.cardId))?.category));
+        const foreign = movable.filter(o => !fits(o));
+        movable = movable.filter(fits);
+        if (foreign.length) {
+          const named = categoryList(step.category).map(c => `"${c}"`).join(', ');
+          notes.push(`left in place, not of category ${named}: ${foreign.map(objName).join(', ')}`);
+        }
+      }
+
       if (!movable.length) return fail(notes.join('; '));
 
       // Vermerke, die den Schritt nicht scheitern lassen: er tut, was er soll,
@@ -1085,20 +1163,8 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         const target = findZone(zones, step.targetZoneLabel);
         if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
 
-        // Eine Zone kann Karten und Assets halten; `accepts` gilt je Sorte, die
-        // Kapazität teilen sie sich (`occupancy` zählt beide). Darum einmal
-        // `zoneRoom` pro Sorte, gerechnet wird mit dem ersten Ergebnis.
-        const rooms = [...new Set(movable.map(kindOf))].map(k => zoneRoom(state, [target], k));
-        const blocked = rooms.filter(r => !r.usable.length);
-        if (blocked.length) return skip(blocked.flatMap(r => r.problems).join('; '));
-
-        const { free, occupied, spots } = rooms[0];
-        const { groups, leftovers } = shareOut(movable, [target], free);
-        groups.get(target).forEach((obj, i) => {
-          const pos = spotFor(spots, target, i, zoneCenter(target), occupied.get(target));
-          obj.x = pos.x;
-          obj.y = pos.y;
-        });
+        const { refusal, leftovers, free } = moveIntoZone(state, movable, target);
+        if (refusal) return skip(refusal);
 
         // Was nicht mitkommt, bleibt liegen und steht mit Namen im Protokoll -
         // stillschweigend verschwinden darf hier nichts.
@@ -1212,10 +1278,52 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // Gesperrt heisst gesperrt - siehe den `clear_zone`-Zweig oben.
       const locked = on.filter(o => o.locked);
-      const gone = new Set(on.filter(o => !o.locked));
+      let movable = on.filter(o => !o.locked);
+      const notes = locked.length ? [`left in place, locked: ${locked.map(objName).join(', ')}`] : [];
+
+      // M15.3/AR1: was verschont wird, wandert in eine Zielzone statt geloescht
+      // zu werden. In Partie 7 war das Boesewicht-Plaettchen nach der Dorfphase
+      // vom Tisch (N3): es stand auf dem Raster, nicht auf `Boesewicht-Platz`,
+      // und `clear_grid` loescht. `pool` sagt, *was* verschont wird - ohne ihn
+      // wanderten die Doerfler mit in die Trophaeenreihe.
+      //
+      // Die Kategorie steht nicht am Token, `assetId` schon - dieselbe Lage wie
+      // bei den Karten in `clear_zone`.
+      if (step.targetZoneLabel && step.pool) {
+        const target = findZone(zones, step.targetZoneLabel);
+        // Ein geratenes Ziel darf nicht loeschen: der Schritt wird ganz
+        // uebersprungen, wie im `clear_zone`-Zweig.
+        if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
+
+        const spared = movable.filter(o => {
+          const asset = assets.find(a => String(a.id) === String(o?.assetId));
+          return norm(asset?.category) === norm(step.pool);
+        });
+        if (spared.length) {
+          const { refusal, leftovers, free } = moveIntoZone(state, spared, target);
+          if (refusal) return skip(refusal);
+          // Was mitkommt *und* was liegenbleibt, wird nicht geloescht: ein
+          // Boesewicht, der auf dem Weg in die Trophaeenreihe verschwindet,
+          // waere schlimmer als einer, der im Weg steht.
+          const stays = new Set(spared);
+          movable = movable.filter(o => !stays.has(o));
+          // Der Rasterplatz gehoert zum Raster: wer es verlaesst, verliert ihn,
+          // sonst zieht `placeOnGrids` ihn beim naechsten Laden zurueck (M3b).
+          for (const obj of spared) {
+            if (leftovers.includes(obj)) continue;
+            obj.gridId = null;
+            obj.cell = null;
+          }
+          if (leftovers.length) {
+            notes.push(`${leftovers.length} of ${spared.length} objects stayed on grid "${grid.label}": ${fullZones([target], free, kindOf(leftovers[0])).join('; ')} (${leftovers.map(objName).join(', ')})`);
+          }
+        }
+      }
+
+      const gone = new Set(movable);
       state.cards = state.cards.filter(o => !gone.has(o));
       state.tokens = state.tokens.filter(o => !gone.has(o));
-      if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
+      if (notes.length) return fail(notes.join('; '));
       return state;
     }
 
