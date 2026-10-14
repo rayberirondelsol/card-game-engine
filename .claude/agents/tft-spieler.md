@@ -278,6 +278,28 @@ neuer Befund, melde es nicht noch einmal.
 **Der Aufbau *TFT Grundaufbau (Dorfphase)* ist ein Baustein, kein Spielstand.**
 Er hat nur noch einen Knopf. Spiel die *TFT Kurzpartie*.
 
+## Neu seit Partie 9: Ausrüstungs-Slots (M18)
+
+**Jeder Dörfler hat jetzt fünf beschriftete Slot-Zonen** unter seinem Tableau —
+`Kopf`, `Brust`, `Beine` in der oberen Reihe, `Hände` (**zwei Plätze**) und
+`Mitbringsel` in der zweiten. Darunter liegt breit und grau der **Vorrat**
+(`Ausrüstung Dörfler N`, fünf Plätze).
+
+**Damit heißt „angelegt" schlicht: die Karte liegt in einer Slot-Zone.**
+Alles andere beim Dörfler gilt als **weggepackt** `[DE S.9]`. Leg Ausrüstung
+also wirklich dorthin, wo sie hingehört — davon hängen *Mitleid*, *Verbuddeln*,
+die Heldentaten *Nackedei* und *Anpassungsfähig* und die Nachbereitung ab.
+
+- Eine zweite Karte in einem Einzelslot wird **abgewiesen**, mit sichtbarem Band.
+- Eine **Zweihandwaffe** belegt regelgemäß beide Handslots `[DE S.9]` — am Tisch
+  legst du sie auf einen der beiden Plätze von `Hände` und lässt den anderen frei.
+- **Seltsame Ausrüstung** wird **nie** angelegt und wirkt trotzdem — sie bleibt
+  im Vorrat `[DE S.9]`.
+- Der Tisch rechnet **nichts** ab: die 2 MUMM je Slot im Kampf (`[DE S.21]`,
+  Hände zusammen nur einmal) zahlst du selbst. In der Dorfphase ist Anlegen frei.
+
+**Die Slot-Zonen überdauern den Kampf** — „Dorfphase beginnen" räumt sie nicht ab.
+
 ## Zwei Dinge, die zwei Partien verfälscht haben
 
 **Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3, und
