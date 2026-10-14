@@ -17,6 +17,7 @@ nicht mehr öffnen müssen.
 | `[E01 hh:mm]` | Regelvideo Genus Solo S01E01 „Regeln" (Aufbau + Dorfphase, 1:20:30), YouTube `2PeqrpPXJxo`. Transkript: `scratchpad/subs/e01.txt`. |
 | `[E02 hh:mm]` | Regelvideo Genus Solo S01E02 „Regeln" (Kampfphase, 1:06:52), YouTube `jv8WfAgnPe4`. Transkript: `scratchpad/subs/e02.txt`. |
 | `[Tableau <Name>]` | Foto des Bösewicht-Tableaus. Basis + Üble Nachbarn: `Z:\Austausch\TfT\*.pdf`. Weitere 8: TTS-Mod `2999560617`, Bilder in `scratchpad/tableaus/`. |
+| `[DE S.x]` | **Deutsche Anleitung** (Frosted Games), `C:\Users\benja\Downloads\Townsfolk_Tussle_Anleitung_WEB.pdf`, 36 Seiten. Entspricht dem Regelstand der 2. Edition (§1.3). **Vollständiges Regelwerk in deutscher Sprache** — sticht die automatisch übersetzten Videountertitel. |
 | `[CS-DE]` | Deutsche Cheatsheet-Karte, `Downloads\Cheatsheet_Card_{FRONT,BACK}_DE_V2*.pdf` — maßgeblich für **deutsche Begriffe**. |
 | `[Crit-DE]` | Deutsche Knaller-Karte, `Downloads\Crit_Hit_Card_FRONT_DE_V1_RZ_klein.pdf`. |
 
@@ -346,9 +347,25 @@ Beispiel Handsy: CHUMP „Mediocre Monster" (nichts), HOOLIGAN „Fabled Fighter
 
 ### 5.3 Schwäche und Beute
 
-- Jedes Bösewicht-Tableau nennt eine **Schwäche (Weakness)**, die unter
-  bestimmten Bedingungen — meist durch eine Bösewicht-Aktion — aktiviert wird.
-  Ist sie aktiv, wird sie markiert und ihr Effekt gilt `[BR S.14]`, `[E01 1:17:31]`.
+- Jedes Bösewicht-Tableau nennt eine **Schwäche (Weakness)**. Sie ist **nicht von
+  Beginn des Kampfes an aktiv**, sondern muss erst aktiviert werden — in aller
+  Regel dadurch, dass eine Bösewicht-Aktion es ausdrücklich anordnet. Erst dann
+  legt man 1 Marker auf den **Kreis neben der Schwäche** auf dem Tableau, und erst
+  dann gilt ihr Effekt `[BR S.14]`, `[DE S.15]`, `[E01 1:17:31]`.
+  > „**WICHTIG: Die Schwäche eines Bösewichts ist nicht von Anfang an aktiv!** Sie
+  > muss erst durch eine Bösewicht-Aktion aktiviert werden." `[DE S.15]`
+- **Das gilt auch dann, wenn der Schwächentext eine eigene Auslösebedingung
+  trägt.** Viele Schwächen sind als Dauer- oder Wiederholungseffekt formuliert
+  (Deputy Waggums: „Whenever Waggums takes an action, if a townsfolk does not take
+  DMG by the end of the action, Waggums takes 1 DMG."; Pepin Milkfrog: „Pepin takes
+  +1 DMG when attacked from the 2 squares directly behind him."). Dieser Text
+  beschreibt, **wie** die Schwäche wirkt, sobald sie aktiv ist — er aktiviert sie
+  nicht selbst. Das Regelwerk nennt diesen Typ ausdrücklich: Effekte, die „**ab
+  jetzt** passiv [gelten] oder … immer wieder ausgelöst werden [können]"
+  `[DE S.15]`. Erkennungsmerkmal: der aufgedruckte Markierkreis neben „WEAKNESS".
+- **Am Tisch ist die Schwäche ein Zustand pro Kampf**, Startwert *aus*. Der
+  Auslösetext wird erst ausgewertet, wenn sie scharfgestellt ist.
+- Bösewichte lassen sich auch **ohne** aktivierte Schwäche besiegen `[DE S.15]`.
 - Unten auf dem Tableau stehen die **3 Bösewicht-Ausrüstungen**, die man erbeuten
   kann. Die mit **(★)** markierte kann zusätzlich **während** des Kampfes durch
   einen Knaller-Wurf von 9+ erlangt werden (§7.4) `[BR S.8]`, `[BR S.30 FAQ]`.
