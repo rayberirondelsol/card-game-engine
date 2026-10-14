@@ -13,9 +13,23 @@ Datenbank. Du spielst und **protokollierst, was sich nicht spielen lässt.**
 
 1. `docs/tft-regeln.md` — das Regelwerk. Es ist vollständig genug, um eine
    Partie zu führen: Rundenablauf, Bösewicht-Leiste, Szenarioaufbau, Attribute,
-   Ausrüstung, Heldentaten. §2.2 regelt die Solo-Besonderheiten, §5.4 die
-   Bösewicht-Werte, §5.10 die Grundflächen, §6.2 den Zug des Bösewichts, §7 was
-   nach einem gewonnenen Kampf geschieht.
+   Ausrüstung, Heldentaten. §2.2 regelt die Solo-Besonderheiten, §4 die Dorfphase
+   (inklusive der drei Arten von Werteänderungen), §5.1 die zehn Schritte des
+   Kampfaufbaus, §5.4 die Bösewicht-Werte, §5.10 die Grundflächen, §6.2 den Zug
+   des Bösewichts, §7 die acht Schritte nach einem gewonnenen Kampf.
+   **Stand 2026-10-14: die Datei ist gegen die deutsche Anleitung geprüft**
+   (`[DE S.x]`) — wo diese Rolle und die Regeldatei sich widersprechen, gilt die
+   Regeldatei. Begriffe, die sich dabei geändert haben: **Krawall** (nicht
+   „Randale"), **Wutausbruch** (nicht „Wutangriff"), **Rammen** (nicht
+   „Rempeln"), **besiegt** (nicht „ausgeschaltet"), **Mitbringsel** (nicht
+   „Zubehör"), **Snack** (nicht „Verzehrbares"), **Shoppen-/Kloppen-Reihenfolge**,
+   **Neue Nachbarn** (nicht „Üble Nachbarn" — die Kategorienamen in der Datenbank
+   tragen noch den alten Namen, das ist bekannt und kein Befund), und die
+   Rasterbuchstaben der Schlachtfeld-Übersicht heißen **`D`/`B`/`EG`**
+   (nicht `T`/`R`/`FF`) — in `docs/spec-setup-system.md` und den Szenariodaten
+   steht teils noch die alte Schreibung, ebenfalls bekannt und kein Befund.
+   Die **offizielle FAQ** (`[FAQ S.x]`, Stand 16.10.2025) geht der Anleitung vor;
+   die vier Punkte, die uns betreffen, stehen in §4 Schritt 3, §6.2 und §6.4.
 2. `docs/spec-setup-system.md` — der Vertrag der Engine. Für das Spielen
    zählen M3b (Raster), M7 bis M7.6 (Kampfaufbau, Bereichsfelder, Drehung,
    Grundflächen, Kampfseite des Zusatz-Bretts, Rückseiten von Geländeteilen)
@@ -75,7 +89,11 @@ verträgt die zerschossenen OCR-Namen: `heuhaufen` findet
 **Mausrad.** Über einer Liste scrollt es die Liste, über dem Tisch zoomt es.
 
 **Würfel.** Der W10 zeigt die gewürfelte Ziffer. **Seite 10 ist der Knaller**,
-nicht die Zehn.
+nicht die Zehn. Bei einem **Angriffswurf gegen den Bösewicht** ist das ein
+automatischer Treffer — „unabhängig von Ergebnis und Trifft-Voraussetzung" —,
+und du würfelst sofort erneut auf der Knaller-Tabelle. **Bei jedem anderen Wurf**
+(Dorf-Ereignis, Terrain, Gleichstand) zählt er als **10** (§6.4, `[DE S.20]`).
+Eine gewürfelte **1** im Angriffswurf ist ein **Patzer** und verfehlt immer.
 
 **Marker.** Auf jeder Attributleiste der Dörfler-Tableaus und auf
 `RUFFIAN MOVEMENT` / `RUFFIAN HEALTH` liegt ein Marker auf dem Feld seines
@@ -149,24 +167,48 @@ drei sind über Rechtsklick auf den Zähler änderbar. Die Dorfphase setzt auf d
 **Ausgangswert** zurück, Leben auf das Maximum.
 
 **Das ist der Grund, warum gekaufte Ausrüstung überlebt** — aber nur, wenn du
-sie einträgst: hebt eine Ausrüstung einen Wert *dauerhaft* (§7.5), **hebst du
-den Ausgangswert von Hand**, wie du am echten Tisch die Karte vor dich legst.
-Tust du es nicht, ist der Bonus nach der nächsten Dorfphase weg.
+sie einträgst: hebt eine **angelegte Ausrüstung** einen Wert *dauerhaft* (schwarze
+Markierung, §7 Schritt 5), **hebst du den Ausgangswert von Hand**, wie du am
+echten Tisch die Karte vor dich legst. Tust du es nicht, ist der Bonus nach der
+nächsten Dorfphase weg. Packst du die Ausrüstung weg oder wirfst sie ab, **senk
+den Ausgangswert wieder** — „die Wertveränderung kommt und geht mit der
+Ausrüstung" (`docs/tft-regeln.md` §4 Schritt 2, `[DE S.10]`).
 
-**Dasselbe gilt für Werteerhöhungen aus Heldentaten** — die sind laut §5.1
-dauerhaft, also gehört auch ihr Plus in den **Ausgangswert**. Nur bei
-Dorf-Ereignissen entscheidet der schwarze Grund (§5.2): schwarz → Ausgangswert,
-sonst nur den Wert für den nächsten Kampf.
+**In den Ausgangswert gehört ausschließlich das.** Alles andere ist ein Wert, den
+die Nachbereitung wieder abholt:
+
+- **Werteerhöhungen aus Heldentaten:** nur den **Wert** heben, **nicht** den
+  Ausgangswert. Sie gelten sofort, aber nur bis zur Nachbereitung des laufenden
+  Kampfes — dort werden die Leisten auf die Startwerte zurückgesetzt und danach
+  nur die schwarz markierten Ausrüstungsboni wieder aufgerechnet
+  (§4 Schritt 1, §7 Schritt 5, `[DE S.22]`, `[DE S.35]`).
+  ⚠️ **Das war bis 2026-10-14 anders in dieser Rolle beschrieben** („gehört in den
+  Ausgangswert"). Die Festlegung „dauerhaft" beruhte auf einer falschen Darstellung
+  der Regellage und ist aufgehoben; siehe `docs/regelabgleich.md` §F8.
+- **Dorf-Ereignisse, Terrain, Bösewicht-Effekte, Knaller-Boni:** ebenfalls nur den
+  **Wert**. Die schwarze Markierung ist ein Merkmal von **Ausrüstung**, kein
+  allgemeines „gilt dauerhaft"-Kennzeichen — auf einem Dorf-Ereignis gibt es sie
+  nicht (§4 Schritt 2, `[DE S.10]`).
+- **„Nur für diesen Zug":** Wert heben und **nach dem Zug selbst zurücksetzen**
+  (`[DE S.10]`).
 
 **„Enlarge" gibt es auch für Tokens** — Bösewicht-Tableau, Dörfler-Tableau,
 Geländeteil. Das ist der Weg, Regeltexte zu lesen; nicht zoomen.
 
 **Tokens lassen sich drehen** — `↺ Rotate Left` und `↻ Rotate Right` im
 Kontextmenü eines Bild-Tokens (neu in M13). **Benutze das für den Bösewicht.**
-Seine Blickrichtung ist nicht Deko: er *dreht sich zum Ziel* und geht bei
-„Bewege dich vorwärts" BEW Felder **geradeaus** (§6, `[BR S.15-16]`). Dreh ihn
-also jedes Mal, wenn er sich ausrichtet, statt Dir die Richtung zu merken —
-sonst ist „geradeaus" nach zwei Zügen nicht mehr entscheidbar.
+Seine Blickrichtung ist nicht Deko: „Der Bösewicht dreht sich in seiner Bewegung
+immer in die Richtung, **in die er sich gerade bewegt**", und bei „Dreht den
+Bösewicht Richtung Ziel und bewegt ihn vorwärts" geht er BEW Felder
+**geradeaus** in Blickrichtung (§6.2, `[DE S.17]`, `[DE S.18]`). Dreh ihn also
+jedes Mal, wenn er sich ausrichtet, statt Dir die Richtung zu merken — sonst ist
+„geradeaus" nach zwei Zügen nicht mehr entscheidbar.
+
+**Wann die BEW des Bösewichts überhaupt zählt**, entscheidet der Wortlaut der
+Anweisung, nicht der Kartenabschnitt: sagt sie „**Er bewegt sich X Felder**", ist
+die BEW **unerheblich**; sagt sie „**auf etwas zu**" / „Richtung …", bewegt er
+sich **bis zu seiner BEW** (§6.2, `[FAQ S.2]`). Im Nachspiel und bei Bewegung
+durch Ausrüstungs-Fähigkeiten ist sie ohnehin unerheblich.
 
 Ein quadratisches Token (Bösewicht 2×2) bleibt dabei auf denselben Feldern. Ein
 längliches Geländeteil dreht **um seine linke obere Ecke**: ein Zaun auf
@@ -212,15 +254,17 @@ Er hat nur noch einen Knopf. Spiel die *TFT Kurzpartie*.
 
 ## Zwei Dinge, die zwei Partien verfälscht haben
 
-**Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3: sie
-wird „unter bestimmten Bedingungen — meist durch eine Bösewicht-Aktion —
-aktiviert". **Wende sie nicht an, solange keine Aktion sie aktiviert hat.**
+**Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3, und
+zwar ohne Weichzeichner: „Die Schwäche eines Bösewichts ist **nicht von Anfang an
+aktiv**! Sie **muss** erst **durch eine Bösewicht-Aktion** aktiviert werden"
+(`[DE S.15]`). Kein „meist", kein „in aller Regel".
+**Wende sie nicht an, solange keine Aktion sie aktiviert hat.**
 Partie 6 und Partie 7 haben sie beide zunächst durchgehend angewendet; in
 Partie 7 fiel es erst auf, als eine Aktion ausdrücklich meldete, die Schwäche
 sei „jetzt aktiv".
 
 **„Dorfphase beginnen" dreht die „Wer ist dran?"-Leiste selbst.** Dreh sie
-**nicht** zusätzlich von Hand — §7.7 ist am echten Tisch ein Handgriff, hier
+**nicht** zusätzlich von Hand — §7 Schritt 7 ist am echten Tisch ein Handgriff, hier
 erledigt ihn die Aktion. Wer beides tut, dreht zweimal und spielt den nächsten
 Kampf in der falschen Reihenfolge. Genau das ist in Partie 7 passiert.
 
@@ -254,8 +298,10 @@ die Trennkarte „HALT STOP!", ist das ein Befund — melde ihn.
 **Die Bösewicht-Beute ist auffindbar.** Zu jedem Bösewicht gibt es in der
 Bibliothek eine Kategorie **`Beute: <Name>`** mit genau seinen drei
 Ausrüstungen; die mit dem **★ im Kartennamen** ist die, die im Kampf über einen
-Knaller-Wurf von 9+ zu holen ist (§7.4). Nach dem Sieg nimmt der Dörfler mit den
-meisten erfüllten Heldentaten **eine zufällige der drei** (§7.3).
+Knaller-Wurf von 9+ zu holen ist (§6.4, `[DE S.32]`). Nach dem Sieg nimmt der
+Dörfler mit den meisten **abgeschlossenen** Heldentaten dieser Runde — Karten,
+nicht Heldenpunkte, und nicht besiegt — **eine zufällige der drei**
+(§7 Schritt 3).
 
 **Die Bibliothekssuche findet nur Kartennamen, keine Kategorienamen** — `beute
 waggums` gibt null Treffer (belegt in Partie 6). Scroll stattdessen in der
@@ -266,8 +312,10 @@ beieinander.
 Nr. 73–161 und liegen damit im gesperrten Deck. Wenn Du meinst, eines benutzen
 zu können, hast Du Dich vertan — melde es.
 
-**Die Ausrüstungskategorien folgen der Rahmenfarbe** (`[BR S.8]`): `Nachschub`
-blau, `Startausrüstung` grau, `Einzigartige Ausrüstung` gelb, `Beute: …` lila —
+**Die Ausrüstungskategorien folgen der Rahmenfarbe** (`[DE S.8]`): `Nachschub`
+blau (= Tante Emma Ausrüstung), `Startausrüstung` grau, gelb = **Besondere
+Ausrüstung** (die Kategorie heißt am Tisch noch „Einzigartige Ausrüstung";
+„einzigartig" ist kein Regelbegriff), `Beute: …` lila —
 jeweils mit dem Erweiterungszusatz `(Üble Nachbarn)` bzw. `(Hookbox)`.
 
 ## Deine Partie

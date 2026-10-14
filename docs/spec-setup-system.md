@@ -3408,6 +3408,29 @@ Festgehalten in `docs/tft-regeln.md` §5.1 und in der Spielerrolle. Am Tisch hei
 das: **Ausgangswert** des Zählers heben, nicht nur den Wert — sonst holt die
 nächste Dorfphase die Erhöhung wieder ab (M11.4).
 
+> **Nachtrag 2026-10-14 — diese Entscheidung ist aufgehoben.**
+>
+> Die Begründung oben („Die Regel schweigt") war **falsch**. Die deutsche
+> Anleitung regelt es ausdrücklich: in Nachbereitungsschritt 5 werden die
+> Werte-Leisten „wieder auf ihre Startwerte" gesetzt — „alle Veränderungen, die du
+> im Laufe des Kampfes erhalten hast, sind hiermit wieder weg" —, und danach
+> werden **nur die schwarz markierten Wertveränderungen von angelegter
+> Ausrüstung** erneut aufgerechnet `[DE S.22]`. Das Glossar bestätigt es: „Nur
+> schwarz markierte Wertveränderungen **durch Ausrüstung** bleiben erhalten"
+> `[DE S.35]`. Die schwarze Markierung ist also ein Merkmal von Ausrüstung, kein
+> generisches „dauerhaft"-Kennzeichen.
+>
+> **Heldentaten-Belohnungen verfallen damit in der Nachbereitung.** Am Tisch:
+> nur den **Wert** des Zählers heben, **nicht** den Ausgangswert. In den
+> Ausgangswert gehört ausschließlich, was angelegte Ausrüstung mit schwarzer
+> Markierung dauerhaft gibt.
+>
+> Entschieden vom Auftraggeber am 2026-10-14 nach dem Regelabgleich. Belege und
+> Wortlaut: `docs/regelabgleich.md` §F8. Eingetragen in `docs/tft-regeln.md`
+> §4 Schritt 1 (die frühere Fundstelle „§5.1" gibt es nicht mehr) und in
+> `.claude/agents/tft-spieler.md`. Der Abschnitt M12.7 selbst bleibt als
+> Vorgeschichte stehen.
+
 ## M13 — Was Partie 5 offen ließ
 
 Drei Punkte, die am Tisch fehlten und die Partie 5 nur mit Behelfen spielbar

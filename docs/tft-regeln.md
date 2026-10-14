@@ -1,8 +1,28 @@
 # Townsfolk Tussle — Regelreferenz für Solopartien (mit beiden Erweiterungen)
 
-Stand: 2026-09-23. Zweck: Wissensgrundlage für einen Agenten, der eine Solopartie
+Stand: 2026-10-14. Zweck: Wissensgrundlage für einen Agenten, der eine Solopartie
 regelkonform auf der Engine durchspielt. Wer diese Datei liest, soll die Quellen
 nicht mehr öffnen müssen.
+
+> **Abgleich 2026-10-14.** Diese Datei ist gegen die deutsche Anleitung
+> (`[DE S.x]`, 36 Seiten) geprüft worden. Alle Korrekturen sind eingetragen; die
+> Begründungen und die wörtlichen Zitate stehen in `docs/regelabgleich.md`.
+> **Rangfolge der Quellen für das Grundspiel:** `[FAQ S.x]` → `[DE S.x]` →
+> alles andere. `[DE S.x]` sticht `[BR S.x]`, `[EXP S.4]` und die
+> Videotranskripte; die offizielle FAQ sticht auch die Anleitung. Wo nur noch ein
+> Video als Beleg dastand und die Anleitung schweigt, ist das mit
+> `⚠️ NUR VIDEO` oder `⚠️ ABGELEITET` gekennzeichnet.
+>
+> **Die Erweiterung heißt auf Deutsch „Neue Nachbarn"** (Titelseite `[NN S.1]`:
+> „Townsfolk Tussle / Neue Nachbarn / Erweiterung"), **nicht „Üble Nachbarn"** —
+> so stand es bis 2026-10-14 in diesen Unterlagen, und so heißen noch die
+> Kategorien in der Produktionsdatenbank (`Dorf-Ereignisse (Üble Nachbarn)` usw.).
+> Auch die Anleitung selbst nennt sie so: „Flut ist ein Terrain aus der **Neue
+> Nachbarn**-Erweiterung" `[DE S.32]`.
+>
+> **§9 und §10 (die Erweiterungen) sind NICHT abgeglichen.** Für sie liegen jetzt
+> die deutschen Anleitungen `[NN]` und `[TT]` vor; der Abgleich ist ein eigener
+> Durchgang (§13.10).
 
 ---
 
@@ -12,24 +32,29 @@ nicht mehr öffnen müssen.
 |---|---|
 | `[BR S.x]` | **Basis-Regelwerk** „Townsfolk Tussle – Rules & Results Booklet" (1st Ed., 32 S.), englisch. Kopie: `scratchpad/rules/base.pdf`, Textauszug `base.txt`. Seitenzahlen = Buchseiten = PDF-Seiten. |
 | `[EXP S.4]` | **Expansion-Demo-Regelwerk**, Seite 4 „Base Game Rule Updates" — offizielle Regel-Updates, die in die **2. Edition** einfließen. Die deutsche Frosted-Games-Ausgabe entspricht diesem Stand (siehe §1.3). Kopie: `scratchpad/rules/expansion.pdf`. |
-| `[FN S.x]` | **Foul Neighbors Rulebook** (dt. „Üble Nachbarn"), `C:\Users\benja\Downloads\Rulebook_FOULNEIGHBORS_Compressed.pdf`. Seitenzahlen = Buchseiten (das PDF enthält Doppelseiten). |
-| `[OJ S.x]` | **Odd Jobs Rulebook** (dt. „Toller Trödel"), `C:\Users\benja\Downloads\Rulebook_ODDJOBS_compressed.pdf`. |
+| `[FN S.x]` | **Foul Neighbors Rulebook** (dt. „Neue Nachbarn"), `C:\Users\benja\Downloads\Rulebook_FOULNEIGHBORS_Compressed.pdf`, englisch, 9 S. **Durch `[NN S.x]` überholt.** |
+| `[OJ S.x]` | **Odd Jobs Rulebook** (dt. „Toller Trödel"), `C:\Users\benja\Downloads\Rulebook_ODDJOBS_compressed.pdf`, englisch, 7 S. **Durch `[TT S.x]` überholt.** |
+| `[NN S.x]` | **Deutsche Anleitung „Neue Nachbarn"** (Frosted Games, 16 Seiten, inkl. Schicksale 37+), `C:\Users\benja\Downloads\Townsfolk_Tussle_Ueble_Nachbarn_Anleitung.pdf`. Deutlich ausführlicher als `[FN]`. **§10 ist noch NICHT vollständig dagegen abgeglichen** (§13.10). |
+| `[TT S.x]` | **Deutsche Anleitung „Toller Trödel"** (Frosted Games, 12 Seiten), `C:\Users\benja\Downloads\Townsfolk_Tussle_Toller_Troedel_Anleitung.pdf`. Deutlich ausführlicher als `[OJ]`. **§9 ist noch NICHT vollständig dagegen abgeglichen** (§13.10). |
 | `[E01 hh:mm]` | Regelvideo Genus Solo S01E01 „Regeln" (Aufbau + Dorfphase, 1:20:30), YouTube `2PeqrpPXJxo`. Transkript: `scratchpad/subs/e01.txt`. |
 | `[E02 hh:mm]` | Regelvideo Genus Solo S01E02 „Regeln" (Kampfphase, 1:06:52), YouTube `jv8WfAgnPe4`. Transkript: `scratchpad/subs/e02.txt`. |
-| `[Tableau <Name>]` | Foto des Bösewicht-Tableaus. Basis + Üble Nachbarn: `Z:\Austausch\TfT\*.pdf`. Weitere 8: TTS-Mod `2999560617`, Bilder in `scratchpad/tableaus/`. |
+| `[Tableau <Name>]` | Foto des Bösewicht-Tableaus. Basis + Neue Nachbarn: `Z:\Austausch\TfT\*.pdf`. Weitere 8: TTS-Mod `2999560617`, Bilder in `scratchpad/tableaus/`. |
 | `[DE S.x]` | **Deutsche Anleitung** (Frosted Games), `C:\Users\benja\Downloads\Townsfolk_Tussle_Anleitung_WEB.pdf`, 36 Seiten. Entspricht dem Regelstand der 2. Edition (§1.3). **Vollständiges Regelwerk in deutscher Sprache** — sticht die automatisch übersetzten Videountertitel. |
+| `[FAQ S.x]` | **Offizielle FAQ von Frosted Games**, „Ich hab da mal ne Frage… — Häufige Fragen, Klarstellungen und Korrekturen (Stand: 16.10.2025)", 3 Seiten, deutsch: `C:\Users\benja\Downloads\Townsfolk_Tussle_FAQ_2025-10-16.pdf`. **Geht der Anleitung vor**, wo beide etwas sagen — sie enthält ausdrücklich „Klarstellungen" und „Korrekturen" zum gedruckten Stand. |
 | `[CS-DE]` | Deutsche Cheatsheet-Karte, `Downloads\Cheatsheet_Card_{FRONT,BACK}_DE_V2*.pdf` — maßgeblich für **deutsche Begriffe**. |
 | `[Crit-DE]` | Deutsche Knaller-Karte, `Downloads\Crit_Hit_Card_FRONT_DE_V1_RZ_klein.pdf`. |
 
 **Warnhinweis zu den Videos:** die Transkripte sind **automatisch ins Englische
 übersetzte** Untertitel eines deutschen Videos. Eigennamen und Fachbegriffe sind
 teils zerstört („Towns for Tassel" = Townsfolk Tussle, „Dürfler" = Dörfler,
-„Mum"/„Mumm" = Moxie, „riot" = Randale, „Auer"/„AU" = AUA/Schaden, „Knaller" =
-kritischer Treffer). **Inhaltlich** sind sie zuverlässig, sprachlich nicht.
-Wo Video und Regelwerk sich widersprechen, gilt das Regelwerk — jede solche
-Stelle ist unten ausdrücklich markiert.
+„Mum"/„Mumm" = Moxie, „riot" = *Krawall*, „Auer"/„AU" = AUA/Schaden, „Knaller" =
+kritischer Treffer). **Inhaltlich** sind sie meistens zuverlässig, sprachlich
+nicht — und in drei Fällen waren sie Quelle eines echten Fehlers: „Randale"
+statt Krawall, vier verunglückte Terrainnamen und die Reihenfolge in
+Dorfphase-Schritt 4. **Die deutsche Anleitung `[DE S.x]` löst diese Quelle
+vollständig ab.** Wo Video und Anleitung sich widersprechen, gilt die Anleitung.
 
-**Unsicherheiten** sind mit `⚠️ UNSICHER` gekennzeichnet. §14 sammelt sie.
+**Unsicherheiten** sind mit `⚠️ UNSICHER` gekennzeichnet. §13 sammelt sie.
 
 ---
 
@@ -37,8 +62,9 @@ Stelle ist unten ausdrücklich markiert.
 
 ### 1.1 Begriffe (deutsch / englisch)
 
-Alle deutschen Begriffe sind aus der deutschen Cheatsheet-Karte und den deutschen
-Druckdaten belegt `[CS-DE]`, `[Crit-DE]`.
+Die deutschen Begriffe stehen in der Anleitung `[DE S.4–36]`, allen voran im
+Definitionsglossar `[DE S.35]`; die Cheatsheet-Karte bestätigt sie `[CS-DE]`,
+`[Crit-DE]`.
 
 | Deutsch | Abk. | Englisch |
 |---|---|---|
@@ -47,130 +73,209 @@ Druckdaten belegt `[CS-DE]`, `[Crit-DE]`.
 | Hauptplan / Schlachtfeld | — | main board / landscape |
 | Zusatz-Brett (beidseitig) | — | sideboard |
 | „Wer ist dran?"-Leiste | — | Buyin'/Beatin' Bar |
+| Kampf-Plätze (Bösewicht-Leiste) | — | fight slots |
+| Shoppen-Reihenfolge (Dorfphase, unten → oben) | — | Buyin' Order |
+| Kloppen-Reihenfolge (Kampf, oben → unten) | — | Beatin' Order |
 | Dorf-Phase / Kampf-Phase | — | Town Phase / Fight Phase |
+| Endgegner-Kampf | — | Final Fight |
 | Dorf-Ereignis | — | Town Event |
-| Heldentat | — | Feat of Mettle |
+| Heldentat (abgeschlossen / nicht abgeschlossen) | — | Feat of Mettle |
 | Tante Emma / Tante Emmas Laden | — | the Peddler / Peddler shop |
-| Nachschub(-stapel) | — | Peddler deck |
-| Ausrüstung / weggepackt / anlegen | — | gear / stashed / equip |
+| Nachschub (= verdeckter Stapel Tante Emma Ausrüstung) | — | Peddler deck |
+| Ausrüstung / weggepackt / anlegen / abwerfen | — | gear / stashed / equip / discard |
+| Merkmal „Seltsam" (nie anlegbar, immer aktiv) | — | Odd |
+| Besondere Ausrüstung (gelber Rand) | — | Special Gear |
+| Snack (konsumierbare Ausrüstung) | — | consumable |
+| Mitbringsel (6. Slot) | — | Accessory |
 | Bösewicht-Aktion (Verhaltenskarte) | — | Ruffian action card |
+| **Krawall** (Kartenabschnitt) | — | Move/Act |
+| Nachspiel | — | Aftereffect |
 | Bewegung | **BEW** | Movement (**MVMT**) |
-| Leben | **LEB** | Health (**HP**) |
+| Leben / Max LEB | **LEB** | Health (**HP**) |
 | Mumm | **MUMM** | Moxie (**MOX**) |
 | Präzision | **PRZ** | Accuracy (**ACC**) |
 | Schaden | **AUA** | Damage (**DMG**) |
+| Trifft-Voraussetzung (Zielwert der Waffe) | — | ACC value |
 | Knaller | — | critical hit |
+| Patzer (natürliche 1) | — | whiff |
+| Wutausbruch | — | Breaking Point |
+| Rammen | — | collision |
+| Freie Schussbahn | — | line of sight |
+| **besiegt** (LEB auf 0 oder weniger) | — | defeated |
 | „Deinen Mumm zusammenraffen" | — | „Muster your Moxie" (Neuwurf) |
 | Hindernis-Terrain / Gebiet-Terrain | — | obstacle / feature |
-| Überfall | — | Ambush (nur Üble Nachbarn) |
-| Fluch | — | Curse (nur Üble Nachbarn) |
+| Überfall | — | Ambush (nur Neue Nachbarn) |
+| Fluch | — | Curse (nur Neue Nachbarn) |
+| Münzen **abwerfen** (= zurück in den Vorrat) | — | discard coins |
+| Münzen **zahlen** (mit Folgetext) | — | pay coins |
 | Rolle / Aufstellbares | — | Role / Deployable (nur Toller Trödel) |
 
-Auf der Bösewicht-Aktionskarte heißen die drei Abschnitte **Ziel** → *(Pfeil-Symbol,
-im Video „Randale" genannt; im engl. Regelwerk „Move/Act")* → **Nachspiel**
-(Aftereffect) `[Aktionskarten-DE]`, `[BR S.15]`, `[E02 03:55]`.
-`⚠️ UNSICHER:` Ob „Randale" tatsächlich als Wort auf der Karte steht, ließ sich
-nicht belegen — im Textlayer der deutschen Karten steht dort nur ein Symbol.
+Die Bösewicht-Aktionskarte hat **fünf** Abschnitte: **Name** → **Umschreibung**
+(Flavourtext) → **Das Ziel** → **Krawall** → **Nachspiel** `[DE S.16]`. Der
+Abschnitt heißt **„Krawall"** — das Wort „Randale" aus dem Videountertitel kommt
+auf keiner der 36 Anleitungsseiten vor, „Krawall" neunmal `[DE S.16–18, 35]`.
+
+**Begriffe aus dem Glossar, die am Tisch etwas entscheiden** `[DE S.35]`:
+
+- **Freies Feld** — „Felder, auf denen sich nichts befindet (kein Terrain,
+  Bösewichte, Dörfler usw.)".
+- **Angrenzend** — nur vertikal/horizontal. „Du bist nie angrenzend zu dir selbst."
+- **Figur** — Dörfler **und** Bösewichte.
+- **„da"** — anwesend auf dem Schlachtfeld.
+- **„dürfen"** — darf, muss nicht.
+- **„1+"** — „1 oder mehr"; **„/"** trennt Optionen wie ein „oder".
+- **Kampf-Beginn** — „nach dem letzten Schritt des Kampf-Aufbaus und vor dem
+  ersten Zug".
+- **Zugbeginn** — „nach dem Ende des vorangegangenen Zuges, aber bevor die erste
+  Aktion des Zuges ausgeführt wurde".
 
 ### 1.2 Partiegrundgerüst
 
 - Eine Partie = **4 Runden**. Jede Runde = **Dorfphase + Kampfphase**.
-  Der **4. Bösewicht ist der Endgegner** („Final Fight"); es gibt **keine
-  zusätzliche 5. Runde** `[BR S.10]`, `[E01 08:41]`.
-- Besiegt die Gruppe alle 4 Bösewichte, hat sie gewonnen `[BR S.10]`.
-- **3-Runden-Modus** (offiziell empfohlen für kürzere Partien) `[EXP S.4]`:
-  - 3-Runden-Marker auf das **erste** Feld der Bösewicht-Leiste, **kein** Bösewicht-Plättchen dorthin.
-  - Die Partie beginnt mit der **zweiten** Dorfphase; erste Dorf- und Kampfphase (Stufe Tunichtgut) entfallen.
-  - Jeder Dörfler startet mit **15** statt 10 Münzen.
+  Die 4. Kampfphase ist der **Endgegner-Kampf**; es gibt **keine zusätzliche
+  5. Runde** `[DE S.11]`, `[E01 08:41]`.
+- „Besiegt ihr nacheinander alle 4 Bösewichte, die sich euch in den Weg stellen,
+  gewinnt ihr die Partie" `[DE S.11]`.
+- **3-Runden-Modus** (offizielle Spielvariante für kürzere Partien) `[DE S.34]`:
+  - Das **3-Runden-Plättchen** statt eines Bösewicht-Plättchens auf den
+    **obersten Kampf-Platz (Tunichtgut)**.
+  - Es wird **sofort abgehandelt**: „Ihr überspringt die 1. Runde und erhaltet
+    jeder einfach so 5 Münzen." Die Partie beginnt also mit der **zweiten**
+    Dorfphase, und jeder hat 10 + 5 = **15 Münzen**. Mechanisch ist das ein
+    Zusatzbetrag beim Abhandeln des Plättchens, keine veränderte Startmenge.
+  - Schritt 1 der 1. Dorfphase (Heldentaten auffüllen) entfällt mit `[DE S.11]`.
+- **Weitere Varianten** `[DE S.34]`: **Doppel-Modus** (zwei Spieler mit je 2
+  Dörflern; geheime Dorf-Ereignisse aussortieren) und **Tausch-Modus**
+  (Ausrüstung außer Startausrüstung in der Dorfphase frei tauschen und
+  verschenken; „Das macht das Spiel leichter!"). Beide sind mit jedem anderen
+  Modus kombinierbar.
 
 ### 1.3 Welche Regelfassung gilt?
 
 Das englische Basis-Regelwerk im TTS-Mod ist die **1. Edition**. Die deutsche
-Ausgabe (Frosted Games), die im Video gespielt wird, entspricht dem **2.-Edition-Stand**.
-Die Unterschiede stehen gesammelt in `[EXP S.4]` und werden im Video genau so
-gespielt — sie sind damit doppelt belegt:
+Ausgabe (Frosted Games, © 2024, Übersetzung Board Game Circus) entspricht dem
+**2.-Edition-Stand**. **Alle fünf Änderungen sind direkt in der deutschen
+Anleitung belegt** — `[EXP S.4]` ist als Quelle damit entbehrlich:
 
-1. **Laden füllt sofort nach:** Wird Ausrüstung gekauft (oder anders entfernt),
-   wird die Lücke **sofort** aus dem Nachschubstapel aufgefüllt
-   `[EXP S.4]`, bestätigt `[E01 57:16]`. (1. Ed.: Auslage blieb lückenhaft.)
-2. **Laden-Reset jederzeit:** Der Reset (2 Münzen pro Dörfler) darf **in jedem
-   Spielerzug** erfolgen, auch nachdem schon gekauft wurde `[EXP S.4]`.
+1. **Laden füllt sofort nach:** „Lege immer, wenn du Ausrüstung aus Tante Emmas
+   Laden kaufst oder auf andere Weise dort entfernst, 1 neue Karte offen vom
+   Nachschub auf das freigewordene Feld nach." `[DE S.12]`
+   (1. Ed.: Auslage blieb lückenhaft.)
+2. **Laden erneuern jederzeit:** „wer von euch gerade am Zug ist, ist dabei egal,
+   solange alle der Erneuerung zustimmen" `[DE S.12]`.
    (1. Ed. `[BR S.11]`: nur *vor* jeder Kaufaktion.)
-3. **„Deinen Mumm zusammenraffen" (Neuwurf):** Im Kampf darf ein Dörfler nach
-   einem **Angriffs- oder Terrainwurf** 2 MUMM zahlen und den Wurf wiederholen.
-   Der neue Wurf gilt. Maximal 1× pro Wurf `[EXP S.4]`, `[CS-DE]`, `[E02 28:22]`.
-4. **Formulierung „Behalte diese Karte vor der Gruppe"** statt vor einem einzelnen
-   Dörfler `[EXP S.4]`.
-5. **3-Runden-Modus** (siehe oben).
+3. **„Deinen Mumm zusammenraffen" (Neuwurf):** „Für 2 MUMM, darfst du den letzten
+   Angriffs- oder Terrain-Wurf neu würfeln. Tust du das? Dann gilt automatisch das
+   neue Würfelergebnis. Du darfst den gleichen Angriffs- oder Terrainwurf nur
+   maximal 1x neu würfeln." `[DE S.20]`
+4. **„vor dir" / „vor euch"** statt „vor einem Dörfler": „Besagt die Karte, dass
+   du sie „vor dir" auslegen sollst, gilt der Text darauf nur für dich. Besagt die
+   Karte, dass du sie „vor euch" auslegen sollst, gilt ihr Text im Kasten für euch
+   alle." `[DE S.12]`, `[DE S.17]`
+5. **3-Runden-Modus** `[DE S.34]` (siehe oben).
 
-> **Für die Engine gilt der 2.-Edition-Stand.**
+> **Für die Engine gilt der 2.-Edition-Stand, und zwar in der Fassung der
+> deutschen Anleitung.**
 
 ---
 
 ## 2. Partieaufbau
 
-### 2.1 Standardaufbau (gilt auch solo) `[BR S.6]`
+### 2.1 Standardaufbau (gilt auch solo) — die 9 gedruckten Schritte `[DE S.6]`
 
-1. **Hauptplan** auslegen. Er trägt das aufgedruckte Raster (Spalten **A–S**,
-   Zeilen **1–14**) `[BR S.13]`. **Zusatz-Brett rechts daneben, Seite „Dorf-Phase"
-   nach oben.**
-2. Schachtel griffbereit halten; Dorf-Ereignisse, Heldentaten und die halbe
-   Nachschub-Ausrüstung in Reichweite legen.
-3. **Alle Bösewicht-Plättchen verdeckt mischen, vier zufällig ziehen** und auf die
-   Bösewicht-Leiste des Hauptplans legen. Die vier Plätze tragen die Stufen
-   **CHUMP → HOOLIGAN → TROUBLEMAKER → FINAL FIGHT**
-   (dt. sinngemäß Tunichtgut → Rüpel → Unruhestifter → Endkampf).
-   Die restlichen Plättchen gehen **ungesehen** zurück in die Schachtel — kein
-   Ausschlussverfahren `[E01 09:32]`.
-4. Jeder Spieler wählt einen Dörfler, nimmt dessen Karte und setzt auf **jeder
-   Werteleiste** (LEB, BEW, MUMM, PRZ) einen Marker auf die farbig hervorgehobene
-   **Startzahl** `[BR S.6-7]`.
-5. Jeder Dörfler erhält **10 Münzen** (15 im 3-Runden-Modus) und die
-   **Startausrüstung**, die unten auf seiner Dörfler-Karte steht `[BR S.6]`.
-6. Dörfler-Plättchen in frei gewählter Reihenfolge auf die **„Wer ist dran?"-Leiste**.
-7. **Drei Stapel mischen und bereitlegen:** Dorf-Ereignisse, Nachschub-Ausrüstung,
-   Heldentaten `[BR S.6]`.
+1. **Spielbrett** in die Tischmitte, **Zusatz-Brett rechts daneben, mit der
+   Dorf-Phase nach oben**. Das Schlachtfeld „erstreckt sich über die Koordinaten
+   A–S (links bis rechts) und 1–14 (oben bis unten)" `[DE S.14]`, `[DE S.35]`.
+2. **Alle Bösewicht-Plättchen verdeckt mischen, vier davon (weiterhin verdeckt)
+   auf die Kampf-Plätze** links unten auf dem Spielbrett legen. „Legt die
+   restlichen Bösewicht-Plättchen in die Schachtel zurück" — **ungesehen**, kein
+   Ausschlussverfahren `[DE S.6]`, `[E01 09:32]`.
+3. Jeder wählt **1 Dörfler**, legt dessen **Tableau** aus, setzt je 1 schwarzen
+   Marker auf die **4 farbig hinterlegten Startwerte** (LEB, BEW, MUMM, PRZ) und
+   nimmt die Figur `[DE S.6]`.
+4. Jeder sucht die **Startausrüstung**, die unten auf seinem Dörfler-Tableau
+   steht. Nicht verwendete Startausrüstung geht zurück in die Schachtel. Ist für
+   einen Dörfler die **Alternative Startausrüstung** schon freigeschaltet
+   (Kennzeichen oben rechts), darf sie stattdessen gewählt werden `[DE S.6]`,
+   `[DE S.8]`.
+5. **Dörfler-Plättchen einzeln von oben nach unten** auf die „Wer ist
+   dran?"-Leiste legen. **Den obersten Platz mit der Beschriftung „Bösewicht"
+   freilassen.** Die Anleitung *empfiehlt* die Sitzreihenfolge, „oben beginnend
+   mit dem größten Störenfried unter euch" — eine Empfehlung, kein Zwang
+   `[DE S.6]`.
+6. **Dorf-Ereignisse und Heldentaten mischen**, beide verdeckt auslegen, dazu
+   alle **Münzen als Vorrat** `[DE S.6]`.
+7. **Tante Emma Ausrüstung mischen** und als **einen** verdeckten Stapel so
+   auslegen, „dass alle ihn gut erreichen können". Dieser Stapel heißt
+   **Nachschub** `[DE S.6]`, `[DE S.35]`. (Von einem *halben* Stapel ist nirgends
+   die Rede.)
+8. Jeder nimmt **1 Übersichts-Karte** sowie **10 Münzen** aus dem Vorrat
+   `[DE S.6]`.
+9. **5 Würfel und die Knaller-Karte** beiseitelegen `[DE S.6]`.
 
-Optional: **Max-LEB-Stopper.** Ein roter Marker auf dem Feld **über** dem
-Maximum-LEB, damit Heilung nie darüber hinausgeht `[BR S.7]`, `[E01 16:08]`.
+Die Kampf-Plätze tragen aufgedruckte Stufennamen. Belegt ist nur **„Tunichtgut"**
+für den obersten `[DE S.34]` und **„Endgegner-Kampf"** für den vierten; siehe
+§5.2.
 
-### 2.2 Solo-Besonderheiten
+Optional, Tischkonvention: **Max-LEB-Stopper.** Ein roter Marker auf dem Feld
+**über** dem Maximum-LEB, damit Heilung nie darüber hinausgeht
+`⚠️ NUR VIDEO: [E01 16:08]`. Die Regel selbst steht in der Anleitung —
+„Max LEB: Maximal mögliche Anzahl Leben, die nicht überschritten werden kann"
+`[DE S.35]` —, der Marker ist nur eine Hilfe.
 
-**Offizielle Soloregel (englisches Regelwerk)** `[BR S.30]`:
+### 2.2 Solo-Besonderheiten — die offizielle deutsche Solovariante
 
-> „For the solo variant, you control **3 townsfolk** at once. **All rules and
-> setup remain the same**, but **secret events are removed** from the Town Event
-> deck at the start of the game."
+Die deutsche Anleitung hat einen eigenen Solo-Abschnitt. **Er ist die
+maßgebliche Quelle und ersetzt die bisherige Herleitung aus `[BR S.30]` und dem
+Video vollständig.** Wortlaut `[DE S.34]`:
 
-Also: Solo = **ein Spieler steuert genau 3 Dörfler**; für Bösewicht-Werte,
-Endkampf-Terrain usw. zählen **3 „controlled townsfolk"**, d. h. die **3P-Spalte**
-(§5.4). Geheime Dorf-Ereignisse (roter Balken) werden **vor Partiebeginn
-aussortiert** — sie ergeben ohne Mitspieler keinen Sinn `[E01 25:36]`.
-Dieselbe Streichung gilt, wenn ein Spieler in einer Mehrspielerpartie mehr als
-einen Dörfler steuert `[E01 26:01]`.
+> „Solo-Partie — Es gelten die gleichen Regeln und Vorbereitungen wie im normalen
+> Modus, bis auf folgende Abweichungen:
+> • Wähle 3 Dörfler, die du spielen willst.
+> • Entferne beim Aufbau alle Geheimen Dorf-Ereignisse aus dem
+> Dorf-Ereignis-Stapel.
+> • Nimm dir zu Beginn der Partie 30 Münzen, auf die alle deine Dörfler jederzeit
+> zugreifen können.
+> • Ziehe in der 1. Dorf-Phase 6 Heldentaten. Lege sie offen vor dich. Diese
+> Heldentaten gelten für alle deine Dörfler. Der Dörfler, der eine Heldentat
+> abschließt, erhält sie (und ihre entsprechende Belohnung). Am Ende jeder
+> Kampf-Phase darfst du alle nicht abgeschlossenen Heldentaten, die du nicht
+> behalten möchtest, abwerfen. Fülle zu Beginn jeder weiteren Dorf-Phase deine
+> nicht abgeschlossenen Heldentaten wieder auf 6 auf.
+> • In Tante Emmas Laden darfst du für alle deine Dörfler Ausrüstung kaufen und
+> Ausrüstung, die keine Startausrüstung ist, darfst du unter allen deinen
+> Dörflern tauschen."
 
-**Drei Abweichungen, die das deutsche Regelvideo zusätzlich nennt** — sie stehen
-**nicht** im englischen Regelwerk (dort heißt es ausdrücklich „all rules remain
-the same"). Sie stammen vermutlich aus dem ausführlicheren Solo-Abschnitt der
-deutschen Ausgabe. `⚠️ UNSICHER — vor der Automatisierung gegen die deutsche
-Regelbeilage prüfen.`
+Daraus, Punkt für Punkt:
 
-| # | Regel laut Video | Beleg |
-|---|---|---|
-| S1 | **Heldentaten:** statt 3 verdeckter pro Dörfler liegen **6 gemeinsame, offene** Heldentaten aus. Wer eine erfüllt, nimmt sie an sich; in der nächsten Dorfphase wird wieder auf **6** aufgefüllt. | `[E01 43:47]`, `[E01 44:00]` |
-| S2 | **Münzen:** **ein gemeinsamer Topf**. Bei 3 Dörflern also 30 Münzen zu Beginn — und ausdrücklich **auch alles später erworbene Geld**. Das Video merkt an, die deutsche Regel lasse das offen, die englische stelle klar, dass *alle* Münzen gemeinsam verwaltet werden. | `[E01 54:43]`, `[E02 15:02]` |
-| S3 | **Ausrüstungstausch:** Dörfler dürfen in der **Dorfphase** Ausrüstung frei untereinander tauschen — **außer Startausrüstung**. Im Kampf nicht. | `[E01 20:04]`, `[E01 44:41]` |
+- **3 Dörfler.** Für Bösewicht-Werte und Endgegner-Terrain zählt die **Anzahl
+  Dörfler im Spiel** (§5.4), solo also **3**.
+- **Geheime Dorf-Ereignisse vor Partiebeginn aussortieren.** Das ist eine echte
+  Soloregel, keine Ableitung. Dasselbe gilt im **Doppel-Modus** `[DE S.34]` —
+  die Streichung hängt also daran, dass ein Spieler mehr als einen Dörfler
+  steuert.
+- **Gemeinsamer Münztopf, 30 Münzen zu Beginn.**
+  `⚠️ ABGELEITET:` Die Anleitung regelt wörtlich nur die **Startmünzen**. Dass
+  auch später erworbenes Geld (die 6 Münzen nach jedem Kampf, Verkäufe,
+  Heldentaten-Belohnungen) in denselben Topf geht, ist die naheliegende Lesart
+  von „auf die alle deine Dörfler jederzeit zugreifen können", steht aber nicht
+  ausdrücklich da. Am Tisch: ein Topf.
+- **6 gemeinsame, offene Heldentaten** statt 3 verdeckter pro Dörfler. Abwerfen
+  **am Ende jeder Kampf-Phase**, Auffüllen auf 6 **zu Beginn jeder weiteren
+  Dorf-Phase**.
+- **Ausrüstungstausch unter den eigenen Dörflern**, Startausrüstung ausgenommen.
+  Der Satz beginnt mit „In Tante Emmas Laden" — der Tausch ist also an den
+  Ladenschritt der Dorfphase gebunden, im Kampf wird nicht getauscht. (Der
+  separate **Tausch-Modus** `[DE S.34]` erlaubt ihn allgemein „während der
+  Dorf-Phase".)
 
-Zum Vergleich die Regelwerkslage: „Townsfolk cannot trade gear with one another,
-although some Town Events will allow townsfolk to exchange gear" `[BR S.8]`.
-S3 widerspricht dem also direkt. Das Video nennt S3 als **Variante**
-(„Tauschmodus"), die man optional zuschalten kann und die solo ohnehin sinnvoll
-ist `[E01 19:57–20:16]`.
+Die Grundregel, von der das abweicht: „Deine Ausrüstung ist und bleibt deine
+Ausrüstung, und das Tauschen und Schenken von Ausrüstungs-Karten untereinander
+ist grundsätzlich nicht möglich" `[DE S.10]`.
 
-**Empfehlung für die Engine:** S1–S3 als **abschaltbare Solo-Optionen** führen,
-Voreinstellung = wie im Video (S1, S2, S3 aktiv), weil die Partie sonst
-mechanisch entkernt ist (verdeckte Heldentaten und getrennte Geldbeutel haben
-solo keine Funktion).
+**Für die Engine:** Diese fünf Punkte sind der **Regelstand** einer Solopartie,
+keine optionalen Hausregeln. Wenn sie abschaltbar geführt werden, ist das
+Abschalten die Abweichung — Voreinstellung = aktiv.
 
 ---
 
@@ -180,180 +285,312 @@ solo keine Funktion).
 Runde 1..4:
   Dorfphase (Zusatz-Brett Seite „Dorf-Phase")
      1 Heldentaten auffüllen
-     2 Dorf-Ereignisse
-     3 Tante Emmas Laden
-     4 Auslage abräumen → Brett wenden → Bösewicht aufdecken
+     2 Dorf-Ereignis ausführen
+     3 Tante Emmas Laden besuchen
+     4 Auf in den Kampf!  (Auslage unter den Nachschub, letzte Anlegekontrolle)
   Kampfphase (Zusatz-Brett Seite „Kampf-Phase")
-     Aufbau → Kampf → Nachbereitung
+     Aufbau (10 Schritte, beginnend mit Brett wenden + Bösewicht aufdecken)
+     → Kampf → Nachbereitung (8 Schritte)
 ```
 
-**„Wer ist dran?"-Leiste** `[BR S.10]`:
+**„Wer ist dran?"-Leiste** `[DE S.11]`:
 
-- **Von unten nach oben = Kaufreihenfolge (Buyin' Order)** — gilt für alles in
+> „In der Dorf-Phase geht es immer in **Shoppen-Reihenfolge von unten nach oben**.
+> In der Kampf-Phase geht es immer in **Kloppen-Reihenfolge von oben nach
+> unten**." `[DE S.11]`
+
+- **Shoppen-Reihenfolge** (engl. Buyin' Order) = unten → oben, gilt für alles in
   der Dorfphase.
-- **Von oben nach unten = Kampfreihenfolge (Beatin' Order)** — gilt im Kampf.
-- Der **Bösewicht steht im Kampf immer ganz oben** und ist **immer zuerst dran**.
-- **Nach jedem Kampf rotiert die Leiste:** der oberste Dörfler wandert nach unten,
-  alle anderen rücken einen Platz auf `[BR S.20]`, `[E02 1:04:38]`.
+- **Kloppen-Reihenfolge** (engl. Beatin' Order) = oben → unten, gilt im Kampf.
+- „Auf dem obersten Platz der „Wer ist dran?"-Leiste liegt immer der Bösewicht.
+  Da in der Kampf-Phase die Kloppen-Reihenfolge gilt, **beginnt somit immer der
+  Bösewicht** mit seiner ersten Bösewicht-Aktion." `[DE S.13]`
+- **Nach jedem Kampf rotiert die Leiste:** „Schiebt das oberste Dörfler-Plättchen
+  an das untere Ende und rutscht dann alle Dörfler-Plättchen wieder nach oben auf.
+  Lasst natürlich wie immer den obersten Platz für den Bösewicht frei."
+  `[DE S.22]` (Nachbereitung, Schritt 7).
 
 ---
 
 ## 4. Die Dorfphase (4 Schritte, links nach rechts)
 
 Die Schritte sind auf dem Zusatz-Brett aufgedruckt und werden **strikt in dieser
-Reihenfolge** abgearbeitet `[BR S.10]`, `[CS-DE]`, `[E01 40:11]`.
+Reihenfolge** abgearbeitet `[DE S.11-12]`, `[CS-DE]`, `[E01 40:11]`.
 
 ### Schritt 1 — Heldentaten auffüllen
 
-**Regulär** `[BR S.10]`: Jeder Dörfler zieht **verdeckt auf 3 unerfüllte
-Heldentaten auf**. In der ersten Dorfphase zieht jeder schlicht 3.
+**Regulär** `[DE S.11]`: „Ihr alle füllt **in Shoppen-Reihenfolge** eure **nicht
+abgeschlossenen** Heldentaten wieder auf 3 auf. Da ihr zu Beginn der Partie noch
+gar keine Heldentaten habt, zieht ihr alle in Runde 1 einfach jeweils 3
+Heldentaten vom Stapel."
 
-**Solo (laut Video, S1):** eine **gemeinsame offene Auslage von 6** Heldentaten;
-Nachziehen bis wieder 6 offen liegen `[E01 43:47]`.
+**Solo (§2.2):** eine **gemeinsame offene Auslage von 6** Heldentaten; Auffüllen
+auf 6 zu Beginn jeder weiteren Dorfphase `[DE S.34]`.
 
-**Wie Heldentaten funktionieren** `[BR S.10]`, `[E01 40:57]`:
+**Wie Heldentaten funktionieren** `[DE S.11]`:
 
-- Jede Karte nennt ein **Ziel** („Sei der erste Dörfler, der im Kampf
-  ausgeschaltet wird", „Beende deinen Zug angrenzend zum Bösewicht", …), eine
-  **Belohnung** (Münzen **oder** Schaden am Bösewicht **oder** Werteerhöhung) und
-  **Heldenpunkte**.
-- Erfüllt ein Dörfler das Ziel **nachdem** er die Karte erhalten hat, deckt er sie
-  **sofort** auf, nimmt sie vor sich und kassiert die Belohnung **sofort**.
-- **Werteerhöhungen aus Heldentaten gelten dauerhaft** — für den Rest der Partie,
-  nicht nur für den nächsten Kampf. Die Karten tragen nicht die Grund-Kennzeichnung
-  der Dorf-Ereignisse (§ „Werteänderungen lesen"), die Regel sagt dazu nichts;
-  **Entscheidung des Auftraggebers, 2026-09-25**. Am Tisch heißt das: nicht nur den
-  Zählerstand erhöhen, sondern den **Grundwert** (§ „Zähler" der Spec) — sonst holt
-  die nächste Dorfphase die Erhöhung wieder ab.
-- Heldentaten können **in der Dorfphase genauso wie im Kampf** erfüllt werden —
-  immer alle Texte prüfen `[E01 46:04]`.
-- Erfüllte Heldentaten liegen offen vor ihrem Erfüller.
-- **Zwei Auswertungen:**
-  - **Am Ende jedes Kampfes:** Wer in *dieser Runde* die **meisten Heldentaten
-    (Anzahl, nicht Punkte)** erfüllt hat und **nicht ausgeschaltet** wurde,
-    bekommt die Bösewicht-Beute (§9).
-  - **Vor dem Endkampf:** Wer die **höchste Summe an Heldenpunkten** hat, wird
-    **Sheriff** (§10.2).
-- Am Ende jedes Kampfes dürfen **unerfüllte** Heldentaten abgeworfen werden, die
-  man nicht behalten will `[BR S.20]`.
-- Auflösungsreihenfolge bei mehreren gleichzeitig: **first come, first served**
-  `[BR S.30 FAQ]`.
+- Die Karte hat vier Felder: **Name**, **Auftrag**, **Heldenpunkte**,
+  **Belohnung**.
+- „Neu gezogene Heldentaten sind **nicht abgeschlossen**. Lege deine nicht
+  abgeschlossenen Heldentaten **verdeckt** vor dir ab, du darfst sie dir aber
+  **jederzeit ansehen**." (Solo liegen sie offen, §2.2.)
+- Erfüllt ein Dörfler den Auftrag, verkündet er das, deckt die Karte auf und legt
+  sie **offen vor sich**; sie gilt nun als **abgeschlossen** und „gibt dir
+  **sofort** die auf ihr angegebene Belohnung".
+- **Belohnungsarten:** „eine Wertverbesserung, AUA für den aktuellen Bösewicht,
+  eine Anzahl Münzen oder eine Auswahl zwischen mehreren dieser Belohnungen".
+- **Werteerhöhungen aus Heldentaten gelten NICHT dauerhaft.** Sie wirken sofort,
+  aber nur bis zur **Nachbereitung des laufenden Kampfes**: dort werden die
+  Werte-Leisten „wieder auf ihre Startwerte" gesetzt, „alle Veränderungen, die du
+  im Laufe des Kampfes erhalten hast, sind hiermit wieder weg", und anschließend
+  werden **nur die schwarz markierten Wertveränderungen von angelegter
+  Ausrüstung** erneut aufgerechnet `[DE S.22]`, `[DE S.35]`. Eine Heldentat
+  erhöht also **nicht** den Grundwert.
+  > Die frühere Festlegung „dauerhaft" (**Entscheidung des Auftraggebers,
+  > 2026-09-25**) beruhte auf der Annahme, die Regel schweige dazu. Das war
+  > falsch — die Anleitung regelt es ausdrücklich. **Die Entscheidung ist am
+  > 2026-10-14 aufgehoben**; siehe `docs/regelabgleich.md` §F8 und den Nachtrag
+  > zu M12.7 in `docs/spec-setup-system.md`.
+- „**Heldentaten lassen sich nicht rückwirkend erfüllen.**" `[DE S.11]`
+- Heldentaten können **in der Dorfphase genauso wie im Kampf** abgeschlossen
+  werden — immer alle Texte prüfen `[E01 46:04]`.
+- **Zwei Auswertungen** `[DE S.11]`:
+  - **Am Ende der Kampf-Phase:** Wer in *dieser Runde* die **meisten Heldentaten
+    (Karten, nicht Heldenpunkte)** abgeschlossen hat und **nicht besiegt** war,
+    bekommt die Bösewicht-Beute (§7.3).
+  - **Zu Beginn des Endgegner-Kampfes:** Wer über die ganze Partie die
+    **höchste Summe an Heldenpunkten** hat, wird **Sheriff** (§8.2).
+- **Im Endgegner-Kampf** zählen Heldentaten nur noch für die Belohnung: „Im
+  Endgegner-Kampf in Runde 4 kannst du deine letzten nicht abgeschlossenen
+  Heldentaten immer noch abschließen, um ihre Belohnung zu erhalten, es geht dann
+  aber nicht mehr um Bösewicht-Ausrüstung oder den Sheriff-Posten." `[DE S.11]`
+- Am Ende jedes Kampfes dürfen **nicht abgeschlossene** Heldentaten abgeworfen
+  werden, die man nicht behalten will `[DE S.22]`.
+- Auflösungsreihenfolge bei mehreren gleichzeitig: „Manche Heldentaten können
+  erst am Ende eines Kampfes erfüllt werden. In welcher Reihenfolge überprüfen wir
+  solche Heldentaten? **Wer zuerst kommt, mahlt zuerst!**" `[DE S.32]`
 
-### Schritt 2 — Dorf-Ereignisse
+### Schritt 2 — Dorf-Ereignis ausführen
 
-- **Jeder Dörfler zieht genau eine Dorf-Ereignis-Karte** und löst sie **laut** in
-  **Kaufreihenfolge (unten → oben)** auf `[BR S.11]`, `[E01 45:26]`.
-- Verlangt das Ereignis einen Wurf, wird **ein W10** geworfen. Steht „Wirf
-  (+ max. BEW)", wird der entsprechende Wert addiert `[BR S.11]`.
-- Ereignisse können gut **oder** schlecht sein und sich auch auf **andere**
-  Dörfler beziehen als den, der gezogen hat `[E01 51:47]`.
-- **Werteänderungen lesen** `[E01 47:08]`:
-  - Wert **auf schwarzem Grund** → **dauerhaft**, auch für alle folgenden Runden.
-  - Wert **ohne schwarzen Grund** → gilt **nur für den nächsten Kampf**; danach
-    auf den Ausgangswert zurücksetzen.
-  - Steht „nur für einen Zug" o. ä. → entsprechend kürzer.
-- **Geheime Ereignisse** (roter Balken oben) bleiben verdeckt beim Ziehenden und
-  lösen erst aus, wenn die auf der Karte genannte Bedingung eintritt — auch über
-  mehrere Runden hinweg, und auch wenn der Dörfler ausgeschaltet ist
-  `[BR S.11]`. **Solo werden sie vor Partiebeginn aussortiert** (§2.2).
-- Danach wird die Karte abgeworfen.
+- „Ihr alle zieht nacheinander **in Shoppen-Reihenfolge je 1 Dorf-Ereignis** und
+  handelt dieses ab." `[DE S.12]`
+- „Dabei solltest du den anderen alles **laut vorlesen** … (**Ausnahme: Geheime
+  Dorf-Ereignisse**)" `[DE S.12]`.
+- Verlangt das Ereignis einen Wurf, wird **ein W10** geworfen. „Steht dort zum
+  Beispiel „Würfle (+BEW)", addiere deinen **aktuellen** BEWEGUNG-Wert zum
+  Würfelergebnis hinzu." `[DE S.12]` — also der **aktuelle**, nicht der maximale
+  Wert.
+- Ereignisse „können sowohl positive als auch negative Effekte haben"
+  `[DE S.12]` und sich auch auf **andere** Dörfler beziehen als den, der gezogen
+  hat `[E01 51:47]`.
+- **Offen auslegen** `[DE S.12]`: „Besagt die Karte, dass du sie **„vor dir"**
+  auslegen sollst, gilt der Text darauf **nur für dich**. Besagt die Karte, dass
+  du sie **„vor euch"** auslegen sollst, gilt ihr Text im Kasten **für euch
+  alle**." Und: „Ein ausliegendes Dorf-Ereignis bleibt ausliegend, **bis sein
+  Text besagt, dass es abgeworfen wird**."
+- **Geheime Ereignisse** (großer roter Balken „GEHEIM!") werden **nicht laut
+  vorgelesen**, sondern nur für sich gelesen und **verdeckt** vor sich gelegt. Sie
+  „werden immer erst bei einer bestimmten Bedingung aktiviert"; tritt sie ein,
+  wird aufgedeckt und sofort abgehandelt. Die Karte kann „auch über mehrere Runden
+  vor dir liegen bleiben und … **sogar aktiviert werden, während du besiegt
+  bist**" `[DE S.12]`. **Solo werden sie vor Partiebeginn aussortiert** (§2.2).
+- „Hast du dein Dorf-Ereignis abgehandelt, **wirf es ab**." `[DE S.12]`
 
-### Schritt 3 — Tante Emmas Laden
+**Werteänderungen lesen — es gibt drei Arten, nicht zwei** `[DE S.10]`:
 
-- Zu Beginn des Schritts werden die **obersten 10 Karten** des Nachschubstapels
-  offen auf das Dorf-Phase-Brett gelegt `[BR S.11]`, `[E01 53:56]`.
-- In **Kaufreihenfolge** darf jeder Dörfler in seinem Zug **entweder eine
-  Ausrüstung kaufen oder eine verkaufen** — dann ist der Nächste dran. Der Zyklus
-  wiederholt sich, bis niemand mehr will `[BR S.11]`.
-- **Kaufen:** Preis steht am rechten Rand der Karte.
-- **Verkaufen:** Man erhält **die Hälfte des Werts, abgerundet**.
-  **Startausrüstung kann nicht verkauft werden** `[BR S.11]`, `[E01 55:16]`.
-- **Nachfüllen (2. Ed.):** Jede gekaufte/entfernte Karte wird **sofort** ersetzt
-  `[EXP S.4]`, `[E01 57:16]`.
-- **Laden-Reset:** Die Gruppe darf gemeinsam **2 Münzen pro Dörfler** zahlen
-  (Aufteilung frei, aber **alle** müssen zustimmen), um die gesamte Auslage
-  abzuwerfen und 10 neue Karten auszulegen. **Höchstens einmal pro Dorfphase.**
-  Nach 2. Ed. in jedem Spielerzug möglich `[EXP S.4]`; nach 1. Ed. nur vor allen
-  anderen Ladenaktionen `[BR S.11]`. Solo mit 3 Dörflern kostet das **6 Münzen**
-  `[E01 1:02:01]`.
-- **Ausrüstung anlegen/ablegen ist in der Dorfphase jederzeit und kostenlos**
-  möglich `[BR S.8]`, `[E01 1:00:45]`.
+| Art | Kennzeichen | Dauer |
+|---|---|---|
+| **Dauerhafte Wertveränderung** | **schwarze Markierung**, steht auf **Ausrüstung** | ab dem Anlegen bis zum Wegpacken oder Abwerfen. „Die Wertveränderung **kommt und geht hier mit der Ausrüstung**!" Nach dem Kampf wird sie auf die zurückgesetzten Startwerte wieder aufgerechnet. |
+| **Direkte Wertveränderung** | Kosten oder Effekt einer Fähigkeit, Bösewicht-Aktion oder eines Dorf-Ereignisses | Marker **sofort** verschieben; gilt „immer nur für die **aktuelle Runde**" und wird in der Nachbereitung zurückgesetzt `[DE S.22]`. |
+| **Besondere Wertveränderung** | direkte Änderung mit **ausdrücklich genannter Dauer**, „meistens „nur für diesen Zug"" | wie angegeben; Marker danach zurücksetzen. |
 
-### Schritt 4 — Auf in den Kampf
+**Achtung, zwei verbreitete Irrtümer:** die schwarze Markierung ist ein Merkmal
+von **Ausrüstung**, nicht ein generisches „gilt über Runden hinweg"-Kennzeichen
+auf Dorf-Ereignissen. Und alles Nicht-Markierte gilt „nur für die **aktuelle
+Runde**", nicht „nur für den nächsten Kampf".
 
-Genau diese Reihenfolge `[E01 1:07:34]`:
+### Schritt 3 — Tante Emmas Laden besuchen
 
-1. **Gesamte Ladenauslage abräumen** und **unter** den Nachschubstapel legen `[BR S.10]`.
-2. **Zusatz-Brett auf die Kampf-Phase-Seite wenden.**
-3. **Oberstes noch verdecktes Bösewicht-Plättchen aufdecken** (von oben nach
-   unten) und **ganz oben auf die „Wer ist dran?"-Leiste** legen `[BR S.11]`.
+- „Legt zu Beginn des Besuchs auf **alle 10 Felder** des Ladens je 1 Karte vom
+  Nachschub **offen** aus." `[DE S.12]`
+- In **Shoppen-Reihenfolge** darf jeder, wenn er am Zug ist, **entweder** 1
+  Ausrüstung kaufen **oder** 1 Ausrüstung aus seinem Besitz verkaufen. „Wenn ihr
+  alle 1x am Zug wart, geht es wieder von vorne los. Dies wiederholt ihr so oft,
+  bis keiner mehr Ausrüstung kaufen oder verkaufen will." `[DE S.12]`
+- **Kaufen:** Münzen in Höhe der Kosten zahlen, Karte in den Besitz nehmen. „Du
+  darfst sie **sofort anlegen**." `[DE S.12]`
+- **Verkaufen:** „für die **Hälfte ihrer Kosten (abgerundet)**". **Startausrüstung
+  kann nicht verkauft werden** `[DE S.12]`.
+- **Nachfüllen:** Jede gekaufte oder anders entfernte Karte wird **sofort** durch
+  1 neue Karte vom Nachschub ersetzt `[DE S.12]`.
+- **„Tante Emmas Laden erneuern"** (nicht „Laden-Reset") `[DE S.12]`:
+  > „Um Tante Emmas Laden zu erneuern, müsst ihr **pro Dörfler 2 Münzen**
+  > abwerfen. Wie ihr diesen Gesamtbetrag unter euch aufteilt, bleibt euch
+  > überlassen, und **wer von euch gerade am Zug ist, ist dabei egal**, solange
+  > alle der Erneuerung zustimmen. Werft die entsprechende Menge Münzen ab, werft
+  > die Ausrüstung aus Tante Emmas Laden ab und legt 10 neue Karten vom Nachschub
+  > offen aus."
+
+  Die Anleitung nennt **keine Häufigkeitsgrenze**. Die frühere Angabe
+  „höchstens einmal pro Dorfphase" stammt aus `[BR S.11]` bzw. dem Video und ist
+  **nicht Regel** — wer sie behalten will, führt sie ausdrücklich als Hausregel.
+  Solo mit 3 Dörflern kostet eine Erneuerung **6 Münzen**.
+- **„Münzen abwerfen" ist nicht dasselbe wie „Münzen zahlen"** `[FAQ S.1]`:
+  „Münzen „**abwerfen**" heißt, dass sie **in den Vorrat zurück gelegt** werden."
+  — „Münzen „**zahlen**" heißt, dass mit diesen oftmals noch **etwas anderes
+  passiert**, was später im Text beschrieben wird."
+  Die Ladenerneuerung sagt **abwerfen** (`[DE S.12]`) — die 2 Münzen pro Dörfler
+  gehen also schlicht in den Vorrat. Beim **Kaufen** heißt es „bezahle Münzen in
+  Höhe ihrer Kosten" `[DE S.12]`; wo ein Kartentext „zahlen" sagt, ist der
+  Folgetext zu lesen.
+- **Ausrüstung anlegen/wegpacken ist in der ganzen Dorfphase frei und kostenlos:**
+  „Innerhalb der gesamten Dorf-Phase kannst du Ausrüstung frei anlegen und
+  wegpacken." `[DE S.10]`, `[DE S.35]`
+
+### Schritt 4 — Auf in den Kampf!
+
+Der Schritt besteht **nur aus zwei Handgriffen** `[DE S.12]`:
+
+> „Wenn niemand mehr etwas kaufen oder verkaufen will, schiebt ihr alle
+> Ausrüstung in Tante Emmas Laden **unter den Nachschub**. Überprüft ein letztes
+> Mal, ob ihr auch **alle eure gewünschte Ausrüstung angelegt** habt, denn jetzt
+> beginnt die Kampf-Phase!"
+
+1. **Gesamte Ladenauslage abräumen** und unter den Nachschub schieben.
+2. **Letzte Anlegekontrolle.** In der Dorfphase ist das Anlegen frei und
+   kostenlos, im Kampf kostet jeder Slot 2 MUMM (§6.3).
+
+Damit endet die Dorfphase. **Brettwenden und Bösewicht-Aufdecken gehören NICHT
+hierher** — sie sind die Schritte 1 und 2 des **Kampfaufbaus** (§5.1)
+`[DE S.13]`, `[DE S.36]`. Umgekehrt gehört „Dreht das Zusatz-Brett auf die
+Dorf-Phase" zur **Dorfphase** und ist Schritt 8 der Nachbereitung `[DE S.22]`,
+`[DE S.36]`. (Die abweichende Reihenfolge der früheren Fassung stammte aus
+`[E01 1:07:34]`.)
 
 ---
 
 ## 5. Kampfaufbau
 
-Reihenfolge nach `[BR S.12]` und `[CS-DE]`; Video bestätigt sie `[E01 1:08:08]`.
+Die Anleitung druckt **10 nummerierte Schritte** `[DE S.13]`. Die Engine sollte
+diese Reihenfolge abbilden.
 
-### 5.1 Schritte
+### 5.1 Die 10 Schritte `[DE S.13]`
 
-1. Zusatz-Brett auf **Kampf-Phase** gewendet.
-2. **Nächsten Bösewicht** von der Bösewicht-Leiste aufdecken, Plättchen **oben
-   auf die „Wer ist dran?"-Leiste**.
-3. **Bösewicht-Tableau** auf das dafür vorgesehene Feld des Zusatz-Bretts legen.
-   **Aktionsdeck des Bösewichts mischen** und darunter ablegen. Jeder Bösewicht
-   hat **15 Aktionskarten** `[BR S.15]`.
-4. **Schlachtfeld aufbauen:** Die **Rückseite des Bösewicht-Tableaus** zeigt eine
-   Rasterkarte (A–S / 1–14) mit den Positionen aller Terrain-Teile. Diese Teile
-   werden auf den Hauptplan gelegt `[BR S.12]`.
-   - **Felder mit `FF` sind Terrain, das NUR im Endkampf platziert wird**
-     `[BR S.12]` — bei den Bösewichten 1–3 also ignorieren.
-   - **Der obere Teil der Tableau-Rückseite (Rasterkarte, T-/R-Felder, Terrainliste)
-     gilt für JEDEN Kampf gegen diesen Bösewicht**, nicht nur für den Endkampf.
-     Nur der **untere Textabschnitt** (Endkampf-Setup, Sonderfähigkeiten,
-     HOW TO WIN, THE RESULTS) gilt ausschließlich, wenn dieser Bösewicht der
-     vierte ist `[BR S.12]`, `[BR S.21]`, `[E01 1:09:02]`, `[E01 1:13:05]`.
-     (Das Banner „FINAL FIGHT" steht auf allen Rückseiten und bezeichnet nur
-     diesen unteren Abschnitt.)
-5. **Für jedes ausliegende Terrain-Teil die passende Terrain-Karte** unter das
-   Schlachtfeld legen `[BR S.12]`.
-6. **Dörfler-Startpositionen:** Die Rasterkarte zeigt **5 mit `T` markierte
-   Felder**. Die Dörfler wählen **in Kampfreihenfolge (oben → unten)** je eine
-   davon aus `[BR S.12]`, `[E01 1:12:01]`.
-7. **Bösewicht auf das Feld `R`** stellen, **mit Blick auf den nächstgelegenen
-   Dörfler** `[BR S.12]`, `[E01 1:11:52]`.
-8. **BEW und LEB des Bösewichts markieren** — siehe §5.4.
-9. **Falls Endkampf:** zusätzlich die Anweisungen im unteren Abschnitt der
-   Rückseite abarbeiten (§10).
-10. **Falls Üble Nachbarn:** Überfall-Karte(n) lesen und neben das Kampfbrett
-    legen (§12.2).
+1. **Zusatz-Brett auf die Seite mit der Kampf-Phase drehen.**
+2. **Nächstes Bösewicht-Plättchen aufdecken** — „auf dem nächsten Kampf-Platz
+   (**von oben nach unten**) … so dass ihr den Namen des nächsten Bösewichts
+   seht. Legt es auf das **oberste Feld** der „Wer ist dran?"-Leiste."
+3. **Bösewicht-Tableau** auf den **oberen Teil** des Zusatz-Bretts legen.
+4. **Bösewicht-Aktionen mischen** und auf das Feld **„Ziehstapel"** des
+   Zusatz-Bretts legen. „Jeder Bösewicht hat **15 Bösewicht-Aktionen**"
+   `[DE S.16]`.
+5. **Schlachtfeld nachbauen:** „Auf der Rückseite des Bösewicht-Tableaus seht ihr
+   die **Schlachtfeld-Übersicht** für diesen Kampf. Baut diese mit den
+   abgebildeten Terrains nach."
+6. **Terrain-Karten auslegen:** „Sucht für jedes Terrain auf dem Schlachtfeld die
+   dazugehörige Terrain-Karte heraus und legt diese offen auf die
+   **T-E-R-R-A-I-N-Felder**."
+7. **Dörfler platzieren:** „Platziert euch nacheinander **in
+   Kloppen-Reihenfolge** auf (noch) verfügbare Dörfler-Startpositionen. Diese
+   sind mit einem **`D`** markiert."
+8. **Bösewicht platzieren:** „Platziert den Bösewicht auf die Felder mit dem
+   **großen `B`**. Dreht ihn so, dass er in die Richtung des ihm **nahesten
+   Dörflers** blickt."
+9. **Werte setzen:** „Legt je 1 (schwarzen) Marker auf die 2 Startwerte für
+   **BEWEGUNG und LEBEN** des Bösewichts auf den beiden Werte-Leisten des
+   Zusatz-Bretts" — siehe §5.4.
+10. **Falls Endgegner-Kampf:** „Befolgt die zusätzlichen Anweisungen unter
+    **AUFBAU** auf der Rückseite des Bösewicht-Tableaus." Und: „**Felder, die mit
+    `EG` markiert sind, werden nur im Endgegner-Kampf genutzt** und in den Kämpfen
+    der Runden 1–3 ignoriert." (§8.1)
 
-**Der Kampf beginnt mit dem Zug des Bösewichts** `[BR S.12]`.
+**Die Rasterbuchstaben heißen `D`, `B` und `EG`** — nicht `T`, `R` und `FF`.
+`D` = Dörfler-Startposition, `B` = Bösewicht (2×2-Fläche, §5.10), `EG` =
+Endgegner-Terrain, bei mehreren „`EG1`, `EG2`, `EG3` usw. …, um die Reihenfolge
+ihrer Platzierung anzuzeigen" `[DE S.23]`.
+> **Achtung, Engine:** `docs/spec-setup-system.md` und die Szenariodaten der
+> Produktionsdatenbank verwenden an einigen Stellen noch `T`/`R`/`FF`. Eine
+> Umstellung ist eine eigene Entscheidung und hier **nicht** vorgenommen.
+
+- **Wie viele `D`-Felder?** Die Anleitung nennt **keine Anzahl**, nur „(noch)
+  verfügbare Dörfler-Startpositionen". Die Beispielgrafik zeigt fünf; bei 7
+  Dörfler-Tableaus ist eine feste 5 nicht belegbar. Richtig ist: **so viele, wie
+  die Schlachtfeld-Übersicht zeigt.**
+- **Der obere Teil der Tableau-Rückseite (Schlachtfeld-Übersicht mit `D`-, `B`-
+  und Terrainfeldern) gilt für JEDEN Kampf** gegen diesen Bösewicht. Nur der
+  Bereich darunter gilt zusätzlich im Endgegner-Kampf: „Der gesamte Bereich
+  **unterhalb** der Schlachtfeld-Übersicht ist dem Endgegner-Kampf gewidmet"
+  `[DE S.15]`, `[DE S.23]`. (Das Banner „FINAL FIGHT" steht auf allen Rückseiten
+  und bezeichnet nur diesen unteren Abschnitt.)
+
+**Kampf-Beginn** ist ein definierter Zeitpunkt: „nach dem letzten Schritt des
+Kampf-Aufbaus und vor dem ersten Zug" `[DE S.35]`. Dort wird geprüft:
+„**Überprüft immer zu Kampfbeginn die Bösewicht-Fähigkeit** des aktuellen
+Bösewichts. Es gibt verschiedene Arten von Bösewicht-Fähigkeiten und sie können
+zu verschiedensten Zeitpunkten im Kampf ausgelöst werden." `[DE S.17]`
+
+**Der Kampf beginnt mit dem Zug des Bösewichts** `[DE S.13]`.
+
+**Zusätzlich bei Neue Nachbarn:** Überfall-Karte(n) lesen und neben das
+Kampfbrett legen (§10.2) — eine Erweiterungsregel, die die deutsche Anleitung
+nicht kennt.
 
 ### 5.2 Stufen-Fähigkeit des Bösewichts
 
-Auf welchem der vier Leistenplätze der Bösewicht lag, bestimmt, **welche seiner
-vier Fähigkeiten** er für den **ganzen Kampf** erhält `[BR S.14]`:
+> „Welche Fähigkeiten der Bösewicht hat, ist davon abhängig, **wann** ihr auf ihn
+> trefft: Je nachdem ob es euer 1., 2., 3. oder gar euer Endgegner-Kampf ist,
+> gewinnt der Bösewicht an Stärke und bringt andere Fähigkeiten mit. **Die Stufe
+> des aktuellen Bösewichts entspricht immer dem untersten sichtbaren
+> Kampf-Platz. Bösewicht-Fähigkeiten gelten immer für den ganzen Kampf.**"
+> `[DE S.15]`
+
+Die **Stufe steht auf dem Kampf-Platz-Feld unter dem Plättchen**: „Die Stufe des
+Bösewichts steht auf dem Feld unter seinem Plättchen und bestimmt seine
+Fähigkeiten im Kampf" `[DE S.35]`. Gelesen wird also der **unterste noch
+sichtbare** Kampf-Platz — was praktisch auf dasselbe hinausläuft (Kampf 1 = Stufe
+1 usw.), aber der Lesemechanismus ist dieser.
 
 | Platz | Stufe | Wirkung |
 |---|---|---|
-| 1 | **CHUMP** (Tunichtgut) | meist reiner Flavourtext, keine Zusatzfähigkeit |
-| 2 | **HOOLIGAN** (Rüpel) | eine Zusatzfähigkeit |
-| 3 | **TROUBLEMAKER** (Unruhestifter) | stärkere Zusatzfähigkeit |
-| 4 | **FINAL FIGHT** (Endkampf) | verweist auf die Rückseite → Endkampfregeln |
+| 1 | **Tunichtgut** (engl. CHUMP) | schwächste Fähigkeitsstufe |
+| 2 | **Rüpel** (engl. HOOLIGAN) | stärker |
+| 3 | **Halunke** (engl. TROUBLEMAKER) | stärker |
+| 4 | **Endgegner-Kampf** (engl. FINAL FIGHT) | verweist auf die Rückseite → §8 |
 
-Beispiel Handsy: CHUMP „Mediocre Monster" (nichts), HOOLIGAN „Fabled Fighter"
-(alle Aktionen mit ‚1000' im Namen +1 AUA), TROUBLEMAKER „Folklore Frenzy"
+„Tunichtgut" ist für Platz 1 belegt `[DE S.34]`, „Endgegner-Kampf" für Platz 4.
+**„Rüpel" und „Halunke" sind in der Erweiterungsanleitung belegt** — „Dr. Bosskops
+**Rüpel**- und **Halunke**-Fähigkeiten lösen jedes Mal beim Erreichen der
+Bedingung wieder aus" `[NN S.15]`. „Unruhestifter" ist damit erledigt, es kam aus
+dem Video.
+`⚠️ UNSICHER:` **welcher der beiden Platz 2 und welcher Platz 3 ist**, folgt nur
+aus der Satzreihenfolge in diesem Zitat (Rüpel vor Halunke) — die Namen stehen
+aufgedruckt auf dem Spielbrett und konnten dort nicht geprüft werden.
+Ebenfalls **unbelegt**: dass Stufe 1 „meist reiner Flavourtext" sei. Die
+Anleitung formuliert neutral (Zitat oben); dass Stufe 1 oft harmlos ist, ist eine
+Tableau-Beobachtung, keine Regel.
+
+Beispiel Handsy: Stufe 1 „Mediocre Monster" (nichts), Stufe 2 „Fabled Fighter"
+(alle Aktionen mit ‚1000' im Namen +1 AUA), Stufe 3 „Folklore Frenzy"
 (zusätzlich Ausrüstung entfernen) `[Tableau Handsy]`.
 
 ### 5.3 Schwäche und Beute
 
 - Jedes Bösewicht-Tableau nennt eine **Schwäche (Weakness)**. Sie ist **nicht von
-  Beginn des Kampfes an aktiv**, sondern muss erst aktiviert werden — in aller
-  Regel dadurch, dass eine Bösewicht-Aktion es ausdrücklich anordnet. Erst dann
-  legt man 1 Marker auf den **Kreis neben der Schwäche** auf dem Tableau, und erst
-  dann gilt ihr Effekt `[BR S.14]`, `[DE S.15]`, `[E01 1:17:31]`.
+  Anfang an aktiv** und **muss erst durch eine Bösewicht-Aktion aktiviert
+  werden** — kein „in aller Regel", kein „meist". Erst wenn eine Bösewicht-Aktion
+  das sagt, legt man 1 Marker auf den **Kreis neben der Schwäche** auf dem
+  Tableau, und erst dann wirkt ihr Effekt `[DE S.15]`, `[E01 1:17:31]`.
   > „**WICHTIG: Die Schwäche eines Bösewichts ist nicht von Anfang an aktiv!** Sie
-  > muss erst durch eine Bösewicht-Aktion aktiviert werden." `[DE S.15]`
+  > **muss** erst durch eine Bösewicht-Aktion aktiviert werden. Sobald eine
+  > Bösewicht-Aktion euch sagt, dass die Schwäche des Bösewichts jetzt aktiv ist,
+  > legt 1 Marker auf den Kreis neben der Schwäche auf dem Bösewicht-Tableau, um
+  > das anzuzeigen." `[DE S.15]`
+
+  Das Glossar formuliert weicher — „Sie ist nicht von Anfang an aktiv und **kann
+  normalerweise** durch eine Bösewicht-Aktion aktiviert werden" `[DE S.35]`. Im
+  Zweifel gilt der Regelabschnitt S. 15: er ist die speziellere Stelle und
+  ausdrücklich fett als „WICHTIG" markiert. Ein abweichender Aktivierungsweg
+  müsste auf einem Tableau ausdrücklich gedruckt stehen.
 - **Das gilt auch dann, wenn der Schwächentext eine eigene Auslösebedingung
   trägt.** Viele Schwächen sind als Dauer- oder Wiederholungseffekt formuliert
   (Deputy Waggums: „Whenever Waggums takes an action, if a townsfolk does not take
@@ -365,27 +602,44 @@ Beispiel Handsy: CHUMP „Mediocre Monster" (nichts), HOOLIGAN „Fabled Fighter
   `[DE S.15]`. Erkennungsmerkmal: der aufgedruckte Markierkreis neben „WEAKNESS".
 - **Am Tisch ist die Schwäche ein Zustand pro Kampf**, Startwert *aus*. Der
   Auslösetext wird erst ausgewertet, wenn sie scharfgestellt ist.
-- Bösewichte lassen sich auch **ohne** aktivierte Schwäche besiegen `[DE S.15]`.
+- Bösewichte lassen sich auch **ohne** aktivierte Schwäche besiegen: „Ihr könnt
+  Bösewichte natürlich auch besiegen, ohne ihre Schwächen zu aktivieren"
+  `[DE S.15]`.
+- **Im Endgegner-Kampf kann die Schwäche eine andere sein:** „Bei den meisten
+  Bösewichten ist die Schwäche immer die gleiche – ob im Endgegner-Kampf oder in
+  einem der 3 davor. **Einige wenige Bösewichte aber haben im Endgegner-Kampf
+  eine andere Schwäche** als wenn ihr vorher auf ihn trefft." `[DE S.23]`
 - Unten auf dem Tableau stehen die **3 Bösewicht-Ausrüstungen**, die man erbeuten
-  kann. Die mit **(★)** markierte kann zusätzlich **während** des Kampfes durch
-  einen Knaller-Wurf von 9+ erlangt werden (§7.4) `[BR S.8]`, `[BR S.30 FAQ]`.
+  kann. Die mit **(★)** markierte kann zusätzlich **während** des Kampfes erlangt
+  werden: „Bösewicht-Ausrüstung mit [★] kannst du bereits während des Kampfes
+  gegen den Bösewicht erhalten, wenn du bei dem Knaller-Bonus **9+** würfelst"
+  `[DE S.32]`, `[DE S.8]` (§6.4).
 
 ### 5.4 Bösewicht-Werte (BEW und LEB) — **die geklärte Frage**
 
-**Regel:**
+**Regel** `[DE S.13]`, Aufbauschritt 9:
 
-> „Mark the Ruffian's starting health (HP) and movement (MVMT). These stats are
-> **shown on the front of the Ruffian card**, and **vary with the number of
-> controlled townsfolk**." `[BR S.12]`
->
-> „A Ruffian's MVMT/HP **changes depending on the number of controlled
-> townsfolk**." `[BR S.14]`
+> „Legt je 1 (schwarzen) Marker auf die 2 Startwerte für BEWEGUNG und LEBEN des
+> Bösewichts auf den beiden Werte-Leisten des Zusatz-Bretts. Ihr findet die Werte
+> auf der **Vorderseite des Bösewicht-Tableaus**. Welche Werte zutreffen ist
+> abhängig von der **Anzahl Dörfler im Spiel**. Nutzt die, die zu eurer Anzahl
+> passen."
 
-Auf dem Tableau stehen darum vier Spalten **2P / 3P / 4P / 5P**.
-**Solo mit 3 Dörflern ⇒ immer die 3P-Spalte** („controlled townsfolk", nicht
-Spieleranzahl — das Regelwerk formuliert es ausdrücklich so).
+Und `[DE S.15]`: „Sowohl BEWEGUNG als auch LEBEN des Bösewichts sind von der
+**Anzahl der Dörfler** abhängig."
 
-Ein Bösewicht **kann nicht über seinen Start-LEB hinaus geheilt werden** `[BR S.14]`.
+Auf dem Tableau stehen darum vier Spalten **2P / 3P / 4P / 5P**. Maßgeblich ist
+die **Anzahl Dörfler im Spiel** — nicht die Spieleranzahl. **Solo mit 3 Dörflern
+⇒ immer die 3P-Spalte.** Die Herleitung über „controlled townsfolk" aus
+`[BR S.12]` ist damit nicht mehr nötig; die deutsche Formulierung ist direkter.
+
+Der Startwert ist **gleichzeitig das Maximum**: „Gleichzeitig ist dieser Wert aber
+auch das Maximale LEBEN des Bösewichts, denn auch wenn er Leben erhält (zum
+Beispiel durch Heilung), **kann er nie mehr LEBEN haben, als der Startwert
+besagt**." `[DE S.15]`
+
+Verändert ein Effekt die BEW des Bösewichts („-1 BEW für den Bösewicht"), wird
+**der Marker auf seiner BEWEGUNG-Leiste sofort verschoben** `[DE S.17]`.
 
 **Die vermeintliche Formel-Regel ist eine Karteneigenschaft eines einzigen
 Bösewichts, keine Regel des Basisspiels oder einer Erweiterung.** Beleg:
@@ -402,18 +656,18 @@ Bösewichts, keine Regel des Basisspiels oder einer Erweiterung.** Beleg:
   Gildenmeister, eigene Mutter) deckt sich wörtlich mit der im Video vorgelesenen
   `[E01 1:09:20]`; (c) die beiden Überfallkarten heißen im Video genau
   „Maskless" und „Mask Straps" `[E01 1:16:04]`.
-- Barry Bluff trägt oben links das Kürzel **FN** — er gehört zu **Üble Nachbarn**.
-- **Alle übrigen 19 Bösewichte** (11 aus dem Basisspiel, 7 aus Üble Nachbarn)
+- Barry Bluff trägt oben links das Kürzel **FN** — er gehört zu **Neue Nachbarn**.
+- **Alle übrigen 19 Bösewichte** (11 aus dem Basisspiel, 7 aus Neue Nachbarn)
   haben **fest gedruckte Zahlen** in den Spalten 2P/3P/4P/5P. Einzeln geprüft:
   - Basisspiel `[Z:\Austausch\TfT\*.pdf]`: Bort Dovis, Bundits, Deputy Waggums,
     Handsy, Lawman Dozy, Penny Pinchetti, Virginia Fitz, Will Barlow.
-  - Üble Nachbarn `[Z:\Austausch\TfT\*.pdf]`: Ernie Offal, Red Atrocious,
+  - Neue Nachbarn `[Z:\Austausch\TfT\*.pdf]`: Ernie Offal, Red Atrocious,
     Tilda Fields (alle mit FN-Kürzel **und** Zahlen **und** Überfall-Zeile).
   - TTS-Mod `[scratchpad/tableaus/]`: Qing & Kween, Umbrello, Samuel Strawman,
     Pepin Milkfrog (Basis) sowie The Door Knockers, Tartar Fishboy,
     Ms. Falls & Co., Patches (FN) — alle mit Zahlen.
 
-**Fazit:** Die frühere Vermutung („Basisspiel gedruckt, Üble Nachbarn Formel")
+**Fazit:** Die frühere Vermutung („Basisspiel gedruckt, Neue Nachbarn Formel")
 ist **widerlegt**. Es gibt **keine** Erweiterungsregel dieser Art. Die Formel ist
 Barry Bluffs / Viktor Visages persönlicher Kartentext. Die Engine muss die
 Bösewicht-Werte daher **pro Bösewicht als Datenfeld** führen, das entweder eine
@@ -445,13 +699,13 @@ Quelle jeweils das Tableau. Deutsche Namen aus den deutschen Aktionsdecks.
 | Lawman Dozy | Schnarchbert | 5/6/6/6 | 12/14/18/21 | – |
 | Penny Pinchetti | Penny Gönnzales | 7/7/8/8 | 12/15/18/21 | – |
 | Virginia Fitz | Viktoria Spitz | 5/6/6/7 | 12/15/18/21 | – |
-| Will Barlow | Jupp Karre | 7/7/7/7 | 11/14/17/20 | – |
+| Will Barlow | Jupp Karre | 7/7/7/7 | 11/14/17/20 | – ⚠️ Druckfehler, siehe unten |
 | Qing & Kween | Nönigin & Könich | 6/6/7/7 | 11/14/17/20 | – |
 | Umbrello | Fürst Wetternich | 6/6/7/7 | 11/14/17/20 | – |
 | Samuel Strawman | Rüdiger Schreck | 6/7/7/8 | 11/15/18/21 | – |
 | Pepin Milkfrog | Freddy Froschmilch | 6/6/7/7 | 11/14/17/20 | – |
 
-**Üble Nachbarn (8):**
+**Neue Nachbarn (8):**
 
 | Bösewicht (EN) | Deutsch | BEW | LEB | Überfall |
 |---|---|---|---|---|
@@ -474,355 +728,794 @@ SCHWANZ" (= *Distracting Tail* ★ auf Deputy Waggums' Tableau) trägt
 (`docs/befund-beute-und-aufstellbares.md` §2.4). Alle übrigen Zuordnungen sind
 über Artwork, Aktionstexte oder Story eindeutig.
 
+**Die acht Namenszuordnungen der Erweiterung sind jetzt direkt belegt** —
+`[NN S.15]` nennt alle acht deutschen Bösewichtnamen: Arnold Schmatz, **Viktor
+Visage**, Die wei**ß**en Herren, Fleckchen, Thea Kotta, Fritze Fischkopp,
+Dr. Bosskop, Rosa Voir & die WG. Dazu zwei Überfall-Kartennamen auf Deutsch:
+Dr. Bosskops **„Pestdoktor"** (= *Plaguebearer*) und Viktors **„Die Gurte der
+Maske"** (= *Mask Straps*).
+
+**⚠️ Druckfehler auf Jupp Karres Tableau — betrifft genau die Solospalte**
+`[FAQ S.2]`:
+
+> „Bösewicht, Jupp Karre: Hier steht aus Versehen **2 mal 2D**. Wie ihr euch aber
+> vermutlich schon gedacht habt, **soll das 2D mit höherem Leben eigentlich ein 3D
+> sein**."
+
+Auf Jupp Karres Tableau ist die Spalte **3 Dörfler fälschlich mit „2D"
+beschriftet**. Solo (3 Dörfler) ist also die **zweite** Spalte zu nehmen — die mit
+dem höheren LEB (14), nicht die erste. Die Zahlen in der Tabelle oben sind
+richtig, nur die Spaltenbeschriftung auf der Pappe ist falsch. (Frosted Games
+bietet dafür einen Aufkleberstreifen an.)
+
+**⚠️ Fehlende Markierung auf Schnarchberts Aktionskarte „Unruhige Beine"**
+`[FAQ S.2]`: „Hier fehlt die [zzz]-Markierung unten auf der Karte. **Schnarchbert
+pennt aber dennoch**, wie auf der Karte angegeben. Der Effekt auf seiner
+„Schlafwandler"-Karte löst dennoch wie üblich aus."
+
 ---
 
 ## 6. Kampfablauf
 
 ### 6.1 Zugreihenfolge
 
-- **„Wer ist dran?"-Leiste von oben nach unten.** Der **Bösewicht steht oben und
-  ist immer zuerst dran** `[BR S.10]`, `[E02 01:53]`.
+- **„Wer ist dran?"-Leiste in Kloppen-Reihenfolge, oben nach unten.** Der
+  **Bösewicht steht oben und ist immer zuerst dran** `[DE S.13]`, `[E02 01:53]`.
 - Danach reihum die Dörfler, dann wieder von oben.
-- Der Bösewicht kann **zusätzlich zu seinem Leistenplatz** aktiviert werden,
-  wenn eine Karte, Fähigkeit oder ein **Wutangriff** das ausdrücklich sagt
-  `[E02 02:11]`.
-- **Keine Diagonalen.** Bewegung, Reichweite und **jede** Entfernungsmessung
-  erfolgt ausschließlich **orthogonal** (waagerecht/senkrecht)
-  `[BR S.30 FAQ]`, `[E01 1:12:46]`.
-- **Ein einziger W10** wird für alles verwendet: Dorf-Ereignisse, Angriffe,
-  Terrain, Bösewicht-Aktionen `[BR S.30 FAQ]`.
+- **Drei Auslöser für „Bösewicht-Aktion ausführen"** `[DE S.16]`: „Immer wenn …
+  der Bösewicht in Kloppen-Reihenfolge **am Zug** ist, … **ein Effekt** euch
+  auffordert eine Bösewicht-Aktion auszuführen, … beim Bösewicht ein
+  **Wutausbruch** ausgelöst wird … Zieht die oberste Bösewicht-Aktion vom
+  Ziehstapel und handelt sie ab. Werft sie danach auf die Ablage ab."
+- **Keine Diagonalen.** „Diagonal is nich, Sportsfreund. **Nie, einfach nie!**"
+  `[DE S.7]`. Entfernungen „werden immer auf die gleiche Weise gezählt: über
+  vertikal und horizontal angrenzende Felder und **niemals diagonal**"
+  `[DE S.32]`.
+- **Ein einziger W10** wird für alles verwendet: „Du würfelst immer – bei
+  Dorf-Ereignissen, Angriffen, Interaktionen und Bösewicht-Aktionen – nur mit
+  genau 1 Würfel mit 10 Seiten (W10)." `[DE S.32]`
+- **Mehrere Effekte gleichzeitig:** „Was, wenn zu Beginn oder am Ende eines Zuges
+  im Kampf gleich mehrere Effekte eintreten? **Ihr bestimmt gemeinsam**, in
+  welcher Reihenfolge die Effekte eintreten." `[DE S.32]`
 
 ### 6.2 Zug des Bösewichts
 
-**Der ganze Zug besteht darin, die oberste Karte des Aktionsdecks aufzudecken und
-von oben nach unten abzuarbeiten** `[BR S.15]`.
+**Der ganze Zug besteht darin, die oberste Karte des Ziehstapels zu ziehen und
+abzuarbeiten; danach wird sie auf die Ablage abgeworfen** `[DE S.16]`.
 
-Kartenaufbau `[BR S.15]`:
+Kartenaufbau — **fünf** Abschnitte `[DE S.16]`:
 
-1. **Name + Flavourtext.**
-2. **Ziel (Target)** — wird **zuerst und für die ganze Karte** bestimmt.
-3. **Randale / Move-Act** *(Pfeil-Symbol)* — Bewegung und Hauptaktion.
-4. **Nachspiel (Aftereffect)** — greift nur, wenn das **Ziel Schaden genommen**
-   hat, oder wenn die Karte etwas anderes ausdrücklich nennt. Nicht jede Karte
-   hat eins.
+1. **Name.**
+2. **Umschreibung** (Flavourtext).
+3. **Das Ziel** — wird **zuerst und für die ganze Karte** bestimmt.
+4. **Krawall** — „Hier tut der Bösewicht meist Dinge, die für euch schlecht sind.
+   Meistens bewegt er sich und/oder fügt Zielen AUA zu."
+5. **Nachspiel** — „ein Zusatz, den nicht alle Bösewicht-Aktionen haben", mit
+   eigenem Auslöser (siehe unten).
 
-**Zielbestimmung** `[BR S.16]`:
+**Auswertungsreihenfolge** `[DE S.17]`: Ziel bestimmen → **Krawall von oben nach
+unten** → prüfen, ob das Nachspiel ausgelöst wurde → **Nachspiel von oben nach
+unten** → Karte abwerfen.
 
-- Häufige Ziele: **nächster Dörfler**, **fernster Dörfler**, **schwächster
-  Dörfler** (niedrigste aktuelle LEB), **alle Dörfler im Umkreis von 2 Feldern**,
-  **kein Ziel**.
-- Entfernung = **erforderliche Bewegungspunkte**, orthogonal gemessen. Andere
-  Dörfler im Weg zählen **nicht** als Hindernis, weil der Bösewicht sie wegrempelt
-  `[E02 06:20]`. **Hindernis-Terrain** verlängert den Weg dagegen sehr wohl
-  `[E02 06:35]`.
-- Auch ein **unerreichbares** Ziel wird gewählt — der Bösewicht bewegt sich dann
-  trotzdem in seine Richtung `[BR S.16]`.
-- **Gleichstand:** Die betroffenen Dörfler würfeln; **der niedrigste Wurf ist das
-  Ziel** `[BR S.16]`, `[E02 12:37]`.
-- Eine Aktion wird **vollständig** abgearbeitet, **auch wenn es kein gültiges Ziel
-  gibt** `[BR S.16]`.
+**Das Nachspiel wird NICHT automatisch abgehandelt**, sondern genau in zwei
+Fällen `[DE S.16]`:
 
-**Bewegung des Bösewichts** `[BR S.15-16]`:
+- das Wort „Nachspiel" steht **nicht** im Krawall, das Ziel der Bösewicht-Aktion
+  hat aber **1+ AUA erlitten**; **oder**
+- das Wort „Nachspiel" steht **ausdrücklich** im Krawall und die dort genannte
+  Bedingung (sofern vorhanden) ist erfüllt.
 
-- BEW = Höchstzahl an Feldern pro Aktion. **Der Bösewicht belegt selbst 4 Felder**;
-  jeder BEW-Punkt verschiebt ihn um **ein** angrenzendes Feld `[BR S.15]`,
-  `[E02 05:33]`.
-- Er **dreht sich zum Ziel** und nimmt den **kürzesten Weg**.
-- Gibt es **mehrere gleich kurze Wege**, **wählen die Spieler** `[BR S.15]`.
-- Würde ein Weg ihm **Schaden zufügen**, muss er ihn **meiden** `[BR S.15]`.
-- **Hindernis-Terrain** kann er nicht durchqueren, **Gebiet-Terrain** schon
-  `[BR S.15]`.
-- **„Bewege dich vorwärts":** Er dreht sich zum Ziel und geht dann BEW Felder
-  geradeaus. Bei perfekter Diagonale wählen die Spieler die Richtung. Stößt er
-  dabei auf undurchdringliches Terrain, **endet die Bewegung** `[BR S.16]`.
-- **Platzieren ≠ Bewegen:** Wird jemand **platziert**, kommt er unabhängig von der
-  Entfernung **direkt** auf das genannte Feld; BEW spielt keine Rolle. Ist das
-  Feld besetzt, kommt er auf das nächstmögliche `[BR S.15]`.
+Es löst **auch dann** aus, wenn das Ziel inzwischen besiegt ist: „Ja, sofern das
+Ziel innerhalb der Bösewicht-Aktion AUA erlitten hat oder es innerhalb der
+Bösewicht-Aktion explizit erwähnt wird" `[DE S.32]`.
 
-**Rempeln (Collision)** `[BR S.15]`, `[E02 09:25]`:
+**Zielbestimmung** `[DE S.16]`:
 
-- Zieht der Bösewicht auf ein Feld mit einem Dörfler, wird dieser **auf ein
-  angrenzendes Feld seiner Wahl geschoben**.
-- Das **kostet den Bösewicht keine zusätzliche Bewegung**, und der geschobene
-  Dörfler **verliert keine eigenen Bewegungspunkte**.
-- Das kann **mehrfach pro Aktion** passieren — und ist für die Dörfler oft
-  **nützlich**, weil man sich gratis umpositionieren kann.
-- Ist kein angrenzendes Feld frei, kommt der Dörfler auf das **nächstmögliche
-  Feld**, das weder von Dörfler, Bösewicht noch Hindernis besetzt ist.
+- **Das Ziel kann „genau 1 Dörfler, mehrere Dörfler, Terrain oder auch niemand"
+  sein.** „Einmal gewählt, bleibt das Ziel **bis zum Abwurf** dieser
+  Bösewicht-Aktion gleich."
+- **Die vier häufigen Ziele, mit Definition** `[DE S.18]`:
+  - **Nahester Dörfler** — „der Dörfler, bei dem der Bösewicht die **wenigste
+    BEWEGUNG** bräuchte, um **angrenzend** zu ihm zu stehen".
+  - **Fernster Dörfler** — analog mit der **meisten** BEWEGUNG.
+  - **Alle Dörfler innerhalb von X Feldern Entfernung.**
+  - **Niemand.**
+- Entfernung = **erforderliche Bewegungspunkte**, orthogonal gemessen.
+  **Hindernis-Terrain verlängert den Weg** und kann einen Dörfler als „nahesten"
+  ausschließen: „Würde der Bösewicht wegen des Hindernisses zu dir mehr BEW
+  benötigen als zu einem anderen Dörfler, bist du nicht der nahester Dörfler und
+  kommst als Ziel nicht in Frage." `[DE S.32]`
+- `⚠️ ABGELEITET:` Dass **andere Dörfler im Weg nicht als Hindernis zählen**,
+  steht nicht ausdrücklich in der Anleitung. Es folgt aus der Rammen-Regel — der
+  Bösewicht bewegt sich sehr wohl auf besetzte Felder `[DE S.17]`, `[E02 06:20]`.
+- Auch ein **unerreichbares** Ziel wird gewählt: „Der Bösewicht bewegt sich auch
+  dann in Richtung seines Ziels, wenn er es **nicht erreichen** kann."
+  `[DE S.17]`. **Aber:** „Soll eine Bewegung zu einem Ziel stattfinden, dass
+  **nicht existiert**, findet aber **keine** Bewegung statt." `[DE S.17]`
+- **Gleichstand:** „Gleichstände werden durch Würfeln entschieden: **Wer die
+  kleinere Zahl würfelt, wird zum Ziel.**" `[DE S.16]` Bei Gleichstand im
+  Gleichstandswurf: „Würfelt eben noch mal" `[DE S.32]`.
+- **Kein gültiges Ziel:** „wird die Karte **trotzdem abgehandelt**. In diesem
+  Falle **ignoriert ihr aber alle Anweisungen, in denen das „Ziel" vorkommt**."
+  `[DE S.16]` — der zweite Satz ist die Implementierungsvorschrift.
+- **Gemessen wird vom Bösewicht:** „Jede innerhalb einer Bösewicht-Aktion
+  vorkommende Entfernung – sei es für eine Bewegung oder einen Angriff – wird
+  immer **vom Bösewicht aus** gezählt, es sei denn, es steht etwas anderes da."
+  `[DE S.17]`
+- **Mehrere Aktionen hintereinander:** „Werdet ihr angewiesen, 2 oder mehr
+  Bösewicht-Aktion auszuführen, zieht immer erst die erste Karte, **führt sie
+  aus** und zieht **erst dann** die nächste." `[DE S.17]`
 
-**Fernangriffe des Bösewichts:** Aktionen, die als „ranged attack" ausgewiesen
-sind, brauchen das Ziel in der genannten Reichweite. **Anders als Dörfler
-ignorieren Bösewichte dabei Hindernisse** — sie treffen auch durch Sichtblocker
-hindurch `[BR S.15]`.
+**Bewegung des Bösewichts** `[DE S.17]`:
 
-**Aktionsdeck leer:** Ablagestapel mischen und als neues Deck verwenden. Manche
-Aktionen verlangen ausdrücklich ein Neumischen — dann wird der gesamte
-Ablagestapel eingemischt `[BR S.15]`.
+- **Der Bösewicht bedeckt 2×2 Felder** (§5.10): „Da sie größer sind, entspricht
+  **1 BEWEGUNG** hier aber **1 angrenzenden Paar an Feldern**." Nur horizontal
+  oder vertikal. `[DE S.17]`, `[DE S.35]`
+- **Blickrichtung:** „Der Bösewicht dreht sich in seiner Bewegung immer in die
+  Richtung, **in die er sich gerade bewegt**." `[DE S.17]` (Nicht „zum Ziel" —
+  das gilt nur für die Krawall-Passage „Dreht den Bösewicht Richtung Ziel".)
+- **Kürzester Weg, Schaden nur als Tiebreak:**
+  > „Bösewichte machen **keine Umwege** und bewegen sich immer auf dem
+  > **kürzesten möglichen Weg**. Kommen dabei mehrere Wege in Frage, **bestimmt
+  > gemeinsam**, welchen Weg er nimmt. Aber: **Bei gleicher Länge** vermeidet er
+  > Wege, auf denen ihm AUA zugefügt werden würde." `[DE S.17]`
 
-**Karten, die liegen bleiben:** „Behalte diese Karte vor der Gruppe / vor dem
-Dörfler" — solche Karten gehen **nicht** auf den Ablagestapel, sondern bleiben
-liegen, bis sie auslösen `[BR S.16]`, `[EXP S.4]`.
+  Für die Engine: Schaden ist **kein Hindernis**, sondern ein **Tiebreak**. Ein
+  kürzerer Weg mit Schaden sticht einen längeren ohne.
+- **Bewegung endet beim Erreichen des Ziels:** „Sobald das Ziel erreicht wird,
+  endet die Bewegung, selbst wenn der BEW-Wert noch weitere BEWEGUNG zulassen
+  würde." `[DE S.17]` „Ziel erreicht?" = „wenn der Bösewicht sich Richtung vorher
+  definiertes Ziel bewegt hat und dann mit seiner Bewegung **auf / angrenzend
+  zum** Ziel angekommen ist" `[DE S.35]`.
+- **BEW limitiert nur den Krawall** — harte Engine-Regel:
+  > „**Wichtig:** Die Bewegung des Bösewichts wird **ausschließlich innerhalb des
+  > Krawalls** der Bösewicht-Aktionen durch den BEW-Wert limitiert! … Bewegt sich
+  > der Bösewicht innerhalb des **Nachspiels** oder bewegt ihr in durch
+  > **Ausrüstungs-Fähigkeiten**, ist diese Bewegung stets **unabhängig** von
+  > seinem BEW-Wert." `[DE S.17]` (Setzfehler „bewegt ihr in durch" im Original.)
+- **Die FAQ gibt dafür das brauchbarere Kriterium** — es hängt am **Wortlaut der
+  Anweisung**, nicht am Kartenabschnitt:
+  > „Kurz und Knapp: **Entweder** die Bewegung eines Bösewichts (oder durch einen
+  > eurer Effekte) sagt „**Er bewegt sich X Felder**", dann ist seine **BEW
+  > unerheblich**; **oder** er bewegt sich „**auf etwas zu**", dann bewegt er sich
+  > **bis zu seinem BEW**. Wir werden durch entsprechende Fettung auf den
+  > Aktionskarten darauf hinweisen, für welche Bewegung der BEW relevant ist."
+  > `[FAQ S.2]`
+
+  Am Tisch also: **feste Feldzahl ⇒ BEW ignorieren; „Richtung/auf … zu" ⇒
+  höchstens BEW Felder.** Die FAQ nennt diese Stelle der Anleitung ausdrücklich
+  „etwas kryptisch" und kündigt eine überarbeitete Seite 17 an — **unser PDF hat
+  sie bereits** (der „Wichtig"-Satz oben steht dort), es ist nichts nachzuladen.
+- **Terrain:** „Bei Terrain gelten für den Bösewicht grundsätzlich die
+  **gleichen** Regeln wie für Dörfler: Durch die meisten Gebiete kann er sich
+  durchbewegen, durch Hindernisse jedoch nicht." `[DE S.17]`
+- **„Bewege dich vorwärts":** „Der Bösewicht dreht sich mit dem Gesicht in
+  Richtung des Ziels und bewegt sich dann so viele Felder weit in Blickrichtung,
+  wie sein BEWEGUNG-Wert angibt (sofern möglich). Steht das Ziel **schräg**, dreht
+  er sich in die Richtung des **kürzesten Weges**; steht es **genau diagonal**,
+  entscheidet die Gruppe. Stößt er an ein unpassierbares Hindernis-Terrain,
+  **endet seine Bewegung**." `[DE S.18]`
+
+**Rammen** (nicht „Rempeln") `[DE S.17]`:
+
+> „Will sich der Bösewicht auf das Feld bewegen, auf dem du grade stehst,
+> **rammt** er dich: Du musst dich **sofort auf ein angrenzendes freies Feld
+> deiner Wahl** bewegen. Diese erzwungene Bewegung **kostet dich aber keine BEW**
+> und kann **mehrmals innerhalb von 1 Bösewicht-Aktion** passieren."
+
+- Es ist für die Dörfler oft **nützlich**: „Das kannst du natürlich auch
+  strategisch nutzen, um dich schnell und ohne BEW ausgeben zu müssen, anders zu
+  positionieren." `[DE S.17]`
+- „Wirst du gerammt und es gibt **kein freies angrenzendes Feld**, … platziere
+  dich auf dem **nahesten freien Feld**." `[DE S.17]`
+- Auch beim **Schieben/Ziehen** des Bösewichts: „Wird ein Bösewicht auf ein Feld
+  geschoben oder gezogen, auf dem ein Dörfler steht, wird dieser **gerammt**, als
+  ob sich der Bösewicht aus eigenem Wille dort hinbewegt hätte." `[DE S.17]`
+
+**Schieben und Ziehen** `[DE S.17]`:
+
+> „Werdet ihr angewiesen, 1 Figur zu **schieben** oder zu **ziehen**, spielt der
+> BEW-Wert und somit auch der zurückzulegende Weg übers Schlachtfeld dafür
+> **keine Rolle**. Schieben und Ziehen zählen **nie als Bewegung**! …
+> Unterschied: **Zieht** ihr eine Figur näher an ein Ziel heran, muss dabei
+> **jedes Feld die Entfernung zum Ziel verringern**. Beim **Schieben** ist es
+> andersrum: … muss dabei **jedes Feld die Entfernung zum Ziel vergrößern**."
+
+**Platzieren ≠ Bewegen** `[DE S.17]`:
+
+- Entfernung und BEW spielen keine Rolle. „Platzierung zählt nie als Bewegung!"
+- Ist die Position blockiert, wird **auf dem nahesten freien Feld** platziert.
+- „Bei mehreren möglichen Optionen, **entscheidet ihr gemeinsam**!"
+- „**Gibt es kein gültiges Feld**, auf dem die Figur platziert werden kann,
+  **bleibt sie, wo sie ist**."
+
+**Fernkampf des Bösewichts** `[DE S.17]`: Das Wort „Fernkampf" kann im Krawall
+stehen; der Bösewicht muss dann innerhalb der genannten Reichweite stehen.
+„**Anders als ihr ignoriert der Bösewicht im Fernkampf alle Hindernisse**, die
+zwischen ihm und seinem Ziel stehen." Glossar: „Fernkampf-Angriffe von
+Bösewichten werden von Terrain **nicht** blockiert" `[DE S.35]`.
+
+**Aktionsdeck leer** `[DE S.17]`: „Liegt keine Bösewicht-Aktion mehr auf dem
+Ziehstapel, mischt **alle** Bösewicht-Aktionen im Ablagestapel und legt sie
+verdeckt auf das Feld „Ziehstapel"." Verlangt eine Karte ein Mischen, wird
+„(sofern nicht anders vorgegeben) **alle** Bösewicht-Aktionen aus dem
+Ablagestapel" eingemischt.
+
+**Karten gelten schon während der Abhandlung als abgeworfen** `[DE S.17]`:
+
+> „**Wichtig:** Bösewicht-Aktionen gelten **bereits während ihres Abhandelns** als
+> abgeworfene Bösewicht-Aktionen im Ablagestapel! Bedenkt das, wenn eine
+> Bösewicht-Aktion euch auffordert die Bösewicht-Aktionen zu mischen. Führt in
+> diesem Fall **trotzdem ihr Nachspiel aus**, auch wenn die Karte bereits
+> eingemischt wurde."
+
+> **⚠️ Dieser Passus wird gestrichen** `[FAQ S.2]`. Die FAQ: „Glücklicherweise
+> betrifft dies **nur Effekte, die besagen, dass anschließend noch eine
+> Bösewicht-Aktion aufgedeckt und abgehandelt wird**. Dennoch ist es unschön, sich
+> einen Effekt merken zu müssen, der auszuführen ist, aber nicht mehr auf einer
+> Karte sichtbar. **Wir werden diesen Passus streichen** und alle entsprechenden
+> Effekte auf Karten so umformulieren, dass das zurückmischen im selben Satz
+> stattfindet, wie die Anweisung zur zusätzlichen Bösewicht-Aktion."
+>
+> **Für den Tisch heißt das:** Wird eine Karte beim Abhandeln eingemischt, ist nur
+> noch das auszuführen, was **auf derselben Karte im selben Satz** mit dem
+> Mischbefehl steht — in der Praxis die zusätzliche Bösewicht-Aktion. Ein
+> Nachspiel aus dem Gedächtnis nachzuholen ist **nicht** mehr nötig. Die
+> Anleitung ist hier überholt.
+
+**Karten, die liegen bleiben** `[DE S.17]`: „vor dir" → gilt nur für den
+Betreffenden, „vor euch" → für alle; der Text im farbigen Kasten gilt, solange
+die Karte ausliegt. **Obergrenze:** „Ausliegende Bösewicht-Aktionen werden
+**immer nach dem Kampf** abgeworfen (es sei denn es steht explizit anders da)."
+Karten, die zwar nicht ausgelegt werden, aber über ihre Abhandlung hinaus wirken,
+„legt euch … etwas abseits hin" — sie zählen bereits zu den abgeworfenen.
+
+**Die fünf häufigen Krawall-Passagen und ihre Auslegung** `[DE S.18]`:
+
+1. „Bewegt den Bösewicht Richtung Ziel. Dann, **nur wenn Ziel erreicht**: Fügt
+   dem Ziel 1 AUA zu."
+2. „Er versucht dabei, sich **vollständig** auf das Ziel zu bewegen." — bei einem
+   **Gebiet-Terrain** als Ziel bleibt er erst stehen, wenn er vollständig darauf
+   steht oder seine BEWEGUNG aufgebraucht ist.
+3. „Füge **jedem** Ziel 1 AUA zu. **Dann**, bewegt den Bösewicht Richtung
+   fernsten Dörfler." — der Schaden kommt zuerst, egal wie weit entfernt.
+4. „**Legt diese Karte offen** vor das Ziel/euch."
+5. „**Dreht den Bösewicht Richtung Ziel und bewegt ihn vorwärts.**"
 
 ### 6.3 Zug eines Dörflers
 
-Ein Dörfler darf in **beliebiger Reihenfolge** und **beliebig verschränkt** alles
-tun, wofür er noch BEW und MUMM hat `[BR S.18]`, `[CS-DE]`:
+„In deinem Zug kannst du **in einer Reihenfolge deiner Wahl** eine Menge Dinge
+tun, sofern du dafür genug BEW, MUMM, Münzen … hast" `[DE S.20]`:
 
 | Aktion | Kosten / Grenze |
 |---|---|
 | **Bewegen** | 1 BEW = 1 orthogonal angrenzendes Feld |
 | **Angreifen** | MUMM-Kosten der Waffe; **jede Waffe max. 1× pro Zug** |
-| **Terrain-Interaktion** | MUMM- oder Münzkosten der Terrain-Karte; **max. 1× pro Terrain-Teil pro Zug** |
-| **Ausrüstungsfähigkeit aktivieren** | wie angegeben; **jede max. 1× pro Zug** |
-| **Dörfler-Fähigkeit aktivieren** | meist MUMM; **jede max. 1× pro Zug** |
-| **Ausrüstung auswechseln** | **2 MUMM** |
+| **Terrain-Interaktion** | MUMM- oder Münzkosten der Terrain-Karte; **max. 1× pro Terrain-Plättchen pro Zug** |
+| **Ausrüstungsfähigkeit aktivieren** | wie angegeben; **jede Ausrüstung max. 1× pro Zug** — bei mehreren Fähigkeiten auf einer Karte **nur eine davon** |
+| **Dörfler-Fähigkeit aktivieren** | meist MUMM; **jede max. 1× pro Zug**, MUMM-Fähigkeiten **nur im eigenen Zug** |
+| **Ausrüstung auswechseln** | **2 MUMM pro Slot** (Ausnahme: beide Hände zusammen) |
 | **Mumm zusammenraffen (Neuwurf)** | **2 MUMM**, max. 1× pro Angriffs-/Terrainwurf |
 | **Aufstellbares platzieren** (Toller Trödel) | keine Kosten, auf ein leeres angrenzendes Feld |
 
-**Bewegung** `[BR S.18]`, `[E02 15:56]`:
+**Bewegung** `[DE S.20]`, `[E02 15:56]`:
 
-- BEW ist ein **Vorrat pro Zug**, kein Wert, der abgebaut wird. **Den Marker auf
-  der BEW-Leiste nicht verschieben** — er zeigt nur, wie viel man **jeden** Zug hat.
-- Die Bewegung ist **frei aufteilbar**: 2 Felder gehen, angreifen, 2 Felder gehen.
-  **Aktionen verbrauchen keine Bewegungspunkte** `[E02 16:48]`.
-- **Dörfler dürfen durcheinander hindurchgehen, aber nicht durch den Bösewicht**
-  `[BR S.18]`.
+- BEW ist ein **Vorrat pro Zug**. „Du musst aber deine Bewegung **nicht an einem
+  Stück** ausführen und darfst **zwischen den Schritten andere Aktionen**
+  ausführen." Aktionen verbrauchen keine Bewegungspunkte.
+- „Du darfst dich **nicht** auf Felder mit **Hindernissen oder Bösewichten**
+  bewegen. Du darfst dich aber **durch andere Dörfler durchbewegen**, solange du
+  die Bewegung wieder **auf einem freien Feld beendest**." `[DE S.20]`
+- **Fremdbewegung ist BEW-unabhängig:** „**Wichtig:** Wirst du durch eine
+  Bösewicht-Aktion oder eine Ausrüstungs-Fähigkeit bewegt, ist dies **unabhängig
+  von deinem BEW-Wert**." `[DE S.20]`
 
-**Mumm (MUMM) = Aktionspunkte** `[BR S.7]`, `[E02 21:31]`:
+**Marker: wann verschieben, wann nicht** `[DE S.7]`, `[DE S.10]`:
 
-- MUMM ist ebenfalls ein **Vorrat pro Zug**. Auch hier den Marker **nicht**
-  verschieben; man rechnet mit.
-- Der Marker wird **nur** bei **dauerhaften** Wertänderungen verschoben
-  (Ausrüstungsbonus mit schwarzem Kasten, Effekte ohne „nur für diesen Zug").
-- Gilt ein Bonus laut Text **nicht** nur „für diesen Zug", **gilt er für den
-  ganzen Kampf** `[E02 22:36]`.
+- **Verbrauch** von BEW und MUMM wird im Kopf mitgezählt, der Marker bleibt
+  stehen: „Deine Marker für BEWEGUNG und MUMM solltest du **nur anpassen, wenn
+  ein Effekt deren Wert verändert**. Bei der ganz normalen Durchführung deines
+  Zuges zählst du einfach deine schon genutzte BEWEGUNG und MUMM im Kopf mit."
+  `[DE S.7]`
+- **Verändert ein Effekt den Wert, wird der Marker sofort verschoben** — und zwar
+  auch bei **direkten** (nicht schwarz markierten) Änderungen und auch bei
+  **Kosten in Wertform**: „Die Fähigkeit besagt, dass du entweder deinen MUMM oder
+  deine PRZ um 1 verringern musst. **Du schiebst dementsprechend den Marker** des
+  gewählten Werts um 1 Feld auf seiner Leiste nach unten." `[DE S.10]`
+- Bei **besonderen** Änderungen („nur für diesen Zug"): „Passe daher nur dann
+  deine entsprechenden Marker an, wenn du sonst durcheinanderkommen würdest (und
+  **vergiss dann nicht, die Marker direkt nach deinem Zug wieder
+  zurückzusetzen**)." `[DE S.10]`
+- Die frühere Formulierung „der Marker wird **nur** bei dauerhaften
+  Wertänderungen verschoben" war zu absolut.
+- **Hat ein Bonus keine Dauerangabe, gilt er für die aktuelle Runde** — also bis
+  zur Nachbereitung —, nicht für die ganze Partie (§4 Schritt 2, `[DE S.10]`,
+  `[DE S.22]`).
+- **Die Leisten sind harte Grenzen:** „Die Marker können die Leisten **nie
+  verlassen**, Veränderungen darüber hinaus **verfallen** somit einfach."
+  `[DE S.7]` Ein +3 BEW auf einer Leiste mit nur 1 freien Feld ist kein
+  gespeicherter Überschuss.
+- **PRZ kann negativ sein:** „Bei einem Angriff würfelst du immer 1
+  Angriffs-Wurf und rechnest dann deinen PRÄZISION-Wert zu dem Würfel-Ergebnis
+  hinzu (**oder ziehst ihn ab, sofern er negativ ist**)." `[DE S.7]`
 
-**Ausrüstung im Kampf** `[BR S.18]`:
+**Ausrüstung im Kampf** `[DE S.21]`:
 
-- **Anlegen/Tauschen kostet 2 MUMM.** Die bisher in dem Slot liegende Ausrüstung
-  wird weggepackt. Beliebig oft pro Zug. **Beide Handslots zählen als eine
-  Aktion** — z. B. zwei Einhandwaffen ablegen und eine Zweihandwaffe anlegen
-  kostet insgesamt 2 MUMM.
-- **Weggepackte Ausrüstung wirkt nicht** — Ausnahme: **„Besondere Ausrüstung"
-  (Special Gear)**; deren passive Fähigkeiten sind **immer** aktiv und
-  aktivierbar, auch ungelegt `[BR S.8]`, `[E02 22:49]`.
-- **Max-LEB-Feinheiten:** Legt man Ausrüstung ab, die Max-LEB gab, sinkt die
-  aktuelle LEB auf das neue Maximum, man nimmt aber **keinen Schaden**. Legt man
-  sie im Kampf an, **gewinnt man keine LEB** dazu.
-- BEW/MUMM/PRZ-Boni wirken **sofort** beim An- bzw. Ablegen — auch noch im
-  laufenden Zug.
-- **Zähler auf Ausrüstung** bleiben zwischen Runden und beim Ablegen liegen
-  `[BR S.18]`.
+- **Anlegen/Tauschen kostet 2 MUMM PRO SLOT**, beliebig oft pro Zug:
+  > „Zahle 2 MUMM, um 1 weggepackte Ausrüstung an 1 deiner Ausrüstungs-Slots
+  > anzulegen. Befindet sich an diesem Slot bereits Ausrüstung? Packe sie vorher
+  > weg. Während deines Zuges darfst du Ausrüstung so oft du willst wechseln,
+  > **musst aber pro Slot jedes Mal 2 MUMM zahlen**. **Ausnahme:** Ausrüstung in
+  > deinen **beiden Hand-Slots** darfst du **gleichzeitig** wechseln, ohne doppelt
+  > MUMM bezahlen zu müssen." `[DE S.21]`
+
+  Also: zwei Einhandwaffen wegpacken und eine Zweihandwaffe anlegen = **2 MUMM**;
+  Kopf und Brust zusammen = **4 MUMM**. Ebenso `[DE S.10]` und `[DE S.35]`.
+- **Weggepackte Ausrüstung wirkt nicht.** Ausnahme ist das Merkmal
+  **„Seltsam"**, nicht die Kartenart „Besondere Ausrüstung":
+  > „**Seltsame Ausrüstung** — Manche Ausrüstung hat das Merkmal „Seltsam". Diese
+  > Art von Ausrüstung **kann an keinen deiner 6 Slots angelegt werden**.
+  > Wertveränderungen und Fähigkeiten von Seltsamer Ausrüstung sind daher auch
+  > **schon aktiv, sobald sie in deinem Besitz ist**." `[DE S.9]`
+
+  Randnotiz derselben Seite: „Seltsame Ausrüstung ist **immer aktiv**, solange sie
+  in deinem Besitz ist!" Sie gilt dauerhaft als weggepackt `[DE S.9]`.
+  **„Besondere Ausrüstung" (gelber Rand) ist dagegen nur eine Herkunftsart** —
+  Ausrüstung, „die du nur unter bestimmten Bedingungen erhältst" `[DE S.8]`,
+  `[DE S.35]`. Sie muss **normal angelegt** werden.
+- **Was gilt als weggepackt:** „**Nur angelegte Ausrüstung kann weggepackt
+  werden.** Jegliche nicht angelegte Ausrüstung (auch Ausrüstung mit dem Merkmal
+  „seltsam") in deinem Besitz **gilt als weggepackt**." `[DE S.9]`
+- **Max-LEB-Feinheiten** `[DE S.10]`:
+  - Sinkt das **Max LEB** (Anlegen, Wegpacken, Abwerfen oder ein Effekt), sinkt
+    das aktuelle LEB mit — **aber nur, „sofern es vorher voll war"**.
+  - Steigt das **Max LEB in der Dorfphase**, „setze auch dein LEBEN **sofort**
+    mit auf diesen neuen maximalen Wert".
+  - Steigt das **Max LEB im Kampf**, „erhöht sich dadurch allerdings dein LEBEN
+    **nicht** automatisch mit".
+  - `⚠️ ABGELEITET:` Dass die Absenkung **kein AUA** ist (und damit keine
+    schadensgebundenen Reaktionen auslöst), steht nicht in der Anleitung. Sie
+    sagt nur, dass sich das LEBEN mitsenkt.
+- **Werteänderungen wirken sofort:** „Wird durch Effekte oder das Anlegen,
+  Wegpacken oder Abwerfen von Ausrüstung 1 oder mehrere deiner Werte verändert,
+  **passe deine Werte-Leisten sofort** entsprechend an." `[DE S.10]`
+- **Marker auf Ausrüstung** bleiben liegen: „Marker auf Ausrüstung werden **weder
+  zwischen den Runden noch beim Wegpacken oder Auswechseln** der Ausrüstung
+  entfernt." `[DE S.21]`, `[DE S.35]`
+- **Snacks** (nicht „Verzehrbares" — das Wort kommt in der Anleitung nicht vor):
+  „Snacks sind konsumierbare Ausrüstung. Snacks legst du – genau wie andere
+  Ausrüstung auch – **an ihren passenden Slot** an. In deinem Zug darfst du den
+  Snack dann „**snacken**" und aktivierst dadurch seine Fähigkeit." `[DE S.9]`
+- **Mehrere Fähigkeiten auf einer Karte:** „Es gibt auch Ausrüstung mit mehreren
+  Fähigkeiten: Dann darfst du **immer nur 1 Fähigkeit der Ausrüstung pro Zug**
+  aktivieren." `[DE S.21]` — das ist eine **Grundregel des Basisspiels**, nicht
+  nur eine Odd-Jobs-FAQ.
+- **Fähigkeiten können automatisch auslösen:** „Manche Fähigkeiten kannst du auch
+  nur in bestimmten Phasen aktivieren oder sie werden **automatisch aktiviert**,
+  wenn etwas Bestimmtes passiert." `[DE S.21]`
+- **Reichweite wird von der Quelle gemessen:** „wird diese Reichweite immer **von
+  der Quelle der Fähigkeit aus (also von dir)** gemessen, es sei denn der Text
+  sagt explizit etwas anderes." `[DE S.10]`
+- **„Erste Karte einer bestimmten Art vom Nachschub nehmen"** `[DE S.10]`: so
+  lange oben aufdecken, bis die erste Karte dieser Art gefunden ist; sie nehmen,
+  alle anderen aufgedeckten „in beliebiger Reihenfolge als **unterste** Karten
+  unter den Nachschub". „Bist du bei deiner Suche an der untersten Karte des
+  Nachschubs angekommen und nicht fündig geworden? **Du gehst leer aus. Mische
+  dann den Nachschub neu.**"
+- **Abwerfen ist endgültig:** „Abgeworfene Ausrüstung … **verlässt das Spiel**.
+  Lege sie dazu zurück in die Spielschachtel." Wer abwerfen muss, darf „sowohl
+  angelegte als auch weggepackte Ausrüstung" abwerfen `[DE S.10]`.
+- **Zweihandwaffen:** „2-Hand-Waffen … belegen deine **beiden Hand-Slots**. Wenn
+  du eine 2-Hand-Waffe angelegt hast, kannst du also keine weitere Waffe
+  anlegen." `[DE S.9]`
+- **MUMM-Fähigkeiten nur im eigenen Zug:** „Deine Dörfler-Fähigkeiten, die dich
+  MUMM kosten, darfst du **nur während deines Zuges** aktivieren – jedoch **jede
+  nur maximal 1x pro Zug**." `[DE S.20]`
 
 **„Tappen" (Quer legen)** — *Tischkonvention, keine gedruckte Regel*:
 Ausrüstung, deren Fähigkeit „einmal pro Kampf" gilt, wird nach Gebrauch **um 90°
 gedreht**, damit man sie nicht erneut nutzt. Zum nächsten Kampf wird alles wieder
 gerade gelegt `[E02 27:29]`. Regeltechnisch gilt schlicht: **jede Fähigkeit max.
-1× pro Zug, sofern nicht anders angegeben** `[BR S.18]`; steht „einmal pro Kampf"
-auf der Karte, gilt das. **Achtung:** viele Verzehrbares-Karten des Basisspiels
-sagen stattdessen **abwerfen** — die sind dann endgültig weg `[E02 27:41]`
-(Odd-Jobs-Verzehrbares dagegen nicht, §11.3).
+1× pro Zug, sofern nicht anders angegeben** `[DE S.21]`; steht „einmal pro Kampf"
+auf der Karte, gilt das. **Achtung:** viele Snack-Karten des Basisspiels sagen
+stattdessen **abwerfen** — die sind dann endgültig weg `[E02 27:41]`
+(Odd-Jobs-Snacks dagegen nicht, §9.4).
 
-**Terrain-Interaktion** `[BR S.13]`, `[E02 17:15]`:
+**Terrain-Interaktion** `[DE S.14]`, `[DE S.20]`, `[E02 17:15]`:
 
-- **Hindernis (Obstacle, brauner Rahmen):** blockiert Bewegung für Dörfler **und**
-  Bösewicht, kann nicht betreten werden. Man muss **angrenzend** stehen, um zu
-  interagieren (diagonal zählt **nicht**). Manche verlangen eine **bestimmte
-  Position** — z. B. „an der Tür" des Wackelhofs.
-- **Gebiet (Feature, grüner Rahmen):** blockiert nichts, kann durchquert werden.
-  Man muss **darin stehen**, um zu interagieren.
+- **Hindernis-Terrain (brauner Rand):** „blockieren Bewegung – **sowohl von
+  Dörflern als auch von Bösewichten**. Sie sind unpassierbar und müssen umgangen
+  werden." Zum Interagieren muss der Dörfler „auf einem (horizontal oder
+  vertikal) **angrenzenden** Feld" stehen. „Bei einigen Hindernis-Terrains musst
+  du dich sogar an einer ganz **bestimmten Position** befinden … Beispiel: Um mit
+  **Marodes Farmhaus** zu interagieren, muss dein Dörfler **vor der Tür**
+  stehen." `[DE S.14]`
+- **Gebiet-Terrain (grüner Rand):** betretbar „sowohl von Dörflern als auch von
+  Bösewichten". Zum Interagieren muss der Dörfler **auf einem Feld innerhalb des
+  Gebiets** stehen. `[DE S.14]`
 - Interaktion kostet den auf der **Terrain-Karte** angegebenen MUMM- oder
-  Münzpreis; **pro Terrain-Teil max. 1× pro Zug**.
-- Manches Terrain hat Extrakosten für Betreten (z. B. Dichter Wald: **2 BEW pro
-  Feld** — gilt **nicht** für Bösewichte und nicht für Bewegung durch
-  Ausrüstung/Fähigkeiten) `[BR S.13]`.
-- Einige Terrain-Teile lassen sich **zerstören oder umwandeln** (Matschiger
-  Graben → Schlammgraben, Zaun einreißen, TNT zünden); manche darf man auch
-  **angreifen** (z. B. das Plumpsklo) und richtet dann Flächenschaden an
-  `[E02 18:36]`, `[E02 19:59]`, `[E02 43:56]`.
+  Münzpreis; „Du darfst mit **jedem einzelnen Terrain-Plättchen maximal 1x pro
+  Zug** interagieren" — zwei Holzzäune sind zwei Plättchen `[DE S.14]`.
+- **Terrain-Würfe** heißen Würfe für Terrain-Interaktionen; sie dürfen mit „Mumm
+  zusammenraffen" **1× wiederholt** werden `[DE S.14]`, `[DE S.20]`.
+- Betretungskosten: „Beispiel: Um dich auf ein Feld von **Dichter Wald** zu
+  bewegen, musst du **2 BEW** zahlen, anstatt wie normal 1 BEW." `[DE S.14]`
+  - **Das gilt auch für Bösewichte.** Die frühere Behauptung („gilt nicht für
+    Bösewichte") ist falsch: Gebiet-Terrains sind „sowohl von Dörflern als auch
+    von Bösewichten" betretbar und können dabei „die Bewegung … einschränken"
+    `[DE S.14]`; „Bei Terrain gelten für den Bösewicht grundsätzlich die
+    **gleichen** Regeln wie für Dörfler" `[DE S.17]`.
+    `⚠️ OFFEN:` ob die Terrain-Karte „Dichter Wald" selbst eine Ausnahme für
+    Bösewichte druckt, ist ungeprüft — die Karte liegt nicht vor.
+  - **Nicht** gilt es für Bewegung durch Ausrüstungs-Fähigkeiten oder
+    Bösewicht-Aktionen: die ist BEW-unabhängig `[DE S.17]`, `[DE S.20]`.
+- Einige Terrain-Teile lassen sich **zerstören oder umwandeln** (Zaun einreißen,
+  Sprengstoff zünden), manche darf man **angreifen** und richtet dann
+  Flächenschaden an `⚠️ NUR VIDEO: [E02 18:36]`, `[E02 19:59]`, `[E02 43:56]`.
+  Die Einzelheiten stehen auf den Terrain-Karten, nicht in der Anleitung (§13.8).
+- **Die 20 Terrainnamen des Grundspiels** stehen auf der Anleitungsrückseite
+  `[DE S.36]` — siehe §13.8. Korrigiert gegenüber den Videountertiteln:
+  „TNT + Zünder" → **Sprengstoff & Auslöser**, „Plumpsklo" → **Miefiges
+  Plumpsklo**, „Arzthütte" → **Hütte des Dorfdoktors**, „Wackelhof" → **Marodes
+  Farmhaus**.
+- **Die 7 Terrains je Grundspiel-Bösewicht** stehen vollständig auf `[DE S.33]`,
+  zusammen mit bösewichtspezifischen Sonderregeln. Das sind **Szenariodaten** und
+  gehören in `setups.scenario_data`, nicht in diese Datei.
 
 ### 6.4 Angreifen
 
-**Ablauf** `[BR S.18-19]`:
+**Die drei gedruckten Schritte** `[DE S.20]`:
 
-1. **In Reichweite kommen.** Nahkampfwaffen haben Reichweite **1** = orthogonal
-   angrenzend, sofern nichts anderes dasteht. Fernkampfwaffen nennen
-   „Reichweite: X".
-2. **MUMM-Kosten der Waffe zahlen.**
-3. **W10 werfen und die eigene PRZ addieren.** Ist das Ergebnis **≥** dem
-   ACC-Wert der Waffe, trifft der Angriff.
-4. Bei Treffer erleidet der Bösewicht den **AUA-Wert** der Waffe.
+1. **Überprüfen:** Reichweite zum Ziel vorhanden **und freie Schussbahn**?
+2. **Kosten:** MUMM-Kosten der Waffe zahlen (dafür wird der Marker **nicht**
+   verschoben).
+3. **Würfeln:** 1 Angriffs-Wurf mit dem W10, **PRZ addieren**. „Erreicht das
+   Ergebnis mindestens die **Trifft-Voraussetzung** der Waffe? Dann landest du
+   einen Treffer!" Bei Treffer erleidet das Ziel „AUA in Höhe des AUA-Wertes der
+   Waffe".
 
+Der Zielwert der Waffe heißt **„Trifft-Voraussetzung"** `[DE S.20-21]`, `[DE S.35]`
+(bisher „ACC-Wert"). Und: „**Nicht jede Waffe kann AUA zufügen.**" `[DE S.35]`
+
+**Reichweite** `[DE S.20]`:
+
+- „Reichweite wird genau gleich gezählt wie Bewegung: Angrenzende horizontale und
+  vertikale Felder."
+- „**Jede** Waffe hat eine Reichweite, aber nicht bei jeder steht sie dabei."
+  Nahkampfwaffen haben „sofern nicht anders vorgegeben … alle **Reichweite 1**".
+- **Reichweite 0 gibt es nicht:** „Hast du eine Waffe mit Reichweite 5, kannst du
+  somit Ziele auf jedem Feld in **1–5** Feldern Entfernung zu dir angreifen.
+  Warum nicht in 0 Feldern Entfernung? Weil du da selbst stehst."
+- **Die Reichweite wird NICHT entlang der Schussbahn gemessen** `[FAQ S.1]`:
+  > „Die Reichweite einer Fernkampfwaffe wird **nicht an der Sichtlinie
+  > gemessen**. Es ist also möglich, mit einer Waffe mit Reichweite 4 auf einen
+  > Gegner zu schießen, wenn **die kürzeste Strecke um ein Hindernis nur 3 Felder**
+  > lang ist, die Sichtlinie jedoch 5 Felder lang wäre."
+
+  Also zwei getrennte Prüfungen: **Reichweite** = kürzeste orthogonale Strecke
+  (um Hindernisse herum), **freie Schussbahn** = die gerade Linie Ecke zu Ecke.
+  Beide müssen stimmen, aber die eine wird nicht an der anderen gemessen.
 - **Jede Waffe darf pro Zug einmal angreifen**, sofern nichts anderes dasteht.
-  Mit zwei Einhandwaffen also zwei Angriffe `[BR S.18]`, `[E02 26:54]`.
-- Man darf mit einer **Fernkampfwaffe auch im Nahkampf** angreifen `[E02 26:46]`.
-- **Sichtlinie (nur für Dörfler):** **Hindernisse blockieren Fernangriffe von
-  Dörflern, nicht die des Bösewichts.** Prüfung: eine **gerade Linie** von
-  **irgendeinem Punkt** des Dörflerfeldes zu **irgendeinem Punkt** eines
-  Bösewichtfeldes ziehen; berührt sie kein Hindernisfeld, ist der Schuss
-  erlaubt `[BR S.18]`, `[E02 41:34]`. **Figuren blockieren nicht** `[E02 41:45]`.
-- **Neuwurf:** nach dem Wurf 2 MUMM zahlen, neu würfeln, **neues Ergebnis gilt**,
-  max. 1× pro Wurf `[EXP S.4]`, `[CS-DE]`.
+  Mit zwei Einhandwaffen also zwei Angriffe `[DE S.20]`, `[E02 26:54]`.
+- Man darf mit einer **Fernkampfwaffe auch im Nahkampf** angreifen
+  `⚠️ NUR VIDEO: [E02 26:46]`.
 
-**Patzer (Whiff):** Eine **natürliche 1** ist **immer ein Fehlschlag**, egal wie
-hoch die PRZ ist `[BR S.18]`, `[E02 52:17]`.
+**Freie Schussbahn (nur für Dörfler)** `[DE S.20]`:
 
-**Knaller (kritischer Treffer):** Zeigt der Würfel das **Knaller-Symbol**, ist es
-ein **automatischer Treffer**, zählt als Wurf **10**, und man würfelt **sofort
-erneut** auf der Knaller-Tabelle `[BR S.20]`. Man soll **immer würfeln**, auch
-wenn der Treffer ohnehin sicher wäre `[E02 30:26]`.
+> „Prüfe, ob dein Fernangriff von einem Hindernis blockiert wird, ziehe eine
+> grade Linie von **1 Ecke deiner Wahl** des Feldes, auf dem du stehst, zu **1
+> Ecke deiner Wahl** des Bösewichts. Berührt diese Linie das Hindernis? Dein
+> Angriff wird blockiert."
 
-**Knaller-Tabelle** (zweiter W10) `[Crit-DE]`, `[BR Rückseite]`, `[FN S.16]`:
+- Die Regel heißt **„Freie Schussbahn"**, und gezogen wird **Ecke zu Ecke**, nicht
+  Punkt zu Punkt. „Hindernis-Terrains blockieren die Sichtlinie von
+  Fernkampf-Angriffen **von Dörflern**" `[DE S.14]` — **die des Bösewichts
+  nicht** `[DE S.17]`, `[DE S.35]`.
+- **Figuren blockieren nicht** `⚠️ NUR VIDEO: [E02 41:45]` — die Anleitung nennt
+  nur Hindernis-Terrain.
+
+**Neuwurf („Deinen Mumm zusammenraffen"):** „Für 2 MUMM, darfst du den letzten
+Angriffs- oder Terrain-Wurf neu würfeln. Tust du das? Dann gilt automatisch das
+**neue** Würfelergebnis. Du darfst den gleichen Angriffs- oder Terrainwurf nur
+**maximal 1x** neu würfeln." `[DE S.20]`
+
+**Die vier Ausgänge eines Angriffswurfs** — eine geschlossene Liste `[DE S.20]`:
+
+1. **einen Treffer landen** — Ergebnis ≥ Trifft-Voraussetzung → AUA in Höhe des
+   AUA-Werts.
+2. **nicht treffen** — Ergebnis darunter → „kein AUA … dein Angriff endet
+   ereignislos".
+3. **einen Knaller landen** — siehe unten.
+4. **einen Patzer landen** — siehe unten.
+
+Knaller und Patzer gelten nur bei einem Angriffs-Wurf **gegen einen Bösewicht**
+`[DE S.35]`.
+
+**Patzer:** „Würfelst du beim Angriffs-Wurf die **1**, landest du einen Patzer!
+Damit **verfehlst du immer automatisch**, völlig egal ob du es rechnerisch
+geschafft hättest oder nicht. Einen Patzer landen gilt auch als nicht treffen."
+`[DE S.20]`
+
+**Knaller (kritischer Treffer)** `[DE S.20]`:
+
+> „Würfelst du bei einem **Angriffs-Wurf auf einen Bösewicht** [Symbol], landest
+> du einen Knaller! Dies ist – **unabhängig von Ergebnis und
+> Trifft-Voraussetzung** – immer ein **automatischer Treffer**."
+
+- Der zweite Wurf auf der Knaller-Tabelle ist **kein Angriffs-Wurf**, sondern
+  bestimmt nur den Bonus. „Wende das AUA durch den Treffer und den Bonuseffekt
+  der Knaller-Tabelle immer **gleichzeitig** an."
+- „Einen Knaller landen gilt **auch als einen Treffer landen**."
+- **„Zählt als 10" gilt NICHT für den Angriffswurf**, sondern für **alle anderen**
+  Würfe: „**Bei anderen Würfen** wird [Symbol] als eine **10** gewertet."
+  `[DE S.20]`, `[DE S.35]` — also bei Dorf-Ereignissen, Terrain-Würfen und
+  Gleichstandswürfen.
+- Man soll **immer würfeln**, auch wenn der Treffer ohnehin sicher wäre
+  `⚠️ NUR VIDEO: [E02 30:26]`.
+
+**Knaller-Tabelle** (zweiter W10) — wörtlich `[DE S.36]`, `[Crit-DE]`:
 
 | Wurf | Wirkung |
 |---|---|
 | **1** | Dein Angriff erzürnt den Bösewicht! **Dein Zug endet sofort nach dem Angriff**, der Bösewicht führt eine Aktion aus. |
 | **2-3** | Der Bösewicht ist aus der Fassung: **oberste Bösewicht-Aktion ansehen.** |
 | **4-5** | Zehen zerquetscht: **-1 BEW für den Bösewicht.** |
-| **6-7** | Aufgeputscht: **+1 BEW oder +1 MUMM oder +1 PRZ** (für diesen Kampf). |
-| **8** | Was für ein Schlag: **+1 AUA**. |
-| **9+** | Nimm dir die mit **(★)** gekennzeichnete Bösewicht-Ausrüstung; du darfst sie **sofort anlegen**. Wurde das in diesem Kampf schon aktiviert, stattdessen **+1 AUA**. |
+| **6-7** | Aufgeputscht: **+1 BEW / +1 MUMM / +1 PRZ**. `⚠️ ABGELEITET:` Die Tabelle nennt **keine Dauer**. Dass der Bonus bis Kampfende hält, folgt daraus, dass es eine **Direkte Wertveränderung** ist — gilt „nur für die aktuelle Runde" `[DE S.10]` und wird in der Nachbereitung zurückgesetzt `[DE S.22]`. |
+| **8** | „Was für ein Schlag! Der Angriff fügt dem Bösewicht **+1 AUA** zu." |
+| **9+** | Nimm dir die mit **(★)** gekennzeichnete Bösewicht-Ausrüstung; „Du darfst sie **sofort anlegen**. Ist das in diesem Kampf schon aktiviert worden? Füge dem Bösewicht **stattdessen +1 AUA** zu." |
 
 Der Schaden des Angriffs und der Knaller-Bonus werden **gleichzeitig** zugeteilt;
-ein dadurch ausgelöster Wutangriff greift erst **nach** dem Knaller-Bonus
-`[BR S.20]`, `[BR S.30 FAQ]`.
+ein dadurch ausgelöster Wutausbruch greift erst **nach** dem Knaller-Bonus:
+„Das AUA und der Knaller-Bonus passieren gleichzeitig. Somit wird auch der
+**Knaller-Bonus vor dem Wutausbruch** abgehandelt." `[DE S.32]`
 
-### 6.5 Wutangriff (Breaking Point)
+### 6.5 Wutausbruch (Breaking Point)
 
-- Auf der LEB-Leiste des Bösewichts sind Schwellen mit einem Symbol markiert:
-  **bei 4, 7, 12 und 18 LEB** `[BR S.20]`. Praktisch sind es die **roten Felder**
-  `[E02 02:37]`.
-- **Sinkt die LEB durch Schaden auf oder unter eine solche Schwelle**, tritt der
-  Wutangriff ein.
-- **Während eines Dörflerzugs:** Der Zug dieses Dörflers **endet sofort** —
-  restliche BEW und MUMM verfallen —, der **Bösewicht führt sofort eine Aktion
-  aus**. Danach geht die Reihenfolge nach dem unterbrochenen Dörfler weiter
-  `[BR S.20]`, `[E02 30:50]`.
-- **Während des Bösewicht-Zugs:** Er führt **nach** seinem Zug eine **Bonusaktion**
-  aus `[BR S.20]`.
-- **Wutangriffe können mehrfach auslösen**, wenn der Bösewicht sich über eine
-  Schwelle zurückheilt und wieder darunter fällt `[BR S.20]`, `[E02 31:09]`.
-  **Heilt** er sich über die Schwelle, löst das für sich **keinen** Wutangriff aus
-  `[E02 31:23]`.
-- Taktisch: **Timing beachten** — wer knapp vor einer roten Schwelle noch etwas
-  vorhatte, sollte erst das andere tun `[E02 03:16]`.
+Der Mechanismus heißt **„Wutausbruch"**; „Wutangriff" kommt in der Anleitung
+nicht vor.
 
-### 6.6 Schaden, Heilung, Ausschalten, Niederlage
+> „Immer wenn das LEBEN des Bösewichts **auf oder über gewisse Schwellen hinweg
+> reduziert wird**, hat er 1 Wutausbruch. … **Sie passieren bei 18, 12, 7 und 4
+> LEBEN.** Ein Wutausbruch lässt den Bösewicht **1 zusätzliche Bösewicht-Aktion**
+> ausführen." `[DE S.22]`
 
-- **Schaden** senkt LEB. **LEB unter 1 ⇒ ausgeschaltet** und vom Feld genommen
-  `[BR S.7]`, `[BR S.20]`.
-- **Heilung** kann LEB nie über das **Maximum** heben `[BR S.7]`.
-- **Ausgeschaltete Dörfler** bekommen bei Sieg über den Bösewicht trotzdem ihre
-  Münzen, sind aber **nicht** für die Bösewicht-Beute berechtigt — egal wie viele
-  Heldentaten sie erfüllt haben `[BR S.20]`.
-- **Solange mindestens ein Dörfler den Kampf übersteht, werden zu Beginn der
-  nächsten Dorfphase ALLE Dörfler auf volle LEB geheilt** `[BR S.20]`.
-  (Ausnahme: der Fluch „Curse of the Bruised Peel", §12.3.)
-- **Wertesenkungen** durch Bösewichte werden am **Ende des Kampfes** aufgehoben
-  `[BR S.20]`.
-- **Vom Feld entfernt:** Ein entfernter Dörfler kann **nicht als Ziel gewählt
-  werden** und **keine Ausrüstung/Fähigkeiten aktivieren**. Ein entfernter
-  Bösewicht kann **nicht angegriffen werden und nimmt keinen Schaden** `[BR S.20]`.
-- **Niederlage:** Die Partie ist verloren, wenn **alle Dörfler ausgeschaltet** sind
-  oder **alle verbliebenen Dörfler ohne Rückkehrmöglichkeit vom Feld entfernt**
-  sind `[BR S.20]`. Im Endkampf zusätzlich: **der Sheriff darf nicht
-  ausgeschaltet werden** (§10.2).
-- **Regelkonflikte:** Widersprechen sich zwei Regeln, wird **zugunsten des
-  Bösewichts** entschieden; gibt es keine solche Auslegung, entscheiden die
-  Spieler nach bestem Ermessen `[BR S.30 FAQ]`.
-- **Reihenfolge von Effekten:** Fähigkeiten sind **reaktiv** und lösen **sofort**
-  aus. Nimmt der Bösewicht z. B. Schaden dadurch, dass er einen Dörfler als Ziel
-  wählt, wird dieser Schaden **vor** dem Rest der Aktion zugeteilt `[BR S.30 FAQ]`.
-- **Sich selbst** gilt man **nicht** als „angrenzenden Dörfler" — Fähigkeiten, die
-  einen angrenzenden Dörfler verlangen, können nicht auf einen selbst zielen
-  `[BR S.30 FAQ]`.
+- **Der Auslöser ist das Ereignis der Reduktion, nicht ein Zustand.** „LEB ≤ 12"
+  als Dauerprüfung ist falsch — nach einer Heilung auf genau 12 würde sie beim
+  nächsten Schaden fälschlich auslösen (siehe unten).
+- **Während eines Dörflerzugs:** „beendet der Dörfler seinen Zug **sofort**. Dann
+  handelt ihr den Wutausbruch ab, indem ihr 1 Bösewicht-Aktion ausführt. **Danach
+  geht es in Kloppen-Reihenfolge weiter.**" `[DE S.22]` Restliche BEW und MUMM
+  verfallen.
+- **Während des Bösewicht-Zugs:** „beendet dieser **zunächst wie üblich seinen
+  Zug**" und führt dann die zusätzliche Aktion aus `[DE S.22]`.
+- **Mehrfaches Auslösen:** „Wird das LEBEN des Bösewichts **erneut** auf/über
+  einen solchen Schwellenwert reduziert, löst dies auch **erneut** 1 Wutausbruch
+  aus." `[DE S.22]`
+- **Heilen über die Schwelle löst nichts aus:** „Falls der Bösewicht LEBEN über
+  einen solchen Wert hinweg heilt, löst das **keinen** Wutausbruch aus."
+  `[DE S.22]`
+- **Heilen genau AUF eine Schwelle entschärft sie:** „Falls der Bösewicht LEBEN
+  **genau auf** einen Schwellenwert heilt, hat der Bösewicht beim nächsten AUA
+  **nicht automatisch** einen Wutausbruch. Das passiert nur, wenn sein LEBEN
+  **auf oder über** den Schwellenwert **hinweg reduziert** wird." `[DE S.22]`
+- Taktisch: „**Prüfe vor deinem Angriff**, ob das AUA den Bösewicht auf oder über
+  [eine Schwelle] bringt. Denn wenn ja, **endet dein Zug dann automatisch**."
+  `[DE S.22]`
+
+### 6.6 Schaden, Heilung, Besiegt, Niederlage
+
+Der Zustand heißt **„besiegt"**, nicht „ausgeschaltet" — das Wort kommt in der
+Anleitung nicht vor.
+
+- **Schaden** senkt LEB. „Wird das LEB einer Figur auf **0 oder weniger**
+  reduziert, ist sie **besiegt**. Entferne sie vom Schlachtfeld." `[DE S.35]`
+  Für Dörfler: „Müsstest du dein LEBEN auf 0 (oder weniger) reduzieren, bist du
+  besiegt. Entferne deine Figur vom Schlachtfeld." `[DE S.22]` („LEB unter 1" ist
+  gleichbedeutend.)
+- **Heilung** kann LEB nie über das **Max LEB** heben `[DE S.35]`.
+- **Besiegte Dörfler** „erhalten bei einem Sieg über den Bösewicht zwar ebenfalls
+  Münzen, haben aber **keine Chance**, sich die Bösewicht-Ausrüstung zu schnappen
+  – selbst wenn sie die heldenhaftesten Helden von allen waren!" `[DE S.22]`
+- **Nach gewonnenem Kampf setzt JEDER Dörfler seine Werte-Leisten auf die
+  Startwerte zurück** — damit auch LEB auf Max LEB. Das ist **Schritt 5 der
+  Nachbereitung** (§7), nicht ein Schritt der nächsten Dorfphase, es gilt für
+  **alle** (auch besiegte) und hängt an **keiner** Bedingung `[DE S.22]`.
+  Die frühere Formulierung („solange mindestens ein Dörfler übersteht, werden zu
+  Beginn der nächsten Dorfphase alle auf volle LEB geheilt") steht so **nicht** in
+  der Anleitung; „solange es noch mindestens 1 unbesiegten Dörfler im Kampf gibt"
+  `[DE S.22]` ist die Bedingung dafür, dass es überhaupt **weitergeht**, nicht für
+  die Heilung. (Ausnahme: der Fluch „Curse of the Bruised Peel", §10.3 — dort ist
+  der **Reset-Schritt** zu überschreiben, nicht ein separater Heilungsschritt.)
+- **Wertesenkungen** werden am Ende des Kampfes aufgehoben: „Am Ende des Kampfes
+  werden **alle** Wertveränderungen (außer dauerhaften Wertveränderungen) wieder
+  zurückgesetzt." `[DE S.35]`
+- **Vom Schlachtfeld entfernt** `[DE S.22]`:
+  - „Solange du vom Schlachtfeld entfernt bist, kannst du **weder zum Ziel einer
+    Bösewicht-Aktion werden** noch lassen sich deine Dörfler-Fähigkeiten oder
+    Ausrüstungen aktivieren."
+  - **Zugprüfung:** „**Überprüfe zu Beginn deines Zuges**, ob du durch einen
+    Effekt wieder aufs Schlachtfeld gebracht wirst. Ist das nicht so,
+    **überspringe deinen Zug**."
+  - „Solange ein Bösewicht vom Schlachtfeld entfernt ist, kann er **weder als
+    Ziel eines Angriffs** gewählt werden **noch kann er AUA erleiden**."
+- **Niederlage:** „Falls ihr **alle gleichzeitig besiegt** seid oder auf andere
+  Weise **ohne Möglichkeit zurückzukehren vom Schlachtfeld entfernt** wurdet,
+  verliert ihr die Partie!" `[DE S.22]` Im Endgegner-Kampf zusätzlich: **„Sobald
+  der Sheriff besiegt wird, verliert ihr die Partie!"** `[DE S.23]` (§8.2).
+- **Regelkonflikte:** `⚠️ NICHT IN DER DEUTSCHEN ANLEITUNG.` Die Regel
+  „Widersprechen sich zwei Regeln, wird zugunsten des Bösewichts entschieden"
+  stammt aus `[BR S.30 FAQ]`; eine Suche über alle 36 Seiten nach „zugunsten",
+  „Widerspr" und „widersprech" ergibt **keinen Treffer**. Die deutsche
+  Gedächtnisstütze kennt nur Reihenfolge-Entscheidungen „gemeinsam" `[DE S.32]`.
+  Als englische FAQ-Regel führen, nicht als deutsche Regel.
+- **Reihenfolge von Effekten:** „Bösewicht-Aktionen und Fähigkeiten sind
+  **reaktionär**. Wird eine deiner Fähigkeiten durch die Bewegung eines
+  Bösewichts ausgelöst oder weil du zu seinem Ziel wirst usw., tritt deine
+  Fähigkeit **sofort** in Kraft. … erleidet er diese AUA **sofort, noch vor dem
+  Rest der Bösewicht-Aktion**." `[DE S.32]`
+- **Sich selbst ist man nie Ziel:** „Nein, du kannst nie als **angrenzend zu dir
+  selbst** gelten". Und weiter gefasst: „Wenn ein Effekt meiner Ausrüstung „alle
+  Dörfler in 3 Feldern Entfernung" als Ziel hat, hat er dann auch mich als Ziel?
+  **Nein. Du bist nie innerhalb der Entfernung zu dir** und bist somit nie als
+  mögliches Ziel wählbar. **Das gilt für Dörfler genauso wie für Bösewichte.**"
+  `[DE S.32]` — die Regel gilt also nicht nur für „angrenzend", sondern für
+  **jede** Entfernungsangabe.
+- **Mehrere Effekte, die das Ziel ändern:** „Sind zur gleichen Zeit mehrere
+  Effekte aktiv, die das Ziel ändern, gilt **immer der zuletzt aktivierte
+  Effekt**." `[DE S.32]` Beispiel der Anleitung: aktiviert ein Dörfler
+  „Blaulicht-Hut" und setzt danach **Alois Amboss** „Nerven aus Stahl" ein, „hat
+  Alois Fähigkeit Vorrang".
+- **„Die nächste Bösewicht-Aktion" heißt: die nächste, die wirklich ausgeführt
+  wird** `[FAQ S.1]`: „Alois Amboss „Nerven aus Stahl": Diese Fähigkeit bezieht
+  sich auf die **nächste ausgespielte** Bösewicht-Aktion. … immer wieder kann es
+  sein, dass eine Bösewicht-Aktion aufgrund einer **nicht zutreffenden Bedingung
+  nicht ausgeführt** wird und dafür eine neue gezogen wird. **Erst die, die dann
+  auch wirklich ausgeführt wird**, ist für die Fähigkeit relevant."
+- **Kosten in Wertform müssen zahlbar sein:** „Du **musst** deine BEW um 2
+  verringern **können**, um [die Fähigkeit] aktivieren zu können." `[DE S.32]`
 
 ---
 
-## 7. Nach dem Kampf (Bösewicht besiegt)
+## 7. Nach dem Kampf (Bösewicht besiegt) — die 8 Schritte der Nachbereitung
 
-Sinkt die LEB des Bösewichts **unter 1**, ist der Kampf sofort vorbei
-`[BR S.20]`. Dann in dieser Reihenfolge `[BR S.20]`, `[CS-DE]`, `[E02 1:00:54]`:
+„Sobald ihr dem Bösewicht so viel AUA zugefügt habt, dass sein **LEB unter 1**
+reduziert werden würde, ist er **sofort besiegt** und der Kampf ist vorbei!"
+`[DE S.22]`. Dann in genau dieser Reihenfolge `[DE S.22]`, `[DE S.36]`:
 
-1. **Unerfüllte Heldentaten** dürfen abgeworfen werden (freiwillig, einzeln
-   wählbar). Abgeworfene sind aus dem Spiel.
-2. **Jeder Dörfler erhält 6 Münzen** (solo: in den gemeinsamen Topf, §2.2/S2).
-3. **Bösewicht-Beute:** Wer in **dieser Runde** die **meisten Heldentaten
-   (Anzahl, nicht Punkte)** erfüllt hat und **nicht ausgeschaltet** wurde, erhält
-   **eine zufällige** der 3 Bösewicht-Ausrüstungen. **Gleichstand:** würfeln,
-   höchster Wurf gewinnt.
-4. **Erfüllte Heldentaten beiseitelegen** — sie zählen weiter für die
-   **Sheriffwahl**, aber **nicht mehr** für die Beute-Auswertung der nächsten
-   Runde. (Tipp aus dem Video: umdrehen, um sie nicht zu verwechseln
-   `[E02 1:03:04]`.)
-5. **Alle Dörflerwerte zurücksetzen.** Nur Wertänderungen durch **angelegte
-   Ausrüstung** bleiben.
-6. **Bösewicht-Material wegräumen** (Tableau, Miniatur, Aktionsdeck, kampfeigene
-   Sonderausrüstung wie „Faceless"). **Trophäen und Erweiterungs-Fortschritt
-   werden hier NICHT eingetragen — das geschieht erst am Partieende**
-   `[E02 1:04:22]`.
-7. **„Wer ist dran?"-Leiste rotieren:** Oberster Dörfler nach unten, Rest rückt auf.
-8. **Zusatz-Brett zurück auf die Dorf-Phase wenden** → nächste Runde.
+1. **Jeder: Wirf nicht abgeschlossene Heldentaten ab (optional).** „Du darfst
+   jetzt beliebig viele nicht abgeschlossene Heldentaten, die du lieber nicht mehr
+   behalten willst, abwerfen." Zu Beginn der nächsten Dorfphase wird wieder auf 3
+   aufgefüllt (solo: auf 6, §2.2).
+2. **Jeder: Nimm dir 6 Münzen** (solo: in den gemeinsamen Topf, §2.2).
+3. **Erhaltet 1 Bösewicht-Ausrüstung.** „Hast du in dieser Runde von euch allen
+   die **meisten Heldentaten abgeschlossen (Karten, nicht Heldenpunkte!)**? Dann
+   darfst du **zufällig 1 davon ziehen**! Bei Gleichstand an Heldentaten wird
+   gewürfelt. **Wer die höhere Zahl würfelt**, darf sich die Bösewicht-Ausrüstung
+   schnappen. **Dörfler, die am Ende des Kampfes besiegt waren, können die
+   Bösewicht-Ausrüstung nicht erhalten.**"
+4. **Jeder: Lege deine abgeschlossenen Heldentaten zur Seite.** „Du brauchst sie
+   noch für die Chance, vor dem Endgegner-Kampf der neue Sheriff zu werden!" Sie
+   zählen also weiter für die **Sheriffwahl**, aber nicht mehr für die
+   Beute-Auswertung der nächsten Runde. (Tischtipp: umdrehen, um sie nicht zu
+   verwechseln `[E02 1:03:04]`.)
+5. **Jeder: Setze deine Startwerte zurück** — in **zwei** Teilschritten:
+   > „1. Setze deine Wert-Leisten wieder auf ihre **Startwerte** zurück. **Alle
+   > Veränderungen, die du im Laufe des Kampfes erhalten hast, sind hiermit wieder
+   > weg.** 2. Wende dann alle für dich geltenden **konstanten Wertveränderungen**
+   > an. Du erkennst sie an der **schwarzen Markierung**." `[DE S.22]`
+
+   Das ist der Schritt, der auch **LEB auf Max LEB** zurücksetzt (§6.6), und es
+   ist der Schritt, der **Heldentaten-Belohnungen wieder abholt** (§4 Schritt 1).
+   Kurzform `[DE S.36]`: „Setzt die Werte der Dörfler zurück. **Nur dauerhafte
+   Wertänderungen bleiben erhalten.**"
+6. **Entsorgt den Bösewicht.** „Legt die Bösewicht-Figur, Bösewicht-Plättchen,
+   Bösewicht-Aktionen und das Bösewicht-Tableau zurück in die Schachtel." Dazu
+   kampfeigene Sonderausrüstung. **Trophäen und Erweiterungs-Fortschritt werden
+   hier NICHT eingetragen — das geschieht erst am Partieende** `[E02 1:04:22]`.
+7. **Aktualisiert die „Wer ist dran?"-Leiste.** „Schiebt das oberste
+   Dörfler-Plättchen an das untere Ende und rutscht dann alle Dörfler-Plättchen
+   wieder nach oben auf. Lasst natürlich wie immer den obersten Platz für den
+   Bösewicht frei."
+8. **Kehrt ins Dorf zurück.** „Dreht das Zusatz-Brett auf die **Dorf-Seite** und
+   beginnt die nächste Dorf-Phase."
+
+**Solo zusätzlich:** „Am Ende jeder Kampf-Phase darfst du alle nicht
+abgeschlossenen Heldentaten, die du nicht behalten möchtest, abwerfen"
+`[DE S.34]` — das ist dasselbe wie Schritt 1, nur für die gemeinsame Auslage.
 
 ---
 
-## 8. Der Endkampf (Final Fight, 4. Runde)
+## 8. Der Endgegner-Kampf (4. Runde)
 
-`[BR S.21]`
+`[DE S.23]`
 
-Der vierte Bösewicht kämpft nach eigenen Regeln. Der **untere Abschnitt der
-Tableau-Rückseite** gilt jetzt — und **nur** jetzt.
+Der vierte Bösewicht kämpft nach eigenen Regeln. Der Bereich **unterhalb der
+Schlachtfeld-Übersicht** auf der Tableau-Rückseite gilt jetzt — und **nur** jetzt
+`[DE S.15]`. Die Anleitung nennt **sechs** Punkte; die deutschen
+Abschnittsnamen sind **„AUFBAU"**, **„Der Weg zum Sieg"** (mit
+**„Spezialaufgabe"**) und **„Euer Schicksal"** — nicht „HOW TO WIN", „Special
+Objective", „THE RESULTS".
 
-### 8.1 Zusätzlicher Aufbau
+### 8.1 Zusätzlicher Aufbau `[DE S.23]`
 
-1. **Endkampf-Setup** laut Tableau abarbeiten. Das umfasst regelmäßig:
-   - **Zusätzliches Terrain** auf den mit **`FF`** markierten Feldern. Bei mehreren
-     Teilen geben **`FF1`, `FF2`, …** die Reihenfolge vor. Die **Anzahl** hängt oft
-     von der **Anzahl gesteuerter Dörfler** ab (solo also 3) `[BR S.21]`.
-   - **Ernennung des neuen Sheriffs** (§8.2).
-2. **Sonderfähigkeiten** für Bösewicht und/oder Dörfler, die nur im Endkampf gelten.
-3. **„HOW TO WIN"** — die Siegbedingungen **und** ein **Sonderziel**
-   (Special Objective).
-4. **„THE RESULTS"** — drei Nummern: Sieg, Sieg mit Sonderziel, Niederlage.
+1. **Endgegner-Terrain.** „Ihre Positionen werden durch **`EG`** (Endgegner)
+   gekennzeichnet. Gibt es mehrere solcher Terrains, sind diese mit **`EG1`,
+   `EG2`, `EG3` usw.** gekennzeichnet, um die **Reihenfolge ihrer Platzierung**
+   anzuzeigen. **Die Anzahl der `EG`-Terrains wird in den meisten Fällen durch die
+   Anzahl der mitspielenden Dörfler bestimmt**" (solo also 3). „Unter **AUFBAU**
+   wird euch erklärt, welche Terrains ihr wie platzieren müsst."
+2. **Der neue Sheriff** (§8.2) und ggf. „weitere unter „Aufbau" beschriebene
+   Aufbau-Schritte".
+3. **Dörfler- und Bösewicht-Fähigkeiten.** „Im Endgegner-Kampf können **neue**
+   Dörfler- oder Bösewicht-Fähigkeiten ins Spiel kommen. Die sind wichtig,
+   vergesst also nicht, sie auch anzuwenden!"
+4. **„Der Weg zum Sieg".** „Hier erfahrt ihr, was ihr tun müsst, um den Endgegner
+   zu besiegen! Zusätzlich hat jeder Endgegner-Kampf noch eine **optionale
+   Spezialaufgabe**."
+5. **„Euer Schicksal"** (§8.3).
+6. **Schwäche.** „Bei den meisten Bösewichten ist die Schwäche immer die gleiche …
+   **Einige wenige Bösewichte aber haben im Endgegner-Kampf eine andere
+   Schwäche**." (§5.3)
 
 Beispiel Handsy „The Hostile Hand Hijacking" `[Tableau Handsy, Rückseite]`:
-5 Versteckte Bürger auf die `FF`-Felder; neuer Sheriff erhält die einzigartige
-Ausrüstung „Warning Whistle"; Dörfler dürfen ihre BEW nutzen, um **statt sich
-selbst** einen Versteckten Bürger zu bewegen; werden **alle 5** getötet,
-verlieren die Dörfler.
+5 Versteckte Bürger auf die `EG`-Felder; neuer Sheriff erhält die auf dem Tableau
+genannte Besondere Ausrüstung „Warning Whistle"; Dörfler dürfen ihre BEW nutzen,
+um **statt sich selbst** einen Versteckten Bürger zu bewegen; werden **alle 5**
+getötet, verlieren die Dörfler.
 
-### 8.2 Sheriffwahl
+### 8.2 Sheriffwahl `[DE S.23]`
 
-- **Beim Aufbau des Endkampfs** wird der Dörfler mit der **höchsten Summe an
-  Heldenpunkten** (nicht Anzahl Karten!) zum **Sheriff** ernannt `[BR S.21]`.
-- **Gleichstand:** Die Gruppe darf sich einigen; sonst würfeln die
-  Gleichstehenden, der höchste Wurf wird Sheriff.
-- Der Sheriff erhält eine **einzigartige Ausrüstung**, die auf dem Tableau genannt
-  wird und meist der Schlüssel zum Sieg ist. Sie darf **sofort angelegt** werden.
-- **Wird der Sheriff ausgeschaltet, ist die Partie sofort verloren**
-  `[BR S.10]`, `[BR S.21]`. Mehrere Tableaus formulieren es präziser:
-  „**du verlierst, wenn der neue Sheriff zu Beginn des Bösewicht-Zuges
-  ausgeschaltet ist**" `[Tableau Handsy]`, `[Tableau Qing & Kween]`.
-  `⚠️ UNSICHER:` welche Formulierung im Zweifel Vorrang hat — die des Tableaus
-  ist die speziellere und sollte gelten.
-- **Solo** entscheidet die Heldenpunktsumme genauso; der Sheriff ist einfach der
-  Dörfler mit den meisten Punkten und muss anschließend besonders geschützt werden
+> „Addiere alle **Heldenpunkte** (Heldenpunkte, **nicht** Heldentaten!) auf allen
+> von dir **in der Partie** abgeschlossenen Heldentaten. Hast du insgesamt die
+> meisten Heldenpunkte gesammelt? Dann wirst du zum neuen Sheriff!"
+
+- **Zeitpunkt:** beim Aufbau des Endgegner-Kampfes.
+- **Gleichstand:** „entscheidet ihr **gemeinsam**, wer davon der bessere Sheriff
+  wäre. Werdet ihr euch nicht einig, würfelt ihr: **Wer höher würfelt**, wird
+  Sheriff."
+- Der Sheriff erhält die auf dem Tableau genannte **Besondere Ausrüstung**: „Als
+  neuer Sheriff nimmst du dir die genannte **Besondere Ausrüstung**, die euch in
+  diesem Endgegner-Kampf helfen wird." Sie ist „oftmals elementar wichtig für den
+  Sieg". (Nicht „einzigartige Ausrüstung" — das ist kein Begriff der Anleitung.)
+- **Niederlagebedingung, unbedingt und ohne Zeitpunktangabe:** „Denn eine Regel
+  gilt für **jeden** Endgegner-Kampf: **Sobald der Sheriff besiegt wird, verliert
+  ihr die Partie!**" `[DE S.23]`
+  - Mehrere Tableaus formulieren es anders: „du verlierst, wenn der neue Sheriff
+    **zu Beginn des Bösewicht-Zuges** besiegt ist" `[Tableau Handsy]`,
+    `[Tableau Qing & Kween]`.
+  - **Empfehlung:** als **sofort** implementieren und nur dort abweichen, wo ein
+    Tableau es ausdrücklich anders druckt. `⚠️ UNSICHER:` die abweichende
+    Tableau-Formulierung konnte nicht geprüft werden; die Anleitung stützt sie
+    nicht.
+- **Solo** entscheidet die Heldenpunktsumme genauso; der Sheriff ist der Dörfler
+  mit den meisten Punkten und muss anschließend besonders geschützt werden
   `[E01 44:54]`.
 
-### 8.3 Sonderziel und Ergebnis
+### 8.3 Spezialaufgabe und „Euer Schicksal" `[DE S.23]`
 
-- Das **Sonderziel** zu erfüllen bringt ein **alternatives Ende** und
-  **freischaltbare Ausrüstung** für künftige Partien — insbesondere die
-  **alternative Startausrüstung** eines Dörflers `[BR S.8]`, `[BR S.21]`.
-- Nach dem Kampf wird **genau eine** Ergebnisnummer gelesen: Sieg, Sieg mit
-  Sonderziel, oder Niederlage `[BR S.22]`.
+> „Jeder Endgegner-Kampf kann auf **3 unterschiedliche Arten** enden: • ihr
+> gewinnt die Partie **ODER** • ihr gewinnt die Partie und erfüllt zudem die
+> Spezialaufgabe **ODER** • ihr verliert die Partie. Neben jeder Option findet ihr
+> eine Nummer: Ist der Kampf vorbei, lest euch euer **Schicksal** im Abschnitt der
+> entsprechenden Nummer **ab Seite 24** durch."
+
+- Die **Spezialaufgabe** zu erfüllen „ändert … euer Schicksal und ihr schaltet
+  **freischaltbare Ausrüstung** frei, die ihr danach in zukünftigen Partien nutzen
+  dürft" — insbesondere die **Alternative Startausrüstung** eines Dörflers
+  `[DE S.8]`, `[DE S.23]`.
+- **Die Schicksale 01 ff. stehen auf `[DE S.24–29]`** und sind die **einzige**
+  Quelle für die konkreten Freischaltungen (Beispiel Schicksal 02: „Ihr habt die
+  alternative Startausrüstung für Finn Fischkopp freigeschaltet! … Laaaanger Aal
+  und Fischstäbchen"). Sie sind hier **nicht abgeschrieben** — sechs Seiten
+  Erzähltext plus Freischaltlisten gehören in die Partieende-Auswertung, nicht in
+  eine Tischreferenz. Nachlesen in der Anleitung.
 
 ---
 
 ## 9. Erweiterung „Toller Trödel" (Odd Jobs) — Erstpartie
 
 `[OJ S.4-10]`. Alle Komponenten tragen **`OJ`** oben links. Voll kombinierbar mit
-Üble Nachbarn `[OJ S.4]`.
+Neue Nachbarn `[OJ S.4]`.
 
 ### 9.1 Der Laden
 
@@ -868,16 +1561,16 @@ verlieren die Dörfler.
 - **Jeder Dörfler darf ein beliebiges ausliegendes Aufstellbares benutzen.**
   Angreifen bzw. Fähigkeiten aktivieren geht nur, wenn man **auf dem Token
   steht** — sofern die Karte nichts anderes sagt.
-- Wird der Besitzer ausgeschaltet oder vom Feld entfernt, **bleibt** das Token liegen.
+- Wird der Besitzer besiegt oder vom Schlachtfeld entfernt, **bleibt** das Token liegen.
 - Wird die Karte im Kampf **abgeworfen**, wird das Token entfernt.
 - **Am Kampfende gehen alle Token an ihre Besitzer zurück.**
 - **Aufstellbare gelten nicht als Terrain** und blockieren keine Bewegung.
 
 ### 9.4 Weitere Odd-Jobs-Kartentypen
 
-- **Odd-Jobs-Verzehrbares:** wird **nicht abgeworfen**, sondern ist **einmal pro
-  Kampf** nutzbar `[OJ S.5]`. (Unterschied zum Basisspiel, wo Verzehrbares meist
-  endgültig weg ist.)
+- **Odd-Jobs-Snacks:** werden **nicht abgeworfen**, sondern sind **einmal pro
+  Kampf** nutzbar `[OJ S.5]`. (Unterschied zum Basisspiel, wo Snacks meist
+  endgültig weg sind, §6.3.)
 - **Karren-Ereignis-Ausrüstung (Cart Event Gear):** erscheint nur beim Einkaufen.
   Wird sie **außerhalb des Ladens** aufgedeckt, wird sie **abgeworfen** und durch
   die nächste Nachschubkarte ersetzt `[OJ S.5]`.
@@ -885,7 +1578,8 @@ verlieren die Dörfler.
   Kartennamen. In Kombination mit bestimmter anderer Ausrüstung schalten sie über
   das **Händler-Journal** neue Ware frei `[OJ S.9]`.
 - **Mehrere Fähigkeiten auf einer Karte:** trotzdem **nur eine pro Zug**
-  aktivierbar `[OJ S.10 FAQ]`.
+  aktivierbar `[OJ S.10 FAQ]` — das ist aber keine Odd-Jobs-Sonderregel, sondern
+  eine **Grundregel** des Basisspiels `[DE S.21]`, siehe §6.3.
 
 ### 9.5 Was ohne das Händler-Journal gilt — **uns fehlt das Heft**
 
@@ -901,7 +1595,7 @@ der Tüftler-Rolle"), **Sticker** am Partieende (Sieg **oder** Niederlage), und
 |---|---|
 | Odd-Jobs-Nachschubdeck **Nr. 1–30** als Laden | Expeditionen, Orte, Vorbereitungen |
 | **Rollen** und Rollenkarten | Sticker am Partieende |
-| Odd-Jobs-Verzehrbares, Karren-Ereignis-Ausrüstung | Journaleinträge („Lies Journal XX") |
+| Odd-Jobs-Snacks, Karren-Ereignis-Ausrüstung | Journaleinträge („Lies Journal XX") |
 | | **Aufstellbare** — Regel §9.3 ist vollständig umsetzbar, die Karten sind aber **unerreichbar**: alle 24 Aufstellbar-Karten tragen die Nummern **73–161** und liegen damit im gesperrten Deck. In einer Erstpartie kann kein Aufstellbares gekauft werden (`docs/befund-beute-und-aufstellbares.md` §3.1). |
 | | **Freischalten** und **Entsorgen** von Ausrüstung |
 | Schlüssel/Reparatur/Graben **als Gegenstandstypen** | deren Auslösewirkung (verweist auf Journal-Nummern) |
@@ -916,7 +1610,11 @@ verändert sich die Wahrscheinlichkeitsverteilung des Decks.
 
 ---
 
-## 10. Erweiterung „Üble Nachbarn" (Foul Neighbors) — Erstpartie
+## 10. Erweiterung „Neue Nachbarn" (Foul Neighbors) — Erstpartie
+
+*Hieß in diesen Unterlagen früher „Üble Nachbarn"; der Name ist am 2026-10-14 auf
+den gedruckten deutschen Titel korrigiert `[NN S.1]`. **Dieser Abschnitt ist
+NICHT gegen `[NN]` abgeglichen** (§13.10).*
 
 `[FN S.4-5, 12-15]`. Alle Komponenten tragen **`FN`** oben links. Voll
 kombinierbar mit Toller Trödel `[FN S.4]`.
@@ -941,7 +1639,7 @@ kombinierbar mit Toller Trödel `[FN S.4]`.
 
 `[FN S.5]`
 
-> Bösewichte aus Üble Nachbarn haben **neben ihren BEW-/LEB-Werten** einen
+> Bösewichte aus Neue Nachbarn haben **neben ihren BEW-/LEB-Werten** einen
 > **Überfall-Eintrag**. Er bedeutet: der Kampf **beginnt mit der genannten
 > Aktionskarte bereits im Spiel**.
 
@@ -970,11 +1668,15 @@ Tableaus (unter BEW und LEB) — nicht eine zusätzliche Leiste auf dem Hauptpla
 - Er wird neben den Hauptplan gelegt, und seine Wirkung ist **die ganze Partie
   über für alle aktiv**.
 - Flüche sind in drei Schwierigkeitsstufen (1–3 Symbole) eingeteilt.
-- **In der Erstpartie ist genau EIN Fluch verfügbar: „Curse of the Bruised Peel"**
-  (dt. sinngemäß „Fluch der matschigen Schale"). Alle anderen liegen gesperrt.
+- **In der Erstpartie ist genau EIN Fluch verfügbar: „Curse of the Bruised Peel",
+  deutsch „Der Fluch der matschigen Haut".** Belegt `[NN S.5]`: „In dieser
+  Erweiterung findet ihr insgesamt **21 Flüche**: 1 für jeden Bösewicht des
+  Grundspiels und dieser Erweiterung sowie **Krummbiegels** ganz persönlichen
+  Fluch. **Dieser ist der einzige Fluch, der schon zu Beginn freigeschaltet ist:
+  Der Fluch der matschigen Haut.**" Alle anderen liegen gesperrt.
 - **Wirkung laut Video:** Normalerweise werden alle Dörfler zwischen den Kämpfen
   **vollständig geheilt**. Mit diesem Fluch heilt man stattdessen nur **1 LEB** —
-  bzw. **2 LEB**, wenn man ausgeschaltet wurde `[E01 36:16]`.
+  bzw. **2 LEB**, wenn man besiegt wurde `[E01 36:16]`.
   `⚠️ UNSICHER:` Der genaue Wortlaut steht auf der Fluchkarte, die uns nur als
   deutsche Druckdatei vorliegt und die ich nicht gelesen habe. Der Fluch ist
   ausgerechnet ein **3-Sterne-Fluch** und laut Video „für die erste Partie nicht
@@ -1031,9 +1733,13 @@ Tableaus (unter BEW und LEB) — nicht eine zusätzliche Leiste auf dem Hauptpla
 
 ### 10.5 Spielvariante „Invasion des Nachbardorfs"
 
-`[FN S.15]` Optional: den Bösewicht-Pool thematisch begrenzen.
-- **Misty Bluff:** Ernie Offal, Barry Bluff, The Door Knockers, Patches.
-- **Sprinkle Falls:** Tilda Fields, Tartar Fishboy, Ms. Falls & Co., Red Atrocious.
+`[NN S.15]` Optional: den Bösewicht-Pool thematisch auf **ein** Nachbardorf
+begrenzen. „Legt dazu zum Beginn der Partie nur Bösewicht-Plättchen des gewählten
+Dorfes (natürlich verdeckt) auf die Kampf-Plätze."
+- **Neblingen** (engl. Misty Bluff): Arnold Schmatz, Viktor Visage, Die weißen
+  Herren, Fleckchen.
+- **Sturzbrunn** (engl. Sprinkle Falls): Thea Kotta, Fritze Fischkopp,
+  Dr. Bosskop, Rosa Voir & die WG.
 
 Das erhöht auch die Chance, denselben Bösewicht dreimal zu besiegen und so Flüche
 freizuschalten `[E01 38:43]`.
@@ -1042,32 +1748,48 @@ freizuschalten `[E01 38:43]`.
 
 ## 11. Dörfler — Werte und Karte
 
-`[BR S.7]`
+`[DE S.7-10]`
 
 | Wert | Bedeutung |
 |---|---|
-| **LEB (HP)** | Lebenspunkte. Unter 1 ⇒ ausgeschaltet. Heilung nie über Max. |
-| **BEW (MVMT)** | Bewegungsvorrat **pro Zug**. 1 BEW = 1 orthogonales Feld. **Marker beim Bewegen nicht verschieben.** |
-| **MUMM (MOX)** | Aktionspunkte **pro Zug**. Alle Aktionen (angreifen, Terrain, Fähigkeiten, Ausrüstungstausch) kosten MUMM. **Marker beim Handeln nicht verschieben.** |
-| **PRZ (ACC)** | Modifikator auf jeden Angriffswurf. |
+| **LEB (HP)** | Lebenspunkte. Auf 0 oder weniger ⇒ **besiegt**, Figur vom Schlachtfeld entfernen `[DE S.35]`. Heilung nie über Max LEB. |
+| **BEW (MVMT)** | Bewegungsvorrat **pro Zug**. 1 BEW = 1 orthogonales Feld. **Verbrauch im Kopf mitzählen, Marker nicht verschieben** — verändert aber ein **Effekt** den Wert, wird er sofort verschoben `[DE S.7]`, `[DE S.10]`. |
+| **MUMM (MOX)** | Aktionspunkte **pro Zug**. Dasselbe Marker-Prinzip wie bei BEW. |
+| **PRZ (ACC)** | Modifikator auf jeden Angriffswurf; **kann negativ sein** und wird dann abgezogen `[DE S.7]`. |
 
-- **Ausrüstungs-Slots:** Kopf, Brust, Beine, Zubehör, linke Hand, rechte Hand.
-  **Pro Slot eine Ausrüstung.** Eine **Zweihandwaffe** belegt beide Handslots
-  `[BR S.8]`.
-- **Zwei Dörfler-Fähigkeiten** pro Karte, oft eine für die Dorfphase und eine für
-  den Kampf. **Jede max. 1× pro Zug** `[BR S.7, S.18]`.
-- **Startausrüstung** (grauer Rand) kann **nicht verkauft**, aber sehr wohl
-  **zerstört** werden `[BR S.8]`.
-- **Alternative Startausrüstung** wird durch **Endkampf-Sonderziele**
-  freigeschaltet und steht danach in allen künftigen Partien zur Wahl `[BR S.8]`.
-- **Ausrüstungsrahmen-Farben:** grau = Start, blau = Nachschub, lila =
-  Bösewicht-Beute, gelb = einzigartig `[BR S.8]`.
-- **Es gibt keine Obergrenze**, wie viel Ausrüstung ein Dörfler **besitzen** darf
-  („weggepackt") `[BR S.8]`.
-- **Abgeworfene Ausrüstung ist endgültig verloren** (zurück in die Schachtel).
-  Wer etwas loswerden will, **verkauft** es lieber `[BR S.8]`.
+**Die Marker können die Leisten nie verlassen; Veränderungen darüber hinaus
+verfallen** `[DE S.7]`.
 
-**Deutsche Dörflernamen** (Zuordnung soweit belegt):
+- **Ausrüstungs-Slots:** „Beine, Brust, Kopf, Linke Hand, Rechte Hand und
+  **Mitbringsel**" `[DE S.7]`; Glossar: „1 Bein, 1 Brust, 1 Kopf, 2 Hände und 1
+  Mitbringsel" `[DE S.35]`. (Nicht „Zubehör".) **Pro Slot eine Ausrüstung.** Eine
+  **Zweihandwaffe** belegt beide Handslots `[DE S.9]`.
+- **Dörfler-Fähigkeiten gibt es in drei Sorten:** „Einige Fähigkeiten lassen sich
+  **während der Dorf-Phase** nutzen, andere **im Kampf** und wieder andere sind
+  **passiv**." `[DE S.7]` **Jede max. 1× pro Zug**, MUMM-Fähigkeiten nur im
+  eigenen Zug `[DE S.20]`.
+- **Startausrüstung** (grauer Rand) kann **nicht verkauft** werden `[DE S.12]`,
+  **wohl aber abgeworfen** — „wie jede andere Ausrüstung auch" `[DE S.8]`.
+  („Zerstört" ist kein Begriff der Anleitung.)
+- **Alternative Startausrüstung** wird durch die **Spezialaufgabe** eines
+  Endgegner-Kampfes freigeschaltet und steht danach zur Wahl `[DE S.6]`,
+  `[DE S.8]`.
+- **Die vier Ausrüstungsarten und ihre Rahmenfarben** `[DE S.8]`:
+  **Startausrüstung** grau · **Tante Emma Ausrüstung** blau (der *Nachschub* ist
+  der verdeckte Stapel daraus, `[DE S.35]`) · **Bösewicht-Ausrüstung** lila ·
+  **Besondere Ausrüstung** gelb („lässt sich nicht kaufen. Man erhält sie nur
+  unter besonderen Bedingungen"). „Einzigartig" ist **kein** Begriff der
+  Anleitung.
+- **Es gibt keine Obergrenze**, wie viel Ausrüstung ein Dörfler **besitzen** darf:
+  „Du darfst **beliebig viel** Ausrüstung in deinem Besitz haben." `[DE S.9]`
+- **Abgeworfene Ausrüstung ist endgültig verloren** („Abgeworfene Ausrüstung kommt
+  aus dem Spiel! Lege sie zurück in die Spielschachtel" `[DE S.35]`). Wer etwas
+  loswerden will, **verkauft** es lieber `[DE S.10]`.
+
+**Deutsche Dörflernamen.** `[DE S.5]` nennt die **sieben** Basis-Dörfler
+vollständig auf Deutsch: **Hennriette Heu, Omma Melba, Finn Fischkopp, Ludwig
+Knilch, Alois Amboss, Siggi von Saumagen, Duo Dacapo.** Englische Namen nennt die
+Anleitung **nie**, sie kann die Zuordnung also nicht auflösen.
 
 | Englisch | Deutsch | Quelle |
 |---|---|---|
@@ -1078,107 +1800,241 @@ freizuschalten `[E01 38:43]`.
 | Blopsy Twins | Duo Dacapo | `[Dorf-Ereignisse DE]` ⚠️ erschlossen |
 | Judy Marks (FN) | Frieda Paletti | `[Dorf-Ereignisse DE]` ⚠️ erschlossen |
 | Fridgette Jones (FN) | Karla Kühl | `[E01 12:52]`, `[E02 …]` |
-| Yancy Plover / Quintus | ⚠️ ungeklärt (Kandidat: „Ludwig Knilch") | — |
+| Yancy Plover | ⚠️ **Ludwig Knilch** oder **Siggi von Saumagen** | Ausschluss über `[DE S.5]` |
+| Quintus Binch | ⚠️ **Ludwig Knilch** oder **Siggi von Saumagen** | Ausschluss über `[DE S.5]` |
+
+Durch Ausschluss bleiben für *Yancy Plover* und *Quintus Binch* genau diese
+beiden deutschen Namen übrig; welcher welcher ist, bleibt offen (§13.6).
+
+**Materialzahlen aus `[DE S.5]`** (nur die, die etwas belegen): 15× Start-,
+**177× Tante Emma**-, **36× Bösewicht**-, **28× Besondere Ausrüstung**;
+**180× Bösewicht-Aktion**, 20× Terrain-Karte, 100× Dorf-Ereignis, 75× Heldentat;
+12 Bösewicht-Tableaus, 7 Dörfler-Tableaus, 49 doppelseitige Terrain-Plättchen,
+5 Würfel, Schachtel mit freischaltbarer Ausrüstung (24 Karten). Das bestätigt
+rechnerisch die **15 Aktionen pro Bösewicht** (180 / 12) und die **3 Beutestücke
+pro Bösewicht** (36 / 12).
 
 ---
 
 ## 12. Kurzreferenz für die Engine
 
 ```
-SETUP
-  Hauptplan + Zusatzbrett(Dorf) ; 4 Bösewichtplättchen zufällig auf Leiste
-  3 Dörfler (solo) : Startwerte, Startausrüstung, 10 Münzen (15 @ 3-Runden)
-  Stapel: Dorf-Ereignisse (ohne geheime!), Nachschub, Heldentaten
-  Solo-Optionen: 6 offene Heldentaten | gemeinsamer Münztopf | Ausrüstungstausch
+SETUP (9 Schritte, [DE S.6])
+  Spielbrett + Zusatzbrett(Dorf-Phase) ; 4 Bösewichtplättchen verdeckt auf Kampf-Plätze
+  3 Dörfler (solo) : Tableau, 4 Startwert-Marker, Figur, Startausrüstung
+  Dörflerplättchen von oben nach unten auf Leiste, OBERSTER PLATZ = Bösewicht, frei
+  Stapel mischen: Dorf-Ereignisse (solo ohne geheime!), Heldentaten, Nachschub
+  je 1 Übersichtskarte + 10 Münzen   (solo: 30 Münzen gemeinsamer Topf)
+  Solo: 6 offene gemeinsame Heldentaten | Tausch unter eigenen Dörflern (außer Start)
 
 RUNDE r = 1..4
-  DORFPHASE   (Reihenfolge: Leiste unten→oben)
+  DORFPHASE   (Shoppen-Reihenfolge: Leiste unten→oben)
     1 Heldentaten auffüllen  (regulär 3 verdeckt/Dörfler | solo 6 offen gemeinsam)
-    2 je 1 Dorf-Ereignis, laut auflösen
+    2 je 1 Dorf-Ereignis, laut vorlesen (Ausnahme: geheime) und abhandeln, dann abwerfen
+      Wurf = 1 W10, "(+BEW)" = AKTUELLER Wert
     3 Laden: 10 Karten Auslage, je Zug 1x kaufen ODER verkaufen (halber Wert abgerundet),
-             Nachfüllen sofort, Reset 2 Münzen/Dörfler (1x/Dorfphase)
-    4 Auslage unter Nachschubstapel → Brett wenden → Bösewicht r aufdecken → oben auf Leiste
+             Nachfüllen sofort, Erneuern 2 Münzen/Dörfler (KEINE Häufigkeitsgrenze)
+    4 Auslage unter den Nachschub ; letzte Anlegekontrolle  -- ENDE Dorfphase
 
-  KAMPFPHASE  (Reihenfolge: Leiste oben→unten, Bösewicht zuerst)
-    Aufbau: Tableau + gemischtes 15er-Aktionsdeck ; Terrain laut Rückseite (FF nur r=4)
-            Terrain-Karten auslegen ; Dörfler auf T-Felder (Kampfreihenfolge)
-            Bösewicht auf R, Blick auf nächsten Dörfler
-            BEW/LEB aus Spalte 3P  (Ausnahme Barry Bluff: Formel)
-            Stufenfähigkeit nach Leistenplatz ; ggf. Überfall-Karte(n)
-            r=4: Endkampf-Setup + Sheriffwahl (höchste Heldenpunktsumme)
+  KAMPFPHASE  (Kloppen-Reihenfolge: Leiste oben→unten, Bösewicht zuerst)
+    Aufbau (10 Schritte, [DE S.13]):
+      1 Brett auf Kampf-Phase wenden
+      2 Bösewicht r aufdecken (oben→unten) → oberstes Feld der Leiste
+      3 Tableau auf oberen Teil des Zusatzbretts
+      4 15er-Aktionsdeck mischen → Feld "Ziehstapel"
+      5 Schlachtfeld nach Schlachtfeld-Übersicht nachbauen
+      6 Terrain-Karten offen auf die TERRAIN-Felder
+      7 Dörfler in Kloppen-Reihenfolge auf freie D-Felder
+      8 Bösewicht auf die B-Felder (2x2), Blick auf NAHESTEN Dörfler
+      9 BEW/LEB aus der Spalte zur ANZAHL DÖRFLER (solo 3P) (Ausnahme Barry Bluff: Formel)
+     10 r=4: AUFBAU-Anweisungen + EG-Felder + Sheriffwahl (höchste Heldenpunktsumme)
+      dazu: Stufenfähigkeit = unterster sichtbarer Kampf-Platz, gilt den ganzen Kampf
+            Bösewicht-Fähigkeit zu KAMPF-BEGINN prüfen ; ggf. Überfall-Karte(n) (FN)
     Schleife:
-      Bösewicht: 1 Aktionskarte  → Ziel → Randale → Nachspiel(nur bei Schaden am Ziel)
+      Bösewicht: 1 Aktionskarte → Ziel → KRAWALL (oben→unten) → Nachspiel? → abwerfen
+                 Nachspiel nur wenn: Wort fehlt UND Ziel hat 1+ AUA erlitten,
+                                  ODER Wort steht da UND Bedingung erfüllt
+                 BEW limitiert NUR den Krawall ; kürzester Weg, Schaden nur als Tiebreak
       Dörfler:   BEW+MUMM frei verplanen, beliebige Reihenfolge
-      Wutangriff bei LEB ≤ {18,12,7,4}: Dörflerzug endet sofort, Bösewicht agiert
-    Ende: Bösewicht LEB < 1  → Sieg ; alle Dörfler K.O. (oder Sheriff K.O. in r=4) → Niederlage
+      Wutausbruch: wenn LEB durch Schaden AUF ODER ÜBER eine Schwelle {18,12,7,4}
+                 HINWEG REDUZIERT wird (Heilung genau AUF eine Schwelle bewaffnet sie
+                 nicht neu) → Dörflerzug endet sofort / Bösewichtzug erst beenden,
+                 dann 1 zusätzliche Bösewicht-Aktion
+    Ende: Bösewicht LEB < 1 → Sieg ; alle gleichzeitig besiegt (oder Sheriff besiegt
+          in r=4) → Niederlage
 
-  NACH SIEG
-    1 unerfüllte Heldentaten abwerfen (optional)
+  NACHBEREITUNG (8 Schritte, [DE S.22])
+    1 nicht abgeschlossene Heldentaten abwerfen (optional)
     2 je 6 Münzen
-    3 Beute an meiste erfüllte Heldentaten dieser Runde (nicht K.O.; Gleichstand: würfeln)
-    4 erfüllte Heldentaten beiseite (zählen weiter für Sheriffwahl)
-    5 Werte zurücksetzen (nur Ausrüstungsboni bleiben)
-    6 Bösewichtmaterial wegräumen  (Trophäen/Journal erst am PARTIEENDE!)
-    7 Leiste rotieren (oberster nach unten)
-    8 Brett auf Dorfphase wenden
+    3 Beute: meiste abgeschlossene Heldentaten dieser Runde (Karten!), nicht besiegt;
+      Gleichstand: würfeln, HÖHERE Zahl gewinnt; 1 zufällige der 3
+    4 abgeschlossene Heldentaten beiseite (zählen weiter für Sheriffwahl)
+    5 Werte-Leisten auf STARTWERTE zurück, dann schwarz markierte Ausrüstungsboni
+      wieder aufrechnen  → damit auch LEB = Max LEB, und Heldentaten-Boni sind WEG
+    6 Bösewichtmaterial in die Schachtel  (Trophäen/Journal erst am PARTIEENDE!)
+    7 Leiste rotieren (oberster nach unten, Bösewichtplatz frei lassen)
+    8 Brett auf Dorf-Seite wenden
 ```
 
 ---
 
 ## 13. Was ich NICHT sicher klären konnte
 
-1. **Die drei Solo-Sonderregeln S1–S3** (6 offene Heldentaten, gemeinsamer
-   Münztopf, freier Ausrüstungstausch). Sie stehen **nicht** im englischen
-   Basis-Regelwerk, dessen Solo-Abschnitt ausdrücklich sagt „all rules and setup
-   remain the same" `[BR S.30]`. Das Video nennt sie mehrfach und offenbar aus
-   einer schriftlichen Quelle `[E01 43:47]`, `[E01 54:43]`, `[E02 15:02]`.
-   **Prüfen an:** der deutschen Regelbeilage / dem deutschen Regelheft von
-   Frosted Games. Uns liegt nur die englische 1. Edition vor.
-2. **Genauer Wortlaut des Fluchs „Curse of the Bruised Peel".** Wirkung nur aus
-   dem Video `[E01 36:16]`; die Fluchkarten liegen nur als deutsche Druckdatei
-   (`FN_Curse_Cards_FRONT_DE_RZ_klein.pdf`) vor und wurden nicht gelesen.
-3. **Formulierung „Randale"** auf der deutschen Aktionskarte — im Textlayer steht
-   an dieser Stelle nur ein Symbol; das Wort stammt aus dem Video.
-4. **Sheriff-Niederlagebedingung:** Regelwerk „wenn der Sheriff ausgeschaltet
-   wird" `[BR S.21]` vs. Tableau-Formulierung „wenn der Sheriff **zu Beginn des
-   Bösewicht-Zuges** ausgeschaltet ist" `[Tableau Handsy]`. Ich halte die
-   Tableau-Formulierung für die präzisere, habe es aber nicht belegen können.
-5. **Zählen ausgeschaltete oder vom Feld entfernte Dörfler für „Anzahl Dörfler"
-   in Kartentexten?** Das Video stellt genau diese Frage und lässt sie offen
-   `[E02 49:50]`. Im Regelwerk nicht beantwortet.
-6. **Deutsche Namen von Yancy Plover und Quintus** sind nicht zugeordnet; die
-   Zuordnungen von Georgie Irongut, Blopsy Twins und Judy Marks sind aus der
-   Bedeutung erschlossen, nicht direkt belegt.
+1. ~~**Die drei Solo-Sonderregeln S1–S3**~~ — **GEKLÄRT.** Die deutsche
+   Anleitung hat einen eigenen Solo-Abschnitt `[DE S.34]`, der alle drei wörtlich
+   enthält. Es sind keine Hausregeln, sondern **die offizielle Solovariante**;
+   §2.2 ist entsprechend neu geschrieben. **Offen bleibt nur:** ob auch später
+   erworbenes Geld in den gemeinsamen Topf geht — die Anleitung regelt wörtlich
+   nur die 30 **Start**münzen.
+2. **Genauer Wortlaut des Fluchs „Curse of the Bruised Peel".** **TEILWEISE
+   GEKLÄRT.** Der **deutsche Name ist jetzt belegt: „Der Fluch der matschigen
+   Haut"**, und er ist **Krummbiegels persönlicher Fluch** — der einzige, der zu
+   Partiebeginn freigeschaltet ist `[NN S.5]`. **Weiter offen bleibt der
+   Effekttext**: er steht auf der Fluchkarte, die nur als deutsche Druckdatei
+   (`FN_Curse_Cards_FRONT_DE_RZ_klein.pdf`) vorliegt und nicht gelesen wurde; die
+   Wirkung in §10.3 stammt aus dem Video `[E01 36:16]`.
+   Hinweis zum Modellieren: der Fluch überschreibt den **Werte-Reset** aus
+   Nachbereitungsschritt 5 (§7), nicht einen separaten Heilungsschritt (§6.6).
+3. ~~**Formulierung „Randale"**~~ — **GEKLÄRT.** Der Kartenabschnitt heißt
+   **„Krawall"** `[DE S.16]`; „Randale" kommt auf keiner der 36 Seiten vor.
+   Überall ersetzt.
+4. **Sheriff-Niederlagebedingung:** **TEILWEISE GEKLÄRT.** Die Anleitung ist
+   **unbedingt und ohne Zeitpunktangabe**: „Sobald der Sheriff besiegt wird,
+   verliert ihr die Partie!" `[DE S.23]` — also **sofort**. Die abweichende
+   Tableau-Formulierung („zu Beginn des Bösewicht-Zuges") konnte nicht geprüft
+   werden und wird von der Anleitung **nicht** gestützt. **Als „sofort"
+   implementieren**, und nur dort abweichen, wo ein Tableau es ausdrücklich
+   anders druckt (§8.2).
+5. **Zählen besiegte oder vom Schlachtfeld entfernte Dörfler für „Anzahl
+   Dörfler"?** **TEILWEISE GEKLÄRT.** Für die drei Fälle, die in der Anleitung
+   vorkommen, ist die Antwort klar, weil alle auf die **Besetzung der Partie**
+   abstellen und nicht auf den Kampfstand: Bösewicht-Werte „abhängig von der
+   Anzahl Dörfler **im Spiel**" `[DE S.13]` (einmal beim Aufbau festgelegt),
+   Endgegner-Terrain „durch die Anzahl der **mitspielenden** Dörfler bestimmt"
+   `[DE S.23]`, Laden erneuern „**pro Dörfler** 2 Münzen" `[DE S.12]` (in der
+   Dorfphase, wo alle wieder dabei sind).
+   **Offen bleibt** die Frage für **Kartentexte im Kampf** („je Dörfler", „alle
+   Dörfler"). Einziger Anhaltspunkt: „Solange du vom Schlachtfeld entfernt bist,
+   kannst du weder zum Ziel einer Bösewicht-Aktion werden" `[DE S.22]` — wer kein
+   Ziel sein kann, dürfte auch nicht in eine Zielmenge zählen. Das deckt aber nur
+   die Zielbestimmung, keine Mengenangaben in Effekten.
+6. **Deutsche Namen von Yancy Plover und Quintus Binch.** **TEILWEISE GEKLÄRT.**
+   `[DE S.5]` nennt alle sieben Basis-Dörfler auf Deutsch; durch Ausschluss
+   bleiben **Ludwig Knilch** und **Siggi von Saumagen** — welcher welcher ist,
+   bleibt offen. Die Anleitung nennt **keine englischen Namen**. Ein Abgleich der
+   Schicksalstexte `[DE S.24–29]`, die deutsche Dörflernamen im Erzähltext
+   nennen, mit den englischen „Results"-Texten könnte die Zuordnung liefern; das
+   englische Heft liegt dafür nicht mehr vor.
+   Die Zuordnungen von Georgie Irongut, Blopsy Twins und Judy Marks bleiben aus
+   der Bedeutung erschlossen, nicht direkt belegt.
+   Nebenbefund: die Anleitung schreibt den Bösewicht auf `[DE S.5]` **„WILLI
+   WEDLER"**, auf `[DE S.33]` **„Willy Wedler"** — sie ist selbst inkonsistent,
+   beide Schreibungen sind belegt.
 7. ~~**Deutsche Namen von Deputy Waggums und Handsy** (Willi Wedler /
    Truthand) sind ebenfalls nur erschlossen~~ — **erledigt.** Belegt über den
    senkrechten Bösewichtnamen auf den Beutekarten, siehe §5.5 und
    `docs/befund-beute-und-aufstellbares.md` §2.4. Dort ebenfalls belegt:
    *Tartar Fishboy = Fritze Fisch**kopp*** und
    *The Door Knockers = Die weissen Herren*.
-8. **Terrainkarten-Details.** Die 20 Basis- + 13 FN-Terrainkarten wurden nicht
-   einzeln erfasst; nur die im Video gezeigten (Hohler Heuhaufen, Matschiger
-   Graben, Holzzaun, TNT + Zünder, Plumpsklo, Werkzeugschuppen, Arzthütte,
-   Dichter Wald, Summender Bienenstock, Wackelhof) und einzelne aus den
-   Regelwerken. Für eine vollständige Implementierung müssen
+8. **Terrainkarten-Details.** **TEILWEISE GEKLÄRT.** Die Anleitung liefert
+   **alle 20 Terrainnamen** des Grundspiels `[DE S.36]`, die **7 Terrains je
+   Grundspiel-Bösewicht** `[DE S.33]` und die Arten-Grundregeln `[DE S.14]`.
+   Die 20 Namen lauten: Dorfteich, **Marodes Farmhaus**, Rostige Schrottkarre,
+   Werkzeugschuppen, Wunschbrunnen, Summender Bienenstock, **Miefiges
+   Plumpsklo**, Pilzwäldchen, Altes Fass, Bärenfalle, **Sprengstoff & Auslöser**,
+   Überwuchertes Maisfeld, Gemüsebeet, **Hütte des Dorfdoktors**, Holzzaun,
+   Hohler Heuhaufen, Verwahrlostes Picknick, Dichter Wald, Trüber Fluss,
+   Matschiger Graben.
+   Damit sind vier frühere Namen korrigiert: „Wackelhof" → Marodes Farmhaus,
+   „Plumpsklo" → Miefiges Plumpsklo, „TNT + Zünder" → Sprengstoff & Auslöser,
+   „Arzthütte" → Hütte des Dorfdoktors. **„Schlammgraben" kommt in der Anleitung
+   nicht vor** (0 Treffer) — die Terrain-Plättchen sind doppelseitig, die
+   Rückseite könnte so heißen, ohne die Plättchen nicht prüfbar
+   (`⚠️ NUR VIDEO: [E02 18:36]`).
+   **Weiter offen** bleiben die **Kartentexte** der 20 Basis- und 13
+   FN-Terrainkarten (Kosten, Interaktionen, Effekte). Dafür müssen
    `terrain_deck_FRONT_DE_V10` und `FN_terrain_deck_FRONT_DE` ausgewertet werden.
-9. **Heldentaten- und Dorf-Ereignis-Decks** wurden nicht erfasst (75 bzw. 100
-    Karten im Basisspiel, +5 Ereignisse aus FN). Sie liegen als deutsche
-    Druckdaten in `Downloads\` vor und extrahieren sauber als Text.
+9. **Heldentaten- und Dorf-Ereignis-Decks** wurden nicht erfasst. Die
+   **Anzahlen** sind bestätigt (`[DE S.5]`: 75× Heldentat, 100× Dorf-Ereignis,
+   +5 Ereignisse aus FN), die **Karteninhalte** nicht. Die Kartenanatomie steht
+   in der Anleitung: Heldentat = Name / Auftrag / Heldenpunkte / Belohnung
+   `[DE S.11]`. Die Druckdaten liegen in `Downloads\` vor und extrahieren sauber
+   als Text.
+10. **Die Erweiterungen — §9 und §10 sind NICHT abgeglichen.** Die
+    Grundspielanleitung behandelt **ausschließlich das Grundspiel**: „Überfall",
+    „Fluch" und „Rolle" kommen auf den 36 Seiten nicht vor. Seit 2026-10-14 liegen
+    aber die **deutschen Erweiterungsanleitungen** `[NN S.x]` (16 S.) und
+    `[TT S.x]` (12 S.) vor — deutlich ausführlicher als `[FN]`/`[OJ]`. Ein
+    eigener Durchgang wie der fürs Grundspiel steht aus. **Beim Eintragen schon
+    aufgefallen (nicht erschöpfend, nicht eingearbeitet):**
+    - **§10 kennt „Krummbiegel" nicht.** Er ist „Tante Emmas größter Konkurrent
+      und Erzrivale", ein Händler für Flüche, und die Flüche der Erweiterung sind
+      **seine** `[NN S.5]`, `[NN S.14]`. Die Trophäenwand schaltet sie frei: „mit
+      jedem neuen Kopf an eurer Trophäenwand belegt der fiese Krummbiegel Heureka
+      mit einem weiteren Fluch". **21 Flüche**, Schwierigkeit leicht/mittel/schwer
+      (§10.3 sagt „1–3 Symbole").
+    - **Deutsche Begriffe fehlen durchgehend in §9 und §10:** `Glaube` statt
+      „Belief", `Kubus` statt „Strange Cube", `Aufstellbare Ausrüstung` statt
+      „Aufstellbares/Deployable", `Laden-Ereignis` statt
+      „Karren-Ereignis-Ausrüstung / Cart Event Gear", `Operation` /
+      `Beutezug` (3 je Operation) / `Vorbereitung` / `Notiz` / `Aufleber` /
+      `Tante Emmas Notizbuch` statt „Expedition / Ort / Vorbereitung /
+      Journaleintrag / Sticker / Peddler's Journal", und die Register heißen
+      **„Tante Emma Ausrüstung (TT)"** und **„Gesperrte Ausrüstung (TT)"**
+      `[TT S.4-9]`, `[NN S.5-7]`.
+    - **§9 fehlen zwei ganze Kartentypen bzw. Regeln** `[TT S.5]`:
+      „**Beende deinen Zug:**"-Fähigkeiten (aktiv ausgelöst, **nur 1 pro Zug**,
+      und zwar am Zugende) und die Einschränkung **„Aufstellbare Ausrüstung kann
+      nur von dem Dörfler platziert werden, der sie besitzt"** (benutzen darf sie
+      jeder, wer auf dem Plättchen steht).
+    - **„1x pro Kampf" ist genauer geregelt als in §6.3** `[NN S.15]`: ein Effekt
+      „1x pro Kampf" **ohne** weitere Kosten kann auch außerhalb des eigenen Zuges
+      ausgelöst werden; **mit** weiteren Kosten („1 MUMM", „Snacken", „Abwerfen")
+      nur im eigenen Zug. Gilt auch für „1x pro Runde".
+    - **`[NN S.15]` enthält die 7 Terrains je Erweiterungs-Bösewicht** und
+      bösewichtspezifische Klarstellungen — das Gegenstück zu `[DE S.33]` und
+      direkt für `setups.scenario_data` verwertbar.
+    - **`[NN S.16]` listet die 13 Terrainnamen der Erweiterung** auf Deutsch, was
+      die Zahl „13 FN-Terrainkarten" in §13.8 bestätigt.
+    - **`[NN S.8-11]` enthält die Schicksale 37 ff.** („die Einträge 1–36 findet
+      ihr in der Anleitung des Grundspiels").
+11. **Karten- und Tableaudaten.** Die Anleitung kann sie grundsätzlich nicht
+    liefern: Terrain-Karten, Heldentaten, Dorf-Ereignisse, Bösewicht-Aktionen,
+    Bösewicht-Ausrüstung und die Bösewicht-Tableaus (BEW/LEB-Zahlen,
+    Schwächentexte, Stufen-Fähigkeiten, Schlachtfeld-Übersichten,
+    Endgegner-Abschnitte). Dafür bleiben `[Tableau …]` und die deutschen
+    Druckdaten die Quelle. **§5.5 ist davon komplett betroffen und wurde nicht
+    gegengeprüft.**
+12. **Aufdrucke auf dem Spielbrett.** Die Stufennamen **Rüpel** und **Halunke**
+    sind inzwischen belegt `[NN S.15]`; **offen bleibt nur, welcher Platz 2 und
+    welcher Platz 3 ist** (§5.2) — das steht auf dem Spielbrett. Ebenso offen: die
+    Bezeichnungen der Leistenplätze.
 
 ## 5.10 Grundflächen: Bösewicht 2×2, Dörfler 1×1
 
-Fehlte bisher in dieser Referenz und ist regelrelevant, weil daran Nachbarschaft,
-Bewegung und Deckung hängen.
+Regelrelevant, weil daran Nachbarschaft, Bewegung und Deckung hängen. **Die
+Anleitung belegt es jetzt in Prosa** — die frühere Foto-Herleitung ist nicht mehr
+nötig.
 
-- **Ein Bösewicht belegt vier Felder (2×2).** Belegt in `[BR S.16]`,
-  „Ruffian Movement Examples": das Raster läuft sichtbar unter der Basis durch,
-  und die als benachbart markierten Felder bilden den Achterring um eine
-  2×2-Fläche. Daraus folgt: ein Bösewicht hat **acht** Nachbarfelder, nicht vier.
-- **Ein Dörfler belegt ein Feld (1×1).** Dasselbe Foto zeigt beide Basen
-  nebeneinander; die Dörflerbasis ist halb so breit.
-- **Auf den Szenariokarten** markiert der `R`-Kreis die 2×2-Fläche: sein
-  Durchmesser beträgt rund 1,8 Felder und sein Mittelpunkt liegt auf einem
-  Rasterkreuz. Die `T`-Kreise markieren einzelne Felder.
+> „Obwohl der Bösewicht im Gegensatz zu den Dörfler **2x2 Felder bedeckt**,
+> funktioniert seine Bewegung dennoch sehr ähnlich: Bösewichte können sich auch
+> nur horizontal oder vertikal auf angrenzende Felder bewegen. Da sie größer
+> sind, entspricht **1 BEWEGUNG hier aber 1 angrenzenden Paar an Feldern**."
+> `[DE S.17]`
+
+Glossar: „Bösewicht bewegen: Mit 1 BEW bewegt sich der Bösewicht auf **ein
+angrenzendes Paar an Feldern** (nicht diagonal)." `[DE S.35]`
+
+- **Ein Bösewicht belegt vier Felder (2×2)** und hat damit **acht**
+  Nachbarfelder, nicht vier. Bestätigt durch `[BR S.16]` („Ruffian Movement
+  Examples").
+- **Ein Dörfler belegt ein Feld (1×1)**: „Mit 1 BEW darfst du dich auf **ein**
+  angrenzendes Feld bewegen (nicht diagonal)" `[DE S.35]`.
+- **Auf den Szenariokarten (Schlachtfeld-Übersicht)** markiert der **`B`**-Kreis
+  die 2×2-Fläche — „Platziert den Bösewicht auf **die Felder** mit dem großen B"
+  `[DE S.13]`, also ausdrücklich mehrere Felder. Nachgemessen: Durchmesser rund
+  1,8 Felder, Mittelpunkt auf einem Rasterkreuz. Die **`D`**-Kreise markieren
+  **einzelne** Felder.
 - **Für die Engine:** der Bösewicht wird über einen Feldbereich gesetzt
   (`J8:K9`), die Dörfler über einzelne Felder (M7.1).
 
