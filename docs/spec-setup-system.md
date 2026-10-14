@@ -4633,3 +4633,121 @@ nie angelegt wird.
 6. Nach Speichern und Laden liegt jede Karte wieder in ihrer Zone.
 7. „Dorfphase beginnen" räumt die Slot-Zonen **nicht** ab — angelegte
    Ausrüstung überdauert den Kampf (§7, `[DE S.22]`).
+
+## M19 — Was die zehnte Partie fand
+
+Belegt in `docs/partie10-bericht.md`: eine vollständige Runde ohne Abbruch und
+**ohne Setup-Editor** — Dorfphase ganz, sieben Käufe mit Anlegen, sechs
+Kampfrunden gegen Deputy Waggums mit elf Bösewicht-Aktionen, **verloren**.
+
+**Die Reparaturen aus M17 halten alle:** „Hide toolbar" klappt nur die
+Werkzeugleiste ein, „Browse" zeigt den verdeckten Vorrat lesbar, eine Karte
+kommt auf einen Stapel in sperrender Zone zurück, Aktionskarten und
+beiseitegestellte Figuren werden abgeräumt, die Leiste dreht sich selbst.
+
+**M18 trägt**, mit einer Einschränkung (M19.6). Abweisung bei vollem Einzelslot
+mit sichtbarem Band, `Hände` nimmt zwei Karten, sieben Karten passen (5 + 2),
+die Slots überdauern „Dorfphase beginnen", und im Spiel waren *Welpenblick*
+(„Hat das Ziel ein Mitbringsel angelegt?") und *Schwitzige Hände* („packt 1
+Waffe weg") am Tisch **ablesbar statt im Kopf** — genau der Zweck.
+
+### M19.1 — Ein Zug am Bösewicht verschob das Geländeteil darunter
+
+**Befund, ohne jede Rückmeldung bemerkt erst zwei Schritte später.** Ein
+96-Pixel-Zug vom Mittelpunkt des Bösewicht-Tokens aus hat **das Geländeteil
+unter ihm** vier Felder weit verschoben statt der Figur.
+
+**Vor dem Bauen zu klären, und zwar zuerst.** `pickTopmost` und `tableLayers`
+(`client/src/utils/tokenLayer.js`) entscheiden, wer einen Zug bekommt. Liegt
+dort die Ursache, ist es ein echter Fehler — eine Figur gehört über ihr
+Gelände. **Es kann aber auch ein Werkzeugartefakt sein:** die Fernsteuerung des
+Spielers erzeugt keine echten Zugereignisse, das ist in Partie 7 ausdrücklich
+festgestellt worden. **Nachmessen mit echten Mausereignissen, bevor irgendetwas
+geändert wird.**
+
+**Abnahme.** Ein Zug, der auf einer Figur beginnt, bewegt die Figur — auch wenn
+unter ihr ein Geländeteil liegt. Bewegt sich etwas anderes, sagt der Tisch es.
+
+### M19.2 — Ein Zug über genau ein Rasterfeld greift nicht
+
+**Befund.** Unter rund 70 Bildschirmpunkten passiert nichts. Bei Spielzoom ist
+ein Feld etwa 20 Punkte breit — eine Figur **ein Feld** weit zu ziehen ist damit
+unmöglich, man muss auf etwa 70 % hochzoomen. Dort liegt die Rasterbeschriftung
+außerhalb des Fensters, und der Spieler hat sich prompt um ein Feld vertan, was
+den Ausgang eines Zuges entschied.
+
+**Auch hier zuerst messen.** `BAR_SLOP` ist **8** Pixel, nicht 70 — die
+Schwelle allein erklärt den Befund **nicht**. Entweder liegt die Ursache
+woanders, oder es ist dasselbe Werkzeugartefakt wie bei M19.1. Zwei frühere
+„Messungen" dieser Art (Zoomschritt und „halbe Strecke" in Partie 6) haben sich
+als Artefakte herausgestellt. **Keine Änderung an der Schwelle ohne Beleg mit
+echten Mausereignissen.**
+
+**Abnahme.** Eine Figur lässt sich bei Spielzoom (um 40 %) um **ein** Feld
+ziehen.
+
+### M19.3 — „Dorfphase beginnen" lässt eine Karte liegen
+
+**Befund.** Die Dorf-Ereigniskarte, die regelgemäß ins **Verhaltensdeck**
+gemischt war, bleibt quer auf der neuen Ladenauslage liegen. Der Ereignisstapel
+steht danach auf **79 statt 80**.
+
+M15.1 hat `clear_zone` einen Kategorienfilter gegeben, damit Fremdkarten
+**liegen bleiben** statt im Nachziehstapel begraben zu werden — hier ist es
+umgekehrt: eine Karte, die dazugehört, wird nicht eingesammelt, weil sie zu
+diesem Zeitpunkt woanders liegt.
+
+**Abnahme.** Nach „Dorfphase beginnen" zählt der Ereignisstapel wieder 80, und
+auf der Ladenauslage liegt keine Ereigniskarte.
+
+### M19.4 — Der Würfel ist bei Spielzoom unlesbar und hat kein „Enlarge"
+
+**Befund, und bei zwanzig Würfen der teuerste Einzelposten der Partie.** M11.6
+hat „Enlarge" für Tokens gebaut, M14.6 hat die Vorschau aufs Fenster skaliert —
+der **Würfel** hat beides nicht. Man zoomt für jeden Wurf hin und zurück.
+
+**Abnahme.** Die Augenzahl eines Würfels ist bei Spielzoom ablesbar, ohne den
+Tisch zu bewegen.
+
+### M19.5 — Der Tisch kennt den Ausgang der Partie nicht
+
+**Befund.** Nach einer **Niederlage** — alle drei Dörfler besiegt — lässt sich
+„Dorfphase beginnen" anstandslos auslösen, und das Bösewicht-Tableau wandert in
+`Besiegte Bösewichte`, als wäre er erledigt. Laut `[DE S.22]` ist die Partie an
+dieser Stelle **zu Ende**.
+
+Das ist derselbe Grundsatz wie bei den Vorbedingungen aus M11.2/M14.1: eine
+Aktion, die in der Lage nicht zulässig ist, soll es sagen. Was der Tisch **nicht**
+tun soll, ist das Spiel für beendet erklären — er baut auf, er spielt nicht.
+Ein Hinweis reicht.
+
+**Abnahme.** Sind alle Dörfler besiegt, meldet „Dorfphase beginnen" das, bevor
+es etwas abräumt. Bestätigen kann man es trotzdem.
+
+### M19.6 — Angelegt sieht man der Karte nicht an, nur ihrer Lage
+
+**Befund zu M18, Abnahme 2.** Die Zonen **sind** unterschieden — nachgemessen
+in den Daten: Slots `color: "green"` (`#22c55e`), Vorrat `null` (`#94a3b8`).
+Unterschieden wird dadurch aber **die Fläche, nicht die Karte**. Wer eine Karte
+ansieht, sieht ihr nicht an, ob sie angelegt ist; er muss wissen, wo sie liegt.
+
+Im Spiel hat das gereicht. Für eine Karte, die am Rand einer Zone liegt oder
+über die man gerade den Zeiger zieht, reicht es nicht.
+
+**Nicht gefordert:** ein neues Feld an der Karte. „Angelegt" bleibt die Zone
+(M18). Gesucht ist eine **Darstellung** — die Karte in einer Slot-Zone bekommt
+ein Merkmal, das sie selbst trägt.
+
+**Abnahme.** Eine Karte in einer Slot-Zone ist bei Spielzoom als angelegt zu
+erkennen, auch ohne ihre Umgebung zu sehen.
+
+### Nachtrag zum Auftrag der Partie
+
+Der Spieler hat zwei Dinge richtiggestellt:
+
+1. **§7 gilt nur für einen gewonnenen Kampf.** Nach einer Niederlage ist die
+   Partie zu Ende `[DE S.22]`; die Nachbereitung war gegenstandslos. Mein
+   Auftrag hat sie trotzdem verlangt.
+2. Der Prüfpunkt „Heldentaten-Boni sind nicht dauerhaft" **blieb unbelegt** —
+   die einzige erfüllte Heldentat bot „+3 Münzen oder +1 PRZ", und er nahm die
+   Münzen. Kein Engine-Befund, aber auch kein Nachweis. Bleibt offen.
