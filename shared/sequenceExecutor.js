@@ -119,7 +119,9 @@ function stepTarget(step) {
   // `category` kann eine Liste sein (M8.11/E1) - dann steht sie lesbar
   // getrennt da statt als aneinandergeklebte Zeichenkette.
   const category = Array.isArray(step?.category) ? step.category.join(' + ') : step?.category;
-  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? category ?? step?.label ?? step?.name ?? null;
+  // M19.5/BM: `name` kann seither ebenfalls eine Liste sein (require_counter).
+  const name = Array.isArray(step?.name) ? step.name.join(' + ') : step?.name;
+  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? category ?? step?.label ?? name ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -430,6 +432,53 @@ function moveIntoZone(state, objs, target) {
   return { refusal: null, leftovers, free };
 }
 
+/**
+ * Karten **unter** einen Stapel zurücklegen - die Hälfte, die `clear_zone` und
+ * `clear_table` teilen (M5.1, BI/M19.3).
+ *
+ * Stand bis M19.3 nur im `clear_zone`-Zweig. `clear_table` konnte deshalb nur
+ * löschen, und eine Dorf-Ereigniskarte, die ihre Handzone verlassen hatte, war
+ * entweder weg oder blieb liegen - beides falsch, sie gehört zurück unter ihren
+ * Stapel. Zweimal hinzuschreiben wären zwei Antworten auf dieselbe Frage (M6).
+ *
+ * In einen Kartenstapel kann nur eine Karte zurück; ein Token darin wäre ein
+ * Fremdkörper, den kein Zug wieder herausholt. Es bleibt liegen, und der
+ * Aufrufer schreibt es ins Protokoll - wie eine volle Zielzone.
+ *
+ * @returns {Array} was nicht mitkonnte (die Nicht-Karten), für das Protokoll.
+ */
+function returnToStack(state, objs, stack, faceDown) {
+  if (!Array.isArray(stack.cards)) stack.cards = [];
+  const cards = objs.filter(o => kindOf(o) === 'card');
+  const others = objs.filter(o => kindOf(o) !== 'card');
+  if (!cards.length) return others;
+
+  // Unten heißt unten: die vorhandenen Karten rücken um so viele Plätze hoch,
+  // wie zurückgelegt werden, und die Reihenfolge der Zurückgelegten bleibt
+  // (`inSlotOrder` liefert sie bereits so).
+  stack.cards.forEach(c => { c.zIndex += cards.length; });
+  const back = cards.map((card, i) => {
+    // Das Gegenstück zum Austeilen: die Karte behält jedes Feld und tauscht nur
+    // Platz und Stapelzugehörigkeit. Ohne Position bliebe sie beim nächsten
+    // Speichern in der Auslage liegen - `getGameState` liest die
+    // Stapelposition aus der untersten Karte.
+    const returned = { ...card, x: stack.x, y: stack.y, zIndex: i + 1, inStack: stack.stackId };
+    delete returned.gridId;
+    delete returned.cell;
+    // Ohne `faceDown` am Schritt behält jede Karte ihre Seite: eine geratene
+    // Seite wäre schlimmer als gar keine Ansage.
+    if (typeof faceDown === 'boolean') {
+      returned.faceDown = faceDown;
+      returned.face_up = !faceDown;
+    }
+    return returned;
+  });
+  const gone = new Set(cards);
+  state.cards = state.cards.filter(o => !gone.has(o));
+  stack.cards = [...back, ...stack.cards];
+  return others;
+}
+
 /** Deal items round robin over the usable zones, stopping at each zone's free count. */
 function shareOut(items, usable, free) {
   const groups = new Map(usable.map(z => [z, []]));
@@ -573,6 +622,51 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // skipped)" um einen richtigen deutschen Satz herum.
       entry.message = step.message;
       return halt(`${step.message} [${zoneContents(zone, state)}]`);
+    }
+
+    // M19.5/BM: dieselbe Wache, nur ueber einen **Zaehler** statt einer Zone.
+    //
+    // Der Befund der zehnten Partie: nach einer Niederlage - alle drei Doerfler
+    // besiegt - laesst sich „Dorfphase beginnen" anstandslos ausloesen. Den
+    // Zustand „besiegt" gibt es am Tisch nicht; die einzige Spur sind die drei
+    // Lebenszaehler auf 0, und die fuehrt der Spieler von Hand.
+    //
+    // **Die Definition steht im Aufbau, nicht hier.** Der Executor weiss nichts
+    // ueber Townsfolk Tussle - genau wie bei `require_zone`, wo der Satz fuer
+    // den Spieler als `message` am Schritt steht. Hier steht nur die Frage:
+    // steht mindestens einer der genannten Zaehler ueber `above` (Vorgabe 0)?
+    //
+    // `confirm` macht aus dem Halt eine **Rueckfrage**: der Tisch zeigt die
+    // Meldung und laesst den Spieler entscheiden (`runSetupAction`). Der Tisch
+    // behauptet nichts ueber den Ausgang der Partie - er nennt den Zaehlerstand
+    // und fragt.
+    case 'require_counter': {
+      const halt = (reason) => { ctx.halted = true; return skip(reason); };
+
+      const names = categoryList(step.name);
+      if (!names.length) return halt('no counter name given');
+
+      const above = step.above === undefined || step.above === null || step.above === ''
+        ? 0 : Number(step.above);
+      if (!Number.isFinite(above)) return halt(`"${String(step.above)}" is not a number`);
+
+      const counters = Array.isArray(state.counters) ? state.counters : [];
+      const found = names.map(n => counters.find(c => norm(c.name) === norm(n)));
+      // Eine Bedingung, die sich nicht pruefen laesst, ist keine erfuellte:
+      // durchzulassen hiesse genau den Schaden zuzulassen, gegen den sie steht
+      // (dieselbe Entscheidung wie bei `require_zone`).
+      const missing = names.filter((n, i) => !found[i]);
+      if (missing.length) return halt(`no counter named ${missing.map(n => `"${n}"`).join(', ')}`);
+
+      if (found.some(c => Number(c.value) > above)) return state;
+
+      const stand = found.map(c => `${c.name}: ${c.value}`).join(', ');
+      if (!step.message) return halt(`no counter above ${above} [${stand}]`);
+      // K2: der Satz, der fuer den Spieler geschrieben ist, steht fuer sich;
+      // `reason` bleibt die Diagnose und geht ins Protokoll.
+      entry.message = step.message;
+      if (step.confirm) entry.confirm = true;
+      return halt(`${step.message} [${stand}]`);
     }
 
     case 'shuffle': {
@@ -1181,41 +1275,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // Nachschubstapel, statt aus dem Spiel zu fliegen.
         const stack = idx.get(step.targetStackLabel);
         if (!stack) return skip(`stack "${step.targetStackLabel}" not found`);
-        if (!Array.isArray(stack.cards)) stack.cards = [];
-
-        // In einen Kartenstapel kann nur eine Karte zurück; ein Token darin
-        // wäre ein Fremdkörper, den kein Zug wieder herausholt. Es bleibt
-        // liegen und steht mit Namen im Protokoll - wie eine volle Zielzone.
-        const cards = movable.filter(o => kindOf(o) === 'card');
-        const others = movable.filter(o => kindOf(o) !== 'card');
-        if (others.length) {
-          notes.push(`${others.length} of ${movable.length} objects stayed in zone "${step.zoneLabel}": only cards go back into a stack (${others.map(objName).join(', ')})`);
-        }
-
-        if (cards.length) {
-          // Unten heißt unten: die vorhandenen Karten rücken um so viele
-          // Plätze hoch, wie zurückgelegt werden, und die Zone behält ihre
-          // Reihenfolge (`inSlotOrder` liefert sie bereits so).
-          stack.cards.forEach(c => { c.zIndex += cards.length; });
-          const back = cards.map((card, i) => {
-            // Das Gegenstück zum Austeilen: die Karte behält jedes Feld und
-            // tauscht nur Platz und Stapelzugehörigkeit. Ohne Position bliebe
-            // sie beim nächsten Speichern in der Auslage liegen - `getGameState`
-            // liest die Stapelposition aus der untersten Karte.
-            const returned = { ...card, x: stack.x, y: stack.y, zIndex: i + 1, inStack: stack.stackId };
-            delete returned.gridId;
-            delete returned.cell;
-            // Ohne `faceDown` am Schritt behält jede Karte ihre Seite: eine
-            // geratene Seite wäre schlimmer als gar keine Ansage.
-            if (typeof step.faceDown === 'boolean') {
-              returned.faceDown = step.faceDown;
-              returned.face_up = !step.faceDown;
-            }
-            return returned;
-          });
-          const gone = new Set(cards);
-          state.cards = state.cards.filter(o => !gone.has(o));
-          stack.cards = [...back, ...stack.cards];
+        const left = returnToStack(state, movable, stack, step.faceDown);
+        if (left.length) {
+          notes.push(`${left.length} of ${movable.length} objects stayed in zone "${step.zoneLabel}": only cards go back into a stack (${left.map(objName).join(', ')})`);
         }
       } else {
         const gone = new Set(movable);
@@ -1269,11 +1331,30 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // Gesperrt heisst gesperrt - siehe den `clear_zone`-Zweig oben.
       const locked = hits.filter(o => o.locked);
-      const gone = new Set(hits.filter(o => !o.locked));
-      state.cards = state.cards.filter(o => !gone.has(o));
-      state.tokens = state.tokens.filter(o => !gone.has(o));
-      state.boards = state.boards.filter(o => !gone.has(o));
-      if (locked.length) return fail(`left in place, locked: ${locked.map(objName).join(', ')}`);
+      const movable = hits.filter(o => !o.locked);
+      const notes = locked.length ? [`left in place, locked: ${locked.map(objName).join(', ')}`] : [];
+
+      // BI/M19.3: mit Zielstapel wird nicht geloescht, sondern zurueckgelegt -
+      // dieselben zwei Felder und dieselbe Funktion wie bei `clear_zone`. Ohne
+      // `targetStackLabel` bleibt der Schritt Wort fuer Wort, was er war.
+      //
+      // Der Befund: eine Dorf-Ereigniskarte, die waehrend des Kampfes ihre
+      // Handzone verlassen hatte, erreichte kein Schritt mehr. Loeschen waere
+      // hier falsch gewesen - der Stapel bliebe auf 79 von 80.
+      if (step.targetStackLabel) {
+        const stack = idx.get(step.targetStackLabel);
+        if (!stack) return skip(`stack "${step.targetStackLabel}" not found`);
+        const left = returnToStack(state, movable, stack, step.faceDown);
+        if (left.length) {
+          notes.push(`${left.length} of ${movable.length} objects stayed on the table: only cards go back into a stack (${left.map(objName).join(', ')})`);
+        }
+      } else {
+        const gone = new Set(movable);
+        state.cards = state.cards.filter(o => !gone.has(o));
+        state.tokens = state.tokens.filter(o => !gone.has(o));
+        state.boards = state.boards.filter(o => !gone.has(o));
+      }
+      if (notes.length) return fail(notes.join('; '));
       return state;
     }
 

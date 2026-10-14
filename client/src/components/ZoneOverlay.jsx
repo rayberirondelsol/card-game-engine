@@ -1,16 +1,9 @@
 import React from 'react';
 import ZoneShape from './ZoneShape';
-import { zoneLabelAbove, zoneShownInPlay, ZONE_LABEL_GAP } from '../../../shared/zoneGeometry.js';
-
-const COLOR_HEX = {
-  red:    '#ef4444',
-  blue:   '#3b82f6',
-  green:  '#22c55e',
-  purple: '#a855f7',
-  orange: '#f97316',
-  yellow: '#eab308',
-  null:   '#94a3b8',
-};
+// M19.6/BL: die Farbtabelle liegt jetzt in `shared/`, weil `cardTint` sie
+// ebenfalls liest. Zwei Tabellen wären zwei Antworten darauf, welches Grün
+// gemeint ist (M6).
+import { zoneLabelAbove, zoneShownInPlay, ZONE_LABEL_GAP, ZONE_COLOR_HEX } from '../../../shared/zoneGeometry.js';
 
 /**
  * Renders zone overlays in world space using absolute positioning.
@@ -28,7 +21,7 @@ export default function ZoneOverlay({ zones = [], myColor = null, all = zones })
   return (
     <>
       {shown.map(zone => {
-        const hex = COLOR_HEX[zone.color] || COLOR_HEX.null;
+        const hex = ZONE_COLOR_HEX[zone.color] || ZONE_COLOR_HEX.null;
         const isMyZone = zone.color === myColor;
         // M16.1: das Schild sitzt **außerhalb** des Kastens, sonst liegt es auf
         // Platz 1. Wo es hängt, rechnet `zoneLabelAbove` aus `shared/` aus -

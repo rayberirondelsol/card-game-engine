@@ -132,8 +132,9 @@ test('BF: ein unbekannter Name räumt nichts und sagt es', () => {
 test('BF Abnahme 5: der Schritt steht im Vokabular, mit beiden Feldern', () => {
   const spec = STEP_TYPES.find(t => t.value === 'clear_table');
   assert.ok(spec, 'clear_table fehlt in STEP_TYPES');
-  assert.deepEqual(stepFields({ type: 'clear_table' }), ['category', 'assetName']);
-  assert.deepEqual(defaultStep('clear_table'), { type: 'clear_table', category: [], assetName: '' });
+  // BI/M19.3 hat zwei Felder ergaenzt; `faceDown` zeigt sich erst mit Zielstapel.
+  assert.deepEqual(stepFields({ type: 'clear_table' }), ['category', 'assetName', 'targetStackLabel']);
+  assert.deepEqual(defaultStep('clear_table'), { type: 'clear_table', category: [], assetName: '', targetStackLabel: '' });
 });
 
 test('BF Abnahme 5: validateStep meldet den fehlenden Filter', () => {
@@ -168,4 +169,118 @@ test('BF Abnahme 6: place_asset löscht die Verloren-Marke eines beiseitegestell
   const fig = state.tokens.find(t => t.label === 'Henlo Bulwark');
   assert.equal(fig.offGrid, false);
   assert.equal(fig.cell, 'B2');
+});
+
+// ── BI / Spec M19.3: `clear_table` darf zurücklegen, nicht nur löschen ───────
+//
+// Partie 10: eine Dorf-Ereigniskarte, die während des Kampfes ihre Handzone
+// verlassen hatte, lag nach „Dorfphase beginnen" quer über der neuen
+// Ladenauslage, und der Ereignisstapel stand auf 79 statt 80. Kein Schritt hat
+// sie erfasst: die drei Schritte, die Ereigniskarten zurücklegen, sehen nur die
+// drei Handzonen (`clear_zone`), und der Schritt, der überall sucht, konnte nur
+// löschen. Begründung in `docs/tasks-partie10.md`, Aufgabe BI.
+
+const EREIGNIS = 'Dorf-Ereignisse';
+
+const CARDS_BI = [
+  ...CARDS,
+  { id: 'e1', name: 'SCHWITZIGE HÄNDE', category: EREIGNIS, image_path: '/u/e1.png' },
+];
+
+/** Die Karte liegt lose irgendwo, der Stapel, in den sie gehört, steht daneben. */
+function looseEvent() {
+  return {
+    cards: [{ tableId: 'tx', cardId: 'e1', name: 'SCHWITZIGE HÄNDE', x: 999, y: 42, zIndex: 7, faceDown: false }],
+    stacks: [{ stackId: 's2', label: EREIGNIS, x: 100, y: 100, cards: [
+      { tableId: 'q1', cardId: 'e1', name: 'A', zIndex: 1, faceDown: true },
+      { tableId: 'q2', cardId: 'e1', name: 'B', zIndex: 2, faceDown: true },
+    ] }],
+    tokens: [],
+    boards: [],
+  };
+}
+
+const biOpts = () => ({ cards: CARDS_BI, assets: ASSETS });
+
+test('BI Abnahme 1: die lose Ereigniskarte geht verdeckt unter ihren Stapel', () => {
+  const state = executeSequence(
+    looseEvent(),
+    [{ type: 'clear_table', category: [EREIGNIS], targetStackLabel: EREIGNIS, faceDown: true }],
+    [],
+    biOpts(),
+  );
+  assert.deepEqual(state.cards, [], 'nichts bleibt lose liegen');
+  const stack = state.stacks.find(s => s.label === EREIGNIS);
+  assert.equal(stack.cards.length, 3, '2 + 1');
+  // Unten heißt unten: die Zurückgelegte trägt zIndex 1, die vorhandenen rücken auf.
+  assert.equal(stack.cards[0].tableId, 'tx');
+  assert.deepEqual(stack.cards.map(c => c.zIndex), [1, 2, 3]);
+  assert.equal(stack.cards[0].faceDown, true);
+  assert.equal(stack.cards[0].inStack, 's2');
+  assert.equal(stack.cards[0].x, 100);
+});
+
+test('BI Abnahme 1: ohne Ziel löscht clear_table wie bisher', () => {
+  const state = executeSequence(
+    looseEvent(),
+    [{ type: 'clear_table', category: [EREIGNIS] }],
+    [],
+    biOpts(),
+  );
+  assert.deepEqual(state.cards, []);
+  assert.equal(state.stacks.find(s => s.label === EREIGNIS).cards.length, 2, 'nichts kommt zurück');
+});
+
+test('BI Abnahme 1: ohne faceDown behält die Karte ihre Seite', () => {
+  const state = executeSequence(
+    looseEvent(),
+    [{ type: 'clear_table', category: [EREIGNIS], targetStackLabel: EREIGNIS }],
+    [],
+    biOpts(),
+  );
+  assert.equal(state.stacks[0].cards[0].faceDown, false);
+});
+
+test('BI Abnahme 1: ein Asset kommt nicht in einen Kartenstapel und steht im Protokoll', () => {
+  const start = looseEvent();
+  start.tokens = [{ id: 'k1', assetId: 'as1', label: 'Henlo Bulwark', x: 10, y: 10, width: 50, height: 50 }];
+  const { state, log } = executeSequenceWithLog(
+    start,
+    [{ type: 'clear_table', assetName: 'Henlo Bulwark', targetStackLabel: EREIGNIS }],
+    [],
+    biOpts(),
+  );
+  assert.equal(state.tokens.length, 1, 'die Figur bleibt liegen');
+  assert.match(log[0].reason || '', /only cards go back into a stack/);
+  assert.match(log[0].reason || '', /Henlo Bulwark/);
+});
+
+test('BI Abnahme 1: ein unbekannter Zielstapel wird übersprungen, nichts geht verloren', () => {
+  const { state, log } = executeSequenceWithLog(
+    looseEvent(),
+    [{ type: 'clear_table', category: [EREIGNIS], targetStackLabel: 'Gibts Nicht' }],
+    [],
+    biOpts(),
+  );
+  assert.equal(state.cards.length, 1, 'die Karte liegt noch da');
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason || '', /stack "Gibts Nicht" not found/);
+});
+
+test('BI Abnahme 3: der Schritt trägt die beiden neuen Felder im Vokabular', () => {
+  // Ohne Zielstapel waere die Seite eine Einstellung ohne Wirkung - dieselbe
+  // Regel wie bei `clear_zone`.
+  assert.deepEqual(stepFields({ type: 'clear_table' }), ['category', 'assetName', 'targetStackLabel']);
+  assert.deepEqual(
+    stepFields({ type: 'clear_table', targetStackLabel: EREIGNIS }),
+    ['category', 'assetName', 'targetStackLabel', 'faceDown'],
+  );
+  assert.match(
+    describeStep({ type: 'clear_table', category: [EREIGNIS] }),
+    /off the table, wherever it lies/,
+  );
+  assert.match(
+    describeStep({ type: 'clear_table', category: [EREIGNIS], targetStackLabel: EREIGNIS, faceDown: true }),
+    /back under stack "Dorf-Ereignisse", face down/,
+  );
 });

@@ -10,8 +10,8 @@ import ZoneOverlay from '../components/ZoneOverlay';
 import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
-import { zoneAt, zoneContains, zoneRejects, countInZone, zoneShownInPlay } from '../../../shared/zoneGeometry.js';
-import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement } from '../../../shared/gridGeometry.js';
+import { zoneAt, zoneContains, zoneRejects, countInZone, zoneShownInPlay, cardTint } from '../../../shared/zoneGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement, fieldAt } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog, shuffleStack } from '../../../shared/sequenceExecutor.js';
@@ -37,7 +37,7 @@ import { stackAt, stackCandidates, looseCandidates, resolveDrop } from '../utils
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
-import { tableLayers, WIDGET_BOX, pickTopmost } from '../utils/tokenLayer.js';
+import { tableLayers, WIDGET_BOX, pickTopmost, widgetScale } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
@@ -426,6 +426,9 @@ export default function GameTable({ room = null }) {
   // Steps of the last setup sequence that did not work - shown until dismissed,
   // because a setup with silently skipped steps looks exactly like a correct one.
   const [setupIssues, setSetupIssues] = useState(null);
+  // M19.5/BM: die offene Rückfrage einer Aktion, die an einer Wache mit
+  // `confirm` angehalten hat - `{ action, index, message }`.
+  const [actionConfirm, setActionConfirm] = useState(null);
   // M5: Aktionen des geladenen Setups - benannte Sequenzen, die der Spieler
   // mitten im Spiel ausloest. Leer = am Tisch ist dazu nichts zu sehen.
   const [setupActions, setSetupActions] = useState([]);
@@ -2372,11 +2375,18 @@ export default function GameTable({ room = null }) {
     counters.forEach(c => add('counter', c, WIDGET_BOX.counter));
     notes.forEach(n => add('note', n, WIDGET_BOX.note));
     textFields.forEach(tf => add('textField', tf, WIDGET_BOX.textField));
-    customDiceOnTable.forEach(d => add('customDie', d, WIDGET_BOX.customDie));
-    hitDice.forEach(d => add('hitDie', d, WIDGET_BOX.hitDie));
-    dice.forEach(d => add('die', d, WIDGET_BOX.die));
+    // M19.4/BJ: die drei Wuerfel werden gegenskaliert gezeichnet, ihr Kasten in
+    // Weltpunkten waechst also mit dem Faktor. Dieselbe eine Funktion liefert
+    // ihn fuer Bild und Treffer - zwei Zahlen waeren zwei Antworten (M6).
+    const dieScale = widgetScale(zoomDisplay / 100);
+    const grown = (box) => ({ width: box.width * dieScale, height: box.height * dieScale });
+    customDiceOnTable.forEach(d => add('customDie', d, grown(WIDGET_BOX.customDie)));
+    hitDice.forEach(d => add('hitDie', d, grown(WIDGET_BOX.hitDie)));
+    dice.forEach(d => add('die', d, grown(WIDGET_BOX.die)));
 
-    const key = pickTopmost(p, items);
+    // M19.1/BK: dasselbe Feldmass wie beim Zug daneben - unter der Leiste darf
+    // nicht etwas anderes greifen als neben ihr.
+    const key = pickTopmost(p, items, fieldAt(tableGrids, p.x, p.y));
     return key == null ? null : items[Number(key)];
   }
 
@@ -2451,9 +2461,13 @@ export default function GameTable({ room = null }) {
     // gleichzeitig ein anderes und pannte; wer auf eines hinloeste, taete gar
     // nichts mehr. Beides bleibt darum genau wie bisher.
     if (objType === 'token' && !obj.locked) {
+      // M19.1/BK: das Feldmass kommt aus dem Raster unter dem Druckpunkt, statt
+      // geraten zu werden. Ohne Raster bleibt es beim geratenen (`fieldAt` gibt
+      // dann 0), und `pickTopmost` verhaelt sich wie vorher.
       const hit = pickTopmost(worldPointer, tokens
         .filter(t => !t.locked)
-        .map(t => ({ key: t.id, x: t.x, y: t.y, width: t.width, height: t.height, size: t.size })));
+        .map(t => ({ key: t.id, x: t.x, y: t.y, width: t.width, height: t.height, size: t.size })),
+      fieldAt(tableGrids, worldPointer.x, worldPointer.y));
       const picked = hit == null ? null : tokens.find(t => t.id === hit);
       if (picked) {
         objId = hit;
@@ -4306,6 +4320,17 @@ export default function GameTable({ room = null }) {
       const assets = assetsRes.ok ? await assetsRes.json() : [];
       const cards = await loadCardLibrary();
       const { state: next, log } = executeSequenceWithLog(getGameState(), action.steps || [], zones, { assets, cards, grids, scenarioData });
+      // M19.5/BM: eine Wache mit `confirm` hat angehalten, **bevor** etwas
+      // abgeräumt wurde - der Zustand ist unberührt, also wird er auch nicht
+      // geladen. Statt einer Meldung kommt die Rückfrage; bestätigt läuft
+      // dieselbe Aktion noch einmal, nur ohne genau diesen Schritt. Kein
+      // zweiter Weg durch den Executor und kein Zustandsbit: eine Folge ist
+      // eine Liste, und eine Liste ohne ihre Wache ist eine Liste.
+      const ask = log.find(e => e.confirm && e.status !== 'ok');
+      if (ask) {
+        setActionConfirm({ action, index: ask.index, message: issueLine(ask) });
+        return;
+      }
       loadGameState(next);
       const bad = log.filter(e => e.status !== 'ok');
       setSetupIssues(bad.length ? bad : null);
@@ -4957,6 +4982,11 @@ export default function GameTable({ room = null }) {
           const isDropTarget = (stackId !== null && stackDropTarget === stackId)
             || mergeTarget === card.tableId;
           const { w: cardW, h: cardH } = getCardDims(card);
+          // M19.6/BL: „angelegt" bleibt die Zone (M18) – die Karte bekommt kein
+          // neues Feld. Was sie bekommt, ist die **Farbe ihrer Zone** als
+          // Rahmen, abgeleitet aus der Lage. `cardTint` steht in `shared/`,
+          // weil der Client keine Testinfrastruktur hat.
+          const tint = cardTint(tableZones, card);
           // Spec section 6: a face-down card keeps its name to itself. The front
           // face stays mounted for the flip animation, so its alt text and name
           // label are readable in the DOM even while rotated away - and the
@@ -5056,14 +5086,26 @@ export default function GameTable({ room = null }) {
                       ? 'border-blue-400 ring-2 ring-blue-400/50'
                       : isStack
                         ? 'border-yellow-400/50'
-                        : 'border-white/30'
+                        : tint
+                          ? ''
+                          : 'border-white/30'
                 }`}
                 data-testid={`card-face-container-${card.tableId}`}
                 data-face-down={card.faceDown ? 'true' : 'false'}
+                data-zone-tint={tint || undefined}
                 style={{
                   width: cardW,
                   height: cardH,
                   perspective: '600px',
+                  // Ziel-Leuchten, Auswahl und Stapel sind **Vorgänge** und
+                  // bleiben vorn; die Zonenfarbe ersetzt allein den
+                  // Ruhezustand. Sonst stünde beim Ziehen die Herkunft über dem
+                  // Ziel. Der Ring von 4 Weltpunkten ist dieselbe Bauform wie
+                  // beim Ziel-Leuchten – bei 41 % wäre ein 2 Punkte breiter
+                  // Rahmen allein 0,8 Bildschirmpunkte und damit keine Aussage.
+                  ...(tint && !isDropTarget && !isSelected && !isStack
+                    ? { borderColor: tint, boxShadow: `0 0 0 4px ${tint}80` }
+                    : {}),
                 }}
               >
                 <div
@@ -5338,6 +5380,11 @@ export default function GameTable({ room = null }) {
             top: die.y - 35,
             zIndex: layerZ(`die:${die.id}`),
             cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
+            // M19.4/BJ: ein Wuerfel ist ein Bedienwidget und behaelt seine
+            // Groesse am Bildschirm. Der Mittelpunkt bleibt, wo er liegt -
+            // `transform-origin` steht auf 50 %, und `left`/`top` sind genau
+            // der halbe `WIDGET_BOX`. Begruendung in `tokenLayer.js`.
+            transform: `scale(${widgetScale(zoomDisplay / 100)})`,
           }}
           onMouseDown={(e) => handleObjDragStart(e, 'die', die.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'die', die.id)}
@@ -5385,7 +5432,8 @@ export default function GameTable({ room = null }) {
           data-ui-element="true"
           data-locked={die.locked ? 'true' : undefined}
           className="absolute select-none pointer-events-auto"
-          style={{ left: die.x - 40, top: die.y - 48, zIndex: layerZ(`customDie:${die.id}`), cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab' }}
+          /* M19.4/BJ: wie der Standardwuerfel - gleiche Groesse am Bildschirm. */
+          style={{ left: die.x - 40, top: die.y - 48, zIndex: layerZ(`customDie:${die.id}`), cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab', transform: `scale(${widgetScale(zoomDisplay / 100)})` }}
           onMouseDown={(e) => handleObjDragStart(e, 'customDie', die.id)}
           onTouchStart={(e) => handleObjDragStart(e, 'customDie', die.id)}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, objType: 'customDie', objId: die.id, cardTableId: null, stackId: null }); }}
@@ -5448,6 +5496,8 @@ export default function GameTable({ room = null }) {
               top: die.y - 42,
               zIndex: layerZ(`hitDie:${die.id}`),
               cursor: draggingObj?.id === die.id ? 'grabbing' : 'grab',
+              // M19.4/BJ: wie der Standardwuerfel.
+              transform: `scale(${widgetScale(zoomDisplay / 100)})`,
             }}
             onMouseDown={(e) => handleObjDragStart(e, 'hitDie', die.id)}
             onTouchStart={(e) => handleObjDragStart(e, 'hitDie', die.id)}
@@ -7291,6 +7341,43 @@ export default function GameTable({ room = null }) {
               className="px-4 py-2 min-h-[44px] bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
             >
               Delete
+            </button>
+          </div>
+        </div>
+      </SwipeModal>
+
+      {/* M19.5/BM: die Rückfrage einer angehaltenen Aktion. Dieselbe Bauform wie
+          die Rückfrage vor dem Löschen (M14.7) — kein `window.confirm`, die
+          Umgebung beantwortet Browserdialoge am Tisch nicht (M12.2).
+          Der Tisch behauptet nichts über den Ausgang der Partie: er zeigt den
+          Satz aus dem Aufbau und lässt den Spieler entscheiden. */}
+      <SwipeModal isOpen={!!actionConfirm} onDismiss={() => setActionConfirm(null)} testId="action-confirm-swipe">
+        <div className="bg-slate-800 rounded-xl p-5 sm:w-96 w-full sm:max-w-none max-w-sm shadow-2xl border border-slate-600" data-testid="action-confirm-modal">
+          <h3 className="text-white font-semibold mb-3">{actionConfirm?.action?.label || 'Aktion'}</h3>
+          <p className="text-slate-300 text-sm mb-4" data-testid="action-confirm-message">
+            {actionConfirm?.message}
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setActionConfirm(null)}
+              data-testid="action-confirm-cancel-btn"
+              className="px-4 py-2 min-h-[44px] text-slate-400 hover:text-white transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={() => {
+                const { action, index } = actionConfirm;
+                setActionConfirm(null);
+                runSetupAction({
+                  ...action,
+                  steps: (action.steps || []).filter((_, i) => i !== index),
+                });
+              }}
+              data-testid="action-confirm-ok-btn"
+              className="px-4 py-2 min-h-[44px] bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition-colors"
+            >
+              Trotzdem
             </button>
           </div>
         </div>

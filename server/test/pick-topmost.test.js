@@ -131,3 +131,57 @@ test('die drei anderen Felder des Boesewichts bleiben seine', () => {
     assert.equal(pickTopmost({ x: 500 + dx, y: 500 + dy }, [boss, doerfler]), 'boss', `${dx}/${dy}`);
   }
 });
+
+// ── BK / Spec M19.1: eine Figur auf ihrem Gelände gehört der Figur ───────────
+//
+// Partie 10, mit echten Mausereignissen nachgemessen (docs/tasks-partie10.md,
+// Phase 0): ein Druck auf dem Mittelpunkt des Bösewichts bewegt ihn — aber ein
+// Druck auf dem Punkt, unter dem der **Mittelpunkt des Geländeteils** liegt,
+// bewegt das Geländeteil, obwohl er mitten im Bösewicht-Kasten liegt.
+//
+// Ursache: M11.9 misst „Mitte" in halben Feldern, und das Feld **rät** die
+// Funktion als kleinste Kantenlänge unter dem Zeiger. Steht eine Figur allein
+// auf einem Geländeteil, ist das die Figur selbst — beim 2x2-Bösewicht also das
+// Doppelte des echten Feldes, und die „Mitte" des 7x4-Geländeteils wird zu einem
+// 100x100 großen Bereich, den der Bösewicht überdeckt.
+
+const FELD50 = 50;
+// Die Maße der Partie: Bösewicht 2x2, Geländeteil "Dichter Wald" 7x4.
+const WALD = { key: 'wald', x: 1100, y: 650, width: 7 * FELD50, height: 4 * FELD50 };
+const BOSS2 = { key: 'boss', x: 1125, y: 650, width: 2 * FELD50, height: 2 * FELD50 };
+
+test('BK Abnahme 1: jeder Punkt im Bösewicht-Kasten nimmt den Bösewicht', () => {
+  const items = [WALD, BOSS2];
+  // Sein Mittelpunkt (ging schon vorher),
+  assert.equal(pickTopmost({ x: 1125, y: 650 }, items, FELD50), 'boss', 'Mitte');
+  // der Punkt über dem Mittelpunkt des Geländeteils (der gemeldete Fehler),
+  assert.equal(pickTopmost({ x: 1100, y: 650 }, items, FELD50), 'boss', 'über der Geländemitte');
+  // und alles dazwischen und daneben.
+  for (const x of [1080, 1090, 1110, 1140, 1170]) {
+    assert.equal(pickTopmost({ x, y: 650 }, items, FELD50), 'boss', `x=${x}`);
+  }
+  for (const y of [605, 630, 670, 695]) {
+    assert.equal(pickTopmost({ x: 1100, y }, items, FELD50), 'boss', `y=${y}`);
+  }
+});
+
+test('BK Abnahme 1: neben der Figur gewinnt das Gelände weiterhin', () => {
+  assert.equal(pickTopmost({ x: 1250, y: 650 }, [WALD, BOSS2], FELD50), 'wald');
+});
+
+test('BK Abnahme 3: M11.9 gilt mit übergebenem Feldmaß unverändert', () => {
+  const items = [boss, doerfler];
+  assert.equal(pickTopmost({ x: 500, y: 500 }, items, F), 'boss', 'Mitte des Bösewichts');
+  assert.equal(pickTopmost({ x: 505, y: 505 }, items, F), 'boss', 'knapp daneben');
+  assert.equal(pickTopmost({ x: doerfler.x, y: doerfler.y }, items, F), 'granny', 'Feld des Dörflers');
+  assert.equal(pickTopmost({ x: 540, y: 540 }, items, F), 'granny', 'äußerer Teil seines Feldes');
+  for (const [dx, dy] of [[-F / 2, -F / 2], [F / 2, -F / 2], [-F / 2, F / 2]]) {
+    assert.equal(pickTopmost({ x: 500 + dx, y: 500 + dy }, items, F), 'boss', `${dx}/${dy}`);
+  }
+});
+
+test('BK: ein kaputtes Feldmaß fällt auf das geratene zurück', () => {
+  for (const bad of [0, -1, NaN, null, undefined, 'viel']) {
+    assert.equal(pickTopmost({ x: 500, y: 500 }, [boss, doerfler], bad), 'boss', String(bad));
+  }
+});

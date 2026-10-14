@@ -365,6 +365,26 @@ export function gridAt(grids, x, y) {
   return null;
 }
 
+/**
+ * Wie groß ein Feld an dieser Stelle ist, in Weltpunkten – oder `0`, wenn dort
+ * kein Raster liegt (Spec M19.1/BK).
+ *
+ * `pickTopmost` (client/src/utils/tokenLayer.js) hat das Feld bisher geraten:
+ * als kleinste Kantenlänge unter dem Zeiger. Bei einer Figur, die allein auf
+ * ihrem Geländeteil steht, ist das die **Figur selbst** – beim 2x2-Bösewicht
+ * also das Doppelte. Die Antwort steht hier, weil das Raster sie ohnehin kennt;
+ * eine zweite Rechnung daneben wäre eine zweite Antwort (M6).
+ *
+ * Bei ungleichen Zellen (ein Raster an einem ungleichmäßig skalierten Anker)
+ * gilt die **kleinere** Kante: sie ist das Maß, an dem „in der Mitte" scheitert.
+ */
+export function fieldAt(grids, x, y) {
+  const grid = gridAt(grids, x, y);
+  if (!grid) return 0;
+  const d = dims(grid);
+  return Math.min(d.cellW, d.cellH);
+}
+
 // ── Snapping ─────────────────────────────────────────────────────────────────
 
 /**

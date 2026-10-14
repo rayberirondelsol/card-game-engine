@@ -212,6 +212,53 @@ export function zoneAt(zones, x, y) {
   return null;
 }
 
+/**
+ * Die Farbnamen einer Zone und was sie am Bildschirm bedeuten.
+ *
+ * Lag bis M19.6 in `client/src/components/ZoneOverlay.jsx`. Seit `cardTint`
+ * braucht sie eine zweite Stelle, und zwei Tabellen wären zwei Antworten
+ * darauf, welches Grün gemeint ist (M6). `null` ist der Rückfall für eine Zone
+ * ohne Farbe — der Rahmen, den sie heute schon bekommt.
+ */
+export const ZONE_COLOR_HEX = {
+  red: '#ef4444',
+  blue: '#3b82f6',
+  green: '#22c55e',
+  purple: '#a855f7',
+  orange: '#f97316',
+  yellow: '#eab308',
+  null: '#94a3b8',
+};
+
+/**
+ * Welche Farbe eine Karte trägt, weil sie dort liegt, wo sie liegt — oder
+ * `null` (Spec M19.6).
+ *
+ * Der Befund der zehnten Partie: M18 unterscheidet angelegt von weggepackt über
+ * die **Zone** (`color: "green"` gegen `null`), und das bleibt so — „angelegt"
+ * ist eine Lage, kein Feld an der Karte. Unterschieden wurde dadurch aber die
+ * *Fläche*, nicht die Karte: wer eine Karte ansieht, sieht ihr nichts an.
+ *
+ * Deshalb wird die Darstellung aus der **Lage** abgeleitet, und zwar hier und
+ * nicht im JSX: der Client hat keine Testinfrastruktur. Gefragt wird `zoneAt` —
+ * dieselbe Funktion, mit der `handleObjDragEnd` entscheidet, in welcher Zone
+ * eine Karte landet; eine zweite Suche wäre eine zweite Antwort. Und weil
+ * `zoneAt` von hinten sucht, gewinnt bei überlappenden Zonen die spätere.
+ *
+ * Eine Zone ohne Farbe gibt `null`, nicht den grauen Rückfall: `null` heißt
+ * „diese Karte ist nichts Besonderes", und der Ruhezustand der Karte bleibt,
+ * wie er ist. Ein unbekannter Farbname gibt ebenfalls `null` — eine geratene
+ * Farbe wäre eine Aussage, die niemand getroffen hat.
+ */
+export function cardTint(zones, card) {
+  const x = Number(card?.x);
+  const y = Number(card?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const zone = zoneAt(zones, x, y);
+  if (!zone?.color) return null;
+  return ZONE_COLOR_HEX[zone.color] || null;
+}
+
 /** `card` | `asset` | `die`. No list (or an empty one) is no restriction. */
 export function zoneAccepts(zone, kind) {
   const list = zone?.accepts;

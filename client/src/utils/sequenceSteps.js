@@ -76,7 +76,10 @@ export const STEP_TYPES = [
   // noch auf einem Raster liegt. `category` adressiert Karten, `assetName` ein
   // benanntes Asset; zusammen gilt die Vereinigung. Ohne beides raeumt der
   // Schritt nichts (siehe `validateStep`).
-  { value: 'clear_table', label: 'Clear Table', fields: ['category', 'assetName'] },
+  // BI/M19.3: `targetStackLabel` + `faceDown` wie bei `clear_zone` - ohne sie
+  // loescht der Schritt wie bisher, mit ihnen legt er die Karten unter den
+  // Stapel zurueck. Eine Dorf-Ereigniskarte gehoert zurueck, nicht weg.
+  { value: 'clear_table', label: 'Clear Table', fields: ['category', 'assetName', 'targetStackLabel', 'faceDown'] },
   // M7/T6: kein `gridLabel` - das Raster steht in den Szenariodaten, nicht am
   // Schritt. Der Schritt hat genau eine Einstellung: ob der Endkampf-Abschnitt
   // dazugehoert.
@@ -86,6 +89,10 @@ export const STEP_TYPES = [
   // den der Spieler liest: der Executor weiss nichts ueber das Spiel, „Erst
   // die Dorfphase beginnen" kann nur hier stehen.
   { value: 'require_zone', label: 'Require Zone', fields: ['zoneLabel', 'expect', 'message'] },
+  // M19.5/BM: dieselbe Wache ueber einen **Zaehler**. „Besiegt" ist kein
+  // Zustand, den der Tisch kennt - die Definition steht im Aufbau, nicht hier.
+  // `confirm` macht aus dem Halt eine Rueckfrage.
+  { value: 'require_counter', label: 'Require Counter', fields: ['name', 'above', 'confirm', 'message'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -120,7 +127,10 @@ export function stepFields(step) {
   }
   // clear_zone: die Seite gilt nur für Karten, die in einen Stapel
   // zurückgehen. Ohne Stapelziel wäre sie eine Einstellung ohne Wirkung.
-  if (spec.value === 'clear_zone' && typeof step === 'object' && !step?.targetStackLabel) {
+  // Dasselbe fuer `clear_table` (BI/M19.3): die Seite gilt nur fuer Karten, die
+  // in einen Stapel zurueckgehen.
+  if ((spec.value === 'clear_zone' || spec.value === 'clear_table')
+    && typeof step === 'object' && !step?.targetStackLabel) {
     return spec.fields.filter(f => f !== 'faceDown');
   }
   // M15.3/AR1: derselbe Satz für `clear_grid` - der Pool sagt, *was* verschont
@@ -224,6 +234,11 @@ export function defaultStep(type, ctx = {}) {
     case 'rotate_zone':
       // Wie `reveal_next`: die Zone *ist* die Adresse, also steht die erste da.
       return { type, zoneLabel: zone };
+    case 'require_counter':
+      // Keine geratenen Zaehler, kein geratener Satz - und `confirm: true`,
+      // weil eine Wache ueber einem handgefuehrten Zaehler im Zweifel fragen
+      // soll statt zu sperren (M19.5).
+      return { type, name: [], above: 0, confirm: true, message: '' };
     case 'require_zone':
       // „leer" ist der haeufigere Fall (und der aus M9.3). Die Meldung bleibt
       // leer: sie ist die eine Entscheidung, die der Schritt nicht vorwegnehmen
@@ -253,7 +268,7 @@ export function defaultStep(type, ctx = {}) {
       // Beides leer: der Schritt loescht vom Tisch, und *was* er loescht, ist
       // die eine Entscheidung, die er nicht vorwegnehmen darf. Eine geratene
       // Kategorie waere der gefaehrlichste Tippfehler im Vokabular (M17.4/BF).
-      return { type, category: [], assetName: '' };
+      return { type, category: [], assetName: '', targetStackLabel: '' };
     default:
       return { type, stackLabel };
   }
@@ -339,6 +354,13 @@ export function describeStep(step) {
     // M9.3/P2: beide Haelften in einer Zeile - die Bedingung und was passiert,
     // wenn sie nicht gilt. Ohne die zweite liest sich der Schritt wie eine
     // Pruefung ohne Folgen.
+    case 'require_counter': {
+      const namen = categoryList(step?.name);
+      const say = String(step?.message ?? '').trim();
+      const ask = step?.confirm ? 'ask before going on' : 'stop the sequence';
+      return `Require one of ${namen.length ? namen.map(n => `"${n}"`).join(', ') : '(no counter)'}`
+        + ` to be above ${Number(step?.above) || 0}, else ${ask}${say ? `: "${say}"` : ''}`;
+    }
     case 'require_zone': {
       const want = step?.expect === 'occupied' ? 'occupied' : 'empty';
       const say = String(step?.message ?? '').trim();
@@ -371,7 +393,13 @@ export function describeStep(step) {
         ...(cats.length ? [`card categor${cats.length > 1 ? 'ies' : 'y'} ${cats.map(c => `"${c}"`).join(' + ')}`] : []),
         ...(String(step?.assetName ?? '').trim() ? [`asset ${q(step.assetName)}`] : []),
       ];
-      return `Clear ${parts.length ? parts.join(' and ') : '(nothing)'} off the table, wherever it lies`;
+      // BI/M19.3: mit Zielstapel wird nicht geraeumt, sondern zurueckgelegt -
+      // und die Seite steht nur da, wo sie gilt (wie bei `clear_zone`).
+      const side = typeof step?.faceDown === 'boolean' ? (step.faceDown ? ', face down' : ', face up') : '';
+      const where = String(step?.targetStackLabel ?? '').trim()
+        ? ` back under stack ${q(step.targetStackLabel)}${side}`
+        : ' off the table, wherever it lies';
+      return `Clear ${parts.length ? parts.join(' and ') : '(nothing)'}${where}`;
     }
     // M15.3/AR1: der verschonte Pool steht nur da, wenn es ein Ziel gibt.
     case 'clear_grid': return step?.targetZoneLabel

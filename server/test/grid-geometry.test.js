@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  createGrid, gridBox, resolveGrids, setGridAnchor, gridAt,
+  createGrid, gridBox, resolveGrids, setGridAnchor, gridAt, fieldAt,
   cellAt, cellCenter, cellLabel, cellFromLabel, cellPoint,
   snapToGrid, snapInto, placeOnGrids, GRID_TYPES,
 } = await import('../../shared/gridGeometry.js');
@@ -361,4 +361,30 @@ test('a new grid is a usable square grid with A1 labelling', () => {
   assert.equal(cellLabel(g, 0, 0), 'A1');
   assert.ok(g.id, 'and it has an id to be referenced by');
   assert.notEqual(createGrid({ grids: [g] }).id, g.id, 'two grids are two grids');
+});
+
+// ── BK / Spec M19.1: das Feldmaß unter einem Punkt ──────────────────────────
+//
+// `pickTopmost` hat das Feld bisher geraten (kleinste Kantenlänge unter dem
+// Zeiger) und lag bei einer Figur auf ihrem Geländeteil um den Faktor zwei
+// daneben. Hier steht die Antwort, die das Raster ohnehin kennt – eine zweite
+// Rechnung daneben wäre eine zweite Antwort (M6).
+
+test('BK Abnahme 4: fieldAt liefert die Kantenlänge des Rasters unter dem Punkt', () => {
+  const grids = [ttGrid()];
+  assert.equal(fieldAt(grids, 120, 120), 40);
+  assert.equal(fieldAt(grids, 100 + 19 * 40 - 1, 100 + 14 * 40 - 1), 40, 'letztes Feld');
+});
+
+test('BK Abnahme 4: kein Raster unter dem Punkt heißt 0', () => {
+  assert.equal(fieldAt([ttGrid()], 0, 0), 0);
+  assert.equal(fieldAt([], 120, 120), 0);
+  assert.equal(fieldAt(null, 120, 120), 0);
+  assert.equal(fieldAt(undefined, undefined, undefined), 0);
+});
+
+test('BK Abnahme 4: bei nicht-quadratischen Zellen gilt die kleinere Kante', () => {
+  // So entstehen sie: ein Raster am Anker, dessen Brett ungleichmäßig skaliert.
+  const grids = [ttGrid({ cellW: 60, cellH: 25 })];
+  assert.equal(fieldAt(grids, 120, 120), 25);
 });

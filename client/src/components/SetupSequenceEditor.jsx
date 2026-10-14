@@ -94,6 +94,10 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     ? step.category.map(c => String(c ?? ''))
     : [String(step.category ?? '')];
   const linesToCategory = (lines) => (lines.length > 1 ? lines : (lines[0] || ''));
+  // M19.5/BM: dieselbe Zeilenlesart fuer die Zaehlerliste von `require_counter`.
+  const nameLines = Array.isArray(step.name)
+    ? step.name.map(n => String(n ?? ''))
+    : [String(step.name ?? '')];
 
   const render = {
     stackLabel: () => field('Stack',
@@ -329,14 +333,43 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
 
     // M4a: der Zähler hat weder Stapel noch Asset - sein Name ist frei
     // geschrieben, er beschriftet ihn am Tisch.
-    name: () => field('Name',
+    // M19.5/BM: `require_counter` fragt **mehrere** Zaehler ab (drei Doerfler),
+    // `place_counter`/`set_counter` genau einen. Dieselbe Bauform wie bei
+    // `category`, eine Zeile je Name - kein zweites Feld daneben.
+    name: () => (step.type === 'require_counter'
+      ? field('Counters',
+        <textarea
+          rows={Math.max(2, nameLines.length)}
+          value={nameLines.join('\n')}
+          onChange={e => set({ name: linesToCategory(e.target.value.split('\n')) })}
+          placeholder="one counter name per line"
+          className={`flex-1 ${INPUT}`}
+          data-testid={`step-${index}-counter-names`}
+        />)
+      : field('Name',
+        <input
+          type="text"
+          value={step.name || ''}
+          onChange={e => set({ name: e.target.value })}
+          placeholder="e.g. Coins"
+          className={`flex-1 ${INPUT}`}
+          data-testid={`step-${index}-counter-name`}
+        />)),
+
+    // M19.5/BM: die Schwelle. „Ueber 0" ist der Fall aus der zehnten Partie;
+    // eine andere Zahl ist dieselbe Frage mit anderem Mass.
+    above: () => field('Above', number(step.above, 0, undefined, n => set({ above: n }))),
+
+    // M19.5/BM: fragen statt sperren. Eine Wache ueber einem handgefuehrten
+    // Zaehler soll den Spieler entscheiden lassen - er weiss, wie die Partie
+    // steht, der Tisch nicht.
+    confirm: () => field('Ask instead of stop',
       <input
-        type="text"
-        value={step.name || ''}
-        onChange={e => set({ name: e.target.value })}
-        placeholder="e.g. Coins"
-        className={`flex-1 ${INPUT}`}
-        data-testid={`step-${index}-counter-name`}
+        type="checkbox"
+        checked={!!step.confirm}
+        onChange={e => set({ confirm: e.target.checked })}
+        className="accent-emerald-400"
+        data-testid={`step-${index}-confirm`}
       />),
 
     // R1: bei `set_counter` ist der Wert keine Zahl, sondern eine von vier

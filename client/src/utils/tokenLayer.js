@@ -68,6 +68,32 @@ export const WIDGET_BOX = {
 };
 
 /**
+ * Der Faktor, mit dem ein Bedienwidget den Tischzoom aufhebt (Spec M19.4).
+ *
+ * Der Befund der zehnten Partie: bei 41 % ist der Eigenwuerfel 32,8 x 49,4
+ * Bildschirmpunkte gross, die Bildseite darin knapp 20, die Augenzahl des
+ * Standardwuerfels knapp 10. Jeder der rund zwanzig Wuerfe kostete einen
+ * Zoom-Ausflug hin und zurueck.
+ *
+ * **Kein „Enlarge".** M11.6 ist fuer das Boesewicht-Tableau gebaut – ein
+ * textreiches Bild, das man einmal je Kampf liest. Ein Wuerfel wird zwanzigmal
+ * *abgelesen*; zwei Klicks je Wurf waeren vierzig, der Zoom-Ausflug war einer.
+ * Und `tokenPreview` antwortet ohne `imageUrl` `null` – ein Wuerfel hat keins.
+ *
+ * Ein Wuerfel ist ein **Bedienwidget**, kein Spielstein: er steht auf keinem
+ * Feld, seine Groesse auf dem Tisch sagt nichts. Gegenskaliert bleibt er am
+ * Bildschirm immer gleich gross. Der Preis, ausgesprochen: bei kleinem Zoom
+ * deckt er mehr Tisch ab – er liegt am Rand und laesst sich wegziehen.
+ *
+ * Ein kaputter oder fehlender Zoom gibt `1`: ein Widget, das verschwindet oder
+ * ins Unendliche waechst, waere schlimmer als eines in Tischgroesse.
+ */
+export function widgetScale(zoom) {
+  const z = Number(zoom);
+  return Number.isFinite(z) && z > 0 ? 1 / z : 1;
+}
+
+/**
  * Die belegte Flaeche eines Dings – mit **denselben** Rueckfaellen, die
  * `GameTable` beim Zeichnen benutzt (`token.width || token.size || 30`).
  * Zwei Rechnungen waeren zwei Antworten: ein Stueck, das anders einsortiert
@@ -139,12 +165,25 @@ export function tableLayers(items) {
  * einer *einzeln* stehenden Figur greift weiterhin die Figur, statt zu pannen.
  * Das geht ohne Bilddaten nicht.
  *
+ * **M19.1/BK: das Feld wird uebergeben, nicht geraten.** Mit echten
+ * Mausereignissen nachgemessen (docs/tasks-partie10.md, Phase 0): ein Druck auf
+ * dem Punkt, unter dem der *Mittelpunkt des Gelaendeteils* liegt, bewegte das
+ * Gelaendeteil, obwohl er mitten im Boesewicht-Kasten lag. Das geratene Feld
+ * (kleinste Kantenlaenge unter dem Zeiger) ist bei einer Figur auf ihrem
+ * Gelaende die **Figur selbst** – beim 2x2-Boesewicht also doppelt so gross wie
+ * das echte Feld, und die „Mitte" des 7x4-Gelaendeteils wird zu einem 100x100
+ * grossen Bereich, den der Boesewicht ueberdeckt. Dort stehen beide in der
+ * Mitte, und der naehere Mittelpunkt gewinnt: das Gelaende.
+ *
  * @param {{x: number, y: number}} point Weltkoordinaten des Zeigers.
  * @param {Array<{key: string, x: number, y: number, width?: number, height?: number, size?: number}>} items
  *   Dieselbe Liste wie bei `tableLayers`, in derselben Reihenfolge.
+ * @param {number} [field=0] Kantenlaenge eines Rasterfeldes in Weltpunkten.
+ *   Ohne sie bleibt alles, wie es war (geratenes Feld, keine Groessengrenze) –
+ *   ein Tisch ohne Raster kennt kein Feld.
  * @returns {string|null} Schluessel des getroffenen Stuecks, sonst `null`.
  */
-export function pickTopmost(point, items) {
+export function pickTopmost(point, items, field = 0) {
   const px = Number(point?.x);
   const py = Number(point?.y);
   if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
@@ -203,8 +242,18 @@ export function pickTopmost(point, items) {
   // Mittelpunkt nur dann naeher als ihren eigenen, wenn sie gar nicht darauf
   // steht – und bei gleichem Abstand (beide Mittelpunkte aufeinander)
   // entscheidet weiterhin die kleinere Flaeche.
-  const half = Math.min(...under.map(u => u.side)) / 2;
-  const middle = under.filter(u => u.reach < half);
+  //
+  // M19.1/BK: ist das Feldmass bekannt, wird nichts geraten – **und die Mitte
+  // ist nur bei einem Stueck ein Griff, das hoechstens zwei Felder misst.**
+  // Alles Groessere ist Untergrund: auf den Mittelpunkt eines Gelaendeteils
+  // zielt niemand, der liegt irgendwo im Gelaende. Zwei Felder, weil das die
+  // groesste Figur im Spiel ist (der Boesewicht) – und weil genau dieser Fall
+  // M11.9 war. Ohne Feldmass gilt beides nicht, und der Absatz darueber steht
+  // Wort fuer Wort weiter.
+  const known = Number(field) > 0 ? Number(field) : 0;
+  const cell = known || Math.min(...under.map(u => u.side));
+  const half = cell / 2;
+  const middle = under.filter(u => u.reach < half && (!known || u.side <= 2 * known));
 
   // Innerhalb der Mitten entscheidet der naehere Mittelpunkt, bei Gleichstand
   // wieder die kleinere Flaeche und dann die Zeichenreihenfolge. Gibt es keine

@@ -74,3 +74,27 @@ test('ein unbekanntes Token und eine leere Liste werfen nicht', () => {
   assert.equal(tableLayers(null)('f'), TOKEN_Z_FLOOR);
   assert.equal(tableLayers(undefined)(null), TOKEN_Z_FLOOR);
 });
+
+// ── BJ / Spec M19.4: der Würfel behält seine Größe am Bildschirm ─────────────
+//
+// Partie 10, teuerster Einzelposten: bei 41 % ist der Eigenwürfel 32,8 × 49,4
+// Bildschirmpunkte groß, die Bildseite darin knapp 20, die Augenzahl des
+// Standardwürfels knapp 10. Jeder der rund zwanzig Würfe kostete einen
+// Zoom-Ausflug hin und zurück. Ein Würfel ist ein Bedienwidget, kein Spielstein:
+// seine Größe auf dem Tisch bedeutet nichts. Begründung in
+// `docs/tasks-partie10.md`, Aufgabe BJ.
+
+const { widgetScale } = await import('../../client/src/utils/tokenLayer.js');
+
+test('BJ Abnahme 1: der Faktor hebt den Zoom auf', () => {
+  assert.equal(widgetScale(1), 1);
+  assert.equal(widgetScale(0.5), 2);
+  assert.equal(widgetScale(0.41), 1 / 0.41);
+  assert.equal(widgetScale(2), 0.5);
+});
+
+test('BJ Abnahme 1: ein kaputter Zoom lässt nichts verschwinden', () => {
+  for (const bad of [0, -1, NaN, null, undefined, 'viel', Infinity]) {
+    assert.equal(widgetScale(bad), 1, String(bad));
+  }
+});
