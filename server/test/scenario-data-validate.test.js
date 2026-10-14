@@ -50,7 +50,7 @@ function clean() {
         decks: [{ category: 'Aktionen: Patches', label: 'Verhaltensdeck' }],
         final: {
           terrain: [{ assetName: 'Giant Milk Jug', cells: ['K2', 'K3'] }],
-          fields: { FF: ['K2', 'K3', 'L2', 'L3', 'M2'] },
+          fields: { EG: ['K2', 'K3', 'L2', 'L3', 'M2'] },
         },
       },
     },
@@ -154,8 +154,8 @@ test('the final section is checked too – asset', () => {
 
 test('the final section is checked too – fields', () => {
   const data = clean();
-  data.bosses.Patches.final.fields.FF[4] = 'M22';
-  onlyProblem(data, 'Patches', 'M22', 'FF5');
+  data.bosses.Patches.final.fields.EG[4] = 'M22';
+  onlyProblem(data, 'Patches', 'M22', 'EG5');
 });
 
 // ── Bösewichte ───────────────────────────────────────────────────────────────
@@ -184,7 +184,7 @@ test('every mistake gets its own line – nothing is swallowed by the first', ()
   const data = clean();
   data.bosses.Patches.terrain[0].assetName = 'Rubber Duck';
   data.bosses.Patches.fields.D[0] = 'Z1';
-  data.bosses.Patches.final.fields.FF[0] = 'Z2';
+  data.bosses.Patches.final.fields.EG[0] = 'Z2';
   const problems = validateScenarioData(data, CTX);
   assert.equal(problems.length, 3, JSON.stringify(problems));
 });
@@ -240,7 +240,7 @@ test('a range in a D field passes the same way – no special case for a key nam
 
 test('a range in a final field passes too', () => {
   const data = clean();
-  data.bosses.Patches.final.fields.FF[0] = 'K2:K3';
+  data.bosses.Patches.final.fields.EG[0] = 'K2:K3';
   assert.deepStrictEqual(validateScenarioData(data, CTX), []);
 });
 

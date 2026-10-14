@@ -508,9 +508,10 @@ diese Reihenfolge abbilden.
 `D` = Dörfler-Startposition, `B` = Bösewicht (2×2-Fläche, §5.10), `EG` =
 Endgegner-Terrain, bei mehreren „`EG1`, `EG2`, `EG3` usw. …, um die Reihenfolge
 ihrer Platzierung anzuzeigen" `[DE S.23]`.
-> **Achtung, Engine:** `docs/spec-setup-system.md` und die Szenariodaten der
-> Produktionsdatenbank verwenden an einigen Stellen noch `T`/`R`/`FF`. Eine
-> Umstellung ist eine eigene Entscheidung und hier **nicht** vorgenommen.
+> **Engine, erledigt am 2026-10-14:** Szenariodaten, Spec, Tests und Kommentare
+> stehen jetzt durchgehend auf `D`/`B`/`EG`. Die Produktionsdaten führten `D`
+> und `B` ohnehin schon richtig; nur `FF` war der Ausreißer. Wer einen
+> Endgegner-Aufbau baut, bindet also `$EG1`…`$EG5`, **nicht** `$FF1`.
 
 - **Wie viele `D`-Felder?** Die Anleitung nennt **keine Anzahl**, nur „(noch)
   verfügbare Dörfler-Startpositionen". Die Beispielgrafik zeigt fünf; bei 7

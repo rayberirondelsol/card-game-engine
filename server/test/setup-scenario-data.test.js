@@ -62,7 +62,7 @@ const SCENARIOS = {
       decks: [{ category: 'Aktionen: Patches', label: 'Verhaltensdeck' }],
       final: {
         terrain: [{ assetName: 'Giant Milk Jug', cells: ['K2', 'K3'] }],
-        fields: { FF: ['K2', 'K3', 'L2', 'L3', 'M2'] },
+        fields: { EG: ['K2', 'K3', 'L2', 'L3', 'M2'] },
       },
     },
   },

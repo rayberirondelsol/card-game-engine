@@ -18,7 +18,7 @@
  *       scenario, terrain: [{ assetName, cells: [], rotation, faceDown }],
  *       fields: { B: "J5", D: ["A1", ...] },
  *       decks: [{ category, label }],
- *       final: { terrain: [...], fields: { FF: [...] } } } } }
+ *       final: { terrain: [...], fields: { EG: [...] } } } } }
  *
  * `final` ist additiv: derselbe Eintrag, ein zusätzlicher Abschnitt, der nur
  * für den Endkampf dazukommt – kein zweites Szenario.
@@ -117,7 +117,7 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [] } =
 
     const fields = part?.fields && typeof part.fields === 'object' ? part.fields : {};
     for (const [key, value] of Object.entries(fields)) {
-      // `B` steht als einzelner Name da, `D` und `FF` als Liste – der Name des
+      // `B` steht als einzelner Name da, `D` und `EG` als Liste – der Name des
       // Platzhalters ist dann `D1`..`D5`, also der Schlüssel plus Position.
       const list = Array.isArray(value) ? value : [value];
       list.forEach((cell, i) => {

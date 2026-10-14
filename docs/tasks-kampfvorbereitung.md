@@ -182,7 +182,7 @@ Eintrag über `$revealedBase` suchen · bei `final` den unteren Abschnitt additi
 dazunehmen (`auto` = `reveal_next` kam vom letzten Platz) · **erst prüfen, dann
 legen** (`validateScenarioData` auf den einen Eintrag; ein Fehler → `failed`,
 nichts liegt) · je Feld ein eigenes Objekt über `assetToken`, mit `gridId`/`cell`
-· `$B`, `$D1..$D5`, `$FF1..$FF5` binden. Kein Eintrag → `skipped` mit Namen.
+· `$B`, `$D1..$D5`, `$EG1..$EG5` binden. Kein Eintrag → `skipped` mit Namen.
 
 **Dateien.** `shared/sequenceExecutor.js` · `shared/scenarioData.js` ·
 `client/src/utils/sequenceSteps.js` · `SetupSequenceEditor.jsx` ·

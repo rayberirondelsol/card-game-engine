@@ -768,7 +768,7 @@ Was die Aktion tut (Regelwerk S. 6 und Regelvideo):
   gedruckt auf der Charakterseite; es gibt in der Engine keine Statusleisten,
   auf die man sie legen könnte.
 
-Der untere Abschnitt der Szenarioseite (FF1..FF5) gilt nur, wenn dieser
+Der untere Abschnitt der Szenarioseite (EG1..EG5) gilt nur, wenn dieser
 Bösewicht der Endgegner ist — die Karte selbst gilt für **jeden** Kampf
 (vom Nutzer bestätigt, 2026-09-23).
 
@@ -1148,7 +1148,7 @@ er wird heute nur weggeworfen.
 
 Vom Nutzer bestätigt (2026-09-23): Die Szenarioseite des Tableaus gilt für
 **jeden** Kampf gegen diesen Bösewicht. Nur ihr **unterer Abschnitt** — die
-Marker `FF1..FF5` bzw. „EG" — gilt zusätzlich, wenn dieser Bösewicht der
+Marker `EG1..EG5` — gilt zusätzlich, wenn dieser Bösewicht der
 Endgegner ist; bei allen davor wird er vollständig ignoriert. Das Banner
 „FINAL FIGHT" steht auf allen Szenarioseiten und bezeichnet nur diesen unteren
 Abschnitt.
@@ -1180,7 +1180,7 @@ Setup ein anderes Raster benutzt.
       "fields": { "B": "J5", "D": ["A1", "B3", "C4", "D6", "E9"] },
       "final":  {
         "terrain": [{ "assetName": "Giant Milk Jug", "cells": ["K2", "K3"] }],
-        "fields":  { "FF": ["K2", "K3", "L2", "L3", "M2"] }
+        "fields":  { "EG": ["K2", "K3", "L2", "L3", "M2"] }
       }
     }
   }
@@ -1216,7 +1216,7 @@ waeren eine Frage danach, welche gewinnt - und die Antwort braeuchte niemand.
   eigenes Objekt**, weil zehn Fetid Furball zehn Plättchen sind und nicht eines,
   das zehnmal umzieht,
 - **bindet die benannten Felder als Platzhalter** für die folgenden Schritte:
-  `$B`, `$D1`…`$D5`, im Endkampf zusätzlich `$FF1`…`$FF5`,
+  `$B`, `$D1`…`$D5`, im Endkampf zusätzlich `$EG1`…`$EG5`,
 - `final: "auto"` heißt: Endkampf genau dann, wenn `reveal_next` vom **letzten
   Platz** der Leiste genommen hat.
 
@@ -1553,7 +1553,7 @@ einer Feldmitte — Deputy Waggums `J8:K9`, Virginia Fitz `K11:L12`, The Bundits
 
 **Damit ist Regel 1 an einer Stelle falsch.** Dort steht, ein Bereich sei in
 `fields` ein Fehler, „ein Dörfler steht auf einem Feld". Das stimmt für die
-Dörfler und für die `FF`-Geländefelder — aber nicht für `B`. Die Begründung war
+Dörfler und für die `EG`-Geländefelder — aber nicht für `B`. Die Begründung war
 richtig beobachtet und falsch verallgemeinert: sie beschreibt die Figuren, die
 ich zufällig zuerst angesehen hatte.
 

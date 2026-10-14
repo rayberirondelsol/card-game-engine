@@ -101,7 +101,7 @@ function scenarioFixture(over = {}) {
         fields: { B: 'J5', D: ['A1', 'B3', 'C4', 'D6', 'E9'] },
         final: {
           terrain: [{ assetName: 'Giant Milk Jug', cells: ['I2', 'I3'] }],
-          fields: { FF: ['I2', 'I3', 'J2', 'J3', 'H2'] },
+          fields: { EG: ['I2', 'I3', 'J2', 'J3', 'H2'] },
         },
         ...over,
       },
@@ -182,7 +182,7 @@ test('final "auto" nimmt den Endkampf-Abschnitt genau vom letzten Platz der Leis
   }));
   assert.deepEqual(statuses(middle.log), ['ok', 'ok', 'ok'], reasons(middle.log));
   assert.equal(tilesNamed(middle.state, 'Giant Milk Jug').length, 0, 'Platz 3 von vier ist kein Endkampf');
-  assert.equal(middle.bindings.FF1, undefined, 'ohne Endkampf keine FF-Bindung');
+  assert.equal(middle.bindings.EG1, undefined, 'ohne Endkampf keine EG-Bindung');
 
   // Dreimal: der dritte Bösewicht steht auf Platz 4, dem letzten der Zone.
   const last = executeSequenceWithLog(shortGameBar(), [REVEAL, REVEAL, REVEAL, BUILD], ZONES, opts({
@@ -192,7 +192,7 @@ test('final "auto" nimmt den Endkampf-Abschnitt genau vom letzten Platz der Leis
   assert.deepEqual(cellsOf(last.state, 'Giant Milk Jug'), ['I2', 'I3'], 'der untere Abschnitt kommt dazu');
   assert.deepEqual(cellsOf(last.state, 'Fetid Furball'), ['C7', 'D7', 'H9'], 'und ersetzt den regulären nicht');
   assert.deepEqual(
-    [last.bindings.FF1, last.bindings.FF5, last.bindings.B],
+    [last.bindings.EG1, last.bindings.EG5, last.bindings.B],
     ['I2', 'H2', 'J5'],
     'die Endkampf-Felder kommen dazu, die regulären bleiben'
   );
