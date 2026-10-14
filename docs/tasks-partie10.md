@@ -540,3 +540,71 @@ einer Niederlage in `Besiegte Bösewichte` landet, ist im Bericht als
   stimmt", 4.
 - **Ä1, Ä2, M14.13** — bekannt und im Bericht ausdrücklich nicht erneut
   gemeldet.
+
+---
+
+## Nachträge aus der Umsetzung
+
+### 1. Warum das Werkzeug keine Züge erzeugt — die Erklärung, nicht nur der Befund
+
+`handleObjDragStart` setzt `draggingObj` über `setDraggingObj`, und
+`handleGlobalMove` liest `draggingObj` aus dem Abschluss des **aktuellen**
+Renders. Kommen Druck und Bewegungen in einer einzigen JS-Aufgabe, hat React
+dazwischen nicht neu gerendert — jedes `mousemove` sieht `draggingObj === null`
+und tut nichts. Mit einem `requestAnimationFrame` zwischen je zwei Ereignissen
+greift derselbe Zug auf den Pixel genau.
+
+Das erklärt alle drei bisherigen Artefakte an einer Stelle: die „halbe Strecke"
+aus Partie 6/7, die „70-Pixel-Schwelle" (M19.2) und den Zug, der angeblich das
+Geländeteil erwischt (M19.1 in der gemeldeten Form). **Wer künftig misst,
+schickt einzelne Ereignisse und lässt dazwischen einen Bildwechsel zu.**
+
+### 2. BK — die Regel, die am Ende dasteht
+
+Fünf Fassungen sind an einem der sieben Fälle gescheitert (M11.9 Abnahme 1,
+M8.2 Abnahme 2/3, M10.1, und der neue Fall). Was trägt, sind **zwei** Sätze,
+nicht einer:
+
+1. Das Feld wird übergeben (`fieldAt`), statt als kleinste Kantenlänge unter
+   dem Zeiger geraten zu werden.
+2. In die „Mitte"-Auswahl kommt nur, was **höchstens zwei Felder** misst.
+
+Der zweite Satz ist der entscheidende: die Reihenfolge *innerhalb* der Mitte
+(näherer Mittelpunkt) lässt sich nicht retten, denn der Mittelpunkt eines
+7 × 4-Geländeteils ist nun einmal ein Mittelpunkt. Ihn gar nicht erst
+mitreden zu lassen ist die einzige Fassung, die M11.9 **und** M19.1 hält.
+Ohne Feldmaß gilt beides nicht — ein Tisch ohne Raster verhält sich wie vorher,
+und die neun vorhandenen `pick-topmost`-Tests messen genau das.
+
+### 3. BI — es gab einen dritten Weg zur 79
+
+Neben „die Karte liegt irgendwo" und „die Karte steckt im Verhaltensdeck" gibt
+es einen dritten: `clear_zone` auf `Ablage` (Schritt 4 der alten Folge) hat
+**kein** Ziel und **keine** Kategorie, löscht also alles, was dort liegt — und
+genau dorthin verlangt *Schwitzige Hände* auf der Karte gelegt zu werden. Weil
+der neue Schritt an **Position 2** steht, also vor jedem löschenden, deckt er
+alle drei Wege mit einer Zeile ab. Am laufenden Tisch nachgestellt: Ereignis in
+die Ablage aufgedeckt (80 → 79), „Dorfphase beginnen" bestätigt, Stapel wieder
+**80**.
+
+### 4. Sichtprüfung, Spielzoom 38 %
+
+| | Ergebnis |
+|---|---|
+| BJ | Die Augenzahl ist **32 Bildschirmpunkte** hoch statt 9; „Roll" trifft (9 → 14, Zähler #2), der Würfel lässt sich ziehen. |
+| BK | Druck genau über dem Mittelpunkt des *Überwucherten Maisfelds*, der unter dem Bösewicht liegt: der **Bösewicht** rückt zwei Felder, das Maisfeld steht still. |
+| BL | Zwei Karten in Slot-Zonen tragen den grünen Rahmen, die vier Karten im Vorratsband darunter nicht — der Unterschied ist bei 38 % ohne die Zonenrahmen erkennbar. |
+| BM | Mit allen drei Lebenszählern auf 0 räumt „Dorfphase beginnen" nichts ab und fragt; „Abbrechen" lässt den Tisch unberührt, „Trotzdem" räumt ab. |
+| BI | Ereignisstapel nach dem Abräumen wieder **80**, keine Ereigniskarte auf der Auslage, keine Meldung im Band. |
+
+Nebenbei bestätigt: die angelegten Karten überdauern „Dorfphase beginnen"
+(M18 Abnahme 7) und tragen ihren Rahmen danach weiter.
+
+### 5. Datenänderung
+
+Aktion „Dorfphase beginnen" im Aufbau *TFT Kurzpartie*: **45 → 44** Schritte.
+Entfernt die drei `clear_zone` auf `Hand Dörfler 1–3`, neu an Position 1 und 2
+die Wache und der eine `clear_table`. Trockenlauf vorab, dann **ein** `PUT` mit
+ausschließlich `action_data` (die Route schreibt mit `COALESCE`, die übrigen
+Spalten bleiben unberührt). Kontrollausgabe danach: 45 Zonen, 3 Szenarien,
+65 Aufbau-Schritte — alles unverändert.
