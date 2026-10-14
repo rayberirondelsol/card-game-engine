@@ -4540,3 +4540,96 @@ einer Karte und die Darstellung. Hier steht es nur, damit es nicht verlorengeht.
   Token schon (M14.7). Ein Fehlgriff wäre unumkehrbar.
 - **Ä5** Zähler am unteren Rand liegen regelmäßig unter der Werkzeugleiste.
 - **Ä6** Die Abweisungsmeldung ist englisch, der Rest deutsch.
+
+## M18 — „Angelegt" und „weggepackt"
+
+**Befund (M17.6, aus der neunten Partie).** Der Tisch kennt keinen Unterschied
+zwischen angelegter und weggepackter Ausrüstung. Alles, was die Regeln daran
+hängen, ist Kopfarbeit: *Mitleid* („packe 1 angelegte Waffe weg"), *Verbuddeln*,
+die Heldentaten *Nackedei* und *Anpassungsfähig*, jeder Ausrüstungstausch, und
+die Nachbereitung, die „nur schwarz markierte Wertveränderungen **von
+angelegter** Ausrüstung" wieder aufrechnet (§7, `[DE S.22]`). Der Spieler behalf
+sich mit Drehen der Karte; bei 41 % Zoom ist davon nichts zu sehen, und eine
+Heldentat hat er deshalb gar nicht verfolgt.
+
+### Die Regellage, seit dem Abgleich belastbar
+
+- **Sechs Slots:** „Beine, Brust, Kopf, Linke Hand, Rechte Hand und
+  Mitbringsel" `[DE S.35]`. **Pro Slot eine Ausrüstung.**
+- **Eine Zweihandwaffe belegt beide Handslots** `[DE S.9]`.
+- **Weggepackt ist alles andere:** „Nur angelegte Ausrüstung kann weggepackt
+  werden. Jegliche nicht angelegte Ausrüstung … in deinem Besitz **gilt als
+  weggepackt**." `[DE S.9]`
+- **Seltsame Ausrüstung** „kann an keinen deiner 6 Slots angelegt werden" und
+  ist „schon aktiv, sobald sie in deinem Besitz ist" `[DE S.9]`. Sie ist
+  dauerhaft weggepackt und wirkt trotzdem — der einzige Fall, in dem
+  „weggepackt" nicht „wirkungslos" heißt.
+- **Im Kampf** kostet Anlegen oder Tauschen **2 MUMM pro Slot**; die **beiden
+  Handslots zusammen** kosten nur einmal `[DE S.21]`. **In der Dorfphase ist es
+  frei und beliebig oft** `[DE S.12]`.
+
+### Die Entscheidung: Zonen, kein neuer Kartenzustand
+
+**„Angelegt" heißt: die Karte liegt in einer Slot-Zone. „Weggepackt" heißt: sie
+liegt beim Dörfler, aber nicht in einer.** Damit braucht es **kein neues Feld an
+der Karte**, keine zweite Darstellung und keine zweite Regel, wo etwas liegen
+darf — die Maschinerie steht vollständig: Zonen mit Kapazität und Plätzen,
+Einrasten, Abweisen mit Meldung (M16.2), und seit M15.5 sind die Zonen
+**sichtbar** und seit M16.1 sitzen ihre Schilder **außerhalb** der Fläche.
+
+Das ist auch die Sprache der Regel selbst: „Zahle 2 MUMM, um 1 weggepackte
+Ausrüstung **an 1 deiner Ausrüstungs-Slots** anzulegen."
+
+**Was daraus folgt und nicht gebaut wird:** keine Automatik. Der Tisch rechnet
+keine MUMM ab, verweigert keinen Tausch im Kampf und prüft keine
+Seltsam-Eigenschaft. Er **zeigt**, was wo liegt — den Rest spielen die Spieler,
+wie überall sonst (§1 der Spec: das System baut auf, es spielt nicht).
+
+### Die Handslots
+
+Zwei Zonen à ein Platz können eine Zweihandwaffe nicht aufnehmen, und eine Zone
+darf eine andere nicht überlappen (M16). **Darum eine Zone „Hände" mit zwei
+Plätzen.** Eine Zweihandwaffe belegt sichtbar einen davon und der Spieler weiß,
+dass der zweite blockiert ist — dieselbe Vereinfachung, die die Regel selbst
+macht, wenn sie die beiden Handslots beim MUMM-Preis als eine Einheit behandelt.
+
+Damit sind es **fünf Zonen je Dörfler**: `Kopf`, `Brust`, `Beine`,
+`Hände` (2 Plätze), `Mitbringsel`.
+
+### Der Platz, und warum das die eigentliche Arbeit ist
+
+`Ausrüstung Dörfler N` misst seit M15.5 **580 × 280** mit fünf Spalten in zwei
+Reihen und stößt genau an die Nachbarzone. Die fünf Slot-Zonen müssen **da
+hinein**, ohne zu überlappen und ohne nach unten auszuwandern — unten ist der
+Platz knapp (M14.4/N6), und die Ausrüstungsreihen lagen schon einmal unterhalb
+des Fensterrandes.
+
+**Wie das aufgeteilt wird, entscheidet, wer es baut**, und begründet es. Zwei
+Wege, die sich anbieten: die obere Reihe wird zu den fünf Slots und die untere
+bleibt Vorrat; oder die Zone wird geteilt und der Vorrat wandert woandershin.
+**Beides hat einen Haken, der zu nennen ist:** der Vorrat ist nach oben offen —
+„Es gibt keine Obergrenze, wie viel Ausrüstung ein Dörfler besitzen darf"
+`[BR S.8]` —, in Partie 7 hatte ein Dörfler sieben Karten, und fünf feste Plätze
+fassen das nicht.
+
+### Was in die Daten gehört
+
+Fünfzehn neue Zonen (drei Dörfler × fünf), am jeweiligen Dörfler-Tableau
+verankert, `accepts: ["card"]`, Kapazität 1 bzw. 2, Namensschild außerhalb.
+Dazu die Spielerrolle: was angelegt heißt, was es kostet, und dass Seltsames
+nie angelegt wird.
+
+### Abnahme
+
+1. Jeder Dörfler hat fünf sichtbare, beschriftete Slot-Zonen; keine überlappt
+   eine andere oder den Aufdruck des Tableaus.
+2. Eine Karte in `Kopf` ist auf einen Blick von einer im Vorrat zu
+   unterscheiden — bei dem Zoom, bei dem man spielt (um 40 %).
+3. Eine zweite Karte in `Kopf` wird abgewiesen, mit sichtbarer Meldung
+   (M16.2), auch bei eingeklappter Leiste.
+4. `Hände` nimmt zwei Karten.
+5. Sieben Ausrüstungskarten eines Dörflers liegen erkennbar bei ihm — fünf
+   angelegt, zwei im Vorrat — und ragen nicht zum Nachbarn.
+6. Nach Speichern und Laden liegt jede Karte wieder in ihrer Zone.
+7. „Dorfphase beginnen" räumt die Slot-Zonen **nicht** ab — angelegte
+   Ausrüstung überdauert den Kampf (§7, `[DE S.22]`).
