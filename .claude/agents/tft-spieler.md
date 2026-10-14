@@ -30,6 +30,32 @@ Datenbank. Du spielst und **protokollierst, was sich nicht spielen lässt.**
    steht teils noch die alte Schreibung, ebenfalls bekannt und kein Befund.
    Die **offizielle FAQ** (`[FAQ S.x]`, Stand 16.10.2025) geht der Anleitung vor;
    die vier Punkte, die uns betreffen, stehen in §4 Schritt 3, §6.2 und §6.4.
+   **Stand 2026-10-14 sind auch §9 (Toller Trödel) und §10 (Neue Nachbarn)
+   gegen die deutschen Erweiterungsanleitungen geprüft.** Drei Dinge daraus, die
+   am Tisch sofort zählen:
+   - **Der Überfall ist ein Aufbauschritt, kein Zustand.** Bei jedem
+     NN-Bösewicht führst Du den Überfall-Effekt vom Tableau (unterhalb BEW/LEB)
+     **sofort beim Kampfaufbau aus**; die dadurch ins Spiel kommenden
+     Überfall-Karten liegen **offen neben dem Zusatz-Brett** und enthalten
+     **meist weitere Aufbauschritte und Sonderregeln**. Lies sie, bevor der
+     erste Zug läuft (§5.1, §10.2).
+   - **„1× pro Kampf" / „1× pro Runde":** ohne weitere Kosten auch **außerhalb**
+     Deines Zuges auslösbar, **mit** weiteren Kosten („1 MUMM", „Snacken",
+     „Abwerfen") **nur in Deinem Zug** (§6.3).
+   - **Wasser** geht auf **jedes** Feld, auf eine Figur gelegtes Wasser liegt auf
+     **deren Tableau**, und **wo** gelegt werden darf, ist **pro Bösewicht**
+     verschieden. Am Kampfende alles **zurück in den Vorrat** (§10.4).
+
+   Weitere Begriffe, die sich geändert haben: **Aufstellbare Ausrüstung** (nicht
+   „Aufstellbares"), **Laden-Ereignis** (nicht „Karren-Ereignis"), **Glaube** /
+   **Kubus** / **bekehrt** (nicht „Belief" / „Strange Cube"), **Verkörpern**
+   (nicht „embody"), **Kostüm-Fetzen**, **Krummbiegel**, **Fluch der matschigen
+   Haut**, **Operation / Beutezug / Vorbereitung / Aufgabe / Aufkleber / Notiz**
+   in **Tante Emmas Notizbuch** (nicht „Expedition / Ort / Sticker /
+   Journaleintrag / Händler-Journal"), und die Register **„Tante Emma Ausrüstung
+   (TT)"**, **„Gesperrte Ausrüstung (TT)"**, **„Müll (TT)"**, **„Flüche –
+   Gesperrt"**, **„Flüche – Freigeschaltet"**. Die vollständige Liste steht in
+   §1.1.
 2. `docs/spec-setup-system.md` — der Vertrag der Engine. Für das Spielen
    zählen M3b (Raster), M7 bis M7.6 (Kampfaufbau, Bereichsfelder, Drehung,
    Grundflächen, Kampfseite des Zusatz-Bretts, Rückseiten von Geländeteilen)
@@ -308,9 +334,12 @@ waggums` gibt null Treffer (belegt in Partie 6). Scroll stattdessen in der
 Kategorieliste nach unten, dort stehen die zwanzig `Beute:`-Kategorien
 beieinander.
 
-**Aufstellbares gibt es, aber nicht in dieser Partie.** Alle 24 Karten tragen
-Nr. 73–161 und liegen damit im gesperrten Deck. Wenn Du meinst, eines benutzen
-zu können, hast Du Dich vertan — melde es.
+**Aufstellbare Ausrüstung gibt es, aber nicht in dieser Partie.** Alle 24 Karten
+tragen Nr. 73–161 und liegen damit im gesperrten Deck. Wenn Du meinst, eines
+benutzen zu können, hast Du Dich vertan — melde es. (Falls doch eines auftaucht:
+**nur der Besitzer platziert**, kostenlos auf 1 angrenzendes freies Feld, max. 2
+eigene gleichzeitig, kein Umsetzen bis Kampfende; **benutzen** darf jeder, der
+auf dem Plättchen steht, und zwar „als wäre sie in deinem Besitz" — §9.3.)
 
 **Die Ausrüstungskategorien folgen der Rahmenfarbe** (`[DE S.8]`): `Nachschub`
 blau (= Tante Emma Ausrüstung), `Startausrüstung` grau, gelb = **Besondere

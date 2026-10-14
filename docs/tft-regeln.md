@@ -20,9 +20,12 @@ nicht mehr öffnen müssen.
 > Auch die Anleitung selbst nennt sie so: „Flut ist ein Terrain aus der **Neue
 > Nachbarn**-Erweiterung" `[DE S.32]`.
 >
-> **§9 und §10 (die Erweiterungen) sind NICHT abgeglichen.** Für sie liegen jetzt
-> die deutschen Anleitungen `[NN]` und `[TT]` vor; der Abgleich ist ein eigener
-> Durchgang (§13.10).
+> **Abgleich der Erweiterungen 2026-10-14.** §9 (Toller Trödel) und §10 (Neue
+> Nachbarn) sind jetzt ebenfalls geprüft — gegen die deutschen Anleitungen
+> `[TT]` (12 S.) und `[NN]` (16 S.). Begründungen und Zitate stehen in
+> `docs/regelabgleich-erweiterungen.md`. **Rangfolge:** `[FAQ]` → `[TT]`/`[NN]`
+> → `[OJ]`/`[FN]`; die zehn Punkte, in denen die englischen Hefte **alleinige**
+> Quelle bleiben, stehen in §0.
 
 ---
 
@@ -32,10 +35,10 @@ nicht mehr öffnen müssen.
 |---|---|
 | `[BR S.x]` | **Basis-Regelwerk** „Townsfolk Tussle – Rules & Results Booklet" (1st Ed., 32 S.), englisch. Kopie: `scratchpad/rules/base.pdf`, Textauszug `base.txt`. Seitenzahlen = Buchseiten = PDF-Seiten. |
 | `[EXP S.4]` | **Expansion-Demo-Regelwerk**, Seite 4 „Base Game Rule Updates" — offizielle Regel-Updates, die in die **2. Edition** einfließen. Die deutsche Frosted-Games-Ausgabe entspricht diesem Stand (siehe §1.3). Kopie: `scratchpad/rules/expansion.pdf`. |
-| `[FN S.x]` | **Foul Neighbors Rulebook** (dt. „Neue Nachbarn"), `C:\Users\benja\Downloads\Rulebook_FOULNEIGHBORS_Compressed.pdf`, englisch, 9 S. **Durch `[NN S.x]` überholt.** |
-| `[OJ S.x]` | **Odd Jobs Rulebook** (dt. „Toller Trödel"), `C:\Users\benja\Downloads\Rulebook_ODDJOBS_compressed.pdf`, englisch, 7 S. **Durch `[TT S.x]` überholt.** |
-| `[NN S.x]` | **Deutsche Anleitung „Neue Nachbarn"** (Frosted Games, 16 Seiten, inkl. Schicksale 37+), `C:\Users\benja\Downloads\Townsfolk_Tussle_Ueble_Nachbarn_Anleitung.pdf`. Deutlich ausführlicher als `[FN]`. **§10 ist noch NICHT vollständig dagegen abgeglichen** (§13.10). |
-| `[TT S.x]` | **Deutsche Anleitung „Toller Trödel"** (Frosted Games, 12 Seiten), `C:\Users\benja\Downloads\Townsfolk_Tussle_Toller_Troedel_Anleitung.pdf`. Deutlich ausführlicher als `[OJ]`. **§9 ist noch NICHT vollständig dagegen abgeglichen** (§13.10). |
+| `[FN S.x]` | **Foul Neighbors Rulebook** (dt. „Neue Nachbarn"), `C:\Users\benja\Downloads\Rulebook_FOULNEIGHBORS_Compressed.pdf`, englisch, 9 S. **Nachrangig gegenüber `[NN S.x]`** — aber in den unten genannten Punkten **weiterhin alleinige Quelle**. |
+| `[OJ S.x]` | **Odd Jobs Rulebook** (dt. „Toller Trödel"), `C:\Users\benja\Downloads\Rulebook_ODDJOBS_compressed.pdf`, englisch, 7 S. **Nachrangig gegenüber `[TT S.x]`** — aber in den unten genannten Punkten **weiterhin alleinige Quelle**. |
+| `[NN S.x]` | **Deutsche Anleitung „Neue Nachbarn"** (Frosted Games, 16 Seiten, inkl. Schicksale 37+), `C:\Users\benja\Downloads\Townsfolk_Tussle_Ueble_Nachbarn_Anleitung.pdf`. **Maßgeblich für §10**; deutlich ausführlicher als `[FN]`. Abgeglichen 2026-10-14. |
+| `[TT S.x]` | **Deutsche Anleitung „Toller Trödel"** (Frosted Games, 12 Seiten), `C:\Users\benja\Downloads\Townsfolk_Tussle_Toller_Troedel_Anleitung.pdf`. **Maßgeblich für §9**; deutlich ausführlicher als `[OJ]`. Abgeglichen 2026-10-14. |
 | `[E01 hh:mm]` | Regelvideo Genus Solo S01E01 „Regeln" (Aufbau + Dorfphase, 1:20:30), YouTube `2PeqrpPXJxo`. Transkript: `scratchpad/subs/e01.txt`. |
 | `[E02 hh:mm]` | Regelvideo Genus Solo S01E02 „Regeln" (Kampfphase, 1:06:52), YouTube `jv8WfAgnPe4`. Transkript: `scratchpad/subs/e02.txt`. |
 | `[Tableau <Name>]` | Foto des Bösewicht-Tableaus. Basis + Neue Nachbarn: `Z:\Austausch\TfT\*.pdf`. Weitere 8: TTS-Mod `2999560617`, Bilder in `scratchpad/tableaus/`. |
@@ -53,6 +56,36 @@ nicht — und in drei Fällen waren sie Quelle eines echten Fehlers: „Randale"
 statt Krawall, vier verunglückte Terrainnamen und die Reihenfolge in
 Dorfphase-Schritt 4. **Die deutsche Anleitung `[DE S.x]` löst diese Quelle
 vollständig ab.** Wo Video und Anleitung sich widersprechen, gilt die Anleitung.
+
+**Rangfolge bei den Erweiterungen:** `[FAQ]` → `[TT]` / `[NN]` → `[OJ]` / `[FN]`.
+Die deutschen Hefte sind deutlich reicher und liefern alle Begriffe, Zahlen und
+etwa zwei Dutzend Regeln, die im Englischen fehlen. **Sie ersetzen die englischen
+aber nicht:** in den folgenden zehn Punkten ist `[OJ]` bzw. `[FN]` die **einzige**
+Quelle (Einzelnachweise in `docs/regelabgleich-erweiterungen.md` §6.1):
+
+1. **Frei-Feld-Definition bei Aufstellbaren** — „contains no terrain, characters,
+   **other deployables**, etc." `[OJ S.3]`; `[TT S.5]` zählt andere Aufstellbare
+   nicht mit auf, die englische Fassung ist die strengere (§9.3).
+2. **Position der Rollenbezeichnung** auf der Karte („on the left side")
+   `[OJ S.4]`; `[TT S.6]` nennt keine Position (§9.2).
+3. **Baby's Bib** — kein MUMM fürs Wegpacken während der Fähigkeit `[OJ S.6]`.
+4. **Bloody Debris** — „‚Missing HP' is your maximum HP minus your current HP"
+   `[OJ S.6]`.
+5. **Startkapital im 3-Runden-Modus** — „10 Coins (**15 Coins in 3-round mode**)"
+   `[OJ S.7]`, `[FN S.9]`; die deutschen Kurzreferenzen nennen nur 10 Münzen.
+6. **Wiederintegration der Bösewicht-Plättchen nach der Partie** — „you **may
+   return** … or keep them integrated" `[FN S.3]`; `[NN S.4]` kennt den Satz nicht
+   (§10.1).
+7. **Flut-Terrain verdrängt andere Terraineffekte** — „removing the effects over
+   other terrain on that square" `[FN S.8]` (§10.4).
+8. **Die ausdrückliche Verneinung bei Theas Pflanzen** — „DMG from an action,
+   **not a terrain piece**" `[FN S.8]`; `[NN S.15]` formuliert es nur positiv
+   (§10.4).
+9. **Die englischen Schlüsselwörter** (cast/lure in/thrash,
+   dunk/force-feed/sharpen cleaver, sulk/spritz/shock, embody) `[FN S.4]` — für
+   die Zuordnung zu Tableau- und TTS-Daten unverzichtbar (§10.4).
+10. **Die englischen Fluch- und Bösewichtnamen der Trophäenwand** `[FN S.7-8]` —
+    die Namensbrücke deutsch/englisch (§10.3).
 
 **Unsicherheiten** sind mit `⚠️ UNSICHER` gekennzeichnet. §13 sammelt sie.
 
@@ -104,11 +137,46 @@ Definitionsglossar `[DE S.35]`; die Cheatsheet-Karte bestätigt sie `[CS-DE]`,
 | **besiegt** (LEB auf 0 oder weniger) | — | defeated |
 | „Deinen Mumm zusammenraffen" | — | „Muster your Moxie" (Neuwurf) |
 | Hindernis-Terrain / Gebiet-Terrain | — | obstacle / feature |
-| Überfall | — | Ambush (nur Neue Nachbarn) |
-| Fluch | — | Curse (nur Neue Nachbarn) |
 | Münzen **abwerfen** (= zurück in den Vorrat) | — | discard coins |
 | Münzen **zahlen** (mit Folgetext) | — | pay coins |
-| Rolle / Aufstellbares | — | Role / Deployable (nur Toller Trödel) |
+
+**Begriffe der Erweiterungen** — die deutschen Namen stehen in `[TT]` und
+`[NN]`; was in diesen Unterlagen früher englisch oder selbst übersetzt stand, ist
+am 2026-10-14 nachgezogen worden (§9, §10):
+
+| Deutsch | Englisch | Quelle |
+|---|---|---|
+| *— nur Neue Nachbarn —* | | |
+| Überfall-Effekt / Überfall-Karte | Ambush | `[NN S.5]` |
+| Register **„Flüche – Gesperrt"** / **„Flüche – Freigeschaltet"** | Curses – Locked / Unlocked | `[NN S.4]` |
+| Krummbiegel (der Fluchhändler) | Barnaby | `[NN S.14]` |
+| Fluch der matschigen Haut (der Startfluch) | Curse of the Bruised Peel | `[NN S.5]` |
+| **Glaube** (Marker) | Belief | `[NN S.6]` |
+| **Kubus** (Besondere Ausrüstung) / **bekehrt** (Zustand) | Strange Cube / converted | `[NN S.6]` |
+| Wasser-Plättchen / Flut-Terrain | water token / Flood terrain | `[NN S.5-6]` |
+| Krankheits-Plättchen | disease token | `[NN S.7]` |
+| **Kostüm-Fetzen** / Tableau **„Fleckchens Kostüm"** | costume pieces / costume mat | `[NN S.6]` |
+| **Verkörpern** | embody | `[NN S.7]` |
+| Köderstulle (zählt **nie** als Figur) | Bait Sandwich | `[NN S.6]` |
+| Neblingen / Sturzbrunn (Nachbardörfer) | Misty Bluff / Sprinkle Falls | `[NN S.3]` |
+| *— nur Toller Trödel —* | | |
+| Rolle / Rollenkarte | Role | `[TT S.6]` |
+| **Aufstellbare Ausrüstung** (+ Plättchen) | Deployable | `[TT S.5]` |
+| **Laden-Ereignis** (Merkmal) | Cart Event Gear | `[TT S.5]` |
+| **Fummelei / Bastelei / Buddelei** (Merkmale) | Key / Repair / Dig | `[TT S.9]` |
+| „**Beende deinen Zug**" (Auslösezeitpunkt) | End your turn | `[TT S.5]` |
+| **Tante Emmas Notizbuch** | Peddler's Journal | `[TT S.8]` |
+| **Operation** → 3 **Beutezüge** → **Vorbereitung** → **Aufgaben** | expedition → locations → preparation → tasks | `[TT S.8]` |
+| **Aufkleber** / **Notiz XX** | sticker / Journal XX | `[TT S.8-9]` |
+| Register **„Tante Emma Ausrüstung (TT)"** / **„Gesperrte Ausrüstung (TT)"** / **„Müll (TT)"** | Peddler Gear / Locked / Trash (Odd Jobs) | `[TT S.4, S.9]` |
+
+*Zwei Inkonsistenzen der Hefte selbst:* `[TT S.12]` schreibt in der
+Kurzreferenz „**Sticker**" statt Aufkleber, `[TT S.10]` „Gesperrt (TT)" statt
+„Gesperrte Ausrüstung (TT)".
+
+**„Einzigartige Ausrüstung" ist kein Regelbegriff.** Der feststehende Begriff ist
+**Besondere Ausrüstung** — Komponentenliste `[TT S.2]` („4x Besondere
+Ausrüstung"), `[NN S.2]` („33x Besondere Ausrüstung"), Regeltext `[TT S.7]`.
 
 Die Bösewicht-Aktionskarte hat **fünf** Abschnitte: **Name** → **Umschreibung**
 (Flavourtext) → **Das Ziel** → **Krawall** → **Nachspiel** `[DE S.16]`. Der
@@ -532,9 +600,16 @@ zu verschiedensten Zeitpunkten im Kampf ausgelöst werden." `[DE S.17]`
 
 **Der Kampf beginnt mit dem Zug des Bösewichts** `[DE S.13]`.
 
-**Zusätzlich bei Neue Nachbarn:** Überfall-Karte(n) lesen und neben das
-Kampfbrett legen (§10.2) — eine Erweiterungsregel, die die deutsche Anleitung
-nicht kennt.
+**Zusätzlich bei Neue Nachbarn — ein echter Aufbauschritt, kein Hinlegen:** den
+**Überfall-Effekt** vom Bösewicht-Tableau (unterhalb BEW/LEB) **sofort
+ausführen**; dadurch kommen 1 oder mehr **Überfall-Karten** ins Spiel, die aus
+den Bösewicht-Aktionen herausgesucht und **offen in die Nähe des Zusatz-Bretts**
+gelegt werden. Sie enthalten **meist weitere Aufbauschritte und / oder
+Sonderregeln** — die müssen vor dem ersten Zug abgearbeitet sein `[NN S.5]`,
+`[NN S.16]`. Die Kurzreferenz setzt den Schritt zwischen Schritt 4 und 5 („Legt
+das entsprechende Bösewicht-Tableau und die zugehörigen Bösewicht-Aktionen auf
+das Zusatz-Brett. → Legt entsprechende Überfall-Karte(n) offen aus.")
+`[NN S.16]`. Siehe §10.2. Die Grundspielanleitung kennt diesen Schritt nicht.
 
 ### 5.2 Stufen-Fähigkeit des Bösewichts
 
@@ -650,6 +725,9 @@ Bösewichts, keine Regel des Basisspiels oder einer Erweiterung.** Beleg:
   - **MVMT:** „Equal to the highest MVMT among townsfolk at start of fight, **plus 1**."
   - **HEALTH:** „Equal to HP total of all townsfolk combined at start of fight, **plus 3**."
   - **AMBUSH:** „Begin the fight with the ‚Maskless' and ‚Mask Straps' action cards in play."
+    (dt. **Maskenlos** und **Die Gurte der Maske** `[NN S.7]`, `[NN S.15]`. Die
+    englische Formulierung „in play" ist genau die, die §10.2 richtigstellt: der
+    Überfall ist ein **auszuführender Aufbauschritt**, kein Zustand.)
 - **Barry Bluff = „Viktor Visage"**, der Bösewicht aus dem Regelvideo. Belegt
   dreifach: (a) das deutsche Aktionsdeck `FN_Action_deck_NormalPrint_FRONT_DE`
   enthält 13 Karten mit der Fußzeile **„VIKTOR VISAGE"**; (b) Barry Bluffs
@@ -680,9 +758,12 @@ Zwei weitere, ähnlich gelagerte Sonderfälle existieren:
   LEB 13/17/20/23), ihre Begleiter („The Company") beginnen laut Tableautext mit
   „**3 HP per townsfolk**" und sind das eigentliche Angriffsziel
   („Defeat The Company! Be sure not to let Ms. Falls die") `[Tableau Ms. Falls & Co.]`.
-- **Patches:** hat mit LEB 1/2/2/3 absurd wenige Lebenspunkte — der Kampf läuft
-  stattdessen über seine **Kostümteile** und die Überfallkarte „9 lives"
-  `[Tableau Patches]`, `[FN S.7]`.
+- **Patches / Fleckchen:** hat mit LEB 1/2/2/3 absurd wenige Lebenspunkte — der
+  Kampf läuft stattdessen über seine **Kostüm-Fetzen** (9 Stück, `[NN S.2]`,
+  `[NN S.6]`) und die Überfallkarte „9 lives" `[Tableau Patches]`, `[FN S.7]`
+  (deutscher Kartenname in `[NN]` nicht genannt). Dazu die Aktion
+  **Katerstimmung**, die sein **Max LEB** erhöht, ohne sein LEB mitzuheben
+  `[NN S.15]` (§10.4).
 
 ### 5.5 Bösewichtstatistik (alle 20)
 
@@ -710,14 +791,24 @@ Quelle jeweils das Tableau. Deutsche Namen aus den deutschen Aktionsdecks.
 
 | Bösewicht (EN) | Deutsch | BEW | LEB | Überfall |
 |---|---|---|---|---|
-| Barry Bluff | Viktor Visage | **höchste Dörfler-BEW +1** | **Summe aller Dörfler-LEB +3** | „Maskless" + „Mask Straps" |
-| Ernie Offal | Arnold Schmatz | 5/5/5/5 | 12/18/21/24 | „Prepare the Main Course" |
-| Red Atrocious | Dr. Bosskop | 5/6/8/8 | 13/17/20/24 | „Plaguebearer" |
-| Tilda Fields | Thea Kotta | 2/3/3/4 | 10/15/20/24 | „Living Garden" |
-| Tartar Fishboy | Fritze Fischkopp | 9/9/9/9 | 13/17/20/23 | „Angry Angler" |
-| The Door Knockers | Die weissen Herren | 5/5/6/7 | 10/15/18/21 | „One of Us" |
-| Ms. Falls & Co. | Rosa Voir & die WG | 4/4/5/5 | 13/17/20/23 (die „Company" beginnt mit **3 LEB je Dörfler** und ist das eigentliche Angriffsziel) | „Shocking Guests" |
-| Patches | Fleckchen | 7/8/8/9 | 1/2/2/3 (Kostümteile ersetzen LEB) | „9 lives" |
+| Barry Bluff | Viktor Visage | **höchste Dörfler-BEW +1** | **Summe aller Dörfler-LEB +3** | **Maskenlos** + **Die Gurte der Maske** |
+| Ernie Offal | Arnold Schmatz | 5/5/5/5 | 12/18/21/24 | **Hauptgericht** |
+| Red Atrocious | Dr. Bosskop | 5/6/8/8 | 13/17/20/24 | **Pestdoktor** |
+| Tilda Fields | Thea Kotta | 2/3/3/4 | 10/15/20/24 | ⚠️ dt. Name unbelegt (en. „Living Garden") |
+| Tartar Fishboy | Fritze Fischkopp | 9/9/9/9 | 13/17/20/23 | **Fischer Fritze fischt** ⚠️ |
+| The Door Knockers | Die weißen Herren | 5/5/6/7 | 10/15/18/21 | ⚠️ dt. Name unbelegt (en. „One of Us") |
+| Ms. Falls & Co. | Rosa Voir & die WG | 4/4/5/5 | 13/17/20/23 (die „Company" beginnt mit **3 LEB je Dörfler** und ist das eigentliche Angriffsziel) | **WG-Terror** |
+| Patches | Fleckchen | 7/8/8/9 | 1/2/2/3 (Kostüm-Fetzen ersetzen LEB) | ⚠️ dt. Name unbelegt (en. „9 lives") |
+
+**Die Überfall-Kartennamen auf Deutsch** stammen aus `[NN S.6-7]` und
+`[NN S.15]`. Für **Thea Kotta**, **Die weißen Herren** und **Fleckchen** nennt
+die deutsche Anleitung **keinen** Namen — dort stehen weiterhin die vom Tableau
+abgelesenen englischen (`[Tableau …]`), ungeprüft.
+`⚠️ UNSICHER:` Bei **Fritze Fischkopp** widersprechen sich die Quellen —
+`[NN S.6]` nennt die Überfall-Karte **„Fischer Fritze fischt"**, vom Tableau war
+„Angry Angler" abgelesen. Entweder ein zweiter Kartenname oder ein Lesefehler;
+hier nicht entscheidbar. (Für Rosa Voir stand bei uns „Shocking Guests" — belegt
+ist **„WG-Terror"** `[NN S.7]`.)
 
 `✅ BELEGT:` Die Zuordnung *Deputy Waggums = Willi Wedler* und
 *Handsy = Truthand* war lange nur aus der Bedeutung erschlossen (wag → wedeln;
@@ -732,9 +823,8 @@ SCHWANZ" (= *Distracting Tail* ★ auf Deputy Waggums' Tableau) trägt
 **Die acht Namenszuordnungen der Erweiterung sind jetzt direkt belegt** —
 `[NN S.15]` nennt alle acht deutschen Bösewichtnamen: Arnold Schmatz, **Viktor
 Visage**, Die wei**ß**en Herren, Fleckchen, Thea Kotta, Fritze Fischkopp,
-Dr. Bosskop, Rosa Voir & die WG. Dazu zwei Überfall-Kartennamen auf Deutsch:
-Dr. Bosskops **„Pestdoktor"** (= *Plaguebearer*) und Viktors **„Die Gurte der
-Maske"** (= *Mask Straps*).
+Dr. Bosskop, Rosa Voir & die WG. Die **Trophäenwand** `[NN S.12-13]` bestätigt
+sie noch einmal zusammen mit allen zwölf Grundspielnamen.
 
 **⚠️ Druckfehler auf Jupp Karres Tableau — betrifft genau die Solospalte**
 `[FAQ S.2]`:
@@ -997,7 +1087,8 @@ tun, sofern du dafür genug BEW, MUMM, Münzen … hast" `[DE S.20]`:
 | **Dörfler-Fähigkeit aktivieren** | meist MUMM; **jede max. 1× pro Zug**, MUMM-Fähigkeiten **nur im eigenen Zug** |
 | **Ausrüstung auswechseln** | **2 MUMM pro Slot** (Ausnahme: beide Hände zusammen) |
 | **Mumm zusammenraffen (Neuwurf)** | **2 MUMM**, max. 1× pro Angriffs-/Terrainwurf |
-| **Aufstellbares platzieren** (Toller Trödel) | keine Kosten, auf ein leeres angrenzendes Feld |
+| **Aufstellbare Ausrüstung platzieren** (Toller Trödel) | **kostenlos**, auf 1 angrenzendes **freies** Feld; **nur der Besitzer** darf platzieren, max. 2 eigene gleichzeitig im Spiel `[TT S.5]` (§9.3) |
+| **„Beende deinen Zug"-Fähigkeit auslösen** (Toller Trödel) | aktiv ausgelöst, **nur 1 davon pro Zug**, und zwar **am Zugende** `[TT S.5]` (siehe unten) |
 
 **Bewegung** `[DE S.20]`, `[E02 15:56]`:
 
@@ -1090,7 +1181,7 @@ tun, sofern du dafür genug BEW, MUMM, Münzen … hast" `[DE S.20]`:
 - **Mehrere Fähigkeiten auf einer Karte:** „Es gibt auch Ausrüstung mit mehreren
   Fähigkeiten: Dann darfst du **immer nur 1 Fähigkeit der Ausrüstung pro Zug**
   aktivieren." `[DE S.21]` — das ist eine **Grundregel des Basisspiels**, nicht
-  nur eine Odd-Jobs-FAQ.
+  nur eine Erweiterungs-FAQ (`[TT S.10]` wiederholt sie).
 - **Fähigkeiten können automatisch auslösen:** „Manche Fähigkeiten kannst du auch
   nur in bestimmten Phasen aktivieren oder sie werden **automatisch aktiviert**,
   wenn etwas Bestimmtes passiert." `[DE S.21]`
@@ -1113,6 +1204,36 @@ tun, sofern du dafür genug BEW, MUMM, Münzen … hast" `[DE S.20]`:
   MUMM kosten, darfst du **nur während deines Zuges** aktivieren – jedoch **jede
   nur maximal 1x pro Zug**." `[DE S.20]`
 
+**„1× pro Kampf" und „1× pro Runde" — wann der Effekt liegen darf.** Diese
+Zeitpunktregel steht **wortgleich in beiden Erweiterungsanleitungen**
+`[TT S.10]`, `[NN S.15]` und ist damit keine Erweiterungssonderregel, sondern die
+Auslegung einer Grundspielformulierung:
+
+> „Gilt ein Effekt „1x pro Kampf", kann dieser **nicht (nur) aktiv im eigenen
+> Zug** ausgelöst werden, sondern kann – je nach Effekt-Text – **auch zu anderen
+> Zeitpunkten** ausgelöst werden. Effekte, die „1x pro Kampf" (**MIT weiteren
+> Kosten**, zum Beispiel „1 MUMM", „Snacken" oder „Abwerfen") ausgelöst werden,
+> können **nur in deinem Zug** ausgelöst werden." `[TT S.10]`
+
+`[NN S.15]` ergänzt: „**Gilt auch für ‚1x pro Runde'.**"
+
+Entscheidend am Tisch: ein „1× pro Kampf"-Effekt **ohne** weitere Kosten ist auch
+als **Reaktion im Bösewicht-Zug** nutzbar; **mit** weiteren Kosten nur im eigenen
+Zug.
+
+**„Beende deinen Zug" (Toller Trödel)** ist ein **eigener Auslösezeitpunkt mit
+eigener Obergrenze** `[TT S.5]`:
+
+> „Manch Ausrüstung – vor allem die vom Tüftler! – haben Fähigkeiten die du
+> auslösen kannst, indem du **deinen Zug beendest**. Aber Achtung: Diese
+> Fähigkeiten löst du **aktiv** aus und kannst somit **immer nur 1 dieser
+> Fähigkeiten pro Zug** auslösen – und zwar wann? Genau, **am Ende**!"
+
+Und `[TT S.10]`: „Diese Anweisung ist **aktiv** und hast du mehrere dieser Karten,
+gilt das Beenden des Zuges **nicht für alle gleichzeitig**." Die Grenze ist also
+**1 pro Zug insgesamt**, unabhängig von der Regel „jede Ausrüstung max. 1× pro
+Zug".
+
 **„Tappen" (Quer legen)** — *Tischkonvention, keine gedruckte Regel*:
 Ausrüstung, deren Fähigkeit „einmal pro Kampf" gilt, wird nach Gebrauch **um 90°
 gedreht**, damit man sie nicht erneut nutzt. Zum nächsten Kampf wird alles wieder
@@ -1120,7 +1241,8 @@ gerade gelegt `[E02 27:29]`. Regeltechnisch gilt schlicht: **jede Fähigkeit max
 1× pro Zug, sofern nicht anders angegeben** `[DE S.21]`; steht „einmal pro Kampf"
 auf der Karte, gilt das. **Achtung:** viele Snack-Karten des Basisspiels sagen
 stattdessen **abwerfen** — die sind dann endgültig weg `[E02 27:41]`
-(Odd-Jobs-Snacks dagegen nicht, §9.4).
+(Toller-Trödel-Snacks werden dagegen **nicht** abgeworfen; ihre
+Nutzungsbegrenzung steht auf der Karte, §9.4).
 
 **Terrain-Interaktion** `[DE S.14]`, `[DE S.20]`, `[E02 17:15]`:
 
@@ -1325,7 +1447,7 @@ Anleitung nicht vor.
   Beginn der nächsten Dorfphase alle auf volle LEB geheilt") steht so **nicht** in
   der Anleitung; „solange es noch mindestens 1 unbesiegten Dörfler im Kampf gibt"
   `[DE S.22]` ist die Bedingung dafür, dass es überhaupt **weitergeht**, nicht für
-  die Heilung. (Ausnahme: der Fluch „Curse of the Bruised Peel", §10.3 — dort ist
+  die Heilung. (Ausnahme: der **Fluch der matschigen Haut**, §10.3 — dort ist
   der **Reset-Schritt** zu überschreiben, nicht ein separater Heilungsschritt.)
 - **Wertesenkungen** werden am Ende des Kampfes aufgehoben: „Am Ende des Kampfes
   werden **alle** Wertveränderungen (außer dauerhaften Wertveränderungen) wieder
@@ -1510,233 +1632,661 @@ getötet, verlieren die Dörfler.
   und Fischstäbchen"). Sie sind hier **nicht abgeschrieben** — sechs Seiten
   Erzähltext plus Freischaltlisten gehören in die Partieende-Auswertung, nicht in
   eine Tischreferenz. Nachlesen in der Anleitung.
+- **Die Schicksale 37–60 stehen in der Erweiterungsanleitung** `[NN S.8–11]`:
+  „Diese Seiten enthalten die Schicksale eurer Partien, wenn ihr es bis zu einem
+  **Neue Nachbarn-Endgegner** geschafft habt (**die Einträge 1-36 findet ihr in
+  der Anleitung des Grundspiels**). Lest immer nur den Eintrag, der zu eurem
+  Schicksal gehört!" Das bestätigt die Rechnung unabhängig: 12
+  Grundspiel-Bösewichte × 3 Ausgänge = 36, 8 NN-Bösewichte × 3 = 24.
+  Die dort freigeschaltete Ausrüstung ist die **Faltschachtel mit 16 Karten**,
+  siehe §10.6.
 
 ---
 
 ## 9. Erweiterung „Toller Trödel" (Odd Jobs) — Erstpartie
 
-`[OJ S.4-10]`. Alle Komponenten tragen **`OJ`** oben links. Voll kombinierbar mit
-Neue Nachbarn `[OJ S.4]`.
+> **Abgeglichen 2026-10-14** gegen die deutsche Anleitung `[TT]` (12 S.). Die
+> Begründungen und wörtlichen Zitate stehen in
+> `docs/regelabgleich-erweiterungen.md`. **`[TT]` ist ab jetzt die maßgebliche
+> Quelle**; `[OJ]` bleibt für die Punkte in §0 zitierbar. Die FAQ sagt zu dieser
+> Erweiterung **nichts** (0 Treffer für „Toller Trödel", „Rolle",
+> „Aufstellbar", „Notizbuch", „Fummelei", „Bastelei", „Buddelei").
+
+„Karten der Toller Trödel-Erweiterung erkennt ihr immer schnell an dem **‚TT' in
+der linken oberen Ecke**" `[TT S.4]` (die englische Ausgabe `OJ`). Voll
+kombinierbar mit Neue Nachbarn: „die beiden Erweiterungen sind komplett
+kompatibel" `[TT S.4]`.
 
 ### 9.1 Der Laden
 
-- **Das Basis-Nachschubdeck wird komplett ersetzt.** Die Basis-Ausrüstung (blauer
-  Rand) kommt in die Schachtel `[OJ S.4]`, `[E01 26:51]`.
-- **In der ersten Partie sind nur die Karten Nr. 1–30 kaufbar** (Register
-  „Peddler Gear (Odd Jobs)"). Der ganze Rest liegt **ungemischt** hinter dem
-  Register **„Locked (Odd Jobs)"** `[OJ S.4]`.
-- Wer über Endkampf-Sonderziele bereits Nachschub-Ausrüstung freigeschaltet hat,
-  darf sie in das Odd-Jobs-Deck einsortieren `[OJ S.4]`.
-- Ansonsten gelten die normalen Ladenregeln (10 Karten Auslage, sofortiges
-  Nachfüllen, Reset für 2 Münzen pro Dörfler).
+- **Das Nachschubdeck des Grundspiels wird komplett ersetzt:** „Ihr verwendet bei
+  einer Partie mit dieser Erweiterung **nicht** die Ausrüstungen des Grundspiels,
+  sondern immer **ausschließlich** die Karten hinter dem Trenner **Tante Emma
+  Ausrüstung (TT)** – und **nur diese**!" `[TT S.4]`
+  `⚠️ NUR VIDEO:` Dass die ersetzte Grundspiel-Ausrüstung am **blauen Rand** zu
+  erkennen ist und „in die Schachtel" kommt, steht in **keinem** Heft — nur
+  `[E01 26:51]`. Die Regel selbst ist belegt, die Begründung über die Randfarbe
+  nicht.
+- **Vor der ersten Partie einsortieren:** „Legt die Karten mit den Zahlen **1–30**
+  hinter den Trenner **Tante Emma Ausrüstung (TT)** und die übrigen – **ohne sie zu
+  mischen!** – hinter den Trenner **Gesperrte Ausrüstung (TT)**" `[TT S.4]`. In der
+  Erstpartie umfasst der Nachschub „nur läppische **30** Ausrüstungen" `[TT S.5]`.
+  (Die Register heißen so — nicht „Peddler Gear (Odd Jobs)" / „Locked (Odd
+  Jobs)". Der Müll-Trenner heißt **„Müll (TT)"** `[TT S.9]`; `[TT S.10]` schreibt
+  einmal „Gesperrt (TT)" statt „Gesperrte Ausrüstung (TT)" — die Anleitung ist
+  selbst inkonsistent.)
+- **Die Zahl steht oben rechts** und ist der Schlüssel für alles Weitere: „Oben
+  rechts findet ihr immer die Zahl einer Ausrüstung. Super praktisch beim
+  freischalten und entsorgen!" `[TT S.9]`
+- **Die Ausnahme reicht über das Grundspiel hinaus:** „**Ausnahme:** Durch
+  Spezialaufgaben in Endgegner-Kämpfen freigeschaltete Tante Emma Ausrüstung **des
+  Grundspiels sowie anderer Erweiterungen** lässt sich auch mit der Toller
+  Trödel-Tante Emma Ausrüstung kombinieren! Mischt sie also gerne einfach dazu."
+  `[TT S.4]` — betrifft also auch die 16 Karten aus Neue Nachbarn (§10.6).
+- **Zur Ladenmechanik schweigt `[TT]`.** Es regelt nur die **Zusammensetzung** des
+  Nachschubdecks. **§4 Schritt 3 gilt unverändert** `[DE S.12]`: 10 Karten Auslage,
+  sofortiges Nachfüllen, Erneuern für 2 Münzen pro Dörfler. (Die frühere
+  Formulierung „Ansonsten gelten die normalen Ladenregeln" suggerierte, die
+  TT-Anleitung bestätige die Übernahme — sie sagt dazu nichts.)
+- **Beim Spielaufbau** liegen „die neuen – und ganz schön großen – **Rollenkarten**
+  neben den Toller Trödel-Nachschub" `[TT S.4]`.
 
-### 9.2 Rollen (Roles)
+### 9.2 Rollen
 
-`[OJ S.6]`
+`[TT S.6-7]`
 
-- Die meisten Odd-Jobs-Ausrüstungen tragen am **linken Rand** eine oder mehrere
-  **Rollenbezeichnungen**.
-- **Sobald ein Dörfler die dritte Ausrüstung derselben Rolle besitzt, erhält er
-  deren Rollenkarte.** **Besitzen genügt — nicht anlegen.**
-- **Jeder Dörfler kann nur eine Rolle gleichzeitig haben.**
-- **First come, first served:** Hat ein Dörfler eine Rolle, kann kein anderer sie
-  bekommen.
-- Würde jemand zwei Rollen gleichzeitig erhalten, wählt er eine.
-- **Rollenwechsel:** Erhält ein Dörfler die dritte (oder weitere) Ausrüstung einer
-  **anderen** Rolle, darf er diese Rollenkarte nehmen und die alte abgeben.
-- **Eine Rolle geht sonst nicht verloren** — auch nicht, wenn man die zugehörige
-  Ausrüstung verkauft oder abwirft.
-- Rollenfähigkeiten sind **passiv**, **aktivierbar** (dann max. 1× pro Zug) oder
-  **verschaffen einzigartige Ausrüstung**.
+- **Höchstens zwei Rollen pro Karte:** „auf der meisten Toller
+  Trödel-Ausrüstung findet ihr **eine oder zwei** Rollen" `[TT S.6]`. Für die
+  Engine: das Rollenfeld einer Karte hat **maximal zwei** Einträge.
+  Dass die Rollenbezeichnung **am linken Rand** steht, sagt nur `[OJ S.4]` („on
+  the left side of the card"); `[TT S.6]` nennt **keine Position**.
+- **Besitzen genügt:** „Sobald du mindestens **3 Ausrüstung einer Rolle** besitzt
+  (**egal ob angelegt oder nicht**), nimmst du die zu dieser Ausrüstung passende
+  Rolle an." `[TT S.6]` Man sucht sie „aus dem Stapel heraus".
+- **Immer nur 1 Rolle, wer zuerst kommt:** „Sobald du eine Rolle annimmst, ist
+  diese **für alle anderen nicht mehr verfügbar**. Falls du genug Ausrüstung in
+  deinem Besitz hast, um zwei oder mehr Rollen anzunehmen, **musst du dich für 1
+  dieser Rollen entscheiden**." `[TT S.6]`
+- **Rollenwechsel ist der einzige Verlustweg — und gibt die Rolle wieder frei:**
+  „Sobald du **drei oder mehr** Ausrüstungen einer **anderen** Rolle im Besitz
+  hast, darfst du dich entscheiden, diese neue Rollenkarte annehmen oder die
+  aktuelle Rolle zu behalten. **Dies ist die einzige Möglichkeit, eine Rolle zu
+  verlieren**, nachdem du sie angenommen hast." `[TT S.6]` Und: „Wenn du eine Rolle
+  abwirfst, lege sie **zurück auf den Stapel mit den verfügbaren Rollen**."
+  `[TT S.6]` → **Die abgegebene Rolle steht wieder allen offen**, ein Mitspieler
+  kann sie übernehmen.
+- **Ausrüstung verlieren kostet die Rolle nicht:** „Selbst wenn du Ausrüstung
+  abwirfst oder verkaufst und so weniger als 3 Ausrüstungen deiner Rolle besitzt,
+  **bleibt die Rolle bei dir**, bis du eine neue Rolle annimmst." `[TT S.6]`
+- **Drei Arten von Rollenfähigkeiten:** „Eine Rolle kann euch **passive
+  Fähigkeiten, aktivierbare Fähigkeiten sowie Besondere Ausrüstung** geben. Passive
+  Fähigkeiten … sind immer aktiv. Aktivierbare Fähigkeiten … darfst du **nur 1x pro
+  eigenem Zug** nutzen." `[TT S.7]`
+  Zwei Korrekturen gegenüber früher: es heißt **Besondere Ausrüstung** (der
+  feststehende Begriff, §1.1 — „einzigartige Ausrüstung" kommt in keiner deutschen
+  Anleitung vor), und die Grenze ist **1× pro eigenem Zug**, also **nicht** im Zug
+  eines anderen Dörflers.
+- **Rollensynergie ist Absicht:** „Rollen funktionieren meist gut mit der
+  Ausrüstung, durch die du sie angenommen hast. **Der Tüftler** zum Beispiel kann
+  Marker von Ausrüstung entfernen, um damit coole neue Ausrüstung herstellen."
+  `[TT S.7]`
 
-### 9.3 Aufstellbares (Deployables)
+**Die deutschen Rollennamen** (bisher nirgends belegt) und die Hinweise dazu
+`[TT S.7]`, `[TT S.10]`:
 
-`[OJ S.5]`
+| Rolle (dt.) | engl. | Regelhinweis `[TT S.10]` |
+|---|---|---|
+| **Tüftler** | Tinkerer | Fähigkeiten über **„Beende deinen Zug"** (§6.3); „hast du mehrere dieser Karten, gilt das Beenden des Zuges **nicht für alle gleichzeitig**". Viel Tüftler-Ausrüstung hat 2 Fähigkeiten — trotzdem nur 1 pro Zug. |
+| **Müllkipper** | Trashlord | „Münzen, die du für die Fähigkeit auf deiner Rolle abwirfst, legst du **in den Vorrat**. Sie gehen **nicht** an den Dörfler, der die Ausrüstung verkauft oder abwirft." |
+| **Die Kolonie** | Colony | „Du bist Die Kolonie und wurdest besiegt? Dann **giltst du für diesen Kampf nicht mehr als Dörfler** (außer fürs **Rammen**). Wenn alle anderen Dörfler besiegt sind, **verliert ihr also trotzdem**." |
+| **Maskottchen** | Mascot | hat meistens 2 Fähigkeiten — „jede Ausrüstung nur 1x pro Zug … (es sei denn, es steht anders da)". |
+| **Koch** | Cook | „**Jedes Mal**, wenn du etwas snackst, darf **1 anderer** Dörfler ebenfalls den (**gesamten**) dadurch ausgelösten Effekt ausführen. Dieser führt den Effekt aber **erst zu Beginn seines Zuges** aus. ‚1x pro Kampf' wird dabei natürlich **ignoriert**." (Der Zeitpunkt steht **nur** deutsch; `[OJ S.6]` nennt ihn nicht.) |
+| **Schnüffler** | Detective | „Die meiste Schnüffler-Ausrüstung dreht sich um **Bösewicht-Aktionen**. Denk dran, dass die Bösewicht-Aktionen **neu gemischt** werden, sobald der **Ziehstapel leer** ist." |
+| **Ungezähmte** | *(in `[OJ]` nicht vorhanden)* | „Nutzt du eine Fähigkeit mit den Kosten ‚**Füge dir 1 AUA zu**', darfst du ihren Effekt auch dann nutzen, wenn du dieses AUA **verhinderst oder auf 0 reduzierst**." |
+| **Rotzgöre** | Instigator | Beispiel für eine **passive** Rolle `[TT S.7]`. |
 
-- **Kann nicht angelegt werden.** Zu jeder Aufstellbar-Karte gehört ein **Token**.
-- **Im Kampf, im eigenen Zug:** Token auf ein **leeres angrenzendes Feld** legen
-  (leer = kein Terrain, keine Figur, kein anderes Aufstellbares).
-- Einmal platziert, kommt es **bis Kampfende nicht zurück**.
-- **Max. 2 eigene Aufstellbare gleichzeitig** auf dem Schlachtfeld (Besitz selbst
-  ist unbegrenzt).
-- **Jeder Dörfler darf ein beliebiges ausliegendes Aufstellbares benutzen.**
-  Angreifen bzw. Fähigkeiten aktivieren geht nur, wenn man **auf dem Token
-  steht** — sofern die Karte nichts anderes sagt.
-- Wird der Besitzer besiegt oder vom Schlachtfeld entfernt, **bleibt** das Token liegen.
-- Wird die Karte im Kampf **abgeworfen**, wird das Token entfernt.
-- **Am Kampfende gehen alle Token an ihre Besitzer zurück.**
-- **Aufstellbare gelten nicht als Terrain** und blockieren keine Bewegung.
+Es gibt **20 Rollen** `[TT S.2]`; die übrigen 12 druckt die Anleitung
+absichtlich nicht ab.
 
-### 9.4 Weitere Odd-Jobs-Kartentypen
+### 9.3 Aufstellbare Ausrüstung
 
-- **Odd-Jobs-Snacks:** werden **nicht abgeworfen**, sondern sind **einmal pro
-  Kampf** nutzbar `[OJ S.5]`. (Unterschied zum Basisspiel, wo Snacks meist
-  endgültig weg sind, §6.3.)
-- **Karren-Ereignis-Ausrüstung (Cart Event Gear):** erscheint nur beim Einkaufen.
-  Wird sie **außerhalb des Ladens** aufgedeckt, wird sie **abgeworfen** und durch
-  die nächste Nachschubkarte ersetzt `[OJ S.5]`.
-- **Schlüssel / Reparatur / Graben (Key, Repair, Dig):** Schlagworte unter dem
-  Kartennamen. In Kombination mit bestimmter anderer Ausrüstung schalten sie über
-  das **Händler-Journal** neue Ware frei `[OJ S.9]`.
-- **Mehrere Fähigkeiten auf einer Karte:** trotzdem **nur eine pro Zug**
-  aktivierbar `[OJ S.10 FAQ]` — das ist aber keine Odd-Jobs-Sonderregel, sondern
-  eine **Grundregel** des Basisspiels `[DE S.21]`, siehe §6.3.
+`[TT S.5]`
 
-### 9.5 Was ohne das Händler-Journal gilt — **uns fehlt das Heft**
+- **Karte und Plättchen gehören zusammen:** „Wenn du Aufstellbare Ausrüstung
+  erhältst, nimm dir **immer auch das zugehörige Plättchen**. Sonst kannst du da nix
+  mit machen!" Und: „Aufstellbare Ausrüstungen lassen sich **nie anlegen**. Wir
+  empfehlen, sie **oberhalb** eurer Dörfler-Tableaus auszulegen, mit dem
+  entsprechenden Plättchen darauf."
+- **Platzieren:** „In deinem Zug kannst du das Plättchen einer deiner Aufstellbaren
+  Ausrüstungen **kostenlos** auf 1 zu dir **angrenzendes freies Feld** platzieren."
+- **Freies Feld:** „Aufstellbare Ausrüstung kannst du nur auf **freie Felder**
+  (ohne Terrain, ohne Figuren und ohne Sahnesoße!) platzieren" `[TT S.5]` — deckt
+  sich mit dem Glossar `[DE S.35]`. **`[TT]` zählt andere Aufstellbare nicht mit
+  auf, `[OJ S.3]` schon:** „contains no terrain, characters, **other deployables**,
+  etc." Die **englische, strengere** Fassung sollte gelten; ein Feld mit einem
+  anderen Aufstellbaren ist dann nicht frei. `⚠️ Nur `[OJ]``
+- **Kein Zurücknehmen, kein Umsetzen:** „Einmal platziert, kannst du das Plättchen
+  bis zum Ende des Kampfes **nicht zurücknehmen und nicht neu platzieren**." Das
+  Umplatzierungsverbot ist die eigentliche Spielbeschränkung.
+- **Besitz unbegrenzt, Auslage begrenzt:** „Du darfst **beliebig viel** Aufstellbare
+  Ausrüstung besitzen, darfst aber **nur maximal 2 davon gleichzeitig auf dem
+  Spielfeld** haben."
+- **Nur der Besitzer platziert, benutzen darf jeder:** „**Aufstellbare Ausrüstung
+  kann nur von dem Dörfler platziert werden, der sie besitzt**, kann aber – einmal
+  platziert – von **jedem** Dörfler genutzt werden."
+- **Benutzen heißt: drauf stehen — und dann gilt Als-ob-Besitz:** „Um die meinste
+  [sic] Aufstellbare Ausrüstung zu nutzen, **musst du auf ihrem Plättchen stehen**.
+  Tust du das, kannst du die Fähigkeit oder Angriffswerte (falls vorhanden) der
+  Aufstellbaren Ausrüstung nutzen, **als wäre sie in deinem Besitz**."
+  Engine-relevant: solange man auf dem Plättchen steht, zählt die Karte für Werte,
+  Rollen-Sets und alles, was auf „Besitz" abfragt.
+  Der Vorbehalt ist **konkret**: „Manche Aufstellbare Ausrüstung, wie zum Beispiel
+  diese **Prügelscheuche**, haben Effekte, **die auf andere Weise aktiviert
+  werden**." (Nicht pauschal „sofern die Karte nichts anderes sagt".)
+- **Eigene Aufstellbare nur von angrenzenden Feldern angreifbar** (nur deutsch
+  belegt, `[TT S.11]`): „Sheriff-„Piñata" / „Sheriff"-Piñata / Prügelscheuche: Diese
+  Aufstellbare Ausrüstung kannst du **nur von angrenzenden Feldern aus angreifen,
+  nicht vom Feld aus, auf dem sie platziert sind**."
+- **Besitzer weg, Plättchen bleibt:** „Wenn du vom Spielbrett entfernt wirst (zum
+  Beispiel weil du besiegt wirst), **bleibt** deine Aufstellbare Ausrüstung auf dem
+  Schlachtfeld."
+- **Karte abwerfen entfernt das Plättchen:** „Wirfst du eine Aufstellbare Ausrüstung
+  ab, entferne **sofort** das dazugehörige Plättchen vom Schlachtfeld."
+- **Am Kampfende zurück:** „Nimm am Ende des Kampfes die Plättchen deiner
+  Aufstellbaren Ausrüstung **zurück zu dir**."
+- **Nie Terrain:** „Plättchen von Aufstellbarer Ausrüstung zählen **nie als
+  Terrain** und blockieren **keine** Bewegung." Deshalb nehmen sie auch **durch
+  Wasser** keinen Schaden an ihrer Fähigkeit (§10.4, `[NN S.15]`).
 
-Das **Peddler's Journal** („Tante Emmas Notizbuch") ist ein eigenes Heft und
-**liegt uns nicht vor**. Es steuert den partieübergreifenden Fortschritt:
-Expeditionen mit je 3 Orten, **Vorbereitungen** (z. B. „Beende eine Partie mit
-der Tüftler-Rolle"), **Sticker** am Partieende (Sieg **oder** Niederlage), und
-**Journaleinträge**, die Ausrüstung **freischalten** oder **entsorgen** `[OJ S.8-9]`.
+### 9.4 Weitere Kartentypen und Merkmale
 
-**Ohne das Journal gilt für eine Erstpartie:**
+- **Toller-Trödel-Snacks — keine Deckregel, ein Kartenfeld:** „Im Grundspiel war es
+  so: Wenn ihr was snackt, ist es weg. **Bei Toller Trödel ist das nicht immer so**,
+  jedoch könnt ihr Snacks trotzdem **oft** nur 1x pro Kampf nutzen. **Steht aber
+  immer dabei!** Und das ‚Abwerfen' eben nicht mehr." `[TT S.5]`
+  → Sie werden beim Snacken **nicht abgeworfen**; eine Nutzungsbegrenzung gilt aber
+  **nicht pauschal**, sondern steht **auf der Karte**. Für die Engine: kein globaler
+  „1× pro Kampf"-Zähler für alle TT-Snacks, sondern ein Kartenfeld. (Das englische
+  Heft formuliert es fälschlich als Pauschale: „can only be used once per fight"
+  `[OJ S.3]`.)
+- **Laden-Ereignis** (engl. Cart Event Gear — „Karren-Ereignis-Ausrüstung" war eine
+  Eigenübersetzung): „**Laden-Ereignisse** sind eine neue Ausrüstungsart. Sie haben
+  das **Merkmal Laden-Ereignis** und sie drehen sich meist um Karten in Tante Emmas
+  Laden. Wenn ihr mal außerhalb von Tante Emmas Laden besuchen ein Laden-Ereignis
+  vom Nachschub zieht oder aufdeckt, **werft es einfach ab und zieht neu**."
+  `[TT S.5]` — der Bezugspunkt ist der Dorfphasen-Schritt „Tante Emmas Laden
+  besuchen" (§4 Schritt 3).
+- **Fummelei / Bastelei / Buddelei** (engl. Key / Repair / Dig): „Auf einigen
+  Ausrüstungskarten findet ihr die **Merkmale Fummelei, Bastelei und Buddelei**.
+  Diese können in Kombination mit anderen Ausrüstungen genutzt werden, um an neue
+  Ausrüstung zu gelangen, indem ihr sie **auffummelt, zusammenbastelt oder
+  ausbuddelt**." Und: „Buddelei, Bastelei und Fummelei findet ihr immer **bei den
+  Merkmalen** der Ausrüstung." `[TT S.9]`
+  Sie schalten über Tante Emmas Notizbuch neue Ware frei (§9.5).
+  `⚠️ ABGELEITET:` Die Zuordnung **Fummelei = Key** folgt aus dem identischen
+  Beispiel in beiden Heften (Bobby Pin ist ein Key `[OJ S.5]`, die Treue Haarklammer
+  hat das Merkmal Fummelei `[TT S.9]`); **Buddelei = Dig** aus der Wortbedeutung,
+  **Bastelei = Repair** nur durch Ausschluss. Keine Quelle stellt die drei Paare
+  ausdrücklich gegenüber.
+- **„Beende deinen Zug"** ist ein eigener Fähigkeitstyp mit eigener Obergrenze —
+  siehe §6.3, weil die Regel dort hingehört.
+- **Mehrere Fähigkeiten auf einer Karte:** trotzdem nur eine pro Zug — „Nein, du
+  darfst pro Zug immer nur **1 Fähigkeit pro Ausrüstung** nutzen" `[TT S.10]`. Keine
+  Sonderregel, sondern eine **Grundregel** des Grundspiels `[DE S.21]`, siehe §6.3.
+- **Einzelne Kartenhinweise** `[TT S.11]` sind Kartendaten und hier nicht
+  abgeschrieben. Zwei davon stehen **nur englisch** und sind darum notiert:
+  „You do not need to pay MOX to unequip **Baby's Bib** while using its ability"
+  und „**‚Missing HP'** is your maximum HP minus your current HP" `[OJ S.6]` — in
+  `[TT S.11]` **nicht enthalten**. Umgekehrt nur deutsch: „Springfrohe Flöhe /
+  Glücks-Egel / Pilzansammlung: Du musst den entsprechenden Wert entsprechend
+  **verringern können**, um die Fähigkeit aktivieren zu können" `[TT S.11]`, und
+  bei „Uuh, ne Bonuskarte!": „Danach geht es **in Shoppen-Reihenfolge** weiter"
+  `[TT S.11]` (`[OJ S.6]` nennt nur den Vorrang des Besitzers).
+
+### 9.5 Was ohne Tante Emmas Notizbuch gilt — **uns fehlt das Heft**
+
+**Tante Emmas Notizbuch** (engl. Peddler's Journal) ist ein eigenes Heft und
+**liegt uns nicht vor**. `[TT S.8-9]` beschreibt nur seine Struktur:
+
+**Operation → 3 Beutezüge → je 1 Vorbereitung → mehrere Aufgaben → Aufkleber →
+Notiz.** (Nicht „Expedition / Ort / Sticker / Journaleintrag".)
+
+- „Vorne im Notizheft findet ihr die von Tante Emma geplanten **Operationen**.
+  **Jede Operation besteht aus 3 Beutezügen.**" `[TT S.8]`
+- „Die Operationen dieser Kampagne werden **immer nacheinander** ausgeführt. …
+  ist erst somit nur die **Erste Operation „Nahes Holungsgebiet"** für euch
+  relevant. Sobald ihr deren 3 Beutezüge durchgeführt habt, weiht euch Tante Emma
+  in die Details der nächsten Operation ein." `[TT S.8]` (Zweiter belegter
+  Beutezugname: **„Die Saumagen-Festung ausrauben"** `[TT S.10]`.)
+- „Jeder Beutezug hat dann seine **eigene Vorbereitung**, die ihr erst abschließen
+  müsst, um den Beutezug durchzuführen. **Ihr dürft die Vorbereitungen aller 3
+  Beutezüge eurer Operation gleichzeitig und in beliebiger Reihenfolge
+  abschließen.**" `[TT S.8]`
+- „Jede **Vorbereitung** besteht aus mehren **Aufgaben**." Die zwei Zeitpunkte
+  `[TT S.8]`, `[TT S.12]`: **Zu Beginn einer Partie** „überprüft ihr immer, welche
+  Aufgaben der aktuellen Operation noch offen sind"; **am Ende einer Partie (egal
+  ob gewonnen oder verloren)** „überprüft jeder welche Aufgaben er erfüllt hat und
+  klebt dort je 1 Aufkleber auf. Bei Aufgaben mit mehreren Felder, klebt **jeder
+  der sie erfüllt** je 1 Aufkleber auf. **Eine Aufgabe ist abgeschlossen, wenn auf
+  jedem ihrer Felder 1 Aufkleber klebt.**"
+- Ist eine Vorbereitung fertig: „Lest die **Notiz** mit der entsprechenden Nummer
+  vor" `[TT S.8]`. „Die meisten Einträge führen dazu, dass Ausrüstung **entsorgt**
+  und / oder **freigeschaltet** wird." `[TT S.9]`
+- **Drei verschiedene Anweisungen, nicht eine** `[TT S.9]`:
+  - **entsorgen** → „legt diese Ausrüstung hinter den Trenner **Müll (TT)**. Sie
+    ist damit **dauerhaft** aus eurer Toller Trödel-Tante Emma Ausrüstung entfernt!"
+  - **freischalten** → „sucht die Ausrüstung mit der entsprechenden Zahl hinter dem
+    Trenner Gesperrte Ausrüstung (TT) heraus und **mischt sie direkt in euren
+    Nachschub** (es sei denn es steht anders da)."
+  - **freischalten & erhalten** → „nimmt **der Dörfler, der die Ausrüstung
+    freigeschaltet hat**, sie nach dem Heraussuchen direkt **in seinen Besitz** …
+    **Am Ende der Partie** fügt ihr sie dann eurem Stapel mit Toller Trödel-Tante
+    Emma Ausrüstung hinzu."
+- **„Selbst ist der Dörfler!"** `[TT S.9]` — der Weg an Ausrüstung **ohne** eine
+  Operation: „In dieser Erweiterung gibt es Ausrüstungen mit einem **gelben
+  Balken** um unteren Rand … Führt ihr die Anweisung darauf aus, könnt ihr damit
+  **noch innerhalb der Partie** neue Ausrüstung freischalten." (Nicht „farbiger
+  Balken", nicht „D.I.Y. Scavenging" — das sind die englischen Formulierungen
+  `[OJ S.5]`.) Die Freischaltung wirkt **mitten in der laufenden Partie**.
+
+**Ohne das Notizbuch gilt für eine Erstpartie:**
 
 | Funktioniert vollständig | Funktioniert nicht |
 |---|---|
-| Odd-Jobs-Nachschubdeck **Nr. 1–30** als Laden | Expeditionen, Orte, Vorbereitungen |
-| **Rollen** und Rollenkarten | Sticker am Partieende |
-| Odd-Jobs-Snacks, Karren-Ereignis-Ausrüstung | Journaleinträge („Lies Journal XX") |
-| | **Aufstellbare** — Regel §9.3 ist vollständig umsetzbar, die Karten sind aber **unerreichbar**: alle 24 Aufstellbar-Karten tragen die Nummern **73–161** und liegen damit im gesperrten Deck. In einer Erstpartie kann kein Aufstellbares gekauft werden (`docs/befund-beute-und-aufstellbares.md` §3.1). |
-| | **Freischalten** und **Entsorgen** von Ausrüstung |
-| Schlüssel/Reparatur/Graben **als Gegenstandstypen** | deren Auslösewirkung (verweist auf Journal-Nummern) |
+| TT-Nachschubdeck **Nr. 1–30** als Laden | Operationen, Beutezüge, Vorbereitungen, Aufgaben |
+| **Rollen** und Rollenkarten | Aufkleber am Partieende |
+| TT-Snacks, Laden-Ereignisse, „Beende deinen Zug" | **Notizen** („Lies Notiz XX") |
+| | **Aufstellbare Ausrüstung** — Regel §9.3 ist vollständig umsetzbar, die Karten sind aber **unerreichbar**: alle 24 tragen die Nummern **73–161** und liegen damit im gesperrten Deck. In einer Erstpartie kann kein Aufstellbares gekauft werden. `⚠️ ABGELEITET` aus eigener Kartenauswertung (`docs/befund-beute-und-aufstellbares.md` §3.1); `[TT S.2]` belegt nur die **Anzahl 24**, keine Nummern. |
+| | **Freischalten**, **Freischalten & Erhalten** und **Entsorgen** |
+| Fummelei / Bastelei / Buddelei **als Merkmale** | deren Auslösewirkung (verweist auf Notiz-Nummern) |
 
 **Praktische Folge:** Der Kartenpool bleibt **dauerhaft bei Nr. 1–30**; es gibt
-**keinen Fortschritt zwischen Partien** über Odd Jobs. Karten mit farbigem
-Balken am unteren Rand („D.I.Y. Scavenging") können ihre Freischaltwirkung
-**nicht** entfalten — man kann sie benutzen, aber der Verweis ins Journal läuft
-ins Leere. `⚠️ Empfehlung:` Solche Karten in der Engine als spielbar, aber mit
-wirkungslosem Journal-Verweis modellieren, statt sie zu entfernen — sonst
-verändert sich die Wahrscheinlichkeitsverteilung des Decks.
+**keinen Fortschritt zwischen Partien** über Toller Trödel. Karten mit gelbem
+Balken am unteren Rand können ihre Freischaltwirkung **nicht** entfalten — man
+kann sie benutzen, aber der Verweis in die Notiz läuft ins Leere.
+`⚠️ Empfehlung:` Solche Karten in der Engine als spielbar, aber mit wirkungslosem
+Notiz-Verweis modellieren, statt sie zu entfernen — sonst verändert sich die
+Wahrscheinlichkeitsverteilung des Decks.
+
+*Nicht aufgenommen, weil ohne das Notizbuch gegenstandslos:* die Wahl unter 3
+Aufkleberfarben und das Zurücksetzen der Kampagne `[TT S.10]`, sowie die
+Empfehlungen, die Rollenkarte über das Bild auf dem Dörfler-Tableau zu legen und
+Rollen erst beim Annehmen anzusehen `[TT S.6-7]` — Tischkosmetik.
 
 ---
 
 ## 10. Erweiterung „Neue Nachbarn" (Foul Neighbors) — Erstpartie
 
 *Hieß in diesen Unterlagen früher „Üble Nachbarn"; der Name ist am 2026-10-14 auf
-den gedruckten deutschen Titel korrigiert `[NN S.1]`. **Dieser Abschnitt ist
-NICHT gegen `[NN]` abgeglichen** (§13.10).*
+den gedruckten deutschen Titel korrigiert `[NN S.1]`.*
 
-`[FN S.4-5, 12-15]`. Alle Komponenten tragen **`FN`** oben links. Voll
-kombinierbar mit Toller Trödel `[FN S.4]`.
+> **Abgeglichen 2026-10-14** gegen die deutsche Anleitung `[NN]` (16 S.). Die
+> Begründungen und wörtlichen Zitate stehen in
+> `docs/regelabgleich-erweiterungen.md`. **`[NN]` ist ab jetzt die maßgebliche
+> Quelle**; `[FN]` bleibt für die Punkte in §0 zitierbar.
+
+Alle Komponenten tragen **`NN`** oben links `[NN S.4]` (die englische Ausgabe
+`FN`). Voll kombinierbar mit Toller Trödel: „die beiden Erweiterungen sind
+komplett kompatibel" `[NN S.4]`.
 
 ### 10.1 Aufbau (einmalig und je Partie)
 
-`[FN S.4]`
+`[NN S.4]`
 
-- **8 neue Bösewicht-Plättchen** in den Basis-Pool → insgesamt **20 Bösewichte**.
-  Nach jeder Partie darf man sie integriert lassen oder wieder trennen.
-- **2 neue Dörfler**: **Judy Marks** (dt. Frieda Paletti) und **Fridgette Jones**
-  (dt. Karla Kühl). Sie sind ganz normal wählbar.
-- **5 neue Dorf-Ereignisse** in den Dorf-Ereignis-Stapel mischen.
-- **9 Überfall-Aktionskarten** in die jeweiligen Bösewicht-Aktionsdecks —
-  **jedes Deck hat danach 15 Karten**.
-- **Patches' Kostüm-Matte NICHT ausbrechen**, bevor man gegen ihn kämpft
-  (Spoilerschutz).
-- **Flüche:** nur **„Curse of the Bruised Peel"** hinter das Register
-  **„Curses – Unlocked"**, **alle anderen** hinter **„Curses – Locked"**.
+- **8 neue Bösewicht-Plättchen**: „Legt beim Bestücken der Kampf-Plätze die 8
+  Bösewicht-Plättchen aus dieser Erweiterung zu den Bösewicht-Plättchen des
+  Grundspiels" `[NN S.4]` → insgesamt **20 Bösewichte**. Dass man sie nach der
+  Partie integriert lassen **oder** wieder trennen darf, steht nur im englischen
+  Heft `[FN S.3]`; `[NN S.4]` rahmt es als Entscheidung **beim Aufbau jeder
+  Partie**. Ergebnis dasselbe, Belegstelle bleibt `[FN S.3]`.
+- **2 neue Dörfler**: **Frieda Paletti** (engl. Judy Marks) und **Karla Kühl**
+  (engl. Fridgette Jones). **Nicht einfach „normal wählbar":** „Baut alles wie
+  gewohnt auf und **achtet auf die besondere Aufbauanweisung auf dem
+  Dörfler-Tableau von Karla Kühl**" `[NN S.4]`.
+  `⚠️ OFFEN:` Was diese Aufbauanweisung besagt, steht nur auf dem Tableau und
+  liegt nicht vor. Ihre Fähigkeiten: Frieda **„Kuss der Muse"** (schenkt anderen
+  Dörflern im Kampf **Gemälde**), Karla **„Einpacken"** (gewährt
+  **Unterschlupf**, „So seid ihr vorübergehend vor AUA geschützt") `[NN S.7]`.
+- **5 neue Dorf-Ereignisse** in den Dorf-Ereignis-Stapel mischen `[NN S.4]`.
+- **9 Überfall-Karten** „(**die mit dem coolen Blut!**) … jeweils zu den
+  Bösewicht-Aktionen des zugehörigen Bösewichts" sortieren `[NN S.4]` —
+  **jedes Deck hat danach 15 Karten** (120 Bösewicht-Aktionen / 8 Bösewichte,
+  `[NN S.2]`; so auch `[FN S.3]`).
+- **Fleckchens Kostüm NICHT ausbrechen:** „**Nehmt nicht die Kostüm-Plättchen aus
+  dem Tableau von Fleckchens Kostüm heraus.** Alle anderen Plättchen könnt ihr
+  aus den Tableaus drücken und entsprechend einsortieren" `[NN S.4]`. Die Teile
+  heißen **Kostüm-Fetzen**, es sind **9** („1 Fleckchens Kostüm **mit 9
+  Kostüm-Fetzen**" `[NN S.2]`), und sie bleiben „am besten **bis zu eurem ersten
+  Kampf gegen Fleckchen**" im Tableau `[NN S.6]`.
+- **Flüche:** „Legt alle Flüche hinter den Trenner **Flüche – Gesperrt**. Legt
+  daraufhin nur den **Fluch der matschigen Haut** hinter den Trenner **Flüche –
+  Freigeschaltet**" `[NN S.4]`. (Register heißen so — nicht „Curses –
+  Locked/Unlocked".)
+- **Wasser-/Glaube-Vorrat:** ein Satz von **70 doppelseitigen Plättchen** für
+  **beide** Marker `[NN S.2]`. Der Vorrat ist damit endlich, und das ist
+  spielrelevant (§10.4).
 
-### 10.2 Überfall (Ambush)
+### 10.2 Überfall
 
-`[FN S.5]`
+Jeder Bösewicht aus Neue Nachbarn hat einen **Überfall-Effekt**, gedruckt
+**unterhalb** der Werte für BEW und LEB auf seinem Tableau `[NN S.5]`.
 
-> Bösewichte aus Neue Nachbarn haben **neben ihren BEW-/LEB-Werten** einen
-> **Überfall-Eintrag**. Er bedeutet: der Kampf **beginnt mit der genannten
-> Aktionskarte bereits im Spiel**.
+> „Jeder neue Bösewicht hat einen Überfall-Effekt. **Ihr führt diesen immer
+> sofort beim Aufbau des Kampfes aus** und je nach Bösewicht kommen dadurch
+> **1 oder mehr Überfall-Karten** ins Spiel. Sie enthalten meist weitere
+> Aufbauschritte und / oder Sonderregeln, die speziell für den Kampf gegen
+> diesen Bösewicht gelten." `[NN S.5]`
 
-- Die Überfall-Karte ist eine **Karte aus dem regulären 15er-Aktionsdeck** dieses
-  Bösewichts.
-- Beim Kampfaufbau: **Überfall-Karte lesen** und **neben das Kampfbrett legen**.
-- Sie enthält oft **zusätzliche Aufbauregeln** und ist der Ort, an dem die
-  Schlagworte des Bösewichts erklärt werden (z. B. Tartars *cast / lure in /
-  thrash*, Ernies *dunk / force-feed / sharpen cleaver*, Barrys *embody*)
-  `[FN S.6-7]`.
-- Ein Bösewicht kann **mehrere** Überfall-Karten haben — Barry Bluff/Viktor
-  Visage hat zwei: **„Maskless"** und **„Mask Straps"** `[Tableau Barry_Bluff]`,
-  `[E01 1:16:04]`.
-- **Die Bösewichte des Basisspiels haben keinen Überfall** — der Schritt entfällt
+**Der Überfall ist ein auszuführender Aufbauschritt, kein Zustand.** Die
+frühere Formulierung („der Kampf beginnt mit der genannten Aktionskarte bereits
+im Spiel", aus `[FN S.3]`) war falsch: wer die Karte nur hinlegt und losspielt,
+überspringt die Aufbauschritte, die **auf** der Karte stehen. `[NN S.5]` warnt
+ausdrücklich: „Lest euch die Überfall-Karten **immer gut durch**, sie sind oft
+ganz schön wichtig für den Kampf!"
+
+- **Effekt und Karte sind zwei Dinge:** der Effekt steht auf dem **Tableau**, die
+  Karte(n) werden „aus den Bösewicht-Aktionen **heraus**[gesucht]" `[NN S.5]`.
+- Ablage: **offen** „in die **Nähe des Zusatz-Bretts**" `[NN S.5]`, `[NN S.16]`
+  („Legt entsprechende Überfall-Karte(n) **offen** aus.") — **nicht** auf das
+  Schlachtfeld und nicht an den Hauptplan.
+- Die Überfall-Karten sind Teil der **120 Bösewicht-Aktionen** der Erweiterung
+  (15 pro Deck) und beim Aufbau an ihrem Blutrand zu erkennen: „Nehmt die 9
+  Überfall-Karten (**die mit dem coolen Blut!**)" `[NN S.4]`.
+- Ein Bösewicht kann **mehrere** Überfall-Karten haben — Viktor Visage hat zwei:
+  **„Maskenlos"** und **„Die Gurte der Maske"** `[NN S.7]`, `[NN S.15]`.
+- Die Überfall-Karte ist der Ort, an dem die **Schlüsselwörter** des Bösewichts
+  erklärt werden: „Um ein Schlüsselwort auszuführen, befolgt die Anweisung genau
+  wie auf [der] Überfall-Karte … beschrieben" `[NN S.6]` (§10.4).
+- **Die Bösewichte des Grundspiels haben keinen Überfall** — der Schritt entfällt
   dann `[E01 1:15:41]`.
+- **Mehr NN-Zusatzschritte als diesen gibt es in der Kampf-Phase nicht.** Die
+  Kurzreferenz `[NN S.16]` markiert in der Kampf-Phase genau **einen** blauen
+  Schritt (die Überfall-Karten), in der Vorbereitung „Wählt 1 freigeschalteten
+  Fluch für eure Partie (**optional**)" und nach der Partie „Klebt pro besiegtem
+  Bösewicht 1 entsprechende Trophäe".
 
-**Nicht verwechseln:** „Überfall" ist die **dritte Zeile im Wertekasten** des
-Tableaus (unter BEW und LEB) — nicht eine zusätzliche Leiste auf dem Hauptplan.
+### 10.3 Krummbiegels Flüche — in der Erstpartie fast alle gesperrt
 
-### 10.3 Flüche (Curses) — in der Erstpartie fast alle gesperrt
+`[NN S.4-5, S.14]`
 
-`[FN S.5, S.14]`
+**Krummbiegel** (engl. Barnaby) ist „Tante Emmas größter Konkurrent und
+**Erzrivale**! … ein schurkischer Händler, der sich ganz und gar auf die
+**Beschwörung und den Verkauf** feinster und fiesester Flüche spezialisiert hat"
+`[NN S.14]`. Die Flüche der Erweiterung sind **seine**.
 
-- Flüche sind eine **optionale Schwierigkeitserhöhung**. **Am Partiebeginn darf
-  man höchstens einen freigeschalteten Fluch hinzufügen.**
-- Er wird neben den Hauptplan gelegt, und seine Wirkung ist **die ganze Partie
-  über für alle aktiv**.
-- Flüche sind in drei Schwierigkeitsstufen (1–3 Symbole) eingeteilt.
-- **In der Erstpartie ist genau EIN Fluch verfügbar: „Curse of the Bruised Peel",
-  deutsch „Der Fluch der matschigen Haut".** Belegt `[NN S.5]`: „In dieser
-  Erweiterung findet ihr insgesamt **21 Flüche**: 1 für jeden Bösewicht des
-  Grundspiels und dieser Erweiterung sowie **Krummbiegels** ganz persönlichen
-  Fluch. **Dieser ist der einzige Fluch, der schon zu Beginn freigeschaltet ist:
-  Der Fluch der matschigen Haut.**" Alle anderen liegen gesperrt.
-- **Wirkung laut Video:** Normalerweise werden alle Dörfler zwischen den Kämpfen
-  **vollständig geheilt**. Mit diesem Fluch heilt man stattdessen nur **1 LEB** —
-  bzw. **2 LEB**, wenn man besiegt wurde `[E01 36:16]`.
-  `⚠️ UNSICHER:` Der genaue Wortlaut steht auf der Fluchkarte, die uns nur als
-  deutsche Druckdatei vorliegt und die ich nicht gelesen habe. Der Fluch ist
-  ausgerechnet ein **3-Sterne-Fluch** und laut Video „für die erste Partie nicht
-  zu empfehlen" `[E01 36:33]`.
+- Flüche sind eine **optionale Schwierigkeitserhöhung**: „Viel zu einfach? Wählt
+  **1 freigeschalteten Fluch** für eure Partie (**optional**)" `[NN S.16]`.
+  Verfügbar sind nur die hinter dem Trenner **Flüche – Freigeschaltet** `[NN S.4]`.
+- Auslage: „Legt den gewählten Fluch – **sofern nicht anders vorgegeben** – für
+  die ganze Partie **für alle offen** aus" `[NN S.4]`. Der Vorbehalt gehört dazu;
+  „offen" heißt **sichtbar**. Die Aktivitätsaussage steht separat: „Ein Fluch ist
+  **immer für alle Dörfler aktiv**, also behaltet ihn während der gesamten Partie
+  im Blick und im Kopf" `[NN S.5]`.
+- Drei Schwierigkeitsgrade: „von (leicht) über (mittel) bis (schwer)" `[NN S.5]`
+  (als Symbole gedruckt, 1–3).
+- **In der Erstpartie ist genau EIN Fluch verfügbar: der „Fluch der matschigen
+  Haut".** `[NN S.5]`: „In dieser Erweiterung findet ihr insgesamt **21 Flüche**:
+  1 für jeden Bösewicht des Grundspiels und dieser Erweiterung **sowie
+  Krummbiegels ganz persönlichen Fluch**. **Dieser ist der einzige Fluch, der
+  schon zu Beginn freigeschaltet ist: Der Fluch der matschigen Haut.**"
+  → Er ist **Krummbiegels eigener** und **keinem Bösewicht zugeordnet**; über die
+  Trophäenwand kann er folglich **nicht** ein zweites Mal freigeschaltet werden.
+  (Die frühere Lesung „Curse of the Bruised **Peel** = matschige **Schale**" ist
+  erledigt: es heißt **Haut**.)
+- **Wirkung — weiterhin offen.** `⚠️ UNSICHER:` **Keine** der Anleitungen druckt
+  einen einzigen Fluchtext ab; `[NN S.14]` listet nur die 20 Namen, `[NN S.5]` nur
+  die Schwierigkeitsstufen. Die Wirkung („zwischen den Kämpfen heilt man nur
+  **1 LEB**, bzw. **2 LEB** wenn man besiegt wurde") stammt allein aus dem Video
+  `[E01 36:16]`, ebenso die Einordnung als 3-Sterne-Fluch und „für die erste
+  Partie nicht zu empfehlen" `[E01 36:33]`. `⚠️ NUR VIDEO`. Hinweis zum
+  Modellieren: der Fluch überschreibt den **Werte-Reset** aus
+  Nachbereitungsschritt 5 (§7), nicht einen separaten Heilungsschritt (§6.6).
 
-**Freischaltung weiterer Flüche — Trophäenwand** `[FN S.12-14]`:
+**Freischaltung weiterer Flüche — Trophäenwand** `[NN S.12-14]`:
 
-- **Am Ende jeder Partie** (Sieg oder Niederlage) klebt man für **jeden in dieser
-  Partie besiegten Bösewicht** eine Trophäe auf die Trophäenwand im
-  FN-Regelheft.
-- **Beim dritten Sieg über denselben Bösewicht** wird dessen **Kopf** montiert und
-  man schaltet den **diesem Bösewicht zugeordneten Fluch** dauerhaft frei.
-- Zuordnung `[FN S.14]`, u. a.: Handsy → „Sprouting Hand Disorder",
-  Barry Bluff → „Face Blindness", Ernie Offal → „Taste for Townsfolk",
-  Qing & Kween → „Gear Shortages", Umbrello → „Violent Winds",
-  Lawman Dozy → „Fight Fatigue", Penny Pinchetti → „Greed Pains",
-  Tilda Fields → „Nature's Rebellion", Red Atrocious → „Disease Carriers",
-  Patches → „Fading Lifespan", Tartar Fishboy → „Alluring Scent",
-  The Door Knockers → „Cube-Wielding Ruffians", Ms. Falls & Co. → „Storm Chasers",
-  Bort Dovis → „Wave of Tourism", Will Barlow → „Stubborn Spirits",
-  Virginia Fitz → „Overzealous Attacks", The Bundits → „Frantic Looting",
-  Samuel Strawman → „Looming Crows", Pepin Milkfrog → „Hopping Pox",
-  Deputy Waggums → „False Empathy".
+- **Am Ende jeder Partie** (Sieg oder Niederlage): „Klebt **pro besiegtem
+  Bösewicht 1** entsprechende Trophäe an eure Trophäenwand" `[NN S.16]`.
+- **Die Reihenfolge ist der Mechanismus:** „Klebt am Ende jeder Partie die
+  **nächste** Trophäe (**in numerisch aufsteigender Reihenfolge**) jedes gerade
+  besiegten Bösewichts an die Trophäenwand. **Beim 3. Sieg** über einen Bösewicht
+  klebt ihr somit dessen abgetrennten Kopf an die Wand" `[NN S.12]`. Der Kopf beim
+  dritten Sieg ist also **Folge** der Klebeordnung, keine Zusatzregel.
+- „Immer wenn der Kopf eines Bösewichts an die Trophäenwand geklebt wird, legt die
+  Fluch-Karte dieses Bösewichts … aus dem Fach **„Flüche – Gesperrt"** in das Fach
+  **„Flüche – Freigeschaltet"**. Ist ein Fluch einmal freigeschaltet, könnt ihr
+  ihn in **allen zukünftigen Partien** verwenden" `[NN S.14]`.
 - **In einer einzelnen Partie mit 4 verschiedenen Bösewichten wird also nie ein
   Fluch freigeschaltet** — man braucht drei Siege über **denselben** `[E01 38:05]`.
 
+**Die 20 Flüche mit deutschen Namen** `[NN S.14]` (englische Namen `[FN S.7]`):
+
+| Bösewicht | Fluch (dt.) | engl. |
+|---|---|---|
+| Arnold Schmatz | Appetit auf Dörfler | Taste for Townsfolk |
+| Thea Kotta | Balance der Natur | Nature's Rebellion |
+| Fleckchen | Leben und Leben lassen | Fading Lifespan |
+| Dr. Bosskop | Virenschleuder | Disease Carriers |
+| Bert Doofis | Terror-Touristen | Wave of Tourism |
+| Jupp Karre | Seelsorgen | Stubborn Spirits |
+| Nönigin & Könich | Weniger ist mehr | Gear Shortages |
+| Viktoria Spitz | Wurfwaffen-Wahnsinn | Overzealous Attacks |
+| Fritze Fischkopp | Zornaroma | Alluring Scent |
+| Die weißen Herren | Ein Kubus, sie zu knechten | Cube-Wielding Ruffians |
+| Rosa Voir & die WG | Blitz & Donner | Storm Chasers |
+| Viktor Visage | Gesichtsblind | Face Blindness |
+| Die Karnoven | Diebische Dörfler | Frantic Looting |
+| Schnarchbert | Heldenmüd | Fight Fatigue |
+| Penny Gönnzales | Geld oder Leben | Greed Pains |
+| Truthand | 1000 mal berührt | Sprouting Hand Disorder |
+| Fürst Wetternich | Nordwind | Violent Winds |
+| Rüdiger Schreck | Herrschaft der Krähen | Looming Crows |
+| Freddy Froschmilch | Morgenmuffel | Hopping Pox |
+| Willy Wedler | Falsches Mitleid | False Empathy |
+
+Plus Krummbiegels Fluch der matschigen Haut = **21**. *Nebenbefund:* `[NN S.14]`
+schreibt **„WILLY WEDLER"**, die Trophäenwand `[NN S.13]` **„WILLI WEDLER"** —
+dieselbe Inkonsistenz wie `[DE S.5]` / `[DE S.33]`, siehe §13.6.
+
 ### 10.4 Neue Marker und Mechaniken
 
-`[FN S.5-7]`
+`[NN S.5-7, S.15]`
 
-- **Wasser-Marker:** Viele FN-Bösewichte legen Wasser auf sich selbst, auf
-  Dörfler, auf Terrain-Karten oder auf das Schlachtfeld, um Effekte auszulösen.
-  **Sind keine Wasser-Marker mehr verfügbar, wird keiner gelegt.**
-  **Am Ende jedes Kampfes alle Wasser-Marker entfernen.**
-- **Glaubens-Marker (Belief)** — nur bei The Door Knockers. Zu viele davon →
-  der Dörfler erhält einen **Strange Cube** und greift in seinem Zug die eigenen
-  Leute an. Sie werden **beim Ausschalten nicht abgeworfen**, aber **am Kampfende
-  entfernt** `[FN S.6, S.15]`.
-- **Krankheits-Marker** — nur bei Red Atrocious; **werden beim Ausschalten des
-  Dörflers entfernt** `[FN S.15]`.
-- **Masken** — nur bei Barry Bluff/Viktor Visage: Masken liegen auf seiner
-  „Maskless"-Überfallkarte; **nur eine Maske gleichzeitig**. Bei „embody" wird der
-  Embody-Effekt der **getragenen** Maske ausgeführt, sonst der der
-  „Maskless"-Karte. Man kann die **Riemen** angreifen (2 Zähler); sind beide weg,
-  **fliegt die Maske aus dem Spiel — endgültig aus dem Aktionsdeck entfernt, nicht
-  nur abgeworfen** — und Barry nimmt sofort Schaden `[FN S.7, S.15]`,
-  `[E02 33:26]`, `[E02 45:25]`.
-- **Patches' Kostüm:** Im Kampf werden nach und nach Kostümteile entfernt. **Am
-  Kampfende kommen alle Teile auf die Matte zurück** `[FN S.7]`.
-- **Tildas Pflanzen** (Marigoon, Doofadil, Cleatus Guytrap) bewegen sich und
-  greifen an. Sie können **nicht durcheinander oder durch Hindernisse**, aber sie
-  **rempeln Figuren weg — auch Tilda selbst**. Blockieren sie sich gegenseitig,
-  gehen sie so nah ans Ziel wie möglich `[FN S.7]`.
+#### Wasser
+
+- **Platzieren ist eine Handlungsregel, keine Aufzählung:** „Wenn ihr Wasser auf
+  einem Feld platzieren sollt, nehmt ihr 1 Wasser-Plättchen **aus dem Vorrat** und
+  legt es auf dieses Feld – **egal ob frei, mit Terrain oder mit Figur**. **Soll
+  Wasser auf eine Figur platziert werden, platziert es immer auf das entsprechende
+  Tableau.**" `[NN S.5]` Es gibt also **keine** Frei-Feld-Bedingung, und Wasser
+  „auf einer Figur" liegt physisch **auf deren Tableau** — daran hängen Effekte
+  („Zu viel Wasser auf deinem Dörfler-Tableau und DU wirst zum neuen
+  Lieblings-Mobbing-Ziel", `[NN S.7]`).
+- **Leerer Vorrat:** „Sollt ihr Wasser platzieren, aber es gibt kein Wasser mehr
+  im Vorrat, **platziert kein Wasser**." `[NN S.5]` Der Vorrat sind 70 Plättchen,
+  geteilt mit Glaube `[NN S.2]`.
+- **Am Kampfende zurück in den Vorrat, nicht „entfernt":** „**Wichtig: Legt am Ende
+  eines Kampfes immer alles Wasser (auch von den Dörfler-Tableaus) in den Vorrat
+  zurück.**" `[NN S.5]` Der Einschluss der Dörfler-Tableaus ist ausdrücklich.
+- **Der Zielraum ist bösewichtabhängig** — `[NN S.15]` schränkt die allgemeine
+  Regel pro Bösewicht ein:
+
+  | Bösewicht | Wasser darf gelegt werden auf |
+  |---|---|
+  | Dr. Bosskop | freie Felder **sowie Terrain-Felder** |
+  | Thea Kotta | **Pflanzen-Terrain-Karten** |
+  | Rosa Voir & die WG | **Dörfler-Tableaus** sowie **Rosa Voirs Bösewicht-Tableau** |
+  | Arnold Schmatz | **freie Felder** |
+  | Fritze Fischkopp | freie Felder **sowie Terrain-Felder** |
+
+  Die weißen Herren, Fleckchen und Viktor Visage haben **keine** Wasserzeile — sie
+  nutzen kein Wasser. Für die Engine: „platziere Wasser" ist **kein globaler**
+  Zielraum.
+- **Aufstellbare Ausrüstung aus Toller Trödel ist wasserfest** (die einzige
+  kreuzweise Erweiterungsregel, gilt auch für §9.3): „**Aufstellbare Ausrüstung aus
+  der Toller Trödel-Erweiterung gelten nicht als Terrain** und verlieren somit
+  **durch Wasser auf ihrem Feld nicht ihre Fähigkeit** und können weiterhin
+  aktiviert werden." `[NN S.15]`
+- Nur englisch belegt: Wasser **verdrängt** andere Terraineffekte auf dem Feld —
+  „Water tokens will convert a square into Flood terrain, **removing the effects
+  over other terrain** on that square" `[FN S.8]`. `[NN S.15]` sagt das nicht.
+
+#### Glaube und Kubus (nur Die weißen Herren)
+
+- „**Glaube** taucht **nur im Kampf gegen die weißen Herren** auf. Je mehr ihr
+  davon habt, desto stärker seid ihr versucht, das großartige Produkt der weißen
+  Herren zu nutzen: **Den Kubus!**" `[NN S.6]`
+- **Der Kubus ist eine Karte, kein Marker, und der Zustand heißt „bekehrt":**
+  „Wenn du genug Glaube gesammelt hast, **wirst du bekehrt**! **Nimm dir dafür
+  sofort 1 Besondere Ausrüstung Kubus.** Dadurch **verlierst du die Kontrolle über
+  deinen Spielzug** und versuchst deine **kubuslosen nicht bekehrten** Freunde zu
+  töten." `[NN S.6]` → Angriffsziele sind **nur** die kubuslosen, nicht bekehrten
+  Mitdörfler; bekehrte Mitspieler sind **keine** Ziele.
+- **Besiegtwerden wirft Glaube nicht ab:** „Wenn du besiegt wirst, wirf deinen
+  gesammelten Glaube **nicht** ab. Wirf deinen Glaube nur ab, wenn ein Effekt es
+  besagt **oder am Ende des Kampfes**." `[NN S.15]`
+- **Am Kampfende zurück in die Auslage:** „Legt am Ende des Kampfes allen Glaube
+  **in die Auslage** zurück." `[NN S.6]` (Nicht „entfernt" — `[FN S.4]` sagt
+  „removed from play", die deutsche Fassung ist die genauere, gleiche Logik wie
+  beim Wasser: endlicher, geteilter Vorrat.)
+
+#### Krankheiten (nur Dr. Bosskop)
+
+- **Besitz = Krankheit:** „**Sobald du ein entsprechendes Krankheits-Plättchen
+  besitzt, hast du die dazugehörige Krankheit.** Von nun an erleidest du – wenn
+  diese auf Dr. Bosskops Bösewicht-Aktionen vorkommt – deren spaßige Symptome."
+  `[NN S.7]`
+- **Abwerfen hat ein Ziel:** „Wenn ihr eine Krankheit abwerft, legt sie **zurück
+  auf Dr. Bosskops Überfall-Karte Pestdoktor**." `[NN S.15]` Das ist der
+  Nachziehstapel — Krankheiten können also wieder auftauchen.
+- **Besiegt = alle ab:** „Wenn du besiegt wirst, **wirf alle** deine bis dahin
+  gesammelten Krankheits-Plättchen **ab**." `[NN S.15]`
+- **Harte Obergrenze 3:** „Die Angabe ‚3 oder mehr' bei der Bösewicht-Aktion
+  **Mutation** bezieht einen möglichen Endgegner-Kampf mit ein. **Im normalen
+  Kampf kann ein Dörfler nicht mehr als 3 Krankheiten haben.**" `[NN S.15]`
+- **Wurminfekt** nur im Endgegner-Kampf: „… werden **nur im Endgegner-Kampf**
+  gegen Dr. Bosskop verwendet und können **nicht auf andere Weise** erhalten
+  werden." `[NN S.15]`
+- Weiteres zu Dr. Bosskop `[NN S.15]`: seine **Rüpel- und Halunke-Fähigkeiten**
+  „lösen **jedes Mal beim Erreichen der Bedingung** wieder aus" (§5.2); Wasser aus
+  der Aktion **Infektiöser Schleim** „hat **nur den Effekt, der auf der Karte
+  steht**".
+
+#### Masken und Verkörpern (nur Viktor Visage)
+
+- „Wird eine Maske aufgesetzt, **legt ihr sie auf Viktors Überfall-Karte
+  Maskenlos**. Er trägt jetzt diese Maske. Viktor kann **immer nur 1 Maske
+  gleichzeitig** tragen." `[NN S.7]`
+- **Verkörpern** (engl. embody): „Wenn Viktor **Verkörpert**, aktiviert ihr immer
+  den Verkörpern-Effekt auf der **gerade getragenen** Maske (oder den
+  Verkörpern-Effekt auf **Maskenlos**, wenn Viktor gerade **keine** Maske trägt)."
+  `[NN S.7]`
+- **Maske abreißen:** „Viktor hat eine zweite Überfall-Karte: **Die Gurte der
+  Maske**. Anstatt Viktor selbst anzugreifen, könnt ihr auch Die Gurte der Maske
+  angreifen. **Nach 2 erfolgreichen Angriffen** darauf, fällt die Maske zu Boden
+  und wird **aus dem Spiel entfernt**." `[NN S.7]` Und `[NN S.15]`: „Wenn ihr den
+  **zweiten Marker** von Viktors Überfall-Karte Die Gurte der Maske entfernt, werft
+  ihr die getragene Maske **nicht nur ab, sondern entfernt sie für die Partie aus
+  dem Spiel**."
+  `⚠️ NUR VIDEO:` dass Viktor beim Maskenverlust **sofort Schaden** nimmt
+  (`[E02 33:26]`, `[E02 45:25]`), steht **in keinem** Heft — weder `[NN S.7/15]`
+  noch `[FN S.8]`. **Unbelegt.**
+
+#### Fleckchens Kostüm
+
+- Im Kampf „zieht ihr ihm dann – **Fetzen für Fetzen** – langsam und schmerzvoll –
+  sein Kostüm über die Ohren" `[NN S.6]`.
+- **Nach dem Kampf zurück:** „Legt nach dem Kampf alle **Kostüm-Fetzen** wieder
+  zurück ins Tableau **Fleckchens Kostüm**." `[NN S.6]` (9 Fetzen, `[NN S.2]`.)
+- **Katerstimmung — Max LEB und LEB sind entkoppelt** `[NN S.15]`: „Wenn ihr
+  Fleckchens **Max. LEB** erhöht, markiert euch das am besten mit einem Marker
+  neben seinem Wert für Max. LEB, **erhöht aber nicht sofort sein LEB!** Erst wenn
+  Fleckchens LEB wieder **auf sein Max. LEB gesetzt** wird, setzt ihr sein LEB ab
+  jetzt auf den neuen Max LEB-Wert."
+
+#### Theas Pflanzen
+
+- Die Kinder heißen **Doofsterglocke**, **Rangelblume** und
+  **Wehtuh-Fratzenfalle** (engl. Doofadil / Marigoon / Cleatus Guytrap); belegt
+  doppelt über `[NN S.7]` und die Terrainlisten `[NN S.15]`, `[NN S.16]`.
+- **Sie sind Hindernis-Terrain** — damit greifen die Bewegungsregeln für
+  Hindernis-Terrain (§1.1, `[DE S.14]`) automatisch: „**Ihre Kinder sind
+  Hindernis-Terrains.** Bei der Bewegung **blockieren sie sich also, wodurch sie
+  sich gegenseitig um sich herum bewegen müssen**. Figuren aber (**inkl. Thea!**)
+  werden von ihnen **gerammt**." `[NN S.7]` (**gerammt**, nicht „gerempelt" —
+  Rammen ist der Regelbegriff, §1.1.)
+- Blockierter Laufweg: „Ist das der Fall, versucht ein Kind trotzdem, sich mit
+  seiner Bewegung **so weit wie möglich seinem Ziel zu nähern**." `[NN S.7]`
+- **Gießen:** „Platziert **jedes Mal**, wenn Thea in einer Bösewicht-Aktion
+  **gießt**, **je 1 Wasser auf die 3 Terrain-Karten** ihrer geliebten Kinder."
+  `[NN S.7]`
+- **„Bewegt Thea so weit wie möglich vom Ziel weg" ist eine volle Bewegung:**
+  „Hier führt Thea eine **volle Bewegung** durch, bei der sie sich so bewegt, dass
+  sie am Ende ihrer Bewegung (**abhängig von ihrem BEW-Wert**) **maximal weit** vom
+  Ziel entfernt steht." `[NN S.15]`
+- **AUA durch Pflanzen zählt als Aktions-AUA:** „Wenn dir **innerhalb einer
+  Bösewicht-Aktion** Pflanzen-Terrain AUA zufügt, gilt dies als **durch
+  Bösewicht-Aktion zugefügtes AUA**." `[NN S.15]` Engine-relevant: entscheidet,
+  welche Schutzeffekte greifen. (`[FN S.8]` formuliert es verneinend — „DMG from an
+  action, **not a terrain piece**" — gleiche Wirkung.)
+
+#### Schlüsselwörter der Bösewichte
+
+Jede Schlüsselwortgruppe wird **auf der Überfall-Karte** erklärt: „Um ein
+Schlüsselwort auszuführen, befolgt die Anweisung genau wie auf [der]
+Überfall-Karte … beschrieben" `[NN S.6]`.
+
+| Bösewicht | Schlüsselwörter (dt.) | engl. `[FN S.4]` | Überfall-Karte |
+|---|---|---|---|
+| Fritze Fischkopp | Auswerfen, Anlocken, **Fluten** | cast, lure in, thrash | Fischer Fritze fischt |
+| Arnold Schmatz | Schmoren, Mästen, Klinge wetzen | dunk, force-feed, sharpen cleaver | Hauptgericht |
+| Rosa Voir & die WG | Schluchzen, **Flennen**, Donnerwetter | sulk, spritz, shock | WG-Terror |
+| Viktor Visage | **Verkörpern** | embody | Maskenlos |
+
+- **Fluten:** „Fritze ist ein Meeresbewohner … **Er kann sich daher nur auf Wasser
+  bewegen** und platziert Wasser auf Feldern, um – langsam aber stetig – das ganze
+  Schlachtfeld in **Flut-Terrain** zu verwandeln." `[NN S.6]`
+  („Fluten" ≠ „thrash" — die Fassungen weichen in der Wortwahl ab, die Mechanik
+  ist dieselbe.)
+- **Flennen bei Wassermangel:** „Wenn bei **Flennen** nicht genug Wasser für alle
+  von Flennen betroffenen Dörfler liegt, **entscheidet gemeinsam**, wer sich das
+  Wasser nimmt. Wenn bei Flennen **kein** Wasser auf Rosas Bösewicht-Tableau liegt,
+  **nimmt sich kein Dörfler Wasser**." `[NN S.15]`
+- **Rosa gibt Wasser weiter:** „Rosa [wird] immer wieder versuchen, **Wasser, das
+  auf ihr liegt, an euch abzugeben**." `[NN S.7]`
+
+#### Köderstulle und weitere Einzelregeln
+
+- **Die Köderstulle ist nie eine Figur** — harte Ausnahme zur Glossardefinition
+  „Figur = Dörfler **und** Bösewichte" (§1.1, `[DE S.35]`): „**Wichtig: Wenn ein
+  Effekt auf Figuren abzielt, zählt die Köderstulle (auch wenn ihr die
+  Köderstulle-Figur nutzt) nie als Figur.**" `[NN S.6]`
+- **Arnolds Verdauungspause:** „Bösewicht-Aktion **Verdauungspause**: Solange sie
+  **offen vor dir** ausliegt, kosten dich Fähigkeiten / Angreifen / Interaktion
+  etc., die eigentlich **0 MUMM** kostet **trotzdem 2 MUMM**." `[NN S.15]`
+- **Dorf-Ereignis „Ausschlafen" im Endgegner-Kampf gegen Die weißen Herren:**
+  „Liegt das Dorf-Ereignis **Ausschlafen** vor dem Sheriff, wenn Die weißen Herren
+  euer Endgegner sind, **ignoriert dieser den Effekt von Ausschlafen**."
+  `[NN S.15]`
+
+#### Errata zu einer Bösewicht-Aktion
+
+**`[FAQ S.2]`, Bösewicht-Aktion „Der perfekte Wurf" (Neue Nachbarn):** Beide
+„Dann, Einholen"-Effekte gehören zum Zweig **„Runterschlucken:"**. Entscheidet
+sich der Dörfler für **„Rausziehen:"**, **finden sie nicht statt**. Die Bewegung
+am Ende der Karte findet in **beiden** Fällen statt. Die Karte liegt auch im
+Errata-Pack bei.
+`⚠️ OFFEN:` Zu welchem Bösewicht die Karte gehört, nennt die FAQ nicht; die
+Schlüsselwörter der NN-Anleitung decken „Einholen" nicht ab (Fritzes drei sind
+Auswerfen / Anlocken / Fluten).
 
 ### 10.5 Spielvariante „Invasion des Nachbardorfs"
 
 `[NN S.15]` Optional: den Bösewicht-Pool thematisch auf **ein** Nachbardorf
-begrenzen. „Legt dazu zum Beginn der Partie nur Bösewicht-Plättchen des gewählten
-Dorfes (natürlich verdeckt) auf die Kampf-Plätze."
+begrenzen. „Legt dazu zum Beginn der Partie **nur** Bösewicht-Plättchen des
+gewählten Dorfes (**natürlich verdeckt**) auf die Kampf-Plätze."
+**„Verdeckt" gehört dazu** — lägen sie offen, wäre die Gegnerreihenfolge bekannt
+und die Variante ein anderes Spiel.
+
 - **Neblingen** (engl. Misty Bluff): Arnold Schmatz, Viktor Visage, Die weißen
   Herren, Fleckchen.
 - **Sturzbrunn** (engl. Sprinkle Falls): Thea Kotta, Fritze Fischkopp,
@@ -1744,6 +2294,33 @@ Dorfes (natürlich verdeckt) auf die Kampf-Plätze."
 
 Das erhöht auch die Chance, denselben Bösewicht dreimal zu besiegen und so Flüche
 freizuschalten `[E01 38:43]`.
+
+### 10.6 Spezialaufgaben-Tracker — die 16 freischaltbaren Karten
+
+`[NN S.11]`. Die Erweiterung bringt **1 Faltschachtel mit freischaltbarer
+Ausrüstung (16 Karten)** `[NN S.2]` mit — „schaut **unter den Einsatz der
+Schachtel**!" `[NN S.8]`. Freigeschaltet wird über die **Spezialaufgabe** des
+Endgegner-Kampfes (§8.3).
+
+| Bösewicht | freischaltbare Ausrüstung |
+|---|---|
+| Fleckchen | Herr Hottehü, Herr Greifmann |
+| Die weißen Herren | Rhombus, Pyramide |
+| Thea Kotta | Kecke Hecke, Knospenkranz |
+| Dr. Bosskop | Abgefüllte Jugend, Schweißband |
+| Fritze Fischkopp | Angelhakenanzug, Flaschenpost |
+| Rosa Voir & die WG | Starkstromkabel, Schleudersitz |
+| Viktor Visage | Tintenkleckser, Alte Maske |
+| Arnold Schmatz | Heureka-Pfännchen, Schmatz-Spieße |
+
+**Zwei Paare sind alternative Startausrüstung statt Nachschub:** Karla Kühl →
+Starkstromkabel + Schleudersitz `[NN S.9]`, Frieda Paletti → Tintenklekser +
+Alte Maske `[NN S.10]`. Die übrigen werden „unter eure Tante Emma Ausrüstung"
+gemischt `[NN S.11]`. *(Schreibweise: `[NN S.10]` „Tintenklekser", `[NN S.11]`
+„Tintenkleckser" — die Anleitung ist selbst inkonsistent.)*
+
+**In der Erstpartie ist keine davon verfügbar** — alle 16 setzen einen
+abgeschlossenen Endgegner-Kampf mit erfüllter Spezialaufgabe voraus.
 
 ---
 
@@ -1850,7 +2427,10 @@ RUNDE r = 1..4
       9 BEW/LEB aus der Spalte zur ANZAHL DÖRFLER (solo 3P) (Ausnahme Barry Bluff: Formel)
      10 r=4: AUFBAU-Anweisungen + EG-Felder + Sheriffwahl (höchste Heldenpunktsumme)
       dazu: Stufenfähigkeit = unterster sichtbarer Kampf-Platz, gilt den ganzen Kampf
-            Bösewicht-Fähigkeit zu KAMPF-BEGINN prüfen ; ggf. Überfall-Karte(n) (FN)
+            Bösewicht-Fähigkeit zu KAMPF-BEGINN prüfen
+      NN-Zusatzschritt nach 4: Überfall-Effekt vom Tableau (unter BEW/LEB) AUSFÜHREN
+            → 1+ Überfall-Karte(n) aus dem Aktionsdeck, OFFEN neben das Zusatzbrett;
+              deren eigene Aufbauschritte/Sonderregeln VOR dem ersten Zug abarbeiten
     Schleife:
       Bösewicht: 1 Aktionskarte → Ziel → KRAWALL (oben→unten) → Nachspiel? → abwerfen
                  Nachspiel nur wenn: Wort fehlt UND Ziel hat 1+ AUA erlitten,
@@ -1872,7 +2452,10 @@ RUNDE r = 1..4
     4 abgeschlossene Heldentaten beiseite (zählen weiter für Sheriffwahl)
     5 Werte-Leisten auf STARTWERTE zurück, dann schwarz markierte Ausrüstungsboni
       wieder aufrechnen  → damit auch LEB = Max LEB, und Heldentaten-Boni sind WEG
-    6 Bösewichtmaterial in die Schachtel  (Trophäen/Journal erst am PARTIEENDE!)
+    6 Bösewichtmaterial in die Schachtel  (Trophäen/Notizbuch erst am PARTIEENDE!)
+      NN: alles Wasser (auch von den Dörfler-Tableaus) zurück in den VORRAT;
+          Glaube zurück in die Auslage; Kostüm-Fetzen zurück ins Tableau
+      TT: eigene Aufstellbaren-Plättchen zurück zum Besitzer
     7 Leiste rotieren (oberster nach unten, Bösewichtplatz frei lassen)
     8 Brett auf Dorf-Seite wenden
 ```
@@ -1887,13 +2470,16 @@ RUNDE r = 1..4
    §2.2 ist entsprechend neu geschrieben. **Offen bleibt nur:** ob auch später
    erworbenes Geld in den gemeinsamen Topf geht — die Anleitung regelt wörtlich
    nur die 30 **Start**münzen.
-2. **Genauer Wortlaut des Fluchs „Curse of the Bruised Peel".** **TEILWEISE
-   GEKLÄRT.** Der **deutsche Name ist jetzt belegt: „Der Fluch der matschigen
-   Haut"**, und er ist **Krummbiegels persönlicher Fluch** — der einzige, der zu
-   Partiebeginn freigeschaltet ist `[NN S.5]`. **Weiter offen bleibt der
-   Effekttext**: er steht auf der Fluchkarte, die nur als deutsche Druckdatei
-   (`FN_Curse_Cards_FRONT_DE_RZ_klein.pdf`) vorliegt und nicht gelesen wurde; die
-   Wirkung in §10.3 stammt aus dem Video `[E01 36:16]`.
+2. **Wirkung des Fluchs der matschigen Haut.** **Name geklärt, Wirkung offen.**
+   Der Name ist belegt — **„Fluch der matschigen Haut"** `[NN S.4]`, `[NN S.5]` —
+   und er ist **Krummbiegels eigener**, keinem Bösewicht zugeordnet und der
+   einzige, der zu Partiebeginn freigeschaltet ist. **Die Wirkung bleibt offen:**
+   **keine** der vier Erweiterungsanleitungen druckt einen einzigen Fluchtext ab
+   (`[NN S.14]` listet nur die 20 Namen, `[NN S.5]` nur die Schwierigkeitsstufen).
+   Die Angabe in §10.3 stammt allein aus dem Video `[E01 36:16]` und bleibt
+   `⚠️ UNSICHER` / `⚠️ NUR VIDEO`. Der Text steht auf der Fluchkarte, die nur als
+   deutsche Druckdatei (`FN_Curse_Cards_FRONT_DE_RZ_klein.pdf`) vorliegt und nicht
+   gelesen wurde.
    Hinweis zum Modellieren: der Fluch überschreibt den **Werte-Reset** aus
    Nachbereitungsschritt 5 (§7), nicht einen separaten Heilungsschritt (§6.6).
 3. ~~**Formulierung „Randale"**~~ — **GEKLÄRT.** Der Kartenabschnitt heißt
@@ -1928,6 +2514,11 @@ RUNDE r = 1..4
    englische Heft liegt dafür nicht mehr vor.
    Die Zuordnungen von Georgie Irongut, Blopsy Twins und Judy Marks bleiben aus
    der Bedeutung erschlossen, nicht direkt belegt.
+   **Die zwei Dörfler aus Neue Nachbarn sind eingegrenzt, nicht belegt:**
+   `[NN S.4]` nennt **Frieda Paletti** und **Karla Kühl**, `[FN S.3]` **Judy
+   Marks** und **Fridgette Jones** — welcher welche ist, sagt keine der beiden
+   Quellen. *Fridgette → Kühl* liegt nahe, *Judy Marks → Frieda Paletti* folgt
+   dann durch Ausschluss. `⚠️ ABGELEITET`
    Nebenbefund: die Anleitung schreibt den Bösewicht auf `[DE S.5]` **„WILLI
    WEDLER"**, auf `[DE S.33]` **„Willy Wedler"** — sie ist selbst inkonsistent,
    beide Schreibungen sind belegt.
@@ -1936,7 +2527,7 @@ RUNDE r = 1..4
    senkrechten Bösewichtnamen auf den Beutekarten, siehe §5.5 und
    `docs/befund-beute-und-aufstellbares.md` §2.4. Dort ebenfalls belegt:
    *Tartar Fishboy = Fritze Fisch**kopp*** und
-   *The Door Knockers = Die weissen Herren*.
+   *The Door Knockers = Die wei**ß**en Herren* (so auch `[NN S.15]`, `[NN S.12]`).
 8. **Terrainkarten-Details.** **TEILWEISE GEKLÄRT.** Die Anleitung liefert
    **alle 20 Terrainnamen** des Grundspiels `[DE S.36]`, die **7 Terrains je
    Grundspiel-Bösewicht** `[DE S.33]` und die Arten-Grundregeln `[DE S.14]`.
@@ -1952,8 +2543,23 @@ RUNDE r = 1..4
    nicht vor** (0 Treffer) — die Terrain-Plättchen sind doppelseitig, die
    Rückseite könnte so heißen, ohne die Plättchen nicht prüfbar
    (`⚠️ NUR VIDEO: [E02 18:36]`).
+   **Die 13 Terrainnamen von Neue Nachbarn sind jetzt belegt** `[NN S.16]`:
+   Wäscheleine, Köderstulle, Rasenmäher, Lagerfeuerchen, **Doofsterglocke**,
+   **Rangelblume**, Foodtruck, Günnis Kneipe, **Wehtuh-Fratzenfalle**,
+   **Flut (3×)**, Matschpfütze, Die Wolken-Gang, Kochtopf. 13 Karten bei **15
+   Plättchen** (Flut dreifach) — was `[NN S.2]` („13× Terrain-Karte", „20
+   doppelseitige Terrain-Plättchen") erklärt. Die drei Pflanzen sind
+   Theas Kinder und **Hindernis-Terrain** (§10.4).
+   `⚠️ UNSICHER:` `[NN S.15]` nennt für Dr. Bosskop **„Gammliges Plumpsklo"**,
+   für Die weißen Herren / Fleckchen / Viktor Visage **„Miefiges Plumpsklo"** —
+   zwei verschiedene Terrains oder ein Setzfehler, mit den vorliegenden Quellen
+   nicht entscheidbar.
+   `[FAQ S.2]` stellt klar, dass **„Matschiger Graben" auf den Aktionskarten
+   „Tragisches Froschkonzert" und „Milchiger Morast" falsch** ist („Es ist der
+   **Trübe Fluss** gemeint") — das Terrain selbst bleibt gültig, es steht in
+   Fritze Fischkopps Terrainliste `[NN S.15]`.
    **Weiter offen** bleiben die **Kartentexte** der 20 Basis- und 13
-   FN-Terrainkarten (Kosten, Interaktionen, Effekte). Dafür müssen
+   NN-Terrainkarten (Kosten, Interaktionen, Effekte). Dafür müssen
    `terrain_deck_FRONT_DE_V10` und `FN_terrain_deck_FRONT_DE` ausgewertet werden.
 9. **Heldentaten- und Dorf-Ereignis-Decks** wurden nicht erfasst. Die
    **Anzahlen** sind bestätigt (`[DE S.5]`: 75× Heldentat, 100× Dorf-Ereignis,
@@ -1961,44 +2567,33 @@ RUNDE r = 1..4
    in der Anleitung: Heldentat = Name / Auftrag / Heldenpunkte / Belohnung
    `[DE S.11]`. Die Druckdaten liegen in `Downloads\` vor und extrahieren sauber
    als Text.
-10. **Die Erweiterungen — §9 und §10 sind NICHT abgeglichen.** Die
-    Grundspielanleitung behandelt **ausschließlich das Grundspiel**: „Überfall",
-    „Fluch" und „Rolle" kommen auf den 36 Seiten nicht vor. Seit 2026-10-14 liegen
-    aber die **deutschen Erweiterungsanleitungen** `[NN S.x]` (16 S.) und
-    `[TT S.x]` (12 S.) vor — deutlich ausführlicher als `[FN]`/`[OJ]`. Ein
-    eigener Durchgang wie der fürs Grundspiel steht aus. **Beim Eintragen schon
-    aufgefallen (nicht erschöpfend, nicht eingearbeitet):**
-    - **§10 kennt „Krummbiegel" nicht.** Er ist „Tante Emmas größter Konkurrent
-      und Erzrivale", ein Händler für Flüche, und die Flüche der Erweiterung sind
-      **seine** `[NN S.5]`, `[NN S.14]`. Die Trophäenwand schaltet sie frei: „mit
-      jedem neuen Kopf an eurer Trophäenwand belegt der fiese Krummbiegel Heureka
-      mit einem weiteren Fluch". **21 Flüche**, Schwierigkeit leicht/mittel/schwer
-      (§10.3 sagt „1–3 Symbole").
-    - **Deutsche Begriffe fehlen durchgehend in §9 und §10:** `Glaube` statt
-      „Belief", `Kubus` statt „Strange Cube", `Aufstellbare Ausrüstung` statt
-      „Aufstellbares/Deployable", `Laden-Ereignis` statt
-      „Karren-Ereignis-Ausrüstung / Cart Event Gear", `Operation` /
-      `Beutezug` (3 je Operation) / `Vorbereitung` / `Notiz` / `Aufleber` /
-      `Tante Emmas Notizbuch` statt „Expedition / Ort / Vorbereitung /
-      Journaleintrag / Sticker / Peddler's Journal", und die Register heißen
-      **„Tante Emma Ausrüstung (TT)"** und **„Gesperrte Ausrüstung (TT)"**
-      `[TT S.4-9]`, `[NN S.5-7]`.
-    - **§9 fehlen zwei ganze Kartentypen bzw. Regeln** `[TT S.5]`:
-      „**Beende deinen Zug:**"-Fähigkeiten (aktiv ausgelöst, **nur 1 pro Zug**,
-      und zwar am Zugende) und die Einschränkung **„Aufstellbare Ausrüstung kann
-      nur von dem Dörfler platziert werden, der sie besitzt"** (benutzen darf sie
-      jeder, wer auf dem Plättchen steht).
-    - **„1x pro Kampf" ist genauer geregelt als in §6.3** `[NN S.15]`: ein Effekt
-      „1x pro Kampf" **ohne** weitere Kosten kann auch außerhalb des eigenen Zuges
-      ausgelöst werden; **mit** weiteren Kosten („1 MUMM", „Snacken", „Abwerfen")
-      nur im eigenen Zug. Gilt auch für „1x pro Runde".
-    - **`[NN S.15]` enthält die 7 Terrains je Erweiterungs-Bösewicht** und
-      bösewichtspezifische Klarstellungen — das Gegenstück zu `[DE S.33]` und
-      direkt für `setups.scenario_data` verwertbar.
-    - **`[NN S.16]` listet die 13 Terrainnamen der Erweiterung** auf Deutsch, was
-      die Zahl „13 FN-Terrainkarten" in §13.8 bestätigt.
-    - **`[NN S.8-11]` enthält die Schicksale 37 ff.** („die Einträge 1–36 findet
-      ihr in der Anleitung des Grundspiels").
+10. ~~**Die Erweiterungen — §9 und §10 sind NICHT abgeglichen**~~ —
+    **erledigt am 2026-10-14.** §9 ist gegen `[TT]` (12 S.), §10 gegen `[NN]`
+    (16 S.) abgeglichen; Begründungen und Zitate in
+    `docs/regelabgleich-erweiterungen.md`. Die deutschen Begriffe,
+    „Beende deinen Zug", die Platzierungsbeschränkung bei Aufstellbaren, die
+    „1× pro Kampf"-Zeitpunktregel (jetzt §6.3), die Fluchliste, die
+    Trophäenwandordnung, die Wasserregeln und die bösewichtspezifischen
+    Klarstellungen sind eingetragen. **Was aus diesem Durchgang offen bleibt:**
+    - **Tante Emmas Notizbuch liegt weiter nicht vor.** `[TT S.8-9]` beschreibt
+      nur die Struktur; belegt sind zwei Beutezugnamen („Nahes Holungsgebiet",
+      „Die Saumagen-Festung ausrauben"), die übrigen nicht (§9.5).
+    - **Keine Fluchtexte, keine Rollenkartentexte, keine Überfall-Kartentexte.**
+      Von den 20 Rollen zeigt `[TT S.7]` zwei als Beispielgrafik (Rotzgöre,
+      Tüftler), ohne Textlayer; die übrigen 18 sind absichtlich nicht abgedruckt
+      („Ey, nix verraten!"). Keine der 9 Überfall-Karten und keine der 21
+      Fluchkarten ist abgedruckt.
+    - **Karla Kühls besondere Aufbauanweisung** steht nur auf ihrem Tableau
+      `[NN S.4]` (§10.1).
+    - **Die Nummern der 24 Aufstellbaren** (73–161) sind eigene Kartenauswertung,
+      keine Heftangabe (§9.5).
+    - **Die Zuordnung der FAQ-Errata „Der perfekte Wurf"** zu einem Bösewicht
+      (§10.4).
+    - **„Gammliges" vs. „Miefiges Plumpsklo"** (§13.8).
+    - **Die 7 Terrains je Erweiterungs-Bösewicht** `[NN S.15]` sind
+      **Szenariodaten** und gehören in `setups.scenario_data`, nicht hierher —
+      das Gegenstück zu `[DE S.33]`, vollständig und direkt verwertbar. Eigener
+      Auftrag.
 11. **Karten- und Tableaudaten.** Die Anleitung kann sie grundsätzlich nicht
     liefern: Terrain-Karten, Heldentaten, Dorf-Ereignisse, Bösewicht-Aktionen,
     Bösewicht-Ausrüstung und die Bösewicht-Tableaus (BEW/LEB-Zahlen,
