@@ -4960,3 +4960,132 @@ das ist, hängt von den gewählten Startplätzen ab, und „am nahesten" ist ein
 Rechnung über den Spielstand — nach §1 nicht die Aufgabe des Tisches. Der
 Bösewicht liegt auf definierten 0°, die Blickrichtung setzt der Spieler mit
 `Rotate Left/Right`.
+
+## M21 — Die erste Partie, die bis zum Ende getragen hat
+
+Belegt in `docs/partie12-bericht.md`. **Zum ersten Mal regulär bis zum
+Endgegner-Kampf:** Waggums und Virginia Fitz besiegt, Dorfphasen gespielt, dann
+**neun volle Runden** gegen The Bundits. Verloren, weil in Runde 9 Sheriffin
+Fridgette fiel; Granny stand am Ende mit 1/5 LEB allein auf dem Feld.
+
+**Alle vier Prüfpunkte aus M20 halten.** Keine `$SHERIFF`-Meldung vor dem
+Endkampf, die Sheriff-Ausrüstung liegt in der `Terrain-Auslage`, das Tableau
+zeigt die FINAL-FIGHT-Seite, genau eine Meldung im Endkampf, BEW/LEB 6/15
+stimmen.
+
+**Warum die Partie verloren ging, ist kein Engine-Befund und gehört trotzdem
+hierher:** The Bundits kam nie unter 15/15, weil er heilt, solange die Königin
+lebt — und die Königin springt bei **jedem** Schadenswurf in die entfernteste
+Brettecke. Mit 2 AUA auf Reichweite 5 als bester Waffe braucht das rund zwanzig
+Runden. Die Gruppe hatte neun. Das ist eine Aussage über die Schwierigkeit, die
+erst eine durchgespielte Partie liefern konnte.
+
+### M21.1 — Abgelegte Bösewicht-Aktionen bilden keinen Stapel
+
+**Befund, und er blockiert.** Die abgeworfenen Aktionskarten liegen als **15
+lose Karten** auf der Ablage, nicht als Stapel. Als der Ziehstapel leer war,
+ließ sich die Ablage **nicht neu mischen** — kein Shuffle, kein Reveal, keine
+Rückseite. Ab da war die Bösewicht-Runde nur noch per Würfel von Hand
+auszulosen.
+
+Das ist das Gegenstück zu M15.4: dort war Mischen nachweisbar, hier gibt es
+nichts zu mischen. Und es trifft **jede längere Partie** — fünfzehn Aktionen
+reichen für etwa fünf Runden, der Endkampf dauert länger.
+
+**Zu klären, bevor gebaut wird:** Entsteht der Stapel nicht, weil das Aufdecken
+die Karte einzeln ablegt (`reveal_next`/`Reveal Top Card to …`), oder weil die
+Zone `Ablage` keine Stapelbildung kennt? M12.5 hat die Staffelung eines
+Ablagestapels gebaut — **gibt es den Stapel hier überhaupt, oder nur Karten
+übereinander?**
+
+**Abnahme.**
+1. Nach fünfzehn aufgedeckten Aktionen liegt auf der Ablage **ein Stapel**.
+2. Er lässt sich mischen, und das Abzeichen `#n` zählt (M15.4).
+3. Er lässt sich als neuer Ziehstapel verwenden, ohne den Tisch zu verlassen.
+
+### M21.2 — Ein gesperrtes Objekt lässt sich drehen
+
+**Befund, und er geht auf meine Rechnung.** M13.1 hat ausdrücklich entschieden:
+„`locked` wird **nicht** geprüft — gesperrt heißt unbeweglich, nicht undrehbar,
+wie schon bei Flip."
+
+Das war für ein Plättchen gedacht. **Für das Sideboard ist es falsch:** ein
+Fehlklick hat es um 90° quer übers Spielfeld gelegt — **samt Zonen und
+Zählern**, die daran verankert sind. Genau dagegen sperrt man ein Brett.
+
+Die Begründung von damals trägt nicht: Flip tauscht ein Bild, Drehen verschiebt
+eine **Fläche**, an der anderes hängt. Das sind nicht dieselben Fälle.
+
+**Änderung.** Gesperrt heißt auch undrehbar. Die Einträge erscheinen weiterhin,
+melden aber den Grund — ein Eintrag, der stumm nichts tut, ist der Fehler aus
+`docs/audit-dead-controls.md`.
+
+**Abnahme.**
+1. Ein gesperrtes Objekt lässt sich über das Kontextmenü nicht drehen, und das
+   Menü sagt warum.
+2. Entsperrt geht es wie bisher.
+3. Flip bleibt unverändert erlaubt (M3d) — das ist die Stelle, an der die alte
+   Begründung richtig war.
+
+### M21.3 — Lange Zieh-Wege landen zu kurz
+
+**Befund.** Die Königin brauchte **vier Versuche** von A1 nach S1 — über die
+ganze Brettbreite.
+
+⚠️ **Vor dem Bauen messen.** Zwei frühere Befunde dieser Art („20 Rastungen",
+„70 Pixel") waren **Artefakte der Fernsteuerung**, und bei M19.2 kam heraus:
+ohne `requestAnimationFrame` zwischen zwei Ereignissen sieht jedes `mousemove`
+den Zustand noch als `null`. Ein langer Zug besteht aus mehr Ereignissen als
+ein kurzer — **genau der Fall, in dem dieses Artefakt zuschlägt.**
+
+Also: mit echten Mausereignissen **und** Bildwechsel dazwischen nachmessen.
+Stellt es sich als Artefakt heraus, ist das ein vollwertiges Ergebnis.
+
+**Abnahme.** Ein Zug über die ganze Brettbreite landet beim ersten Versuch —
+oder der Befund ist als Artefakt widerlegt und die Aufgabe entfällt.
+
+### M21.4 — Die Ausrüstungszone weist die sechste Karte stumm zurück
+
+**Befund.** Der Vorrat fasst fünf Karten (M18); die sechste springt
+**kommentarlos** zurück.
+
+Das widerspricht M16.2 unmittelbar — dort wurde die sichtbare Abweisung gebaut,
+und Partie 10 hat sie bestätigt („deutliches oranges Band, auch bei
+eingeklappter Leiste"). **Warum greift sie hier nicht?**
+
+Dazu die zweite Hälfte: fünf Vorratsplätze sind **zu wenig**. „Es gibt keine
+Obergrenze, wie viel Ausrüstung ein Dörfler besitzen darf" `[BR S.8]`; in
+Partie 7 waren es sieben. M18 hat 5 + 6 Slotplätze = 11 gewählt und das
+begründet — die Rechnung stimmt, die Aufteilung nicht.
+
+**Abnahme.**
+1. Eine abgewiesene Ablage meldet sich sichtbar, auch hier.
+2. Ein Dörfler kann mehr Ausrüstung besitzen, als er anlegen kann, ohne dass
+   Karten zum Nachbarn wandern.
+
+### M21.5 — Was der Aufbau für den Endkampf nicht stellt
+
+**Befund.** Drei Dinge fehlen, und sie sind verschiedener Art:
+
+- **Karni-Marker:** der Endkampf braucht **sechs**, der Aufbau liefert
+  **null**. Der Spieler hat sie selbst gebaut.
+- **„SIE KOMMEN!"** bleibt im Verhaltensdeck, statt auszuliegen.
+- **Scatter** aus dem Deck zu nehmen ist Handarbeit (M20.3, bewusst).
+
+**Zu entscheiden, und zwar begründet:** Welches davon ist Aufbau und welches
+Spielzug? Ein Marker hinzulegen ist Aufbau — er hat eine gedruckte Zahl und
+keine Wahl. Eine Karte aus dem Deck zu ziehen ist ein Zug. Die Grenze aus §1
+gilt, aber sie läuft nicht dort, wo M20.3 sie gezogen hat.
+
+**Abnahme.** Der Endkampf gegen The Bundits stellt, was ohne Spielerwahl
+feststeht; was Wahl ist, nennt die Spielerrolle als Handarbeit.
+
+### Nachtrag zur Spielerrolle
+
+Sie nennt **zwei** bewusst manuelle Schritte. Es sind **mindestens vier** —
+dazu kommen die Karni-Marker und das Ernennen des Sheriffs. Nachziehen, sobald
+M21.5 entschieden ist.
+
+Und eine Richtigstellung des Spielers an sich selbst, die festgehalten gehört:
+dass die Königin bei ihm auf H10 stand statt auf E10, war **sein eigener
+Ziehfehler**, kein Tischfehler. Die Aufbaudaten sind richtig.
