@@ -260,16 +260,13 @@ Plumpsklo-Plättchen und dementsprechend nur das eine Asset
 
 ## 5. Was fehlt und warum
 
-1. **`stats` (BEW / LEB) für alle acht.** Die drei Grundspiel-Einträge tragen
-   `stats: {BEW, LEB}`; die neuen nicht. Folge: der Aufbau meldet beim Kampf
-   gegen einen Erweiterungs-Bösewicht vier übersprungene Schritte
-   (`place_asset "Marker: Bösewicht BEW"`, `… LEB`, `set_counter
-   "Bösewicht: Bewegung"`, `… "Leben"` — je *„$BEW ist nicht gebunden"*).
-   **Nicht erfasst, weil die Werte nicht auf der Szenarioseite stehen**, sondern
-   auf der **Vorderseite** des Tableaus, und dort je Stufe (CHUMP / HOOLIGAN /
-   TROUBLEMAKER / FINAL FIGHT) verschieden. Welche Stufe der einzelne Wert der
-   vorhandenen Einträge meint, ist aus den Daten nicht ablesbar — eine falsche
-   Zahl hier wäre schlimmer als keine. Das ist ein eigener Auftrag.
+1. ~~**`stats` (BEW / LEB) für alle acht.**~~ **Erledigt am 2026-10-15, siehe
+   Abschnitt 7.** Die damalige Begründung („je Stufe CHUMP / HOOLIGAN /
+   TROUBLEMAKER / FINAL FIGHT verschieden") war ein Irrtum: die Stufenkästen auf
+   der Vorderseite tragen die **Bösewicht-Fähigkeiten**, nicht BEW und LEB.
+   BEW und LEB stehen in **einem** Block darunter, in vier Spalten
+   **2P / 3P / 4P / 5P** — maßgeblich ist die Anzahl Dörfler im Spiel, solo also
+   die 3P-Spalte (`docs/tft-regeln.md` §5.4).
 
 2. **`Dichter Wald` vs. `Dichter Wald 2`.** Red Atrocious und The Door Knockers
    haben je **zwei** Waldstücke. Welches der beiden Assets (die sich im Artwork
@@ -332,3 +329,120 @@ sich mit der Tableaurückseite.
 Gemeldet wurden nur die vier Schritte aus Lücke 1 (`$BEW` / `$LEB` nicht
 gebunden). Danach wurde der Aufbau neu geladen, der Tisch ist wieder im
 Ausgangszustand.
+
+---
+
+## 7. Kampfwerte BEW und LEB (ergänzt 2026-10-15)
+
+### 7.1 Regel und Spalte
+
+`docs/tft-regeln.md` §5.4: BEW und LEB stehen auf der **Vorderseite** des
+Bösewicht-Tableaus, in vier Spalten **2P / 3P / 4P / 5P**. Maßgeblich ist die
+**Anzahl Dörfler im Spiel**, nicht die Spielerzahl — *„Welche Werte zutreffen
+ist abhängig von der Anzahl Dörfler im Spiel"* `[DE S.13]`, *„Sowohl BEWEGUNG
+als auch LEBEN des Bösewichts sind von der Anzahl der Dörfler abhängig"*
+`[DE S.15]`. Dieser Aufbau spielt **solo mit drei Dörflern** (Henlo Bulwark,
+Fridgette Jones, Granny Melba) ⇒ **immer die 3P-Spalte**. Der Startwert ist
+zugleich das **Maximum** des Bösewichts `[DE S.15]`.
+
+**Gegenprobe an den Grundspiel-Einträgen.** Die drei vorhandenen `stats` sind
+genau die 3P-Spalte ihrer Tableaus — Deputy Waggums `6 / 14` aus
+`MVMT 6 6 7 7` / `HEALTH 12 14 17 20`, Virginia Fitz `6 / 15`, The Bundits
+`6 / 15`. Damit ist belegt, welche Spalte das Feld meint; geraten wurde nichts.
+
+### 7.2 Die Werte
+
+Alle acht Vorderseiten wurden aus `table_assets."Tableau: <Name>".image_path`
+über `https://gaming.benjathi.de<image_path>` geladen und in Zoomausschnitten
+abgelesen (Originalauflösung 1500×3000 bis 1663×3264, Ausschnitt jeweils
+`y 0,72–0,87`, `x 0,02–0,68` der Bildfläche, auf 1000 px Breite hochskaliert).
+
+| Bösewicht | Zeile MVMT (2P/3P/4P/5P) | Zeile HEALTH | **BEW** (3P) | **LEB** (3P) | Sicherheit | Fundstelle im Bild |
+|---|---|---|---|---|---|---|
+| Red Atrocious | 5 / **6** / 8 / 8 | 13 / **17** / 20 / 24 | **6** | **17** | **sicher** | Ausschnitt `y 2147–2595`, Block unter dem Umschreibungskasten, über `AMBUSH: 'Plaguebearer'` |
+| Tilda Fields | 2 / **3** / 3 / 4 | 10 / **15** / 20 / 24 | **3** | **15** | **sicher** | `y 2204–2663`, über `AMBUSH: 'Living Garden'` |
+| Ernie Offal | 5 / **5** / 5 / 5 | 12 / **18** / 21 / 24 | **5** | **18** | **sicher** | `y 2350–2839`, über `AMBUSH: 'Prepare the Main Course'` |
+| Tartar Fishboy | 9 / **9** / 9 / 9 | 13 / **17** / 20 / 23 | **9** | **17** | **sicher** | `y 2160–2610`, über `AMBUSH: 'Angry Angler'` |
+| Ms. Falls & Co. | 4 / **4** / 5 / 5 | 13 / **17** / 20 / 23 | **4** | **17** | **sicher** | `y 2160–2610`, über `AMBUSH: 'Shocking Guests'` |
+| Patches | 7 / **8** / 8 / 9 | 1 / **2** / 2 / 3 | **8** | **2** | **sicher** | `y 2160–2610`, über `AMBUSH: '9 lives'` |
+| The Door Knockers | 5 / **5** / 6 / 7 | 10 / **15** / 18 / 21 | **5** | **15** | **sicher** | `y 2160–2610`, über `AMBUSH: 'One of Us'` |
+| Barry Bluff | **keine Zahlen — Formel** | **keine Zahlen — Formel** | Text (s. u.) | Text (s. u.) | **sicher gelesen, nicht rechenbar** | `y 2232–2697`, statt der Spalten steht Fließtext |
+
+**Alle sieben Zahlenpaare sind eindeutig lesbar** — die Ziffern stehen groß und
+dunkel auf hellem Grund, auch auf den vier Handyfotos der gedruckten Tableaus.
+Keine Ziffer musste erschlossen werden. Die Werte decken sich zusätzlich Zeile
+für Zeile mit der unabhängig erstellten Tabelle in `docs/tft-regeln.md` §5.5.
+
+### 7.3 Barry Bluff — die Formel, wortgleich eingetragen
+
+Barry Bluffs Tableau trägt an der Stelle der vier Spalten Fließtext. Er ist
+wörtlich übernommen, wie er dasteht (englisch, wie gedruckt):
+
+```json
+"Barry Bluff": { "stats": {
+  "BEW": "Equal to the highest MVMT among townsfolk at start of fight, plus 1.",
+  "LEB": "Equal to HP total of all townsfolk combined at start of fight, plus 3."
+} }
+```
+
+Das ist Absicht und kein Notbehelf: der Platzhalter `$BEW` **bindet** damit, und
+die beiden Zählerschritte melden anschließend sauber, dass sie den Wert nicht
+lesen können — *„counter ‚Bösewicht: Bewegung': ‚Equal to the highest MVMT …'
+is not a value it can take"*. Vorher meldeten sie *„$BEW ist nicht gebunden"*,
+also einen Datenmangel, den es bei Barry Bluff gar nicht gibt. Die Formel ist
+Barry Bluffs persönlicher Kartentext, keine Erweiterungsregel
+(`docs/tft-regeln.md` §5.4).
+
+### 7.4 Zwei Werte, die stimmen, aber in die Irre führen können
+
+- **Ms. Falls & Co. — `LEB 17` gilt für Ms. Falls selbst.** Ihre Begleiter
+  („The Company") beginnen laut Tableautext mit **3 LEB je Dörfler** und sind
+  das eigentliche Angriffsziel (*„Defeat The Company! Be sure not to let
+  Ms. Falls die"*). Die Engine führt einen Bösewicht-Zähler, und der gehört
+  Ms. Falls — die Company ist damit **nicht** abgebildet.
+- **Patches — `LEB 2` ist richtig abgelesen.** Fleckchen hat tatsächlich
+  1/2/2/3 Leben; der Kampf läuft über seine neun **Kostüm-Fetzen** und die
+  Überfallkarte „9 lives". Ein Zähler, der auf 2 steht, ist also kein
+  Lesefehler.
+
+### 7.5 Was geschrieben wurde
+
+Geschrieben wurde **ausschließlich** die Spalte `setups.scenario_data` des
+Aufbaus `b1e10f4e-b8f2-4c2a-bb3e-54643944121b` (Spiel
+`072123c0-cd97-4ffb-a330-369630fab93f`), in einer `db.transaction`, nach einem
+Trockenlauf, der die Gegenprobe *„alles außer den acht neuen `stats` ist
+unverändert"* mitführt. `action_data` und `zone_data` wurden nicht angefasst.
+Die drei Grundspiel-Einträge sind unverändert (`6/14`, `6/15`, `6/15`).
+
+`validateScenarioData` gegen die echte Assetliste (212 Assets) und das echte
+Raster `Spielfeld A–S / 1–14`: **0 Probleme**.
+
+### 7.6 Prüfung des Ergebnisses
+
+Der Aufbau und die Aktion *„Kampf beginnen"* wurden mit den **echten**
+Produktionsdaten (`state_data`, `sequence_data`, `zone_data`, `grid_data`,
+`action_data`, `scenario_data`, 212 Assets, 1087 Karten) durch
+`executeSequenceWithLog` geschickt — je Durchlauf mit einem der acht
+Erweiterungs-Bösewichte auf dem ersten aufdeckbaren Platz der Bösewicht-Leiste.
+
+Ergebnis für alle sieben mit Zahlen: die vier vorher übersprungenen Schritte
+stehen auf **`ok`**, und die beiden Zähler tragen danach die 3P-Werte —
+`Bösewicht: Bewegung` / `Bösewicht: Leben` = 6/17, 3/15, 5/18, 9/17, 4/17, 8/2,
+5/15. Für Barry Bluff stehen die vier Schritte auf `skipped` mit der oben
+zitierten Begründung („is not a value it can take"), nicht mehr mit
+„nicht gebunden".
+
+**Nicht Teil dieses Befunds:** bei Red Atrocious, The Door Knockers und Barry
+Bluff meldet `build_scenario` weiterhin *„no terrain card named ‚Sprengstoff' /
+‚Auslöser' / ‚Dichter Wald 2'"*. Das sind fehlende **Geländekarten** in der
+Kartenbibliothek (Lücke 6, „keine `decks`-Angaben"); die Geländeteile selbst
+liegen. Der Befund bestand vorher und ist von dieser Änderung unberührt.
+
+> **Offen: Sichtprüfung am laufenden Tisch.** Anders als am 2026-10-14 konnte
+> der Browser-Bereich diesmal **nicht** angemeldet werden — er zeigte die
+> Anmeldemaske, und Zugangsdaten einzugeben ist nicht zulässig. Die Prüfung
+> oben läuft deshalb gegen denselben Executor und dieselben Daten, aber nicht
+> durch die Oberfläche. Wer das nachholt: Token `Bösewicht: Patches` auf den
+> zweiten Leistenplatz legen, verdeckt, „Kampf beginnen" drücken — erwartet
+> werden die Zähler **Bewegung 8** und **Leben 2** und **keine** Meldung über
+> `$BEW` / `$LEB`.
