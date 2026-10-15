@@ -77,10 +77,31 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   //
   // `halted` ist das dritte: hat eine Vorbedingung die ganze Folge angehalten
   // (M9.3)? Es steht neben dem Zustand, weil es nur diesen einen Lauf betrifft.
-  const ctx = { vars: {}, revealedLast: false, halted: false };
+  //
+  // `finalFight` ist das vierte und steht neben `revealedLast`, nicht an
+  // seiner Stelle: es ist die *Entscheidung*, die `build_scenario` getroffen
+  // hat (`final: auto` folgt `revealedLast`, `true`/`false` überstimmen es).
+  // `null` heißt „noch keine getroffen" - dann gilt der Platz der Leiste
+  // (M20.1).
+  const ctx = { vars: {}, revealedLast: false, halted: false, finalFight: null };
 
   for (let index = 0; index < sequenceData.length; index++) {
     const step = sequenceData[index];
+    // M20.1: ein Schritt, der nur zum Endgegner-Kampf gehört (oder nur zu den
+    // Kämpfen davor), läuft sonst **gar nicht** - und bekommt dann auch keine
+    // Protokollzeile. Er ist nicht gescheitert, er gehört nicht zu diesem
+    // Aufbau; dieselbe Entscheidung wie bei den Schritten hinter einer Wache
+    // (M9.3). Eine Zeile wäre genau der Lärm, gegen den M20.1 steht: der
+    // Sheriff-Schritt meldete in jedem Vorkampf „$SHERIFF is not bound" und
+    // schwieg ausgerechnet im Endkampf.
+    //
+    // Gefragt wird **eine** Stelle: was `build_scenario` entschieden hat
+    // (`ctx.finalFight`), sonst der Platz, von dem `reveal_next` genommen hat.
+    // Eine zweite Rechnung daneben wäre die Regel, die M6 verbietet - und sie
+    // ginge auseinander, sobald jemand `final: true` erzwingt, um einen
+    // Endkampf zu prüfen.
+    const gate = onlyFinalOf(step?.onlyFinal);
+    if (gate !== null && gate !== Boolean(ctx.finalFight ?? ctx.revealedLast)) continue;
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
@@ -332,6 +353,25 @@ const PLACEHOLDER_ONE = /\$[A-Za-z][A-Za-z0-9]*/;
 /** Steht in diesem Wert ein Platzhalter? Auch die Validierung im Editor fragt das. */
 export function hasPlaceholder(value) {
   return typeof value === 'string' && PLACEHOLDER_ONE.test(value);
+}
+
+/**
+ * M20.1: `onlyFinal` an einem Schritt - gehört er zum Endgegner-Kampf, zu den
+ * Kämpfen davor, oder zu jedem?
+ *
+ * `true` = nur im Endkampf, `false` = nur außerhalb, **`null` = in jedem** -
+ * und `null` ist auch die Antwort auf alles Unverstandene. Ein Wert, den
+ * niemand gemeint hat, darf einen Schritt nicht lautlos verschlucken; das wäre
+ * derselbe Fehler wie die Meldung, gegen die M20.1 steht, nur umgekehrt.
+ * `validateStep` meldet den Wert im Editor.
+ *
+ * Der Editor fragt dieselbe Funktion, damit Zeile und Ausführung nicht
+ * auseinanderlaufen.
+ */
+export function onlyFinalOf(value) {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
 }
 
 /**
@@ -1488,6 +1528,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const useFinal = step.final === true || step.final === 'true' ? true
         : step.final === false || step.final === 'false' ? false
         : Boolean(ctx.revealedLast);
+      // M20.1: die Entscheidung gilt ab hier fuer die ganze Folge. Ein Schritt
+      // mit `onlyFinal` liest sie, statt die Rechnung oben zu wiederholen -
+      // eine Frage, eine Antwort (M6).
+      ctx.finalFight = useFinal;
       // `final` ist additiv: derselbe Eintrag, ein zusaetzlicher Abschnitt.
       const parts = [entry, useFinal ? entry?.final : null].filter(Boolean);
 

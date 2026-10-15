@@ -328,6 +328,29 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         <option value="false">Never</option>
       </select>),
 
+    // M20.1: das Gate, das jeder Schritt hat. Drei Antworten - und „jeder
+    // Kampf" steht oben, weil es die Vorgabe ist und bleibt: ein Schritt ohne
+    // das Feld laeuft wie bisher immer. Ohne diesen Renderer zeichnete
+    // `fields.map(f => render[f]?.())` stillschweigend nichts
+    // (`docs/audit-dead-controls.md`).
+    onlyFinal: () => field('Runs in',
+      <select
+        value={step.onlyFinal === true || step.onlyFinal === 'true' ? 'true'
+          : step.onlyFinal === false || step.onlyFinal === 'false' ? 'false' : ''}
+        onChange={e => {
+          const next = { ...step };
+          if (e.target.value === '') delete next.onlyFinal;
+          else next.onlyFinal = e.target.value === 'true';
+          onChange(next);
+        }}
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-only-final`}
+      >
+        <option value="">Every fight</option>
+        <option value="true">Only the final fight</option>
+        <option value="false">Only before the final fight</option>
+      </select>),
+
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
 
@@ -478,6 +501,11 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
       </div>
 
       {fields.map(f => render[f]?.())}
+      {/* M20.1: das Gate steht an **jedem** Schritt und darum ausserhalb von
+          `fields` - diese Liste sind die Felder, die `applyStep` liest, und
+          das Gate liest die Schleife darueber. Hier gezeichnet, nicht
+          fuenfundzwanzigmal in `STEP_TYPES.fields` eingetragen. */}
+      {render.onlyFinal()}
 
       {problems.length > 0 && (
         <div className="mt-1 text-xs text-amber-400" data-testid={`sequence-step-${index}-problems`}>

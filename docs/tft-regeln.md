@@ -1603,13 +1603,17 @@ getötet, verlieren die Dörfler.
 - **Niederlagebedingung, unbedingt und ohne Zeitpunktangabe:** „Denn eine Regel
   gilt für **jeden** Endgegner-Kampf: **Sobald der Sheriff besiegt wird, verliert
   ihr die Partie!**" `[DE S.23]`
-  - Mehrere Tableaus formulieren es anders: „du verlierst, wenn der neue Sheriff
-    **zu Beginn des Bösewicht-Zuges** besiegt ist" `[Tableau Handsy]`,
-    `[Tableau Qing & Kween]`.
+  - **Drei Tableaus formulieren es anders** — belegt: „du verlierst, wenn der
+    neue Sheriff **zu Beginn des Bösewicht-Zuges** besiegt ist"
+    `[Tableau Handsy]`, `[Tableau Qing & Kween]`, `[Tableau The Bundits]`.
+    The Bundits druckt wörtlich: „You lose if all townsfolk are knocked out,
+    **or if the new sheriff is knocked out at the start of the Ruffian's
+    turn**." — am Tisch gelesen in Partie 11
+    (`docs/partie11-bericht.md`, Abschnitt 3).
   - **Empfehlung:** als **sofort** implementieren und nur dort abweichen, wo ein
-    Tableau es ausdrücklich anders druckt. `⚠️ UNSICHER:` die abweichende
-    Tableau-Formulierung konnte nicht geprüft werden; die Anleitung stützt sie
-    nicht.
+    Tableau es ausdrücklich anders druckt. Genau dieser Fall ist jetzt dreifach
+    belegt; die Anleitung stützt die abweichende Formulierung weiterhin nicht,
+    die Tableaus tun es.
 - **Solo** entscheidet die Heldenpunktsumme genauso; der Sheriff ist der Dörfler
   mit den meisten Punkten und muss anschließend besonders geschützt werden
   `[E01 44:54]`.
@@ -2485,13 +2489,15 @@ RUNDE r = 1..4
 3. ~~**Formulierung „Randale"**~~ — **GEKLÄRT.** Der Kartenabschnitt heißt
    **„Krawall"** `[DE S.16]`; „Randale" kommt auf keiner der 36 Seiten vor.
    Überall ersetzt.
-4. **Sheriff-Niederlagebedingung:** **TEILWEISE GEKLÄRT.** Die Anleitung ist
+4. ~~**Sheriff-Niederlagebedingung**~~ — **GEKLÄRT.** Die Anleitung ist
    **unbedingt und ohne Zeitpunktangabe**: „Sobald der Sheriff besiegt wird,
    verliert ihr die Partie!" `[DE S.23]` — also **sofort**. Die abweichende
-   Tableau-Formulierung („zu Beginn des Bösewicht-Zuges") konnte nicht geprüft
-   werden und wird von der Anleitung **nicht** gestützt. **Als „sofort"
-   implementieren**, und nur dort abweichen, wo ein Tableau es ausdrücklich
-   anders druckt (§8.2).
+   Tableau-Formulierung („zu Beginn des Bösewicht-Zuges") ist **geprüft**: sie
+   steht auf **drei** Tableaus — Handsy, Qing & Kween und **The Bundits**, das
+   in Partie 11 am Tisch lag (`docs/partie11-bericht.md`, Abschnitt 3). Die
+   Anleitung stützt sie nicht, die Tableaus drucken sie. **Handlungsempfehlung
+   unverändert:** als „sofort" implementieren und nur dort abweichen, wo ein
+   Tableau es ausdrücklich anders druckt (§8.2).
 5. **Zählen besiegte oder vom Schlachtfeld entfernte Dörfler für „Anzahl
    Dörfler"?** **TEILWEISE GEKLÄRT.** Für die drei Fälle, die in der Anleitung
    vorkommen, ist die Antwort klar, weil alle auf die **Besetzung der Partie**

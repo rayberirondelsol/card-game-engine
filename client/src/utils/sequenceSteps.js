@@ -14,7 +14,7 @@
 import { counterMax, counterValueForm } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
-import { hasPlaceholder, categoryList } from '../../../shared/sequenceExecutor.js';
+import { hasPlaceholder, categoryList, onlyFinalOf } from '../../../shared/sequenceExecutor.js';
 import { findCardByName } from '../../../shared/cardSearch.js';
 
 /**
@@ -107,6 +107,12 @@ export function stepTypeLabel(step) {
  * The fields to show for this step. Takes a type or a whole step: place_asset
  * is positioned either by a zone or by coordinates, and showing both invites
  * setting x/y that the zone then silently overrides.
+ *
+ * M20.1: `onlyFinal` steht **nicht** hier. Diese Liste sind die Felder, die
+ * `applyStep` liest - eines je Handler; das Gate liest die Schleife darüber,
+ * für jeden Schritt gleich. Es gehört darum keinem Typ und steht im Editor als
+ * eigene Zeile an jedem Schritt (`SetupSequenceEditor.jsx`), statt
+ * fünfundzwanzigmal in `STEP_TYPES.fields`.
  */
 export function stepFields(step) {
   const spec = specOf(step);
@@ -287,6 +293,15 @@ const down = (step) => (step?.faceDown ? ', face down' : '');
  * the bare type and every "Place Asset" row looks like every other one.
  */
 export function describeStep(step) {
+  // M20.1: das Gate steht als Nachsatz an **jeder** Zeile, und nur wenn es
+  // eines gibt - „· every fight" wäre Rauschen an jedem Schritt. Es steht
+  // hinten, weil die Zeile zuerst sagt, *was* der Schritt tut.
+  const gate = onlyFinalOf(step?.onlyFinal);
+  const when = gate === null ? '' : gate ? ' · only in the final fight' : ' · not in the final fight';
+  return describeWork(step) + when;
+}
+
+function describeWork(step) {
   const type = typeOf(step);
   const zone = step?.targetZoneLabel ? `zone ${q(step.targetZoneLabel)}` : 'all player zones';
   switch (type) {
@@ -593,6 +608,15 @@ export function validateStep(step, ctx = {}) {
     if (!String(step?.message ?? '').trim()) {
       problems.push('no message given: the protocol then shows a diagnosis, not what to do');
     }
+  }
+  // M20.1: drei Antworten, und alles andere lässt der Executor **laufen** -
+  // ein Schritt, der lautlos ausfällt, weil jemand „vielleicht" hingeschrieben
+  // hat, wäre genau der Fehler, gegen den das Gate steht. Gemeldet wird es
+  // darum hier, beim Schreiben.
+  if (step?.onlyFinal !== undefined && onlyFinalOf(step.onlyFinal) === null
+    && step.onlyFinal !== null && step.onlyFinal !== '') {
+    problems.push(`"${String(step.onlyFinal).trim()}" is not an answer:`
+      + ' every fight, only the final fight, or only before it');
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

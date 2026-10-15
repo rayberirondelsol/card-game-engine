@@ -606,6 +606,63 @@ Ausrüstung gibt es in den Daten keinen Platz — einen zu erfinden untersagt de
 Auftrag ausdrücklich. Gelesen wurden `scenario_data` sowie `zone_data`,
 `grid_data`, `sequence_data`, `action_data` und `state_data` für das
 Durchrechnen; geschrieben wurde keine Spalte.
+
+### 8.9 `Die Bundo-Königin / Beruhigungs-Leckerli` hat keine Geländekarte (2026-10-15)
+
+Partie 11 hat den Endgegner-Kampf gegen **The Bundits** zum ersten Mal am Tisch
+aufgebaut, und er meldet:
+
+> `#6 build_scenario — failed: no terrain card named "Die Bundo-Königin / Beruhigungs-Leckerli"`
+
+Das Plättchen liegt (E10, aus `The Bundits.final.terrain`), die Karte fehlt.
+**Das ist der `Pile of Locals`-Fall aus 8.7, kein Namensproblem wie beim Wald.**
+Geprüft gegen die Produktionsdaten:
+
+- Unter **allen 1087 Karten** des Spiels trägt keine einen Namen, in dem
+  `bundo`, `leckerli`, `königin`, `karni` oder `karn` steht und die eine
+  Geländekarte wäre. Die fünf Treffer sind `KARNOVEN-JACKE` und
+  `KARNI AN DER LEINE` (Beute), `KARNIBUNKER` (Aufstellbares),
+  `EIN SCHIEFER TURM AUS KARNIS` und `DER KARNOVE` (Bösewicht-Aktionen).
+- Die beiden Geländekarten-Kategorien (`Gelände`, `Gelände (Üble Nachbarn)`)
+  führen zusammen **33** Karten; der Assetkategorie `Gelände` stehen **62**
+  Plättchen gegenüber. **34** davon finden über die Regel aus M8.3 (Name, sonst
+  der Teil vor dem Schrägstrich) **keine** Karte.
+
+**Die Lücke ist eine Klasse, kein Einzelfall.** Die 34 ohne Karte sind — neben
+den drei Varianten aus 8.7 (`Dichter Wald 2`, `Holzzaun 2`, `Flut (hochkant)`)
+und den beiden Hälften von `Sprengstoff & Auslöser` — durchweg Plättchen, die
+erst im Endgegner-Kampf oder durch eine Fähigkeit auf das Brett kommen: alle
+sechs `Versteckter Bürger`, alle fünf `Grabhügel`, beide `Fetid Furball`, die
+vier `Krankheit:`-Teile, beide `Unbekannt`, `Pile of Locals`,
+`Verschlingende Welle`, `Die Gesellschaft`, `Ritualzeichen / Weizenfeld`,
+`Bundo 1`–`Bundo 6` und die Königin. Das deckt sich mit dem Befund am Tisch: die
+Regeln der Königin stehen auf der **Tableau-Rückseite**, nicht auf einer Karte.
+
+**Neu: Deputy Waggums ist genauso betroffen.** Sein `final.terrain` legt dasselbe
+Asset **dreimal** (O13, N4, C5); nach der Entdoppelung über Name + Seite wird
+daraus **eine** fehlende Karte und damit **eine** Meldung. Die Tabelle aus 8.7
+bekommt also eine vierte Zeile:
+
+| Meldung | wahre Lage | Folge |
+|---|---|---|
+| `Die Bundo-Königin / Beruhigungs-Leckerli` (**The Bundits `final`**, **Deputy Waggums `final`**) | In der Kartenbibliothek gibt es **keine** Karte dieses Namens, und auch keine für eine der beiden Seiten. | **Echte Lücke**, zweiter Fall neben `Pile of Locals`; betrifft zwei der fünf vorhandenen `final`-Abschnitte. |
+
+**Was nicht getan wurde und warum** (Entscheidung zu Spec M20.2,
+`docs/tasks-endkampf.md` `BP`):
+
+1. **Keine Karte angelegt.** Dazu gehörten Bild und Regeltext, die es hier nicht
+   gibt — das wäre erfundene Kartendaten, dieselbe Grenze wie in 8.7.
+2. **Kein `noCard`-Vermerk am Gelände-Eintrag.** Er behauptete „dieses Plättchen
+   **hat** keine Karte"; belegt ist nur „in **dieser Bibliothek** gibt es
+   keine". Würde die Karte später importiert, läge sie danach still nicht mehr
+   auf dem Tisch — derselbe Fehler, den M20.1 für Meldungen abgeschafft hat, nur
+   eine Schicht tiefer.
+3. **Keine unterdrückte Meldung.** Nach M20.1 ist die `$SHERIFF`-Zeile aus den
+   Vorkämpfen verschwunden; diese Meldung ist damit im Endkampf die **einzige**
+   Zeile im Protokoll — zum ersten Mal ein Signal statt einer von zwei.
+
+`scenario_data` ist dafür **unverändert** geblieben.
+
 ---
 
 ## 9. Die Besondere Ausrüstung des neuen Sheriffs (eingetragen 2026-10-15)

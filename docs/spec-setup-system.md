@@ -4856,3 +4856,107 @@ ob er sie nie hatte. Das sind zwei verschiedene Befunde.
 1. Im Endkampf zeigt das Bösewicht-Tableau die Seite, die der Endkampf braucht.
 2. Der Bösewicht steht nach dem Aufbau in einer definierten Richtung — oder die
    Spec sagt, dass der Aufbau keine setzt und warum.
+
+---
+
+> ## Nachtrag zu M20 (2026-10-15) — umgesetzt, mit vier Richtigstellungen
+>
+> Aufgaben, Befunde und die geprüften Gegenbelege stehen in
+> `docs/tasks-endkampf.md`. Was sich an der Spec ändert:
+
+### M20.1 — die Unterscheidung wurde verallgemeinert, nicht kopiert
+
+Die Vermutung der Spec („wenn dieselbe Unterscheidung einem `place_card` zur
+Verfügung steht") traf nicht zu: `step.final` wird **nur** im
+`case 'build_scenario'` gelesen, und die Tatsache darunter
+(`ctx.revealedLast`) war von keinem Schritt erreichbar.
+
+Gebaut ist darum **ein Feld an jedem Schritt**: `onlyFinal` — `true` (nur im
+Endgegner-Kampf), `false` (nur in den Kämpfen davor), fehlend (in jedem, und
+das ist die Vorgabe). Ausgewertet wird es **einmal**, in der Schleife von
+`executeSequenceWithLog`, bevor der Schritt läuft; ein Schritt, der nicht
+dazugehört, bekommt **keine Protokollzeile** — er ist nicht gescheitert,
+er gehört nicht zu diesem Aufbau (dieselbe Entscheidung wie bei den Schritten
+hinter einer Wache, M9.3).
+
+Gefragt wird **eine** Stelle: `ctx.finalFight`, die Entscheidung, die
+`build_scenario` getroffen hat, mit `ctx.revealedLast` als Rückfall für Schritte
+davor. Damit zieht ein von Hand erzwungenes `final: true` das Gate mit, statt
+zwei Antworten auf dieselbe Frage zu geben (M6).
+
+`onlyFinal` steht **nicht** in `stepFields`: diese Liste sind die Felder, die
+`applyStep` liest, eines je Handler. Das Gate liest die Schleife darüber und
+gehört darum keinem Typ; der Editor zeichnet es als eigene Zeile an jedem
+Schritt.
+
+**Tilda Fields braucht keine eigene Regel.** Mit dem Gate steht in ihren
+Kämpfen 1–3 keine Zeile, und im Endkampf steht
+`skipped: "$SHERIFF": $SHERIFF is not bound` — die einzige Sheriff-Zeile der
+ganzen Partie, genau da, wo sie etwas bedeutet. Den Grund (ihr Sheriff zieht
+aus dem Gartendeck) in eine Schrittmeldung zu heben hieße, dem Executor
+Townsfolk Tussle beizubringen (§1).
+
+### M20.2 — echte Lücke, dokumentiert statt überdeckt
+
+Es ist der `Pile of Locals`-Fall, kein Namensproblem: unter allen 1087 Karten
+gibt es keine Geländekarte für `Die Bundo-Königin / Beruhigungs-Leckerli`, und
+die Lücke ist strukturell — 62 Geländeassets gegen 33 Geländekarten, 34 Assets
+ohne Karte, darunter jedes Plättchen, das erst im Endgegner-Kampf oder durch
+eine Fähigkeit auf das Brett kommt. **Deputy Waggums ist genauso betroffen.**
+
+Der erste Zweig der Abnahme („baut ohne `failed` auf") wäre nur über eine
+erfundene Karte oder eine unterdrückte Meldung zu erreichen — und unterdrückte
+Meldungen sind laut M20.1 genau das Problem. Ein Vermerk `noCard` am
+Gelände-Eintrag behauptete „dieses Plättchen **hat** keine Karte"; belegt ist
+nur „in **dieser Bibliothek** gibt es keine". Also **zweiter Zweig**: die Lücke
+steht mit Grund in `docs/szenariodaten-erweiterung.md` 8.9. Dafür ist die
+Meldung nach M20.1 im Endkampf die **einzige** Zeile im Protokoll.
+
+### M20.3 — die vier Bundos und *Scatter* baut der Tisch nicht auf
+
+**Entschieden dagegen, beides.** Die Grenze liegt nicht zwischen „Fähigkeit"
+und „Aufbau", sondern an der Frage, ob die Daten eine Position behaupten, die
+nirgends gedruckt steht. Jeder Eintrag in `scenario_data.terrain` ist von einer
+gedruckten Schlachtfeld-Übersicht abgelesen; das Tableau sagt hier nur
+„**adjacent to** The Bundo Queen" — vier von sechs Plättchen auf acht
+Nachbarfeldern, also 70 Möglichkeiten, von denen der Spieler eine wählt. Dazu
+erzeugt **SPREAD** die Bundos im Kampf weiter: eine feste Aufbauposition wäre ab
+Runde 2 falsch, und `build_scenario` hat keinen Begriff von „mehr davon".
+Dieselbe Entscheidung ist für Patches' „10 Fetid Furball terrain pieces aside
+for later use" schon gefallen (`docs/szenariodaten-erweiterung.md` 8.5).
+
+Die Karte *Scatter* fällt aus einem einfacheren Grund heraus: sie ist im
+deutschen 15er-Deck nicht identifizierbar, und eine Aktionskarte offen ins
+Spiel zu legen ist ein Zug, kein Aufbau.
+
+**Für die Spielerrolle** (die es in diesem Repo nicht gibt — sie wird hier
+dreimal erwähnt und muss vom Auftraggeber nachgezogen werden), wörtlich
+übernehmbar:
+
+> Im Endgegner-Kampf gegen **The Bundits** baut der Tisch die Königin auf E10
+> auf, **nicht** die vier Bundo-Plättchen und **nicht** die Karte *Scatter*.
+> Beides ist Handarbeit: vier `Bundo`-Token über den Token-Knopf auf vier
+> Nachbarfelder der Königin, und die *Scatter*-Aktion aus dem Verhaltensdeck
+> (Name im deutschen Deck ungeklärt, `docs/partie11-bericht.md` 6.1).
+
+### M20.4 — die Rückseite liegt, und „keine Rotation" war ein Messartefakt
+
+Das Tableau wird im Endkampf gewendet: an „Kampf beginnen" hängt ein Schritt
+`set_asset_face { assetName: "Tableau: $revealedBase", faceDown: true,
+onlyFinal: true }`. Ein eigener Schritt und nicht ein `onlyFinal: false` an der
+vorhandenen Drehung auf die Vorderseite — dann stünde die Endkampfseite nur
+noch darin, dass Schritt 5 verdeckt legt, und wer das ändert, dreht den
+Endkampf still auf die falsche Seite.
+
+**Der Bösewicht stand nie ohne Drehung.** `place_asset` schreibt
+`rotation: rotationOf(step.rotation) ?? 0` in **allen drei** Zweigen, auch als
+0; was im Bericht fehlte, war das DOM-Attribut
+(`data-rotation={rotation || undefined}`, bei 0 also keines). Dasselbe Muster
+wie der „70-Pixel-Befund" aus Partie 10.
+
+**Der Aufbau wählt keine Blickrichtung, und das bleibt so.** Aufbauschritt 8
+der Regeln verlangt „in die Richtung des ihm **nahesten Dörflers**"; welcher
+das ist, hängt von den gewählten Startplätzen ab, und „am nahesten" ist eine
+Rechnung über den Spielstand — nach §1 nicht die Aufgabe des Tisches. Der
+Bösewicht liegt auf definierten 0°, die Blickrichtung setzt der Spieler mit
+`Rotate Left/Right`.
