@@ -103,6 +103,12 @@ liefern. Ein Objekt merkt sich `gridId` + `cell` (`C7`), nicht nur Koordinaten;
 `placeOnGrids` setzt es beim Laden wieder auf sein Feld. Zonenplätze schlagen
 das Raster darunter (`snapInto`). Raster liegen in `setups.grid_data`.
 
+## Produktionsdaten
+
+Wer an den echten Spieldaten arbeitet: **`docs/datenzugriff.md`** — zwei geprüfte
+Zugangswege, das base64-Rezept (Umlaute überleben den `qm guest exec`-Weg sonst
+nicht), die Regeln fürs Schreiben und die Fallen, die schon zugeschlagen haben.
+
 ## Eigenheiten, die Zeit sparen
 
 - **Der Setup-Editor ist nur über `?mode=setup`** erreichbar (Button auf der
