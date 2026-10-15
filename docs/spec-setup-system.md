@@ -4751,3 +4751,108 @@ Der Spieler hat zwei Dinge richtiggestellt:
 2. Der Prüfpunkt „Heldentaten-Boni sind nicht dauerhaft" **blieb unbelegt** —
    die einzige erfüllte Heldentat bot „+3 Münzen oder +1 PRZ", und er nahm die
    Münzen. Kein Engine-Befund, aber auch kein Nachweis. Bleibt offen.
+
+## M20 — Der Endgegner-Kampf war zum ersten Mal am Tisch
+
+Belegt in `docs/partie11-bericht.md`. Die ehrliche Partie endete im **ersten**
+Kampf — Deputy Waggums besiegte alle drei Dörfler und überlebte mit **1 von 14
+LEB**. Danach wurde, wie beauftragt, auf Testbetrieb umgestellt und der
+**Endgegner-Kampf gegen The Bundits** erreicht, aufgebaut, geprüft und sein
+erster Bösewicht-Zug ausgespielt.
+
+**Der Endkampf trägt.** Zusätzliches Gelände wird gelegt (Die Bundo-Königin auf
+E10), die Sheriff-Ausrüstung **Perfekte Möhre** liegt in der `Terrain-Auslage`
+und ließ sich zum Sheriff ziehen, BEW 6 / LEB 15 stimmen exakt mit Tableau und
+Regeldatei. **Alle vier M19-Punkte halten** — Würfel bei Spielzoom lesbar,
+angelegte Karte trägt den grünen Rahmen selbst, der Zug auf der Figur bewegt die
+Figur (direkt über dem Gemüsebeet gemessen), und „Dorfphase beginnen" fragt bei
+allen besiegten Dörflern nach.
+
+**Drei Richtigstellungen an meiner Vorgabe**, alle belegt:
+- **The Bundits hat EG-Gelände.** Ich hatte nur Tilda Fields und The Door
+  Knockers genannt.
+- **Die Schwäche ist bei The Bundits im Endkampf nicht anders** — wortgleich auf
+  beiden Seiten. §5.3 sagt „einige wenige"; dieser gehört nicht dazu.
+- **Die abweichende Sheriff-Niederlagebedingung** („zu Beginn des
+  Bösewicht-Zuges") steht auch auf diesem Tableau. In §8.2 ist sie noch als
+  `⚠️ UNSICHER` geführt — das ist jetzt belegt und gehört dort korrigiert.
+
+### M20.1 — Die Sheriff-Warnung erscheint in jedem Kampf außer dem richtigen
+
+**Befund, und er geht auf meine Rechnung.** `place_card "$SHERIFF"` läuft in
+**jedem** Kampf. In Kampf 1 und 2 meldet er `skipped: "$SHERIFF" is not bound`,
+im Endkampf schweigt er.
+
+Technisch ist das genau das entworfene Verhalten. **Praktisch ist es eine
+Falle:** ich habe dem Spieler vorab gesagt, diese Meldung sei harmlos — womit
+er sie in jeder Runde zu ignorieren lernt. **Ein echter Fehlschlag im Endkampf
+wäre ihm dadurch nicht aufgefallen.** Eine Meldung, die man ignorieren soll,
+ist keine Meldung, sondern Lärm; und Lärm, der genau dort aufhört, wo es darauf
+ankommt, ist schlimmer als keine Meldung.
+
+**Änderung.** Der Schritt läuft **nur im Endkampf**. Wie das geht, entscheidet,
+wer es baut: `build_scenario` kennt bereits `final: "auto"` — wenn dieselbe
+Unterscheidung einem `place_card` zur Verfügung steht, ist es dieselbe Regel
+und keine zweite. Falls nicht, ist der ehrlichere Weg, sie dort einzuführen,
+statt die Meldung zu unterdrücken: **unterdrückte Meldungen sind genau das
+Problem.**
+
+**Abnahme.**
+1. In den Kämpfen vor dem Endkampf steht **keine** `$SHERIFF`-Meldung im
+   Protokoll.
+2. Im Endkampf liegt die Karte, und bleibt sie aus, **sagt es das Protokoll**.
+3. Bei Tilda Fields — deren Sheriff aus dem Gartendeck zieht — bleibt es
+   erklärbar: entweder kein Schritt oder eine Meldung, die den Grund nennt.
+
+### M20.2 — Dem Endkampf-Gelände fehlt seine Geländekarte
+
+**Befund.** `build_scenario — failed: no terrain card named "Die Bundo-Königin /
+Beruhigungs-Leckerli"`. Das Plättchen liegt, die **Karte** fehlt.
+
+Das ist **nicht** derselbe Fall wie die vermeintlich fehlenden Karten aus dem
+letzten Datenauftrag — dort trafen nur die Namen nicht (eine Karte
+`Sprengstoff & Auslöser` für zwei Plättchen). Hier meldet der Schritt
+**`failed`**, nicht eine Fußnote.
+
+**Zu klären, bevor etwas geschrieben wird:** Gibt es die Karte unter einem
+anderen Namen? `Pile of Locals` ist aus demselben Durchgang als wirklich
+fehlend bekannt — ist das hier derselbe Fall, oder ein Namensproblem wie beim
+Wald?
+
+**Abnahme.** Der Endkampf gegen The Bundits baut ohne `failed` auf, oder die
+Lücke steht mit Grund in `docs/szenariodaten-erweiterung.md`.
+
+### M20.3 — Die Stufenfähigkeit des Endkampfs wird nicht aufgebaut
+
+**Befund.** The Bundits' Endkampf verlangt eine **Scatter**-Karte und **vier
+Bundo-Geländeteile**. Die Tokens `Bundo 1`–`Bundo 6` gibt es; gesetzt werden sie
+nicht. Der Spieler hat vier von Hand gelegt. Die Karte *Scatter* ist im
+deutschen Deck nicht identifizierbar.
+
+**Das berührt die Grenze aus §1 der Spec** — der Tisch baut auf, er spielt
+nicht. Geländeteile beim Aufbau hinzulegen **ist** Aufbau; eine
+Stufenfähigkeit auszuführen ist es nicht. Zu entscheiden ist, welcher Teil
+davon hierher gehört, und das gehört begründet.
+
+**Abnahme.** Entweder legt der Endkampf die vier Bundos mit, oder die
+Entscheidung dagegen steht mit Begründung in der Spec — und die Spielerrolle
+sagt, dass es Handarbeit ist.
+
+### M20.4 — Das Tableau wird für den Endkampf nicht gewendet
+
+**Befund.** Der Endkampf benutzt den Bereich **unterhalb der
+Schlachtfeld-Übersicht** auf der Tableau-Rückseite `[DE S.15]` — das Tableau
+selbst wird aber nicht gewendet. Wer am Tisch nachlesen will, was der Endkampf
+verlangt, dreht von Hand.
+
+**Dazu, aus demselben Befund:** **Aufbauschritt 8 dreht den Bösewicht gar
+nicht** — am Token liegt keine Rotation. Seit M13.1 kann er gedreht werden; der
+Aufbau benutzt es nicht.
+
+**Zu prüfen:** Ob Schritt 8 eine Drehung *vorsieht* und sie nicht ankommt, oder
+ob er sie nie hatte. Das sind zwei verschiedene Befunde.
+
+**Abnahme.**
+1. Im Endkampf zeigt das Bösewicht-Tableau die Seite, die der Endkampf braucht.
+2. Der Bösewicht steht nach dem Aufbau in einer definierten Richtung — oder die
+   Spec sagt, dass der Aufbau keine setzt und warum.
