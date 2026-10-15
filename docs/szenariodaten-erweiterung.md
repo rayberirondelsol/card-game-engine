@@ -522,7 +522,7 @@ den Namen.
 | Tableau (englisch) | Karte (deutsch) | Kategorie | Beleg | Sicherheit |
 |---|---|---|---|---|
 | Snake Oil | **QUACKSALBE** | `Einzigartige Ausrüstung (Üble Nachbarn)` | Flasche „QUACK-SALBE" mit Schlange; der Text nimmt bzw. wirft `Krankheit` ab — Red Atrocious' Kampf läuft über Krankheiten | **sicher** |
-| Belly Balm | **KÖRPERBUTTER** | dto. | Tiegel „ENTSPANNUNG", *„Wenn's dir mal wieder zu viel wird!"*; einzige Balsam-/Cremekarte des Satzes | **hoch, aber nicht wörtlich** — der Name ist nicht die Übersetzung von „Belly Balm"; ein anderer Kandidat ist im Satz nicht vorhanden |
+| Belly Balm | **KÖRPERBUTTER** | dto. | Tiegel „ENTSPANNUNG", *„Wenn's dir mal wieder zu viel wird!"*; einzige Balsam-/Cremekarte des Satzes. **Nachgeprüft 2026-10-15** (Abschnitt 9.2): der Kartentext *„Abwerfen: -2 MUMM"* ist die Antwort auf Ernie Offals Fähigkeit **„Cuisine Counterer"** (*„Whenever a townsfolk deals DMG to Ernie, they gain +1 MOX … if that townsfolk has 10 MOX, they take 1 DMG"*) — MUMM = MOX | **sicher** (vorher „hoch, aber nicht wörtlich") |
 | „Spare" Limbs | **ERSATZ-GLIEDMASSEN** | dto. | wörtliche Übersetzung | **sicher** |
 | Absorbant Towel | **MIKROFASERTUCH** | dto. | tropfendes Tuch; der Text verschiebt `Wasser`-Marker — Ms. Falls' Kampf läuft über Wasser | **sicher** |
 | Shooing Broom | **MIETZ-SCHEUCHER** | dto. | Besen; *„Entferne 1 Siffigen Haarball innerhalb von 4 Feldern"* — das sind Patches' Fetid Furballs | **sicher** |
@@ -538,11 +538,11 @@ Zur Einordnung: dieselbe Zuordnung trägt auch das Beispiel aus
 Drei Angaben sind erfasst, haben aber **keinen Platz** in `scenario_data`, und
 es wurde **keiner erfunden**:
 
-1. **Die Besondere Ausrüstung je Bösewicht.** Ein Eintrag kennt `scenario`,
-   `terrain`, `fields`, `decks`, `stats` und `final` — keinen Platz für „diese
-   Karte bekommt der neue Sheriff". Wohin das gehört, ist eine Entscheidung und
-   keine Lesung. (Denkbar wäre ein `decks`-Eintrag im `final`-Abschnitt, der die
-   Karte in eine Zone legt — das wäre aber neues Verhalten.)
+1. ~~**Die Besondere Ausrüstung je Bösewicht.**~~ **Erledigt am 2026-10-15,
+   siehe Abschnitt 9.** Der Platz war schon da: `final.stats` — dieselbe
+   Bindung, die `$BEW` und `$LEB` liefert. Ein `final`-Abschnitt, der **nur**
+   `stats` enthält, trägt (9.3), und ein `place_card`-Schritt am Ende von
+   „Kampf beginnen" legt `$SHERIFF` aus. Neues Verhalten brauchte es nicht.
 2. **Patches' „10 Fetid Furball terrain pieces aside for later use".** „Aside"
    nennt kein Feld, und die Assetliste führt `Fetid Furball` nur **zweimal**
    (beide `width` 95) — zehn Exemplare gibt es dort nicht. Die Plättchen kommen
@@ -606,3 +606,244 @@ Ausrüstung gibt es in den Daten keinen Platz — einen zu erfinden untersagt de
 Auftrag ausdrücklich. Gelesen wurden `scenario_data` sowie `zone_data`,
 `grid_data`, `sequence_data`, `action_data` und `state_data` für das
 Durchrechnen; geschrieben wurde keine Spalte.
+---
+
+## 9. Die Besondere Ausrüstung des neuen Sheriffs (eingetragen 2026-10-15)
+
+### 9.1 Das Ergebnis in einem Satz
+
+Zehn der elf Bösewichte nennen auf ihrer Tableau-Rückseite **eine** Besondere
+Ausrüstung; sie steht jetzt als `final.stats.SHERIFF` in den Szenariodaten, und
+ein `place_card`-Schritt am Ende der Aktion **„Kampf beginnen"** legt sie im
+Endgegner-Kampf in die **Terrain-Auslage**. **Tilda Fields fällt heraus** — bei
+ihr zieht der Sheriff die oberste Karte eines gemischten Decks, es gibt also
+keinen Kartennamen, den der Tisch legen könnte.
+
+### 9.2 Die fünf nachgelesenen Namen
+
+Abgelesen mit derselben Methode wie in Abschnitt 8.2: `table_assets."Tableau:
+<Name>".back_image_path`, das **SETUP**-Band unter dem Szenariobanner
+(y 0,50–0,72 der Bildhöhe), auf 1400 px Breite hochskaliert. Die Bilder wurden
+diesmal nicht über `https://gaming.benjathi.de` geholt (der Vorsatz antwortet
+inzwischen mit **403**), sondern direkt aus dem Upload-Verzeichnis des
+Containers — dieselbe Datei, ein anderer Weg.
+
+| Bösewicht (Szenario) | SETUP-Wortlaut | Ausrüstung (englisch) | Karte (deutsch) | Sicherheit |
+|---|---|---|---|---|
+| **Deputy Waggums** — „Pacifying the Pooch" | *„Appoint a new sheriff! The new sheriff quickly scatters treats across the landscape and grabs the **Sheriff's Tranq** unique gear (may equip immediately)."* | Sheriff's Tranq | **BETÄUBUNGSWUMME** | **sicher** |
+| **Virginia Fitz** — „The Old Sheriff's Debt" | *„… They receive the **Sheriff's Shovel** unique gear (may equip immediately)!"* | Sheriff's Shovel | **SHERIFFS SCHAUFEL** | **sicher** |
+| **The Bundits** — „The Bundo Queen Cometh" | *„… the newly appointed sheriff receives the **Irresistible Carrot** unique gear (may equip immediately)."* | Irresistible Carrot | **PERFEKTE MÖHRE** | **sicher** |
+| **The Door Knockers** — „The Flawless Sales Pitch" | *„… the new sheriff grabs some gear from Goob's Tavern. They receive the **'No Solicitors'** unique gear (may equip immediately)."* | 'No Solicitors' | **DER BEGRÜSSER** | **sicher** |
+| **Tilda Fields** — „Shearing the Scoundrels" | *„Find the 10 **garden** keyword gear in the unique gear deck. Shuffle them face down and set them aside to form the **Garden deck**."* / *„Appoint a new sheriff! They rush ahead and receive the top card of the Garden deck."* | **kein benanntes Teil** | — | **sicher gelesen, nicht eintragbar** |
+
+**Warum die vier Zuordnungen sicher sind** — zugeordnet wurde wie in 8.4 über
+**Kartenbild und Kartentext**, nicht über den Namen:
+
+- **BETÄUBUNGSWUMME** (Betäubungs-Wumme, Spritzenpistole): *„Reichweite 4. Wenn
+  du hiermit triffst, **-1 ENERGIE für Willi**."* „Willi" ist Deputy Waggums im
+  Deutschen, und **Energie** ist genau seine Fähigkeit „Boundless Energy"
+  (*„Waggums begins the fight with 2 energy per townsfolk"*). Die vier
+  „SHERIFFS …"-Karten der Grundspielkategorie (Anker, Feuerzeug, Klebstoff,
+  Schaufel) gehören nachweislich zu anderen Bösewichten.
+- **SHERIFFS SCHAUFEL** (blutige Schaufel): *„+1 auf deine Terrain-Würfe für
+  **Grabhügel**."* Grabhügel = Burial Mound, Virginia Fitz' einziges
+  Endkampf-Terrain. Nicht zu verwechseln mit **GÜNNIS SCHAUFEL** aus derselben
+  Kategorie.
+- **PERFEKTE MÖHRE**: *„1 MUMM: Bewege **Die Karnönigin** oder 1 **Karni** um
+  bis zu 3 Felder."* Karnönigin = The Bundo Queen, Karni = Bundo.
+- **DER BEGRÜSSER**: Das Artwork zeigt eine aufgerollte Fußmatte mit der
+  Aufschrift „HAU AB!", die wie eine Wumme abgefeuert wird, mit einem roten
+  Verbotszeichen als Mündungsrauch — das „No Solicitors"-Türschild. Der Text
+  *„Immer wenn du einen **bekehrten** Dörfler mit dieser Waffe angreifst,
+  darfst du 1 **Glaube** abwerfen"* nennt beide Begriffe, die nur den Door
+  Knockers gehören.
+
+**Nebenbefund: die Rückfrage zu Ernie Offal ist geklärt.** Der Auftrag bat um
+eine zweite Lesung der einzigen Zuordnung aus 8.4, die „hoch, aber nicht
+wörtlich" stand. Das SETUP-Band sagt wortgleich *„They never leave home without
+their tummy meds — a wise choice! They receive **Belly Balm** unique gear."*
+**KÖRPERBUTTER** trägt *„Abwerfen: -2 MUMM."* Ernies Fähigkeit **„Cuisine
+Counterer"** schiebt den Dörflern bei jedem Treffer +1 MOX zu und bestraft sie
+bei 10 MOX mit 1 DMG — MUMM ist MOX, und die Karte ist das Gegenmittel. Damit
+hängt die Zuordnung nicht mehr nur am Tiegelbild: **sicher** (8.4 nachgezogen).
+
+**Was weggelassen wurde: Tilda Fields.** Ihr Sheriff bekommt kein benanntes
+Teil, sondern die **oberste Karte des Garten-Decks** — zehn gemischte Karten
+mit dem Schlüsselwort `garden`. Der Tisch dürfte nicht entscheiden, welche das
+ist, und einen Deck-Schritt zu bauen hieße, die zehn Karten erst einmal zu
+identifizieren (die Kategorie `Einzigartige Ausrüstung (Üble Nachbarn)` führt
+neun offensichtliche: GARTENHANDSCHUHE, GARTENSCHERE, GARTENSCHLAUCH,
+GARTENSTIEFEL, RECHEN, SPATEN, UNKRAUTVERNICHTER, WASSEREIMER, ERNTEHUT — die
+zehnte ist nicht am Namen erkennbar). Also **kein Eintrag**, und der Schritt
+wird bei ihr übersprungen wie in jedem Vorkampf.
+
+### 9.3 Trägt ein `final`-Abschnitt, der nur `stats` enthält?
+
+**Ja.** Sechs der elf hatten gar keinen `final`-Abschnitt (8.1, und das ist
+richtig — sie haben kein Endkampf-Gelände). Geprüft wurde an beiden Stellen,
+die darüber entscheiden:
+
+- **`shared/sequenceExecutor.js`, `build_scenario`:**
+  `const parts = [entry, useFinal ? entry?.final : null].filter(Boolean);` —
+  `filter(Boolean)` wirft nur `null`/`undefined` weg, ein Objekt `{ stats: … }`
+  ist wahr und bleibt drin. Die Schleife darunter liest `part?.terrain`,
+  `part?.fields` und `part?.stats` je für sich; leere Gelände- und Feldlisten
+  tun schlicht nichts.
+- **`shared/scenarioData.js`, `validateScenarioData`:** `section()` meldet nur,
+  was dasteht, und gibt zurück, ob der Abschnitt etwas legt. Die einzige Stelle,
+  die daran hängt, ist `if (!placesSomething && !finalPlaces) problems.push(…
+  "places nothing")` — und `placesSomething` ist für alle elf Einträge wahr
+  (jeder hat Hauptgelände). Ein `final`, das nur `stats` trägt, gilt also **nicht
+  als leer**, sondern als „legt nichts, bindet aber".
+
+Gegenprobe am Durchrechnen: für alle elf Bösewichte sind **Rasterobjekte,
+Status von `build_scenario`, dessen Meldungen und die beiden Bösewicht-Zähler
+vor und nach der Änderung identisch** — der neue `final`-Abschnitt ändert am
+Aufbau nichts außer der zusätzlichen Karte.
+
+### 9.4 Was eingetragen wurde
+
+**`setups.scenario_data`** — je Bösewicht ein Schlüssel im `final`-Abschnitt,
+genau in der Form, die `$BEW` und `$LEB` schon benutzen:
+
+```json
+"Red Atrocious":   { "final": { "stats": { "SHERIFF": "QUACKSALBE" } } },
+"Deputy Waggums":  { "final": { "terrain": [...], "fields": {...},
+                                "stats": { "SHERIFF": "BETÄUBUNGSWUMME" } } }
+```
+
+| Bösewicht | `final` vorher | `final` nachher | `SHERIFF` |
+|---|---|---|---|
+| Deputy Waggums | `terrain`+`fields` | `terrain`+`fields`+`stats` | BETÄUBUNGSWUMME |
+| Virginia Fitz | `terrain`+`fields` | `terrain`+`fields`+`stats` | SHERIFFS SCHAUFEL |
+| The Bundits | `terrain`+`fields` | `terrain`+`fields`+`stats` | PERFEKTE MÖHRE |
+| The Door Knockers | `fields` | `fields`+`stats` | DER BEGRÜSSER |
+| Red Atrocious | — | `stats` | QUACKSALBE |
+| Ernie Offal | — | `stats` | KÖRPERBUTTER |
+| Tartar Fishboy | — | `stats` | ERSATZ-GLIEDMASSEN |
+| Ms. Falls & Co. | — | `stats` | MIKROFASERTUCH |
+| Patches | — | `stats` | MIETZ-SCHEUCHER |
+| Barry Bluff | — | `stats` | BLUTBESPRITZT |
+| **Tilda Fields** | `terrain`+`fields` | **unverändert** | — |
+
+**`setups.action_data`** — ein Schritt, **angehängt** an „Kampf beginnen"
+(Schritt 17, die Aktion hat jetzt 18):
+
+```json
+{ "type": "place_card", "cardName": "$SHERIFF", "targetZoneLabel": "Terrain-Auslage" }
+```
+
+Die Schritte 0–16 sind Zeichen für Zeichen unverändert, die beiden anderen
+Aktionen („Dorfereignis ziehen", „Dorfphase beginnen") ebenfalls. `zone_data`,
+`grid_data`, `sequence_data` und `state_data` wurden **nur gelesen**.
+
+**Eindeutigkeit der Namen.** `place_card` löst über `findCardByName` gegen die
+**ganze** Bibliothek auf (1087 Karten), nicht gegen eine Kategorie. Alle zehn
+eingetragenen Namen und die fünf `GESICHTSLOS`-Namen treffen dort **genau eine**
+Zeile — exakte Übereinstimmung auf `squashName`, kein `ambiguous`, kein
+„has N copies". Geprüft mit `findCardByName` gegen die echte Kartenliste.
+
+### 9.5 Wohin die Karte fällt — und warum dorthin
+
+**`Terrain-Auslage`.** Wer Sheriff wird, entscheiden die Spieler über
+Heldenpunkte (`docs/tft-regeln.md` §8.2); der Tisch darf das nicht vorwegnehmen.
+Er legt die Karte darum **sichtbar und unparteiisch** hin, von Hand wandert sie
+zum richtigen Dörfler. Von den 45 Zonen des Aufbaus bleibt dafür genau eine
+übrig:
+
+- **`Ausrüstung Dörfler 1/2/3`** scheiden aus — jede Wahl wäre eine Sheriffwahl.
+- **`Heldentaten-Auslage`** hat `capacity: 6`, und „Dorfphase beginnen" füllt sie
+  mit `fill: true` wieder auf 6 Heldentaten auf; eine Fremdkarte nähme einen
+  Platz weg und verschöbe die Zählung.
+- **`Nachschub-Auslage`** ist der Laden, und „Kampf beginnen" räumt sie mit
+  `clear_zone` in den Stapel *Nachschub (Tante Emma)* — die Ausrüstung
+  verschwände im nächsten Kampf im Nachziehstapel.
+- **`Ablage`** ist der Ablagestapel: eine Karte, die noch genommen werden soll,
+  sähe dort weggeworfen aus.
+- **`Aktionen`** bekommt im selben Durchlauf das Verhaltensdeck (Schritt 15).
+- **`Hand Dörfler 1/2/3`** wären wieder eine Zuweisung.
+
+Übrig bleibt **`Terrain-Auslage`**: `accepts: ["card"]`, **`capacity: null`**
+(sie kann also nie voll laufen und keiner Geländekarte den Platz nehmen), am
+Hauptbrett verankert und über dessen ganze Breite sichtbar, und sie hält genau
+die Karten, die zum **gerade liegenden Kampf** gehören. Dass „Dorfphase
+beginnen" sie mit `clear_zone` leert, ist hier das Entscheidende: die Besondere
+Ausrüstung gilt nur im Endgegner-Kampf und wird mit ihm abgeräumt, statt liegen
+zu bleiben.
+
+Die Karte liegt **hinter** den Geländekarten, weil der Schritt ans Ende der
+Aktion gehängt ist und `place_card` den ersten freien Platz nimmt.
+
+### 9.6 Wie die Meldung im Vorkampf lautet
+
+In den Kämpfen vor dem Endkampf bindet `build_scenario` den `final`-Abschnitt
+nicht, `$SHERIFF` bleibt also ungebunden, und der Schritt wird **übersprungen**
+— mit Absicht. Im Protokoll steht dann, wortgleich:
+
+> **place_card** — `skipped` — `"$SHERIFF": $SHERIFF is not bound`
+
+Das ist dieselbe Zeile, die jeder Platzhalterschritt ohne Bindung erzeugt
+(`shared/sequenceExecutor.js`, Platzhalterauflösung über `NAME_FIELDS`), und
+**kein Datenmangel**: im Chump-, Hooligan- und Troublemaker-Kampf gibt es keinen
+neuen Sheriff. Bei **Tilda Fields** steht dieselbe Zeile auch im Endkampf, aus
+dem Grund in 9.2.
+
+### 9.7 Prüfung
+
+**Verfahren** nach `docs/datenzugriff.md`: Trockenlauf mit Gegenprobe („außer
+`final.stats` ist nichts anders, die Schritte 0–16 sind unverändert, die
+anderen Aktionen sind unverändert"), Sicherung der beiden Spalten, dann scharf
+in **einer** `db.transaction` über `scenario_data` und `action_data` — jede
+Spalte mit ihrem eigenen `UPDATE`, keine ganze Zeile zurückgeschrieben.
+Danach Kontrollausgabe aus der Datenbank.
+
+**`validateScenarioData`** gegen die echte Assetliste (212 Assets) und das echte
+Raster `Spielfeld A–S / 1–14`, auf die **geschriebene** Spalte: **0 Probleme**.
+
+**Durchgerechnet** mit den echten Produktionsdaten (`state_data`,
+`sequence_data`, `zone_data`, `grid_data`, `action_data`, `scenario_data`,
+212 Assets, 1087 Karten) durch `executeSequenceWithLog`, je Durchlauf die echte
+Aufbausequenz mit dem Testbösewicht auf dem **dritten und damit letzten**
+Leistenplatz, danach dreimal „Kampf beginnen" mit „Dorfphase beginnen"
+dazwischen. (Zwei Füller auf den vorderen Plätzen: zweimal derselbe Name ginge
+nicht, `place_asset` verschiebt dasselbe Objekt, statt ein zweites zu legen.)
+
+| Bösewicht | Kampf 1 | Kampf 3 (Endkampf) | Terrain-Auslage nach Kampf 3 |
+|---|---|---|---|
+| Deputy Waggums | `skipped` | **`ok`** | 7 Geländekarten + **BETÄUBUNGSWUMME** |
+| Virginia Fitz | `skipped` | **`ok`** | 5 + **SHERIFFS SCHAUFEL** |
+| The Bundits | `skipped` | **`ok`** | 6 + **PERFEKTE MÖHRE** |
+| The Door Knockers | `skipped` | **`ok`** | 7 + **DER BEGRÜSSER** |
+| Red Atrocious | `skipped` | **`ok`** | 6 + **QUACKSALBE** |
+| Ernie Offal | `skipped` | **`ok`** | 7 + **KÖRPERBUTTER** |
+| Tartar Fishboy | `skipped` | **`ok`** | 7 + **ERSATZ-GLIEDMASSEN** |
+| Ms. Falls & Co. | `skipped` | **`ok`** | 7 + **MIKROFASERTUCH** |
+| Patches | `skipped` | **`ok`** | 7 + **MIETZ-SCHEUCHER** |
+| Barry Bluff | `skipped` | **`ok`** | 6 + **BLUTBESPRITZT** |
+| **Tilda Fields** | `skipped` | `skipped` (`$SHERIFF is not bound`) | 7, keine Ausrüstung |
+
+> **Weiterhin offen: Sichtprüfung am laufenden Tisch.** Der Browser-Bereich war
+> auch diesmal nicht angemeldet, und anmelden ist nicht zulässig. Die Prüfung
+> läuft gegen denselben Executor und dieselben Daten, aber nicht durch die
+> Oberfläche. Wer das nachholt: Token `Bösewicht: Patches` auf den **letzten**
+> Leistenplatz legen, verdeckt, dreimal „Kampf beginnen" mit „Dorfphase
+> beginnen" dazwischen — im dritten Durchgang liegt **MIETZ-SCHEUCHER** in der
+> Terrain-Auslage, in den ersten beiden steht die Zeile aus 9.6 im Protokoll.
+
+**Unverändert fortbestehend** (nicht Teil dieses Befunds): die Meldungen
+*„no terrain card named …"* aus 8.7, und Barry Bluffs beide Zählerschritte, die
+seine Formel nicht rechnen können (7.3).
+
+### 9.8 Was weiterhin keinen Platz hat
+
+1. **Barry Bluffs zweiter Schritt** — *„At the start of the fight, each other
+   townsfolk receives a piece of **Faceless** unique gear at random."* Die fünf
+   Karten liegen und heißen eindeutig (`GESICHTSLOS`, `GESICHTSLOS (2)` …
+   `(5)`), aber der Schritt richtet sich an *„each **other** townsfolk"* — also
+   an alle außer dem Sheriff, und wer das ist, darf der Tisch nicht entscheiden.
+   Dazu kommt „at random". Abbildbar wäre nur „leg alle fünf irgendwo hin", und
+   das wären fünf weitere Schritte, die in zehn von elf Kämpfen übersprungen im
+   Protokoll stünden. **Nicht gebaut**, bewusst.
+2. **Tilda Fields' Garten-Deck** (9.2).
+3. **Patches' „10 Fetid Furball terrain pieces aside for later use"** —
+   unverändert, siehe 8.5.
