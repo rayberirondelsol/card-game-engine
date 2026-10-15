@@ -446,3 +446,163 @@ liegen. Der Befund bestand vorher und ist von dieser Änderung unberührt.
 > zweiten Leistenplatz legen, verdeckt, „Kampf beginnen" drücken — erwartet
 > werden die Zähler **Bewegung 8** und **Leben 2** und **keine** Meldung über
 > `$BEW` / `$LEB`.
+
+---
+
+## 8. Der Endgegner-Kampf der sechs ohne `final`-Abschnitt (erfasst 2026-10-15)
+
+### 8.1 Das Ergebnis in einem Satz
+
+**Keiner der sechs braucht einen `final`-Abschnitt.** Red Atrocious, Ernie
+Offal, Tartar Fishboy, Ms. Falls & Co., Patches und Barry Bluff haben auf ihrer
+Tableau-Rückseite **kein einziges `EG`-Feld** (auf den englischen Tableaus
+**FF**) und **kein zusätzliches Gelände**. Ihr Endgegner-Kampf fügt dem Aufbau
+nichts hinzu, was der Tisch legen könnte — er fügt die **Besondere Ausrüstung
+des neuen Sheriffs** hinzu und Regeln. Dass die sechs keinen `final`-Abschnitt
+haben, ist also **kein Datenmangel**, sondern richtig.
+
+Das deckt sich mit `docs/tft-regeln.md` §8.1, die die Dörflerzahl nur für „die
+meisten Fälle" an die `EG`-Zahl bindet — es gibt Endgegner-Kämpfe ganz ohne
+`EG`-Terrain, und das sind diese sechs.
+
+### 8.2 Woher das kommt und wie geprüft wurde
+
+| Angabe | Quelle |
+|---|---|
+| `EG`-Felder, Zusatzgelände | **Rückseite des Bösewicht-Tableaus**, `table_assets."Tableau: <Name>".back_image_path`, über `https://gaming.benjathi.de<image_path>` geladen |
+| „AUFBAU"-Schritte, Name der Besonderen Ausrüstung | dasselbe Bild, das **SETUP**-Band unter dem Szenariobanner (y ≈ 0,53–0,61 der Bildhöhe), auf 1400 px Breite hochskaliert abgelesen |
+| Ausrüstungskarte in der Bibliothek | `cards` des Spiels `072123c0-…`, Kategorien `Einzigartige Ausrüstung` und `Einzigartige Ausrüstung (Üble Nachbarn)`; zugeordnet über **Kartenbild und Kartentext**, nicht über den Namen (die Bibliothek ist deutsch, die Tableaus sind englisch) |
+
+**Zwei Gegenproben, damit „ich sehe nichts" nicht „ich erkenne es nicht" heißt.**
+
+1. **Wie ein `EG`-Feld aussieht**, wurde an den beiden schon erfassten
+   Erweiterungs-Tableaus abgelesen: bei **The Door Knockers** steht auf **L8**
+   ein weißes Kästchen mit der Aufschrift **FF**, bei **Tilda Fields** ein
+   ebensolches über **F1:G2**. In derselben Darstellung (Rasterbereich auf
+   900 px Breite) ist auf keinem der sechs Tableaus ein solches Kästchen. Für
+   die drei Handyfotos (Red Atrocious, Ernie Offal, Barry Bluff) wurde
+   zusätzlich in zwei Hälften auf 1500 px Breite nachgesehen — ebenfalls keines.
+2. **Dass das Raster richtig liegt**, zeigt die Gegenprobe an schon erfassten
+   Werten: auf Red Atrocious' Rückseite liest dieselbe Rasterlage die
+   Dörflerfelder **F9, H9, J9, E10, J10** — genau das, was in `scenario_data`
+   steht (Abschnitt 3). Die Lesung wurde nicht an die Daten angepasst, sie
+   fällt mit ihnen zusammen.
+
+Unabhängig davon stützt der **Text** die Lesung: keiner der sechs
+SETUP-Abschnitte enthält überhaupt eine Platzierungsanweisung. Wo es `EG`-Felder
+gibt, nennt der Tableautext sie (The Door Knockers: *„The new sheriff begins the
+fight on the square marked FF."*).
+
+### 8.3 Die Tabelle
+
+Alle Angaben **sicher** gelesen, sofern nicht anders vermerkt. Die Szenarionamen
+stimmen mit den schon erfassten Einträgen überein — Gegenprobe, dass das
+richtige Tableau vor einem liegt.
+
+| Bösewicht (Szenario) | `EG`-Felder | Zusatzgelände | weitere AUFBAU-Schritte | Besondere Ausrüstung |
+|---|---|---|---|---|
+| **Red Atrocious** — „Feelin' Feverish" | **keine** | **keines** | nur Schritt 1 (Sheriff) | **Snake Oil** — *„They receive the Snake Oil unique gear, and may equip it immediately."* |
+| **Ernie Offal** — „The Forced Feasting" | **keine** | **keines** | nur Schritt 1 (Sheriff) | **Belly Balm** — *„They never leave home without their tummy meds … They receive Belly Balm unique gear."* |
+| **Tartar Fishboy** — „Uncalm Waters" | **keine** | **keines** | nur Schritt 1 (Sheriff) | **„Spare" Limbs** — mit Anführungszeichen wie gedruckt, *„(may equip immediately)"* |
+| **Ms. Falls & Co.** — „In Bad Company" | **keine** | **keines** | nur Schritt 1 (Sheriff) | **Absorbant Towel** — so gedruckt, nicht „Absorbent"; *„from a nearby clothesline (may equip immediately)"* |
+| **Patches** — „Meal Time's Over" | **keine** | **keines** | Schritt 2: *„Set **10 Fetid Furball** terrain pieces aside for later use (pictured below)."* | **Shooing Broom** — *„leaning against a nearby wall (may equip immediately)"* |
+| **Barry Bluff** — „The Skinned Skirmish" | **keine** | **keines** | Schritt 2: *„At the start of the fight, each other townsfolk receives a piece of **Faceless** unique gear at random."* | **Blood-Splattered** |
+
+Fundstelle je Zeile: Tableau-Rückseite, SETUP-Band direkt unter dem Banner
+„FINAL FIGHT / ⟨Szenarioname⟩"; der `EG`-Befund stammt aus dem Rasterbereich
+darüber, über die ganze Breite und die Zeilen 1–14.
+
+### 8.4 Die Besondere Ausrüstung in der Kartenbibliothek
+
+Alle sechs Karten **liegen in der Bibliothek**, alle in der Kategorie
+**`Einzigartige Ausrüstung (Üble Nachbarn)`** (33 Karten). Die Bibliothek ist
+deutsch; zugeordnet wurde deshalb über **Kartenbild und Kartentext**, nicht über
+den Namen.
+
+| Tableau (englisch) | Karte (deutsch) | Kategorie | Beleg | Sicherheit |
+|---|---|---|---|---|
+| Snake Oil | **QUACKSALBE** | `Einzigartige Ausrüstung (Üble Nachbarn)` | Flasche „QUACK-SALBE" mit Schlange; der Text nimmt bzw. wirft `Krankheit` ab — Red Atrocious' Kampf läuft über Krankheiten | **sicher** |
+| Belly Balm | **KÖRPERBUTTER** | dto. | Tiegel „ENTSPANNUNG", *„Wenn's dir mal wieder zu viel wird!"*; einzige Balsam-/Cremekarte des Satzes | **hoch, aber nicht wörtlich** — der Name ist nicht die Übersetzung von „Belly Balm"; ein anderer Kandidat ist im Satz nicht vorhanden |
+| „Spare" Limbs | **ERSATZ-GLIEDMASSEN** | dto. | wörtliche Übersetzung | **sicher** |
+| Absorbant Towel | **MIKROFASERTUCH** | dto. | tropfendes Tuch; der Text verschiebt `Wasser`-Marker — Ms. Falls' Kampf läuft über Wasser | **sicher** |
+| Shooing Broom | **MIETZ-SCHEUCHER** | dto. | Besen; *„Entferne 1 Siffigen Haarball innerhalb von 4 Feldern"* — das sind Patches' Fetid Furballs | **sicher** |
+| Blood-Splattered | **BLUTBESPRITZT** | dto. | wörtliche Übersetzung | **sicher** |
+| Faceless (Barry, Schritt 2) | **GESICHTSLOS**, `GESICHTSLOS (2)`…`(5)` | dto. | fünf Exemplare, genau wie der Schritt sie braucht | **sicher** |
+
+Zur Einordnung: dieselbe Zuordnung trägt auch das Beispiel aus
+`docs/tft-regeln.md` §8.1 — Handsys „Warning Whistle" liegt als
+**TRILLERPFEIFE** in der Grundspielkategorie `Einzigartige Ausrüstung`.
+
+### 8.5 Was die Szenariodaten nicht aufnehmen können
+
+Drei Angaben sind erfasst, haben aber **keinen Platz** in `scenario_data`, und
+es wurde **keiner erfunden**:
+
+1. **Die Besondere Ausrüstung je Bösewicht.** Ein Eintrag kennt `scenario`,
+   `terrain`, `fields`, `decks`, `stats` und `final` — keinen Platz für „diese
+   Karte bekommt der neue Sheriff". Wohin das gehört, ist eine Entscheidung und
+   keine Lesung. (Denkbar wäre ein `decks`-Eintrag im `final`-Abschnitt, der die
+   Karte in eine Zone legt — das wäre aber neues Verhalten.)
+2. **Patches' „10 Fetid Furball terrain pieces aside for later use".** „Aside"
+   nennt kein Feld, und die Assetliste führt `Fetid Furball` nur **zweimal**
+   (beide `width` 95) — zehn Exemplare gibt es dort nicht. Die Plättchen kommen
+   im Kampf über die Bösewicht-Fähigkeit „Coughin' Fits" aufs Brett, nicht beim
+   Aufbau.
+3. **Barry Bluffs „each other townsfolk receives a piece of Faceless unique gear
+   at random".** Das ist ein Kartengeschäft, kein Gelände; die fünf Karten
+   liegen (8.4).
+
+### 8.6 Prüfung
+
+**`validateScenarioData`** gegen die echte Assetliste (212 Assets) und das echte
+Raster `Spielfeld A–S / 1–14`, auf die unveränderte Spalte `scenario_data` des
+Aufbaus `b1e10f4e-b8f2-4c2a-bb3e-54643944121b`: **0 Probleme**.
+
+**Durchgerechnet** wurde mit den echten Produktionsdaten (`state_data`,
+`sequence_data`, `zone_data`, `grid_data`, `action_data`, `scenario_data`,
+212 Assets, 1087 Karten) durch `executeSequenceWithLog`: je Durchlauf die echte
+Aufbausequenz, nur mit dem Testbösewicht auf dem **dritten und damit letzten**
+Leistenplatz, danach dreimal die echte Aktion „Kampf beginnen" mit „Dorfphase
+beginnen" dazwischen. Im dritten Durchgang nimmt `reveal_next` vom letzten
+Platz, `final: "auto"` greift also.
+
+- **Positivprobe Tilda Fields** (hat einen `final`-Abschnitt): im dritten
+  Durchgang liegen **acht** Geländeteile statt sieben — dazugekommen ist
+  **F1:G2**, der `Pile of Locals`. Der Zusatzaufbau greift also nachweislich.
+- **Die sechs**: im dritten Durchgang liegt **genau das Hauptgelände** aus
+  Abschnitt 3, kein Teil mehr und keins weniger (Red Atrocious 9, Ernie Offal 7,
+  Tartar Fishboy 7, Ms. Falls & Co. 7, Patches 7, Barry Bluff 8 Geländeteile,
+  dazu die Bösewicht-Basis und die drei Dörfler).
+
+> **Weiterhin offen: Sichtprüfung am laufenden Tisch.** Der Browser-Bereich war
+> auch diesmal nicht angemeldet, und anmelden ist nicht zulässig. Die Prüfung
+> läuft gegen denselben Executor und dieselben Daten, aber nicht durch die
+> Oberfläche.
+
+### 8.7 Die gemeldeten „fehlenden Geländekarten" sind **keine** fehlenden `decks`-Angaben
+
+Beim Durchrechnen meldet `build_scenario` weiterhin *„no terrain card named …"*.
+Die Ursache ist **nicht** eine fehlende `decks`-Angabe (die gibt es in diesen
+Daten ohnehin nirgends), sondern der Namensvergleich zwischen **Geländeasset**
+und **Geländekarte**: die Karte wird über ihren Namen gesucht, ersatzweise über
+den Teil vor bzw. hinter dem Schrägstrich eines zweiseitigen Teils
+(`shared/sequenceExecutor.js`, M8.3).
+
+| Meldung | wahre Lage | Folge |
+|---|---|---|
+| `Sprengstoff`, `Auslöser` (Red Atrocious, Barry Bluff) | Die Bibliothek führt **eine** Karte **`Sprengstoff & Auslöser`** für **zwei** Plättchen. | Im Spiel richtig (eine Karte für beide Teile), aber die Karte wird **gar nicht** ausgelegt, weil kein Name trifft. |
+| `Dichter Wald 2` (Red Atrocious, The Door Knockers) | Es gibt **eine** Karte `Dichter Wald` für beide Waldstücke; sie liegt schon über das erste Stück. | Harmlos — die Meldung ist Rauschen. |
+| `Pile of Locals` (**Tilda Fields, `final`**) | In der Kartenbibliothek gibt es **keine** Karte dieses Namens. | **Echte Lücke**, neu gefunden; sie betrifft einen der fünf schon vorhandenen `final`-Abschnitte, nicht die sechs. |
+
+Nicht behoben, weil jede Behebung eine Entscheidung verlangt, die der Auftrag
+nicht deckt: Assets umbenennen zöge `scenario_data` mit, Karten anzulegen hieße
+Kartendaten zu erfinden.
+
+### 8.8 Geschrieben wurde nichts
+
+`setups.scenario_data` ist **unverändert**. Es gab nichts zu schreiben: die
+sechs haben kein Endgegner-Gelände und keine `EG`-Felder, und für die Besondere
+Ausrüstung gibt es in den Daten keinen Platz — einen zu erfinden untersagt der
+Auftrag ausdrücklich. Gelesen wurden `scenario_data` sowie `zone_data`,
+`grid_data`, `sequence_data`, `action_data` und `state_data` für das
+Durchrechnen; geschrieben wurde keine Spalte.
