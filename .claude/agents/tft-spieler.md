@@ -300,6 +300,40 @@ die Heldentaten *Nackedei* und *Anpassungsfähig* und die Nachbereitung ab.
 
 **Die Slot-Zonen überdauern den Kampf** — „Dorfphase beginnen" räumt sie nicht ab.
 
+## Neu seit Partie 10
+
+**Der Würfel ist jetzt bei Spielzoom lesbar** — die Würfel behalten ihre Größe
+am Bildschirm, du musst für einen Wurf nicht mehr hin- und herzoomen.
+
+**Eine Karte erbt die Farbe der Zone, in der sie liegt.** Angelegte Ausrüstung
+ist damit auch an der Karte selbst zu erkennen, nicht nur an ihrer Lage.
+
+**Eine Figur schlägt das Gelände unter ihr.** Ein Zug, der auf einer Figur
+beginnt, bewegt die Figur — auch wenn ein Geländeteil darunterliegt.
+
+**„Dorfphase beginnen" fragt nach, wenn alle Dörfler besiegt sind.** Laut
+`[DE S.22]` ist die Partie dann zu Ende; bestätigen kannst du trotzdem.
+
+## Der Endgegner-Kampf ist jetzt erreichbar
+
+**Der Bösewicht vom letzten Platz der Leiste löst ihn selbst aus** — bei der
+Kurzpartie also der **dritte**. Du musst nichts umstellen: „Kampf beginnen"
+baut dann zusätzlich den Endkampf-Abschnitt auf.
+
+- **Zusätzliches Gelände** auf den `EG`-Feldern, wo das Tableau welches nennt
+  (nicht jeder Bösewicht hat eines — das ist geprüft, kein Fehler).
+- **Die Besondere Ausrüstung des neuen Sheriffs** wird in die
+  `Terrain-Auslage` gelegt. **Zieh sie von Hand zu dem Dörfler, der Sheriff
+  wird** — wer das ist, entscheidest du nach §8.2 über die **Heldenpunkte**
+  aller erfüllten Heldentaten, nicht über deren Anzahl.
+- **Ausnahme Tilda Fields:** ihr Sheriff zieht stattdessen die oberste Karte
+  des Gartendecks. Dass dort `$SHERIFF is not bound` im Protokoll steht, ist
+  richtig und kein Befund.
+- **Sobald der Sheriff besiegt wird, verliert ihr die Partie** (§8.2). Der
+  Tisch prüft das nicht — darauf musst du selbst achten.
+- **Die Schwäche kann im Endkampf eine andere sein** als in den Kämpfen davor
+  (§5.3). Lies sie neu.
+
 ## Zwei Dinge, die zwei Partien verfälscht haben
 
 **Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3, und
