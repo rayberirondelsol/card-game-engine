@@ -663,6 +663,16 @@ bekommt also eine vierte Zeile:
 
 `scenario_data` ist dafür **unverändert** geblieben.
 
+**Sichtprüfung am laufenden Tisch, 2026-10-15.** Aufbau *TFT Kurzpartie* frisch
+geladen, dreimal „Kampf beginnen" mit „Dorfphase beginnen" dazwischen. Im
+Endgegner-Kampf gegen The Bundits meldet der Tisch
+
+> **1 action did not work** — `#6 build_scenario — failed: no terrain card
+> named „Die Bundo-Königin / Beruhigungs-Leckerli"`
+
+und **sonst nichts**. Das Plättchen liegt auf E10, die sechs übrigen
+Geländekarten und die PERFEKTE MÖHRE liegen in der `Terrain-Auslage`.
+
 ---
 
 ## 9. Die Besondere Ausrüstung des neuen Sheriffs (eingetragen 2026-10-15)
@@ -879,13 +889,14 @@ nicht, `place_asset` verschiebt dasselbe Objekt, statt ein zweites zu legen.)
 | Barry Bluff | `skipped` | **`ok`** | 6 + **BLUTBESPRITZT** |
 | **Tilda Fields** | `skipped` | `skipped` (`$SHERIFF is not bound`) | 7, keine Ausrüstung |
 
-> **Weiterhin offen: Sichtprüfung am laufenden Tisch.** Der Browser-Bereich war
-> auch diesmal nicht angemeldet, und anmelden ist nicht zulässig. Die Prüfung
-> läuft gegen denselben Executor und dieselben Daten, aber nicht durch die
-> Oberfläche. Wer das nachholt: Token `Bösewicht: Patches` auf den **letzten**
-> Leistenplatz legen, verdeckt, dreimal „Kampf beginnen" mit „Dorfphase
-> beginnen" dazwischen — im dritten Durchgang liegt **MIETZ-SCHEUCHER** in der
-> Terrain-Auslage, in den ersten beiden steht die Zeile aus 9.6 im Protokoll.
+> **Sichtprüfung nachgeholt am 2026-10-15** (`docs/tasks-endkampf.md`, `BN`).
+> Am laufenden Tisch, mit der echten Leiste statt einem Testbösewicht: Aufbau
+> frisch geladen, dreimal „Kampf beginnen" mit „Dorfphase beginnen" dazwischen.
+> Kampf 1 (Deputy Waggums) und Kampf 2 (Virginia Fitz): **keine Meldung**, auch
+> nicht die aus 9.6 — der Schritt trägt seit M20.1 ein `onlyFinal: true` und
+> läuft dort gar nicht mehr. Endkampf (The Bundits): **PERFEKTE MÖHRE** liegt in
+> der Terrain-Auslage, und im Protokoll steht **eine einzige** Zeile — die
+> fehlende Geländekarte aus 8.9.
 
 **Unverändert fortbestehend** (nicht Teil dieses Befunds): die Meldungen
 *„no terrain card named …"* aus 8.7, und Barry Bluffs beide Zählerschritte, die
