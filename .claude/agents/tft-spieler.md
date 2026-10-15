@@ -326,9 +326,26 @@ baut dann zusätzlich den Endkampf-Abschnitt auf.
   `Terrain-Auslage` gelegt. **Zieh sie von Hand zu dem Dörfler, der Sheriff
   wird** — wer das ist, entscheidest du nach §8.2 über die **Heldenpunkte**
   aller erfüllten Heldentaten, nicht über deren Anzahl.
+- **Das Tableau wird für den Endkampf gewendet** und zeigt die Rückseite — dort
+  steht, was der Endkampf verlangt.
 - **Ausnahme Tilda Fields:** ihr Sheriff zieht stattdessen die oberste Karte
   des Gartendecks. Dass dort `$SHERIFF is not bound` im Protokoll steht, ist
-  richtig und kein Befund.
+  richtig und kein Befund — aber **nur im Endkampf**. In den Kämpfen davor darf
+  dort **gar nichts** stehen; tut es das doch, ist das ein Befund.
+
+**Zwei Dinge baut der Aufbau bewusst nicht**, sie sind Handarbeit:
+
+- **Bundos ans Feld legen.** Das Tableau sagt nur „angrenzend an die
+  Bundo-Königin" — vier von sechs Plättchen auf acht Nachbarfeldern, das ist
+  deine Wahl, und SPREAD erzeugt im Kampf weitere. Eine feste Aufbauposition
+  wäre ab Runde 2 falsch.
+- **Die Blickrichtung des Bösewichts.** Er steht nach dem Aufbau auf 0°; wohin
+  er schaut, hängt vom Spielstand ab (§6) — dreh ihn selbst, wie seit M13.
+
+**Eine fehlende Geländekarte ist bekannt und kein Befund:** 34 der 62
+Geländeassets haben keine Karte in der Bibliothek, durchweg Plättchen, die erst
+im Endkampf oder über eine Fähigkeit aufs Brett kommen. Betroffen sind The
+Bundits und Deputy Waggums. Das Plättchen liegt trotzdem.
 - **Sobald der Sheriff besiegt wird, verliert ihr die Partie** (§8.2). Der
   Tisch prüft das nicht — darauf musst du selbst achten.
 - **Die Schwäche kann im Endkampf eine andere sein** als in den Kämpfen davor
