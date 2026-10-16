@@ -5277,3 +5277,113 @@ Zwölf Partien lang hat niemand einen Spielstand fortgesetzt — jede Partie
 begann am frisch gebauten Tisch. Deshalb ist es nie aufgefallen. Sobald jemand
 eine Partie über zwei Sitzungen spielen will, ist es das Erste, was ihm
 begegnet.
+
+## M23 — Was die dreizehnte Partie fand
+
+Belegt in `docs/partie13-bericht.md`. **Zum ersten Mal durch alle drei Kämpfe
+bis in den Endgegner-Kampf.** Kampf 1 verloren (der Tisch hat es erkannt und mit
+Regelzitat nachgefragt — M19.5 arbeitet), Kampf 2 in vier Runden gewonnen,
+Endkampf über sechs Runden.
+
+**Beide Prüfpunkte halten.** Der Ziehstapel lief im Endkampf wirklich leer und
+ließ sich in **vier Griffen** neu bilden — der Blocker aus Partie 12 ist weg.
+Und der Spielstand übersteht das Neuladen vollständig: 15 Zähler mit Werten und
+Maxima, 38 Token auf den Punkt, Stapelgrößen, Slot-Belegung, Kamera, sogar der
+Wurfzähler. Der Beweis dafür sind die **falschen** Dinge — der Bösewicht auf
+seiner erspielten Position, ein verrutschtes Terrainteil, verschobene Zähler.
+Ein frischer Aufbau hätte das geradegerückt.
+
+**Zurückgezogen: M21.3.** „Lange Zieh-Wege landen zu kurz" stimmt nicht. Ein
+559-Pixel-Zug landete exakt; die zu kurzen Züge endeten **neben** einer Zone mit
+eigenem Raster, die das Stück auf ihren Platz zog. Vierter Fehlalarm dieser
+Familie — und der erste, den der Spieler selbst erkannt hat, bevor er ihn
+meldete.
+
+### M23.1 — „Remove from Table" löscht eine Karte ohne Nachfrage
+
+**Befund, und er stand seit Partie 9 als Ä4 auf der Liste.** M14.7 hat die
+Sicherheitsabfrage für **Tokens** gebaut, nachdem ein Dörfler-Tableau
+verschwunden war. **Karten haben sie nicht** — und das Kartenmenü hat keine
+feste Höhe, der Eintrag wandert also je nach Stapelzustand.
+
+**Änderung.** Dieselbe Abfrage wie bei Tokens, über dieselbe Stelle. Keine
+zweite Mechanik.
+
+**Abnahme.**
+1. Eine Karte lässt sich nicht in einem Klick endgültig entfernen; die Abfrage
+   nennt sie beim Namen.
+2. Bei einem **Stapel** nennt sie die Zahl der Karten.
+3. Tokens verhalten sich unverändert (M14.7).
+
+### M23.2 — Vier Kartenarten haben keinen Platz
+
+**Befund, und das ist die größte Lücke der Partie:** erfüllte Heldentaten,
+ausliegende Dorf-Ereignisse, ausliegende Bösewicht-Aktionen und **seltsame**
+Ausrüstung haben keine Ablagefläche. Zwölf Karten, rund **zwanzig Griffe** am
+Brettrand, und nach jedem Schwenk sucht man sie neu.
+
+Die vier sind regelseitig verschieden und brauchen darum nicht dieselbe Lösung:
+
+- **Erfüllte Heldentaten** liegen offen vor ihrem Erfüller und zählen bis
+  zum Partieende für die Sheriffwahl (§5.1, §8.2) — sie gehören **zum Dörfler**
+  und überdauern die Dorfphase.
+- **Ausliegende Dorf-Ereignisse** (geheime, §5.2) bleiben beim Ziehenden, bis
+  ihre Bedingung eintritt — ebenfalls beim Dörfler, aber vergänglich.
+- **Ausliegende Bösewicht-Aktionen** gehören zum laufenden Kampf und werden von
+  „Dorfphase beginnen" abgeräumt (M17.4 tut das bereits).
+- **Seltsame Ausrüstung** ist dauerhaft weggepackt und wirkt trotzdem
+  (`[DE S.9]`) — sie gehört in den **Vorrat**, nicht in einen Slot, und das ist
+  heute schon möglich.
+
+**Zu entscheiden, begründet:** welche davon eine eigene Zone brauchen und
+welche in einer vorhandenen aufgehoben sind. **Nicht jede Kartenart braucht eine
+Zone** — vier neue Zonen je Dörfler wären zwölf weitere Kästen auf einem Tisch,
+der seit M16 schon dicht belegt ist. Der Platz unter den Tableaus ist seit M18
+verplant; lies `scripts/equipment-zones.mjs`, bevor Du etwas dazulegst.
+
+**Abnahme.** Erfüllte Heldentaten und ausliegende Ereignisse haben einen Platz
+beim Dörfler, der einen Schwenk übersteht; die Begründung für jede nicht
+angelegte Zone steht in der Spec.
+
+### M23.3 — Die Ladenauslage lässt sich nicht nachfüllen
+
+**Befund.** Die Zone `Nachschub-Auslage` existiert, steht aber **nicht im
+Aufdeck-Menü** („Reveal Top Card to …"). Geht eine Ladenkarte weg, lässt sich
+keine nachziehen, obwohl §9.1 sofortiges Nachfüllen verlangt.
+
+**Zu prüfen:** M11.5 filtert das Menü nach der **sichtbaren Seite** des
+Zusatz-Bretts, und `Nachschub-Auslage` trägt `anchorSide: "back"`. Zeigt das
+Brett im Kampf die andere Seite, ist das **richtig** — dann ist der Befund
+„beim Einkaufen in der Dorfphase geht es nicht" und etwas ganz anderes.
+**Miss, in welcher Phase es fehlt**, bevor Du etwas änderst.
+
+**Abnahme.** In der Dorfphase lässt sich eine Ladenkarte nachziehen.
+
+### M23.4 — Die Startausrüstung landet im Vorrat statt in den Slots
+
+**Befund.** Der Aufbau legt sie in den Vorrat. Sie ist aber **angelegt** —
+sonst wirken ihre schwarz markierten Werte nicht (§7, `[DE S.22]`), und der
+Spieler muss sie in Runde 1 von Hand einsortieren.
+
+Seit M18 gibt es die Slot-Zonen; die sechs `place_card`-Schritte zielen noch
+auf die alte Fläche. **Reine Datenarbeit.**
+
+**Abnahme.** Nach dem Aufbau liegt jede Startausrüstung in dem Slot, in den sie
+gehört — und die Nachbereitung rechnet ihre Werte wieder auf.
+
+### M23.5 — Die Dörflerzähler liegen unter dem Schlachtfeld
+
+**Befund.** 600 bis 1300 Einheiten unterhalb; der Spieler musste sie in Runde 1
+hochziehen, um überhaupt spielen zu können.
+
+M14.4 hat dafür die Ansicht „Dörfler" gebaut, und M14.13 hat sie
+fenstergrößenunabhängig gemacht — **offenbar reicht beides nicht**, wenn man
+während eines Kampfes ständig zwischen Brett und Werten wechselt.
+
+**Zu klären:** Ist das ein Platzproblem (die Zähler stehen zu weit weg) oder ein
+Ansichtsproblem (man wechselt zu oft)? Davon hängt ab, ob die Zähler umziehen
+oder die Ansichten besser werden. **Entscheide es, bevor Du etwas verschiebst** —
+Zähler umzuhängen betrifft `zone_data` und die Ansichten gleichzeitig.
+
+**Abnahme.** Während eines Kampfes sind Schlachtfeld und die Werte des gerade
+ziehenden Dörflers gleichzeitig lesbar, ohne Ansichtswechsel.
