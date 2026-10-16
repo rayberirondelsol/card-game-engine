@@ -397,6 +397,18 @@ unter `.claude/` und nicht in `docs/`. Nachzuziehen:
 
 ## Was gefunden, aber nicht gebaut wurde
 
+* **Ein Spielstand lässt sich nicht mit seinen Zonen wieder aufmachen.**
+  Beim Wiederherstellen des Tisches nach der Sichtprüfung aufgefallen:
+  `getGameState` schreibt Objekte, Kamera und Stapelnamen — **keine Zonen,
+  Raster, Aktionen oder Szenariodaten**; die kommen ausschließlich aus dem
+  `?setupId=`-Zweig, und der **führt die Aufbausequenz neu aus**. Wer den
+  Browser neu lädt, hat damit die Wahl zwischen „frischer Aufbau" und
+  „Objekte ohne Zonen"; `?setupId=` **und** `?saveId=` zugleich entscheidet
+  ein Wettlauf zweier `useEffect`, und der Aufbau gewinnt ihn (gemessen).
+  Eine laufende Partie überlebt ein Neuladen also nicht — das erklärt den
+  Satz der Spielerrolle („ruf **nicht** `/play/<id>` auf") von der anderen
+  Seite. Kein Auftrag in M21, aber der Befund mit den größten Folgen, der
+  hier aufgetaucht ist.
 * **Der Dialog „Add Token" hat kein Suchfeld.** 212 Bildtoken in einem 144
   Punkte hohen Rollkasten; das ist der eigentliche Grund für L3. Die
   Kartenbibliothek hat eine Suche über alle Kategorien — die Assetliste nicht.
