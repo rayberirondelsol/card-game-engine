@@ -401,6 +401,26 @@ Bundits und Deputy Waggums. Das Plättchen liegt trotzdem.
 - **Die Schwäche kann im Endkampf eine andere sein** als in den Kämpfen davor
   (§5.3). Lies sie neu.
 
+## Neu seit Partie 12
+
+**Die Ablage wird ein Stapel.** Aufgedeckte Bösewicht-Aktionen sammeln sich auf
+der `Ablage` zu einem echten Stapel mit Abzeichen. Ist der Ziehstapel leer,
+zieh die Ablage auf `Aktionen`, dreh sie um (`Flip Stack`) und misch sie
+(`Shuffle`) — damit ist §6.2 am Tisch zu Ende spielbar. Vorher waren es lose
+Karten, und die Partie saß fest.
+
+**Der Vorrat eines Dörflers ist jetzt ein Stapel** statt fünf Plätzen — er läuft
+also nicht mehr voll. Die fünf **Slot-Zonen** bleiben Einzelplätze.
+
+**Gesperrt heißt jetzt auch undrehbar.** Die Dreh-Einträge bleiben sichtbar,
+sind aber abgeschaltet und sagen „gesperrt". Vorher konnte ein Fehlklick das
+Sideboard samt Zonen und Zählern quer übers Spielfeld legen.
+
+**Ein Spielstand überlebt jetzt das Neuladen.** Er merkt sich seinen Aufbau und
+holt beim Öffnen Zonen, Raster und Aktionen zurück, **ohne** den Tisch neu
+aufzubauen. Alte Stände von vor dieser Änderung zeigen einen bleibenden Hinweis,
+dass ihnen das Gerüst fehlt — das ist richtig so und kein Befund.
+
 ## Zwei Dinge, die zwei Partien verfälscht haben
 
 **Die Schwäche des Bösewichts schläft, bis sie scharfgestellt wird.** §5.3, und
