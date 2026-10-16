@@ -114,3 +114,23 @@ export const DELETE_FALLBACKS = {
 export function deleteLabel(objType, obj) {
   return tableObjectView(obj, DELETE_FALLBACKS[objType] || 'Object').caption;
 }
+
+/**
+ * Wie eine Karte (oder ein Stapel) in der Löschabfrage heißt (Spec M23.1).
+ *
+ * Der Befund der dreizehnten Partie: Tokens fragen seit M14.7 nach, Karten
+ * nicht — und das Kartenmenü hat keine feste Höhe, der Eintrag wandert also je
+ * nach Stapelzustand. Gelöscht wird immer die ganze Auswahl, und ein Stapel ist
+ * beim Anfassen ganz ausgewählt (`handleCardMouseDown`); gefragt wird deshalb
+ * nach der Auswahl, nicht nach der angeklickten Karte.
+ *
+ * Eine Karte steht mit ihrem Namen da, mehrere mit ihrer Zahl: bei vierzehn
+ * Karten ist „14 cards" die Auskunft, die den Fehlklick verhindert, und vierzehn
+ * Namen wären keine. Der Name kommt über `tableObjectView` wie bei `deleteLabel`
+ * — verdeckt heißt auch im Löschdialog verdeckt (Spec Abschnitt 6).
+ */
+export function cardDeleteLabel(cards) {
+  const list = Array.isArray(cards) ? cards : [];
+  if (list.length > 1) return `${list.length} cards`;
+  return tableObjectView(list[0], 'Card').caption;
+}

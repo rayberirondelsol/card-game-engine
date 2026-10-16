@@ -186,3 +186,59 @@ test('AH1: die Rückfrage ist ein Dialog im JSX, kein Browserdialog', () => {
   assert.match(lines.slice(i - 4, i + 3).join('\n'), /min-h-\[44px\]/,
     'der Bestätigungsknopf ist zu klein für einen Finger');
 });
+
+// ── BX / Spec M23.1 — eine Karte löschen fragt genauso nach wie ein Token ────
+//
+// Der Befund der dreizehnten Partie (F1): „Remove from Table" nahm die Karte
+// sofort und endgültig, während derselbe Griff am Token seit M14.7 nachfragt.
+// Der Name kommt aus derselben Quelle wie dort (`tableObjectView`), damit eine
+// verdeckt liegende Karte auch im Löschdialog verdeckt bleibt (Spec Abschnitt 6).
+
+const { cardDeleteLabel } = await import('../../client/src/utils/objectTypes.js');
+
+test('BX: eine offene Karte steht mit ihrem Namen in der Abfrage', () => {
+  assert.equal(cardDeleteLabel([{ name: 'OMMAS GEHSTOCK' }]), 'OMMAS GEHSTOCK');
+});
+
+test('BX: eine verdeckte Karte verrät ihren Namen auch hier nicht', () => {
+  assert.equal(cardDeleteLabel([{ name: 'UNGEZÜGELTE VERMEHRUNG', faceDown: true }]), HIDDEN_CAPTION);
+});
+
+test('BX: ein Stapel wird über die Zahl der Karten genannt', () => {
+  const stack = Array.from({ length: 14 }, (_, i) => ({ name: `K${i}`, faceDown: true, inStack: 's1' }));
+  assert.equal(cardDeleteLabel(stack), '14 cards');
+  assert.equal(cardDeleteLabel([{ name: 'A' }, { name: 'B' }]), '2 cards');
+});
+
+test('BX: ohne Karte und bei unbrauchbarer Eingabe bleibt der Rückfall stehen', () => {
+  assert.equal(cardDeleteLabel([]), 'Card');
+  assert.equal(cardDeleteLabel(null), 'Card');
+  assert.equal(cardDeleteLabel([{}]), 'Card');
+});
+
+test('BX: beide Löschwege fragen — Kontextmenü und Werkzeugleiste', () => {
+  const lines = gameTable.split('\n');
+
+  const menu = lines.findIndex(l => l.includes('Remove from Table'));
+  assert.ok(menu >= 0, 'den Menüeintrag gibt es nicht mehr');
+  const menuBlock = lines.slice(Math.max(0, menu - 20), menu).join('\n');
+  assert.match(menuBlock, /setDeleteTarget\(/, `der Menüeintrag fragt nicht nach:\n${menuBlock}`);
+  assert.doesNotMatch(menuBlock, /removeCardFromTable\(/,
+    `der Menüeintrag löscht weiterhin sofort:\n${menuBlock}`);
+
+  const bar = lines.findIndex(l => /onRemove=\{/.test(l));
+  assert.ok(bar >= 0, 'die Werkzeugleiste hat keinen Löschweg mehr');
+  const barBlock = lines.slice(bar, bar + 8).join('\n');
+  assert.match(barBlock, /setDeleteTarget\(/, `der Touch-Weg fragt nicht nach:\n${barBlock}`);
+  assert.doesNotMatch(barBlock, /removeCardFromTable\(/,
+    `der Touch-Weg löscht weiterhin sofort:\n${barBlock}`);
+});
+
+test('BX: gelöscht wird nur im Bestätigungsknopf', () => {
+  const lines = gameTable.split('\n');
+  const i = lines.findIndex(l => l.includes('data-testid="object-delete-confirm-btn"'));
+  assert.ok(i >= 0);
+  const block = lines.slice(Math.max(0, i - 14), i).join('\n');
+  assert.match(block, /removeCardFromTable\(/,
+    `der Bestätigungsknopf löscht keine Karten:\n${block}`);
+});

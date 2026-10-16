@@ -27,7 +27,7 @@ import { revealZones, revealPlan } from '../utils/revealToZone.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
-import { objectLists, objectDeleters, objectSetters, moveObject, deleteLabel } from '../utils/objectTypes.js';
+import { objectLists, objectDeleters, objectSetters, moveObject, deleteLabel, cardDeleteLabel } from '../utils/objectTypes.js';
 import { canStartPan, panCursor } from '../utils/panTarget.js';
 import { issueLine } from '../utils/setupActions.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
@@ -7445,7 +7445,10 @@ export default function GameTable({ room = null }) {
           <h3 className="text-white font-semibold mb-3">Delete from table?</h3>
           <p className="text-slate-300 text-sm mb-4">
             <strong className="text-white" data-testid="object-delete-name">
-              {deleteTarget ? deleteLabel(deleteTarget.objType, (objLists[deleteTarget.objType] || []).find(o => o.id === deleteTarget.objId)) : ''}
+              {!deleteTarget ? ''
+                : deleteTarget.objType === 'card'
+                  ? cardDeleteLabel(tableCards.filter(c => deleteTarget.cardIds.includes(c.tableId)))
+                  : deleteLabel(deleteTarget.objType, (objLists[deleteTarget.objType] || []).find(o => o.id === deleteTarget.objId))}
             </strong>
             {' '}is removed for good — there is no undo.
           </p>
@@ -7459,7 +7462,15 @@ export default function GameTable({ room = null }) {
             </button>
             <button
               onClick={() => {
-                objDeleters[deleteTarget.objType]?.(deleteTarget.objId);
+                // M23.1: Karten sind kein Eintrag in `objDeleters` — sie liegen
+                // nicht in `objectLists`, sondern in `tableCards`, und gelöscht
+                // wird die ganze Auswahl.
+                if (deleteTarget.objType === 'card') {
+                  deleteTarget.cardIds.forEach(tid => removeCardFromTable(tid));
+                  setSelectedCards(new Set());
+                } else {
+                  objDeleters[deleteTarget.objType]?.(deleteTarget.objId);
+                }
                 setDeleteTarget(null);
               }}
               data-testid="object-delete-confirm-btn"
@@ -8063,11 +8074,16 @@ export default function GameTable({ room = null }) {
                     </button>
                   );
                 })()}
+                {/* M23.1: und er führt nicht mehr direkt ins Löschen. Dieselbe
+                    Abfrage wie beim Token (M14.7), über dieselbe Stelle — in
+                    der dreizehnten Partie war eine Karte mit einem Klick weg,
+                    und das Kartenmenü hat keine feste Höhe. */}
                 <button
                   onClick={() => {
-                    selectedCards.forEach(tid => removeCardFromTable(tid));
+                    setDeleteTarget({ objType: 'card', cardIds: [...selectedCards] });
                     setContextMenu(null);
                   }}
+                  data-testid="context-remove-card"
                   className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
                 >
                   Remove from Table
@@ -8562,8 +8578,9 @@ export default function GameTable({ room = null }) {
           setTableCards(prev => prev.map(c => c.inStack === stackId ? { ...c, faceDown: !c.faceDown } : c));
         }}
         onRemove={() => {
-          selectedCards.forEach(tid => removeCardFromTable(tid));
-          setSelectedCards(new Set());
+          // M23.1: derselbe Weg wie im Kontextmenü. Eine Abfrage nur an der
+          // Maus ließe den Einklick-Löscher auf dem Tablet stehen.
+          setDeleteTarget({ objType: 'card', cardIds: [...selectedCards] });
         }}
         isLandscape={isMobileLandscape}
       />
