@@ -5188,3 +5188,92 @@ abwerfen musste.
 `.claude/agents/tft-spieler.md` nennt jetzt **vier** bewusst manuelle Schritte
 (Bundos ans Feld, „SIE KOMMEN!" aus dem Deck, Sheriff ernennen, Blickrichtung),
 die sechs Plättchen bei ihrem Namen, und die Richtigstellung zu E10.
+
+## M22 — Ein Spielstand überlebt kein Neuladen
+
+**Befund**, gefunden bei der Sichtprüfung zu M21 und hier nachgemessen. Er ist
+der folgenreichste der ganzen Reihe, weil er eine Grundannahme verletzt: dass
+ein gespeicherter Spielstand den Tisch wiederherstellt.
+
+### Was wirklich gespeichert wird
+
+`getGameState` schreibt die **Stücke**: `camera`, `background`, `cards`,
+`stacks`, `hand`, `counters`, `dice`, `hitDice`, `customDice`, `notes`,
+`tokens`, `boards`, `textFields`, `views`, `stackNames`, `maxZIndex`.
+
+**Es schreibt keine Zonen, keine Raster, keine Aktionen und keine
+Szenariodaten.** Die vier gehören zum **Aufbau** und kommen ausschließlich aus
+dem `?setupId=`-Zweig.
+
+### Warum das Laden den Spielstand zerstört
+
+Der `?setupId=`-Zweig setzt nicht nur Zonen, Raster, Aktionen und Szenario — er
+**führt die Aufbausequenz aus** und legt den gebauten Zustand hin. Der Code sagt
+seine eigene Absicht:
+
+> `// Execute setup sequence for new games (not savegame loads)`
+
+**Diese Prüfung gibt es nicht.** Die Sequenz läuft, sobald sie nicht leer ist.
+
+Stehen beide Parameter in der URL, laufen zwei `useEffect` nebeneinander: der
+eine lädt den Spielstand, der andere baut neu auf. Der Aufbau gewinnt. **Eine
+laufende Partie überlebt damit kein Neuladen** — und das erklärt rückblickend
+mehrere „der Spielstand wurde überschrieben"-Notizen der letzten Tage, die wir
+als Nebensache behandelt haben.
+
+Ohne `?setupId=` ist es nicht besser, nur anders: dann hat der Tisch **keine
+Zonen, kein Raster und keine Aktionen**. Die Stücke liegen da, aber nichts
+rastet ein, keine Zone nimmt etwas an, kein Knopf baut etwas auf.
+
+### Die Änderung
+
+**Ein Spielstand merkt sich den Aufbau, aus dem er stammt.** Beim Laden wird
+dessen **Gerüst** geholt — Zonen, Raster, Aktionen, Szenariodaten — und die
+**Sequenz nicht ausgeführt**. Darüber kommen die Stücke aus dem Spielstand.
+
+Das ist genau das, was der Kommentar seit jeher behauptet; es fehlt die Spalte,
+die sagt *welcher* Aufbau, und die Prüfung, die den Neuaufbau verhindert.
+
+1. **`save_states` bekommt `setup_id`** — additiv in `server/src/database.js`,
+   nach dem dort vorhandenen Muster (es gibt kein Migrations-Framework).
+2. **Beim Speichern** wird festgehalten, aus welchem Aufbau der Tisch stammt.
+   ⚠️ **Zu klären, bevor gebaut wird:** Woher weiß der Tisch das mitten im
+   Spiel? Aus der URL, solange sie den Parameter trägt — aber sie trägt ihn
+   nach einem Spielstandladen vielleicht nicht mehr. Das ist die eigentliche
+   Entwurfsfrage dieser Aufgabe; beantworte sie, bevor Du die Spalte füllst.
+3. **Beim Laden eines Spielstands** mit `setup_id`: Gerüst aus dem Aufbau,
+   **Sequenz übersprungen**, danach `loadGameState`. Die Reihenfolge ist
+   wesentlich — `loadGameState` bekommt die Raster schon heute ausdrücklich
+   mit, weil `grids` im Zustand erst beim nächsten Rendern steht.
+4. **Ein Wettlauf zweier Effekte darf nicht entscheiden.** Trägt die URL beide
+   Parameter, gewinnt der **Spielstand**: er ist das Spätere.
+5. **Alte Spielstände ohne `setup_id`** verhalten sich wie bisher — aber
+   **sichtbar**: der Tisch sagt, dass dieser Stand ohne Gerüst geladen wurde.
+   Stillschweigend die Hälfte zu laden ist der Fehler, den diese Aufgabe
+   behebt.
+
+### Was ausdrücklich **nicht** dazugehört
+
+- **Zonen, Raster, Aktionen und Szenario in den Spielstand zu kopieren.** Dann
+  gäbe es sie zweimal, und eine Korrektur am Aufbau erreichte alte Stände nie.
+  Der Aufbau bleibt die eine Quelle (M6).
+- Eine Automatik, die den Aufbau errät, wenn `setup_id` fehlt.
+
+### Abnahme
+
+1. Eine Partie speichern, die Seite **neu laden**, den Stand öffnen: Stücke,
+   Zonen, Raster und die Aufbau-Knöpfe sind da, und **die Aufbausequenz ist
+   nicht gelaufen** (kein frisch gestellter Tisch, keine neuen Stapel).
+2. Ein Zähler, der im Spiel auf 3 stand, steht nach dem Laden auf 3.
+3. Eine Karte in `Dörfler 1: Kopf` liegt danach wieder dort und rastet.
+4. Die Aktion „Dorfphase beginnen" läuft nach dem Laden und findet ihre Zonen.
+5. Ein Spielstand **ohne** `setup_id` lädt wie bisher und sagt, dass das Gerüst
+   fehlt.
+6. URL mit beiden Parametern: der Spielstand gewinnt, reproduzierbar.
+
+### Warum das jetzt dran ist
+
+Zwölf Partien lang hat niemand einen Spielstand fortgesetzt — jede Partie
+begann am frisch gebauten Tisch. Deshalb ist es nie aufgefallen. Sobald jemand
+eine Partie über zwei Sitzungen spielen will, ist es das Erste, was ihm
+begegnet.
