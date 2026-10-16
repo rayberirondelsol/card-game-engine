@@ -437,6 +437,29 @@ wird **nur** `zone_data`.
 
 ---
 
+## Was die Sichtprüfung noch gezeigt hat
+
+1. **Das Aufdeck-Menü wächst durch CB um sechs Einträge.** Die sechs neuen Zonen
+   tragen `layout: "stack"` und stehen damit in `revealZones` unter den
+   Ablagestapeln — am Nachschubstapel stehen jetzt neun statt drei
+   „Reveal Top Card to …". Das ist der Preis dafür, dass sie Ablagestapel sind,
+   und er ist bewusst bezahlt: dafür lässt sich ein geheimes Dorf-Ereignis in
+   einem Griff offen zu seinem Dörfler legen. Das Menü ist gedeckelt und
+   scrollt (`menuPlacement`), Ä2 bleibt davon unberührt schlecht.
+2. **„Remove from Table" nimmt die Auswahl, nicht den Stapel.** Ein Rechtsklick
+   auf einen Stapel wählt am Mauszeiger **eine** Karte aus; die Abfrage sagt
+   dann folgerichtig „Face down" und nicht „30 cards". Erst eine Mehrfachauswahl
+   (Strg-Klick, oder am Finger das Antippen eines Stapels) ergibt „N cards" —
+   geprüft am Tisch mit 2 und mit 21 Karten. Die Spec-Abnahme 2 („bei einem
+   Stapel nennt sie die Zahl der Karten") setzt voraus, dass der Eintrag den
+   ganzen Stapel nimmt; das tut er nicht, und die Abfrage nennt richtigerweise
+   genau das, was verschwindet.
+3. **Der Satz der Abfrage ist zahlneutral geworden.** „14 cards **is** removed
+   for good" stand so da; statt eines zweiten Zweiges nur für das Verb heißt es
+   jetzt „<Name> — removed for good, there is no undo".
+
+---
+
 ## Nicht Teil dieser Liste
 
 * **Ä2** (Kontextmenü ohne feste Position und Länge) und **Ä3** (Token-Legende
