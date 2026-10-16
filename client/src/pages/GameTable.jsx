@@ -7450,7 +7450,11 @@ export default function GameTable({ room = null }) {
                   ? cardDeleteLabel(tableCards.filter(c => deleteTarget.cardIds.includes(c.tableId)))
                   : deleteLabel(deleteTarget.objType, (objLists[deleteTarget.objType] || []).find(o => o.id === deleteTarget.objId))}
             </strong>
-            {' '}is removed for good — there is no undo.
+            {/* M23.1: zahlneutral formuliert. Seit die Abfrage auch für Karten
+                gilt, steht dort auch „14 cards" — „14 cards is removed" wäre
+                falsch, und ein zweiter Zweig nur für das Verb wäre eine zweite
+                Stelle, die weiß, ob es eins oder viele sind. */}
+            {' '}— removed for good, there is no undo.
           </p>
           <div className="flex gap-2 justify-end">
             <button
