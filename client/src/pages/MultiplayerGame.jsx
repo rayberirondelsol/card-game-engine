@@ -14,6 +14,9 @@ export default function MultiplayerGame() {
 
   const playerId = sessionStorage.getItem(`room_${code}_player_id`);
   const [gameId, setGameId] = useState(null);
+  // M22: der Aufbau des Raums. Der Tisch fuehrt seine Herkunft mit und
+  // schreibt sie in jeden Spielstand - im Raum ist der "Save"-Knopf sichtbar.
+  const [setupId, setSetupId] = useState(null);
   // Must be declared before any early returns (Rules of Hooks)
   const roomRef = React.useRef({});
 
@@ -23,6 +26,7 @@ export default function MultiplayerGame() {
       .then(r => r.json())
       .then(data => {
         if (data.game_id) setGameId(data.game_id);
+        if (data.setup_id) setSetupId(data.setup_id);
       })
       .catch(() => {});
   }, [code]);
@@ -40,10 +44,10 @@ export default function MultiplayerGame() {
     );
   }
 
-  return <MultiplayerGameInner code={code} playerId={playerId} gameId={gameId} roomRef={roomRef} />;
+  return <MultiplayerGameInner code={code} playerId={playerId} gameId={gameId} setupId={setupId} roomRef={roomRef} />;
 }
 
-function MultiplayerGameInner({ code, playerId, gameId, roomRef }) {
+function MultiplayerGameInner({ code, playerId, gameId, setupId, roomRef }) {
   const {
     connected,
     players,
@@ -64,6 +68,7 @@ function MultiplayerGameInner({ code, playerId, gameId, roomRef }) {
   const room = {
     roomCode: code,
     gameId,
+    setupId,
     myPlayerId: playerId,
     myColor: myPlayer?.color || null,
     myPlayer,

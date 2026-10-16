@@ -4,6 +4,16 @@ import { getDb } from '../database.js';
 // neben server/ und client/.
 import { isEmptyTableState } from '../../../shared/tableState.js';
 
+/**
+ * Die Setup-Kennung aus einem Anfragerumpf, oder `null`. Eine Stelle fuer
+ * beide Schreibwege (M6): "Herkunft unbekannt" wird genau als `NULL`
+ * geschrieben, nie als leerer Text.
+ */
+function setupIdOf(body) {
+  const raw = body && body.setup_id;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+}
+
 export async function savesRoutes(fastify) {
   // GET /api/games/:id/saves - List save states for a game
   fastify.get('/api/games/:id/saves', async (request, reply) => {
@@ -28,6 +38,10 @@ export async function savesRoutes(fastify) {
     const db = getDb();
     const { id } = request.params;
     const { name, state_data } = request.body || {};
+    // M22: woher der Tisch stammt, weiss nur der Client - der Server speichert
+    // es, er leitet es nicht her. Leerer Text zaehlt wie "nicht angegeben",
+    // sonst gaebe es zwei Schreibweisen fuer "Herkunft unbekannt".
+    const setupId = setupIdOf(request.body);
 
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
     if (!game) {
@@ -42,8 +56,8 @@ export async function savesRoutes(fastify) {
     const stateJson = typeof state_data === 'string' ? state_data : JSON.stringify(state_data || {});
 
     db.prepare(
-      'INSERT INTO save_states (id, game_id, name, is_auto_save, state_data) VALUES (?, ?, ?, 0, ?)'
-    ).run(saveId, id, name.trim(), stateJson);
+      'INSERT INTO save_states (id, game_id, name, is_auto_save, state_data, setup_id) VALUES (?, ?, ?, 0, ?, ?)'
+    ).run(saveId, id, name.trim(), stateJson, setupId);
     console.log('[SQL] INSERT INTO save_states (manual save)', saveId);
 
     const save = db.prepare('SELECT * FROM save_states WHERE id = ?').get(saveId);
@@ -55,6 +69,7 @@ export async function savesRoutes(fastify) {
     const db = getDb();
     const { id } = request.params;
     const { state_data } = request.body || {};
+    const setupId = setupIdOf(request.body);
 
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(id);
     if (!game) {
@@ -82,9 +97,11 @@ export async function savesRoutes(fastify) {
 
     if (existing) {
       // Update existing auto-save
+      // Die Herkunft geht beim Ueberschreiben mit: ohne das behielte der erste
+      // Auto-Stand eines Spiels seine `NULL` fuer immer (M22).
       db.prepare(
-        "UPDATE save_states SET state_data = ?, updated_at = datetime('now') WHERE id = ?"
-      ).run(stateJson, existing.id);
+        "UPDATE save_states SET state_data = ?, setup_id = ?, updated_at = datetime('now') WHERE id = ?"
+      ).run(stateJson, setupId, existing.id);
       console.log('[SQL] UPDATE save_states (auto-save)', existing.id);
       const save = db.prepare('SELECT * FROM save_states WHERE id = ?').get(existing.id);
       return save;
@@ -92,8 +109,8 @@ export async function savesRoutes(fastify) {
       // Create new auto-save
       const saveId = uuidv4();
       db.prepare(
-        'INSERT INTO save_states (id, game_id, name, is_auto_save, state_data) VALUES (?, ?, ?, 1, ?)'
-      ).run(saveId, id, 'Auto Save', stateJson);
+        'INSERT INTO save_states (id, game_id, name, is_auto_save, state_data, setup_id) VALUES (?, ?, ?, 1, ?, ?)'
+      ).run(saveId, id, 'Auto Save', stateJson, setupId);
       console.log('[SQL] INSERT INTO save_states (auto-save)', saveId);
       const save = db.prepare('SELECT * FROM save_states WHERE id = ?').get(saveId);
       return reply.status(201).send(save);

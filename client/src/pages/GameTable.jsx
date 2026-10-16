@@ -42,6 +42,7 @@ import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
+import { resolveTableSource, scaffoldNotice } from '../utils/tableSource.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -426,6 +427,21 @@ export default function GameTable({ room = null }) {
   // Steps of the last setup sequence that did not work - shown until dismissed,
   // because a setup with silently skipped steps looks exactly like a correct one.
   const [setupIssues, setSetupIssues] = useState(null);
+  // M22: der Aufbau, aus dem dieser Tisch stammt. **Der Tisch fuehrt seine
+  // Herkunft selbst** - die URL ist nur eine von drei Eingangsquellen und wird
+  // genau einmal gelesen, beim Laden. Gesetzt vom `?setupId=`-Zweig, vom
+  // `?saveId=`-Zweig (aus `save.setup_id`) und vom Raum; gelesen von beiden
+  // Speicherwegen. Nur aus der URL waere die Kette beim ersten Glied gerissen:
+  // `GameDetail` oeffnet einen Stand als `/play?saveId=<v>`, ohne `setupId`.
+  const [activeSetupId, setActiveSetupId] = useState(null);
+  // Derselbe Wert fuer den `beforeunload`-Weg: dessen Effekt haengt nur an
+  // `game`/`id`, sein Abschluss ist also der von damals (dieselbe Falle wie
+  // bei `performAutoSaveRef` daneben). Ein Ref ist beim Entladen aktuell.
+  const activeSetupIdRef = useRef(null);
+  activeSetupIdRef.current = activeSetupId;
+  // M22/CB: 'missing' | 'gone' - ein Stand ohne Geruest sagt es, statt still
+  // die Haelfte zu laden. Bleibt stehen, bis er geschlossen wird.
+  const [scaffoldWarning, setScaffoldWarning] = useState(null);
   // M19.5/BM: die offene Rückfrage einer Aktion, die an einer Wache mit
   // `confirm` angehalten hat - `{ action, index, message }`.
   const [actionConfirm, setActionConfirm] = useState(null);
@@ -3821,6 +3837,14 @@ export default function GameTable({ room = null }) {
     }
   }, [room?.grids]);
 
+  // M22: und die Herkunft, aus demselben Grund - der "Save"-Knopf ist im Raum
+  // sichtbar, ein von dort gespeicherter Stand waere sonst der einzige ohne
+  // Aufbau. Der Raum laedt keine Spielstaende (`POST /api/rooms/:code/start`
+  // *startet*), also braucht er keine Pruefung, nur diese Weitergabe.
+  useEffect(() => {
+    if (room?.setupId) setActiveSetupId(room.setupId);
+  }, [room?.setupId]);
+
   // M6-Nachtrag 2: Uebergibt der Raum einen Brettzustand, zeigt der Tisch ihn
   // an. Der Server hat die Aufbau-Sequenz beim Start bereits ausgefuehrt - hier
   // wird nur noch geladen, derselbe Weg wie Setup und Spielstand. Die Raster
@@ -3847,7 +3871,10 @@ export default function GameTable({ room = null }) {
       const res = await apiFetch(`/api/games/${id}/saves`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, state_data: stateData }),
+        // M22: die Herkunft reist mit - sonst laedt dieser Stand spaeter ohne
+        // Zonen, Raster, Aktionen und Szenario. Nicht in `state_data`: der
+        // Aufbau bleibt die eine Quelle, der Stand fuehrt nur die Kennung.
+        body: JSON.stringify({ name, state_data: stateData, setup_id: activeSetupId }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -3893,7 +3920,7 @@ export default function GameTable({ room = null }) {
       const res = await apiFetch(`/api/games/${id}/saves/auto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state_data: stateData }),
+        body: JSON.stringify({ state_data: stateData, setup_id: activeSetupId }),
       });
       if (res.ok) {
         lastAutoSaveRef.current = new Date().toISOString();
@@ -3938,7 +3965,7 @@ export default function GameTable({ room = null }) {
           apiFetch(`/api/games/${id}/saves/auto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state_data: stateData }),
+            body: JSON.stringify({ state_data: stateData, setup_id: activeSetupIdRef.current }),
             keepalive: true,
           }).catch(() => {});
         }
@@ -4384,24 +4411,79 @@ export default function GameTable({ room = null }) {
     setSetupIssues(bad.length ? bad : null);
   }
 
+  /**
+   * M22: das Geruest eines Aufbaus auf den Tisch legen - Zonen, Raster,
+   * Aktionen, Szenariodaten. **Ohne** die Aufbausequenz und ohne
+   * `setup.state_data`: welche Stuecke liegen, entscheidet der Aufrufer.
+   *
+   * Eine Stelle fuer beide Ladewege (M6). Gibt Zonen, Raster und Szenario
+   * zurueck, weil der Executor und `loadGameState` sie *jetzt* brauchen - im
+   * Zustand stehen sie erst beim naechsten Rendern.
+   */
+  function applySetupScaffold(setup) {
+    let parsedZones = [];
+    try { parsedZones = JSON.parse(setup.zone_data || '[]'); } catch {}
+    if (!Array.isArray(parsedZones)) parsedZones = [];
+    setZones(parsedZones);
+    let parsedGrids = [];
+    try { parsedGrids = JSON.parse(setup.grid_data || '[]'); } catch {}
+    if (!Array.isArray(parsedGrids)) parsedGrids = [];
+    setGrids(parsedGrids);
+    // M5: Aktionen gehoeren zum Setup, laufen aber erst spaeter - hier nur
+    // merken, nicht ausfuehren.
+    let parsedActions = [];
+    try { parsedActions = JSON.parse(setup.action_data || '[]'); } catch {}
+    setSetupActions(Array.isArray(parsedActions) ? parsedActions : []);
+    const parsedScenario = parseScenarioData(setup.scenario_data);
+    setScenarioData(parsedScenario);
+    setActiveSetupId(setup.id);
+    return { zones: parsedZones, grids: parsedGrids, scenarioData: parsedScenario };
+  }
+
   // Load save state from URL query param on mount
   useEffect(() => {
     if (saveLoadedRef.current) return;
-    const saveId = searchParams.get('saveId');
-    if (!saveId) return;
+    // M22/BY: welche Quelle gilt, ist eine Rechnung und kein Zeitverhalten -
+    // vorher entschied, welcher der beiden Effekte zuletzt `loadGameState`
+    // aufrief, und das war (gemessen) der Aufbau.
+    const source = resolveTableSource({
+      mode: searchParams.get('mode'),
+      setupId: searchParams.get('setupId'),
+      editSetupId: searchParams.get('editSetupId'),
+      saveId: searchParams.get('saveId'),
+    });
+    if (source.kind !== 'save') return;
     // Wait for game data to load first
     if (loading || !game) return;
 
     saveLoadedRef.current = true;
     async function loadSave() {
       try {
-        const res = await apiFetch(`/api/games/${id}/saves/${saveId}`);
+        const res = await apiFetch(`/api/games/${id}/saves/${source.saveId}`);
         if (!res.ok) {
           console.error('Failed to load save:', res.status);
           return;
         }
         const save = await res.json();
-        loadGameState(save.state_data);
+        // M22: erst das Geruest aus dem Aufbau, aus dem dieser Stand stammt -
+        // **ohne** die Sequenz -, dann die Stuecke darueber. Die Reihenfolge
+        // ist wesentlich, und die Raster gehen ausdruecklich mit: im Zustand
+        // stehen sie erst beim naechsten Rendern, `placeOnGrids` braucht sie
+        // jetzt.
+        let gridsForPlacement = null;
+        let setupLoaded = false;
+        if (save.setup_id) {
+          const setupRes = await apiFetch(`/api/games/${id}/setups/${save.setup_id}`);
+          if (setupRes.ok) {
+            gridsForPlacement = applySetupScaffold(await setupRes.json()).grids;
+            setupLoaded = true;
+          } else {
+            console.error('Failed to load the setup this save came from:', setupRes.status);
+          }
+        }
+        const notice = scaffoldNotice(save.setup_id, setupLoaded);
+        setScaffoldWarning(notice === 'none' ? null : notice);
+        loadGameState(save.state_data, gridsForPlacement);
         setSaveToast(`Loaded save: "${save.name}"`);
         setTimeout(() => setSaveToast(null), 4000);
       } catch (err) {
@@ -4416,17 +4498,24 @@ export default function GameTable({ room = null }) {
     if (setupLoadedRef.current) return;
     if (loading || !game) return;
 
-    const mode = searchParams.get('mode');
-    const setupId = searchParams.get('setupId');
-    const editSetupIdParam = searchParams.get('editSetupId');
+    const source = resolveTableSource({
+      mode: searchParams.get('mode'),
+      setupId: searchParams.get('setupId'),
+      editSetupId: searchParams.get('editSetupId'),
+      saveId: searchParams.get('saveId'),
+    });
+    const setupId = source.setupId;
 
     // Enter setup mode if mode=setup
-    if (mode === 'setup') {
+    if (source.setupMode) {
       setSetupMode(true);
     }
 
+    // M22: Bei `kind === 'save'` passiert hier **nichts** - kein Geruest zum
+    // zweiten Mal, keine Sequenz, kein `loadGameState`. Der Stand ist das
+    // Spaetere, und sein Geruest holt sein eigener Zweig.
     // If loading a setup to play (setupId param)
-    if (setupId && !editSetupIdParam) {
+    if (source.kind === 'setup') {
       setupLoadedRef.current = true;
       async function loadSetup() {
         try {
@@ -4436,28 +4525,16 @@ export default function GameTable({ room = null }) {
             return;
           }
           const setup = await res.json();
-          let parsedZones = [];
-          if (setup.zone_data) {
-            try { parsedZones = JSON.parse(setup.zone_data); } catch {}
-          }
-          setZones(parsedZones);
-          let parsedGrids = [];
-          if (setup.grid_data) {
-            try { parsedGrids = JSON.parse(setup.grid_data); } catch {}
-          }
-          setGrids(parsedGrids);
-          // M5: Aktionen gehoeren zum Setup, laufen aber erst spaeter - hier
-          // nur merken, nicht ausfuehren.
-          let parsedActions = [];
-          try { parsedActions = JSON.parse(setup.action_data || '[]'); } catch {}
-          setSetupActions(Array.isArray(parsedActions) ? parsedActions : []);
-          // Die Szenariodaten wie die Raster frisch aus dem Setup: `scenarioData`
-          // im State steht erst beim naechsten Rendern, und `build_scenario`
-          // braucht sie jetzt (M7/T6).
-          const parsedScenario = parseScenarioData(setup.scenario_data);
-          setScenarioData(parsedScenario);
+          // Zonen, Raster, Aktionen und Szenariodaten - dieselbe Stelle, die
+          // auch der Spielstandzweig benutzt (M6/M22). Die Werte kommen
+          // zurueck, weil der Executor sie *jetzt* braucht: im Zustand stehen
+          // sie erst beim naechsten Rendern (M7/T1, M7/T6).
+          const { zones: parsedZones, grids: parsedGrids, scenarioData: parsedScenario } =
+            applySetupScaffold(setup);
 
-          // Execute setup sequence for new games (not savegame loads)
+          // Execute setup sequence for new games (not savegame loads) - dass
+          // dies kein Spielstandladen ist, steht jetzt in `source.kind`. Der
+          // Kommentar hat es behauptet, geprueft wurde es nie (M22).
           let parsedSeq = [];
           try { parsedSeq = JSON.parse(setup.sequence_data || '[]'); } catch {}
 
@@ -4495,12 +4572,12 @@ export default function GameTable({ room = null }) {
     }
 
     // If editing an existing setup (mode=setup&editSetupId param)
-    if (mode === 'setup' && editSetupIdParam) {
+    if (source.kind === 'setup-edit') {
       setupLoadedRef.current = true;
-      setEditingSetupId(editSetupIdParam);
+      setEditingSetupId(setupId);
       async function loadSetupForEdit() {
         try {
-          const res = await apiFetch(`/api/games/${id}/setups/${editSetupIdParam}`);
+          const res = await apiFetch(`/api/games/${id}/setups/${setupId}`);
           if (!res.ok) {
             console.error('Failed to load setup for editing:', res.status);
             return;
@@ -4537,7 +4614,7 @@ export default function GameTable({ room = null }) {
     }
 
     // New setup mode - just enter setup mode with empty table
-    if (mode === 'setup') {
+    if (source.kind === 'setup-new') {
       setupLoadedRef.current = true;
     }
   }, [loading, game, id, searchParams]);
@@ -6172,6 +6249,34 @@ export default function GameTable({ room = null }) {
                   </ul>
                 </div>
                 <button onClick={() => setSetupIssues(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* M22/CB: ein Stand ohne Geruest sagt es. Bleibt stehen, bis er
+            geschlossen wird - der gruene Toast daneben geht nach vier
+            Sekunden, und still die Haelfte zu laden ist genau der Fehler,
+            den M22 behebt. Dieselbe Form wie `setup-issues`. */}
+        {scaffoldWarning && (
+          <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
+            <div
+              className="max-w-lg bg-amber-600 text-white px-5 py-3 rounded-xl shadow-2xl"
+              data-testid="scaffold-warning"
+              data-ui-element="true"
+            >
+              <div className="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                </svg>
+                <div className="text-sm">
+                  {scaffoldWarning === 'gone'
+                    ? 'The setup this save came from no longer exists - zones, grids and setup actions are missing.'
+                    : 'This save has no setup - zones, grids and setup actions are missing.'}
+                </div>
+                <button onClick={() => setScaffoldWarning(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
               </div>
             </div>
           </div>

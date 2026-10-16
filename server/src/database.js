@@ -233,6 +233,19 @@ export async function setupDatabase() {
     console.log('[DB] Migration: added scenario_data column to setups');
   }
 
+  // M22: der Aufbau, aus dem ein Spielstand stammt. Nur die Kennung - Zonen,
+  // Raster, Aktionen und Szenario bleiben am Setup, sonst gaebe es sie zweimal
+  // und eine Korrektur am Aufbau erreichte alte Staende nie (M6). Nullbar ohne
+  // Vorgabewert: `NULL` ist die Aussage "Herkunft unbekannt", an der der
+  // sichtbare Hinweis am Tisch haengt. Ohne `REFERENCES`, weil SQLite einem
+  // bestehenden Tisch keinen Fremdschluessel nachruesten kann - ein geloeschter
+  // Aufbau wird deshalb beim Laden behandelt, nicht beim Schreiben.
+  const saveStateCols = db.prepare("PRAGMA table_info(save_states)").all().map(c => c.name);
+  if (!saveStateCols.includes('setup_id')) {
+    db.exec('ALTER TABLE save_states ADD COLUMN setup_id TEXT');
+    console.log('[DB] Migration: added setup_id column to save_states');
+  }
+
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');
 
