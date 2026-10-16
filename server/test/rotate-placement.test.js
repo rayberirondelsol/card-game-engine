@@ -327,3 +327,32 @@ test('der Tisch legt Winkel, Ort und Adresse einer fremden Drehung an', () => {
   assert.match(zweig, /gridAddress\(msg\)/, 'sonst bliebe der zweite Platz auf der alten Adresse');
   assert.match(zweig, /msg\.x/, 'und am alten Ort');
 });
+
+// ── BU / M21.2: gesperrt heisst auch undrehbar ────────────────────────────────
+//
+// M13.1 hat `locked` beim Drehen ausdruecklich nicht geprueft ("gesperrt heisst
+// unbeweglich, nicht undrehbar, wie schon bei Flip"). Fuer ein Plaettchen war
+// das gedacht; am **Sideboard** hat ein Fehlklick es um 90 Grad quer ueber das
+// Spielfeld gelegt - samt der vier Zonen, die per `anchor.assetId` daran
+// haengen (`Aktionen`, `Ablage`, `Boesewicht: Bewegung`, `Boesewicht: Leben`).
+// Flip tauscht ein Bild, Drehen verschiebt eine Flaeche.
+// Aufgabe BU in docs/tasks-partie12.md.
+
+test('BU Abnahme 1: ein gesperrtes Token dreht nicht – null heisst Abweisung', () => {
+  const brett = on('A1:F6', 300, 300, { locked: true });
+  assert.equal(rotatePlacement(brett, { grids: [grid], step: 90 }), null);
+  assert.equal(rotatePlacement(brett, { grids: [grid], step: -90 }), null);
+  // Auch eine halbe Drehung, die nur den Winkel aendert, bleibt aus.
+  assert.equal(rotatePlacement(brett, { grids: [grid], step: 180 }), null);
+});
+
+test('BU Abnahme 2: entsperrt dreht es wie bisher', () => {
+  const zaun = on('A3:D3', 200, 50, { locked: false });
+  const p = rotatePlacement(zaun, { grids: [grid], step: 90 });
+  assert.equal(p.rotation, 90);
+  assert.equal(p.cell, 'A3:A6');
+  // Und ohne das Feld ueberhaupt – ein Zustand vor M21.2 kennt `locked` nicht.
+  const alt = on('A3:D3', 200, 50);
+  delete alt.locked;
+  assert.equal(rotatePlacement(alt, { grids: [grid], step: 90 }).rotation, 90);
+});

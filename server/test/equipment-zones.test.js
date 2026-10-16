@@ -88,12 +88,31 @@ test('BH: `Hände` hat zwei Plätze, weit genug für zwei Karten', () => {
   }
 });
 
-test('BH: der Vorrat teilt sich in fünf Spalten und eine Reihe', () => {
+// BV / M21.4: der Vorrat ist ein Ablagestapel ohne Obergrenze.
+//
+// „Es gibt keine Obergrenze, wie viel Ausrüstung ein Dörfler besitzen darf"
+// `[BR S.8]` — und in 580 × 140 Weltpunkten gibt es keine zweite Kartenreihe
+// (`cols = round(sqrt(cap·w/h))` liefert bei 580/140 höchstens fünf in einer
+// Reihe, jede Kapazität darüber zwei Reihen). Jede Zahl wäre eine erfundene
+// Grenze; `capacity` weg heißt `zoneCapacity === null` heißt `zoneRejects`
+// sagt nie „voll". Begründung in docs/tasks-partie12.md, BV.
+test('BV: der Vorrat hat einen Platz und keine Obergrenze', () => {
   for (const z of resolved.filter(q => q.label.startsWith('Ausrüstung Dörfler '))) {
+    assert.equal(z.layout, 'stack', z.label);
+    assert.equal(zoneCapacity(z), null, `${z.label}: trägt noch eine Obergrenze`);
     const slots = zoneSlots(z);
-    assert.equal(slots.length, 5, z.label);
-    assert.equal(new Set(slots.map(s => s.y)).size, 1, `${z.label}: mehr als eine Reihe`);
-    assert.ok(Math.abs((slots[1].x - slots[0].x) - 116) < 1e-6, `${z.label}: Spaltenabstand`);
+    assert.equal(slots.length, 1, z.label);
+    assert.ok(Math.abs(slots[0].x - (z.x + z.width / 2)) < 1e-6, z.label);
+    assert.ok(Math.abs(slots[0].y - (z.y + z.height / 2)) < 1e-6, z.label);
+  }
+});
+
+test('BV: die fünfzehn Slot-Zonen bleiben, wie M18 sie gemessen hat', () => {
+  const slots = resolved.filter(q => /: (Kopf|Brust|Beine|Hände|Mitbringsel)$/.test(q.label));
+  assert.equal(slots.length, 15);
+  for (const z of slots) {
+    assert.equal(z.layout, 'row', z.label);
+    assert.equal(z.height, BAND.card.height, z.label);
   }
 });
 
@@ -106,8 +125,11 @@ test('BH: in keine Zone passt mehr, als die Regel erlaubt', () => {
   assert.equal(zoneRejects(kopf, 'card', 1), 'zone "Dörfler 1: Kopf" is full (1)');
   assert.equal(zoneRejects(haende, 'card', 1), null);
   assert.equal(zoneRejects(haende, 'card', 2), 'zone "Dörfler 1: Hände" is full (2)');
-  assert.equal(zoneRejects(vorrat, 'card', 4), null);
-  assert.equal(zoneRejects(vorrat, 'card', 5), 'zone "Ausrüstung Dörfler 1" is full (5)');
+  // BV / M21.4: der Vorrat weist nie ab — „WAFFEN-WIRRWARR" gibt zwei
+  // Dörflern gegenseitig **alle** Waffen, und die sechste Karte blieb beim
+  // falschen Besitzer.
+  assert.equal(zoneRejects(vorrat, 'card', 5), null);
+  assert.equal(zoneRejects(vorrat, 'card', 42), null);
   // Nur Karten, kein Marker und kein Würfel.
   assert.ok(zoneRejects(kopf, 'asset', 0));
 });

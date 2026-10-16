@@ -33,7 +33,7 @@ import { issueLine } from '../utils/setupActions.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { stackAt, stackCandidates, looseCandidates, resolveDrop } from '../utils/cardDrop.js';
+import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp } from '../utils/cardDrop.js';
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
@@ -1829,6 +1829,15 @@ export default function GameTable({ room = null }) {
       return;
     }
 
+    // M21.1: in einer Zone, die ein Ablagestapel ist, ist der Haufen **ein**
+    // Stapel. Die Regel steht in `pileUp` (`cardDrop.js`, aus `server/test/`
+    // geprueft); hier wird sie nur um das Ergebnis des jeweiligen Zweigs
+    // gelegt, damit sie denselben Zustand sieht, den der Zweig schreibt.
+    // Die Id wird **ausserhalb** der Aktualisierung gewuerfelt: React darf
+    // einen Updater zweimal laufen lassen, und zwei Ids waeren zwei Stapel.
+    const freshStackId = crypto.randomUUID();
+    const pile = (list) => (dropZone?.layout === 'stack' ? pileUp(list, dropZone, freshStackId) : list);
+
     // If dropped on a stack, merge them
     if (targetStack) {
       const targetStackCards = tableCards.filter(c => c.inStack === targetStack);
@@ -1903,7 +1912,7 @@ export default function GameTable({ room = null }) {
 
     if (isMultiSelected) {
       // Snap all selected cards/stacks by the same offset as the dragged card
-      setTableCards(prev => prev.map(c => {
+      setTableCards(prev => pile(prev.map(c => {
         const isSelected = selectedCards.has(c.tableId);
         const isInSelectedStack = c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
         if (isSelected || isInSelectedStack) {
@@ -1911,27 +1920,27 @@ export default function GameTable({ room = null }) {
           return { ...c, x: c.x + snapDx, y: c.y + snapDy, gridId: null, cell: null };
         }
         return c;
-      }));
+      })));
     } else if (card.inStack) {
       // Snap the whole stack
-      setTableCards(prev => prev.map(c => {
+      setTableCards(prev => pile(prev.map(c => {
         if (c.inStack === card.inStack) {
           return { ...c, x: c.x + snapDx, y: c.y + snapDy };
         }
         return c;
-      }));
+      })));
       // M9.4: der Zug am Stapel geht in den Raum. Den Empfaenger gab es seit
       // jeher (audit-dead-controls Fund 9), er suchte den Stapel nur unter dem
       // falschen Feldnamen - siehe `findStack` in messageHandler.js.
       if (room) room.sendAction({ type: 'stack_move', stack_id: card.inStack, x: finalX, y: finalY });
     } else {
-      setTableCards(prev => prev.map(c => {
+      setTableCards(prev => pile(prev.map(c => {
         if (c.tableId !== draggingCard) return c;
         // The field, not the coordinates, is what makes a card come back to the
         // same place after the board moved. A card in a multi-selection or in a
         // stack keeps no field: it moved as part of something else.
         return { ...c, x: finalX, y: finalY, gridId: hit.gridId, cell: hit.cell };
-      }));
+      })));
       // Dieselbe Luecke wie bei `token_move`: Karten tragen seit M3b
       // `gridId`/`cell`, und ohne sie behielte der Raum das alte Feld (G5).
       if (room) room.sendAction({
@@ -4351,6 +4360,17 @@ export default function GameTable({ room = null }) {
     const plan = revealPlan(getGameState(), stackId, zoneLabel);
     const { state: next, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
     loadGameState(next);
+    // M21.1: die aufgedeckte Karte tritt dem Haufen bei, wenn die Zielzone ein
+    // Ablagestapel ist - dieselbe Regel wie beim Ablegen von Hand, dieselbe
+    // Funktion. **Nach** `loadGameState`: React arbeitet die Aktualisierungen
+    // in der Reihenfolge ihres Aufrufs ab, dieser sieht also den geladenen
+    // Stand. Der Executor kann es nicht tun - er kennt nur `state.stacks`,
+    // und der Haufen entsteht am Tisch.
+    const pileZone = tableZones.find(z => z.label === zoneLabel && z.layout === 'stack');
+    if (pileZone) {
+      const freshStackId = crypto.randomUUID();
+      setTableCards(prev => pileUp(prev, pileZone, freshStackId));
+    }
     // Der Hilfsname fuer einen namenlosen Stapel war nur die Adresse des
     // Schritts - in der Oberflaeche hat er nichts zu suchen.
     if (plan.tempLabel) {
@@ -8042,8 +8062,16 @@ export default function GameTable({ room = null }) {
                     Knopf, der nichts Sichtbares tut, ist der Fehler aus
                     docs/audit-dead-controls.md. Eine Rueckseite braucht es
                     nicht - eine einseitige Figur laesst sich drehen.
-                    `locked` wird absichtlich nicht geprueft: gesperrt heisst
-                    unbeweglich, nicht undrehbar, wie schon bei Flip.
+                    M21.2: **gesperrt heisst jetzt auch undrehbar.** Die alte
+                    Begruendung ("unbeweglich, nicht undrehbar, wie schon bei
+                    Flip") trug fuer ein Plaettchen, nicht fuer ein Brett: ein
+                    Fehlklick hat das gesperrte Sideboard quer ueber das
+                    Spielfeld gelegt, samt der vier Zonen, die per
+                    `anchor.assetId` daran haengen. Geprueft wird es in
+                    `rotatePlacement` (eine Stelle, aus `server/test/`
+                    pruefbar); hier stehen die Eintraege **weiter da** und
+                    nennen den Grund - einer, der stumm nichts tut, ist der
+                    Fehler aus docs/audit-dead-controls.md.
                     M13.4: gedreht wird **der Kasten mit**. Ein 200x50-Zaun in
                     einem ungedrehten Kasten wuerde von `object-fit: contain`
                     auf ein Viertel gestaucht; `rotatePlacement` tauscht darum
@@ -8056,6 +8084,8 @@ export default function GameTable({ room = null }) {
                   if (!tok || tok.shape !== 'image') return null;
                   const turn = (step) => {
                     const place = rotatePlacement(tok, { grids: tableGrids, step });
+                    // M21.2: `null` heisst abgewiesen - gesperrt.
+                    if (!place) { setContextMenu(null); return; }
                     setTokens(prev => prev.map(t => (t.id === tok.id ? { ...t, ...place } : t)));
                     // Die Adresse geht denselben Weg wie bei `token_move` -
                     // ueber `gridAddress`, damit nicht zwei Feldlisten
@@ -8069,21 +8099,33 @@ export default function GameTable({ room = null }) {
                     });
                     setContextMenu(null);
                   };
+                  // M21.2: gesperrt wird nicht gedreht - der Eintrag bleibt
+                  // stehen, abgeschaltet, mit dem Grund daneben.
+                  const cls = tok.locked
+                    ? 'w-full px-4 py-2 text-left text-sm text-slate-500 cursor-not-allowed flex items-center gap-2'
+                    : 'w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2';
+                  const why = tok.locked
+                    ? <span className="ml-auto text-xs text-slate-500">gesperrt</span>
+                    : null;
                   return (
                     <>
                       <button
                         onClick={() => turn(-90)}
+                        disabled={!!tok.locked}
+                        title={tok.locked ? 'Gesperrt — erst entsperren' : undefined}
                         data-testid="context-token-rotate-ccw"
-                        className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                        className={cls}
                       >
-                        {'↺ Rotate Left'}
+                        <span>{'↺ Rotate Left'}</span>{why}
                       </button>
                       <button
                         onClick={() => turn(90)}
+                        disabled={!!tok.locked}
+                        title={tok.locked ? 'Gesperrt — erst entsperren' : undefined}
                         data-testid="context-token-rotate-cw"
-                        className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                        className={cls}
                       >
-                        {'↻ Rotate Right'}
+                        <span>{'↻ Rotate Right'}</span>{why}
                       </button>
                     </>
                   );

@@ -35,6 +35,7 @@
  */
 
 import { CARD_WIDTH, CARD_HEIGHT, getCardDims } from './cardDims.js';
+import { zoneContains, zoneCenter } from '../../../shared/zoneGeometry.js';
 
 /**
  * Der Stapel, auf dem `point` liegt.
@@ -148,4 +149,67 @@ export function looseCandidates(cards, excludeIds) {
 export function resolveDrop({ point, stacks, refusal } = {}) {
   const stack = stackAt(point, stacks) || null;
   return { stack, refusal: stack ? null : (refusal || null) };
+}
+
+/**
+ * Der Haufen in einer Zone, die ein Ablagestapel ist, als **ein** Stapel
+ * (Spec M21.1).
+ *
+ * Der Befund der zwoelften Partie, und er hat die Partie beendet: die
+ * abgeworfenen Boesewicht-Aktionen lagen als **dreizehn lose Karten** auf der
+ * `Ablage`. Als der Ziehstapel leer war, liess sich nichts neu mischen - kein
+ * `Shuffle`, kein `Flip Stack`, kein `Reveal Top Card`, weil es all das nur am
+ * Stapel gibt.
+ *
+ * **`layout: 'stack'` war bis hierher nur eine Ortsregel.** `zoneSlots` gibt
+ * einen Platz (die Mitte), `snapPoint` und `spotFor` versetzen jede weitere
+ * Karte um `STACK_OFFSET` (`stackPoint`, M12.5) - und *niemand* setzt
+ * `inStack`. M12.5 hat also die Staffelung gebaut, nicht den Stapel. Eine Zone,
+ * die ein Stapel *ist*, haelt jetzt auch einen.
+ *
+ * Gefragt wird die **Form** der Zone (`zoneContains`), nicht ihr Rechteck -
+ * dieselbe Auskunft, die `objectsInZone` und `clear_zone` lesen. Und gesperrte
+ * Karten bleiben aussen vor, wie bei `clear_zone` und `rotate_zone`:
+ * gesperrt heisst gesperrt.
+ *
+ * Liegt in der Zone schon **ein** Stapel, behaelt er seine Id - sonst zaehlte
+ * das Mischabzeichen `#n` (M15.4) bei jeder neuen Karte von vorn. Liegen zwei,
+ * gilt die mitgegebene: zwei Stapel auf einem Platz sind keine Lage, die eine
+ * der beiden Ids verdient.
+ *
+ * Reine Rechnung, weil der Client keine Testinfrastruktur hat; `newStackId`
+ * kommt deshalb vom Aufrufer und wird nicht hier gewuerfelt (eine
+ * React-Aktualisierung darf nicht zweimal verschiedene Ids liefern). Geprueft
+ * aus `server/test/card-drop.test.js`.
+ *
+ * @param {Array<object>} cards alle Tischkarten
+ * @param {object} zone die Zone, in die gerade abgelegt wurde (aufgeloest)
+ * @param {string} newStackId die Id, falls ein neuer Stapel entsteht
+ * @returns {Array<object>} die neue Kartenliste - oder `cards` unveraendert,
+ *   wenn es nichts zu stapeln gibt.
+ */
+export function pileUp(cards, zone, newStackId) {
+  if (!Array.isArray(cards) || zone?.layout !== 'stack') return cards;
+
+  const mine = cards.filter(c => c && !c.locked && zoneContains(zone, c.x, c.y));
+  if (mine.length < 2) return cards;
+
+  const stackIds = new Set(mine.map(c => c.inStack).filter(Boolean));
+  // Liegt schon alles in einem Stapel, ist der gewuenschte Zustand erreicht.
+  if (stackIds.size === 1 && mine.every(c => c.inStack)) return cards;
+
+  const stackId = stackIds.size === 1 ? [...stackIds][0] : newStackId;
+  const at = zoneCenter(zone);
+  // Unten bleibt unten: wer schon im Stapel liegt, zuerst, danach die
+  // Hinzukommenden - innerhalb beider Gruppen nach ihrer bisherigen Lage.
+  const z = (c) => Number(c.zIndex) || 0;
+  const order = [...mine].sort((a, b) => (Number(Boolean(a.inStack)) - Number(Boolean(b.inStack))) * -1 || z(a) - z(b));
+  // Fortlaufend ab der untersten vorhandenen Lage: der Stapel behaelt seinen
+  // Platz in der Tiefe, und "oberste Karte" bleibt eindeutig.
+  const base = Math.min(...mine.map(z));
+  const rank = new Map(order.map((c, i) => [c, base + i]));
+
+  return cards.map(c => (rank.has(c)
+    ? { ...c, inStack: stackId, x: at.x, y: at.y, zIndex: rank.get(c), gridId: null, cell: null }
+    : c));
 }

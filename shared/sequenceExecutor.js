@@ -1248,6 +1248,24 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const zone = findZone(zones, step.zoneLabel);
       if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
 
+      // M21.1: ein Stapel in der Zone ist ein Ding in der Zone. `objectsInZone`
+      // liest `state.cards`, und die Karten eines Stapels liegen in
+      // `stack.cards` - bis M21.1 konnte dort keiner entstehen, seither bildet
+      // eine Zone mit `layout: 'stack'` am Tisch einen. Ohne diese Zeilen
+      // ueberlebte die `Ablage` die Rundenwende still, und der naechste Kampf
+      // fing mit dreizehn alten Aktionskarten an.
+      //
+      // **Aufgeloest, nicht uebersehen:** danach gilt jeder der drei Zweige
+      // unten unveraendert. Und nur ein **namenloser** Haufen - ein benannter
+      // Stapel (`Verhaltensdeck`, `Nachschub (Tante Emma)`) ist ein Ding fuer
+      // sich und wird mit `remove_stack` entfernt. Das ist die Entscheidung,
+      // die am `remove_stack`-Zweig schon steht.
+      for (const pile of [...state.stacks]) {
+        if (String(pile?.label ?? '').trim() || !zoneContains(zone, pile.x, pile.y)) continue;
+        for (const c of pile.cards || []) state.cards.push({ ...c, x: pile.x, y: pile.y, inStack: null });
+        state.stacks = state.stacks.filter(s => s !== pile);
+      }
+
       // Eine leere Zone zu leeren ist gelungen, nicht gescheitert: der
       // gewünschte Zustand liegt schon vor. Anders als bei `reveal_next`, wo
       // "nichts da" heißt, dass die Absicht nicht erfüllt wurde. Sonst meldet

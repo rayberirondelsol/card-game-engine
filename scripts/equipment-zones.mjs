@@ -97,9 +97,21 @@ const base = (id, label, capacity, layout, color) => ({
 });
 
 /**
- * Die achtzehn Zonen: fünfzehn neue Slots und die drei Vorräte in ihrer neuen
- * Gestalt (eine Reihe statt zwei, fünf Plätze statt zehn — in der Summe
- * steigt die Kapazität je Dörfler von 10 auf 11).
+ * Die achtzehn Zonen: fünfzehn Slots und die drei Vorräte.
+ *
+ * **BV / M21.4: der Vorrat ist ein Ablagestapel ohne Obergrenze.** „Es gibt
+ * keine Obergrenze, wie viel Ausrüstung ein Dörfler besitzen darf" `[BR S.8]`,
+ * und „WAFFEN-WIRRWARR" gibt zwei Dörflern gegenseitig *alle* Waffen — in
+ * Partie 12 blieb die sechste Karte beim falschen Besitzer. Mehr Plätze gibt
+ * der Kasten nicht her: `zoneSlots` rechnet `cols = round(sqrt(cap·w/h))`, und
+ * bei 580 × 140 passen höchstens fünf in **eine** Reihe; jede Kapazität
+ * darüber ergibt zwei, und die liegt entweder in der ersten oder hinter der
+ * Werkzeugleiste (M18, verworfene Varianten 2 und 3). Jede Zahl wäre also eine
+ * erfundene Grenze. `capacity` weg heißt `zoneCapacity === null` heißt
+ * `zoneRejects` sagt nie „voll" — die Regel ohne Obergrenze, ohne eine Zahl.
+ *
+ * Der **Kasten bleibt**, wie M18 ihn gemessen hat; geändert ist nur das
+ * Layout. Die fünfzehn Slot-Zonen sind unberührt.
  *
  * Grün für die Slots, grau für den Vorrat: bei Zoom 0,41 ist das Namensschild
  * 4,5 Bildschirmpunkte hoch und damit unlesbar. Was eine angelegte Karte von
@@ -116,7 +128,7 @@ export function equipmentZones() {
       });
     }
     out.push({
-      ...base(VORRAT_IDS[d.n], `Ausrüstung Dörfler ${d.n}`, 5, 'grid', null),
+      ...base(VORRAT_IDS[d.n], `Ausrüstung Dörfler ${d.n}`, null, 'stack', null),
       anchor: anchor({ relX: 0, relY: rowV, relWidth: relW, relHeight: relH }),
     });
   }
@@ -125,7 +137,14 @@ export function equipmentZones() {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
-const CURRENT_VORRAT = { relY: 1.02, relHeight: 0.7, capacity: 10 };
+/**
+ * Der Stand, den dieser Schalter **vorfindet**: das Ergebnis von BH/M18.
+ *
+ * Vor M18 stand hier `{ relY: 1.02, relHeight: 0.7, capacity: 10 }` — der
+ * Stand davor. Eine Vorprüfung, die gegen einen überholten Stand vergleicht,
+ * beanstandet die eigene letzte Änderung; sie zieht darum mit.
+ */
+const CURRENT_VORRAT = { relY: 1.83, relHeight: 0.35, capacity: 5, layout: 'grid' };
 
 async function main(argv) {
   const [mode, dbPath] = argv;
@@ -146,7 +165,9 @@ async function main(argv) {
   const current = read();
   const complaints = [];
 
-  if (current.length !== 30) complaints.push(`erwartet 30 Zonen, gefunden ${current.length}`);
+  // 45 seit BH/M18: die fünfzehn Slot-Zonen kamen zu den dreißig hinzu. Vor
+  // M18 stand hier 30 — dieselbe Falle wie bei CURRENT_VORRAT.
+  if (current.length !== 45) complaints.push(`erwartet 45 Zonen, gefunden ${current.length}`);
   for (const d of DOERFLER) {
     const z = current.find(q => q.id === VORRAT_IDS[d.n]);
     if (!z) { complaints.push(`Vorrat ${d.n} (${VORRAT_IDS[d.n]}) fehlt`); continue; }
@@ -154,18 +175,21 @@ async function main(argv) {
     if (z.anchor?.relY !== CURRENT_VORRAT.relY) complaints.push(`Vorrat ${d.n}: relY ${z.anchor?.relY}`);
     if (z.anchor?.relHeight !== CURRENT_VORRAT.relHeight) complaints.push(`Vorrat ${d.n}: relHeight ${z.anchor?.relHeight}`);
     if (z.capacity !== CURRENT_VORRAT.capacity) complaints.push(`Vorrat ${d.n}: capacity ${z.capacity}`);
+    if (z.layout !== CURRENT_VORRAT.layout) complaints.push(`Vorrat ${d.n}: layout ${z.layout}`);
   }
-  const taken = new Set(current.map(z => z.id));
+  // BV: die fünfzehn Slot-Zonen sind seit M18 **vorhanden**, und dieser Lauf
+  // schreibt sie unverändert zurück. Vor M18 stand hier die umgekehrte
+  // Prüfung („ID ist schon vergeben"); sie träfe jetzt jede der fünfzehn.
+  const byId = new Map(current.map(z => [z.id, z]));
   for (const z of zones) {
-    if (z.id in VORRAT_IDS === false && taken.has(z.id) && !Object.values(VORRAT_IDS).includes(z.id)) {
-      complaints.push(`ID ${z.id} ist schon vergeben`);
-    }
+    if (Object.values(VORRAT_IDS).includes(z.id)) continue;
+    const have = byId.get(z.id);
+    if (!have) { complaints.push(`Slot-Zone ${z.id} ("${z.label}") fehlt`); continue; }
+    if (have.label !== z.label) complaints.push(`${z.id}: Name "${have.label}" statt "${z.label}"`);
+    if (JSON.stringify(have) !== JSON.stringify(z)) complaints.push(`${z.id} ("${z.label}") weicht ab`);
   }
-  const labels = new Set(current.map(z => z.label));
-  for (const z of zones) {
-    if (!Object.values(VORRAT_IDS).includes(z.id) && labels.has(z.label)) {
-      complaints.push(`Name "${z.label}" ist schon vergeben`);
-    }
+  if (new Set(current.map(z => z.label)).size !== current.length) {
+    complaints.push('zwei Zonen tragen denselben Namen');
   }
 
   console.log(`${mode === '--check' ? 'Trockenlauf' : 'Vorprüfung'}: ${complaints.length} Beanstandungen`);
@@ -185,8 +209,10 @@ async function main(argv) {
   console.log(`geschrieben: ${after.length} Zonen`);
   for (const d of DOERFLER) {
     const z = after.find(q => q.id === VORRAT_IDS[d.n]);
-    console.log(`  Vorrat ${d.n}: relY ${z.anchor.relY} relHeight ${z.anchor.relHeight} capacity ${z.capacity}`);
+    console.log(`  Vorrat ${d.n}: relY ${z.anchor.relY} relHeight ${z.anchor.relHeight} layout ${z.layout} capacity ${JSON.stringify(z.capacity)}`);
   }
+  const slots = after.filter(z => /: (Kopf|Brust|Beine|Hände|Mitbringsel)$/.test(z.label));
+  console.log(`  Slot-Zonen: ${slots.length}, davon layout row: ${slots.filter(z => z.layout === 'row').length}`);
   const untouched = current.filter(c => !replace.has(c.id));
   const same = untouched.every(c => JSON.stringify(c) === JSON.stringify(after.find(a => a.id === c.id)));
   console.log(`  unberührt: ${untouched.length} Zonen, unverändert: ${same}`);

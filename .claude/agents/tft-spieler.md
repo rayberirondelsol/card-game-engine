@@ -172,7 +172,10 @@ liegt.
 bis sie aufleuchtet, dann loslassen. Auf Berührung derselbe Griff, dazu „Stack
 with card below" im Langdruck-Menü. Ein gewöhnliches Ablegen verschmilzt
 **nicht** — das war Absicht, seit eine aufgedeckte Aktionskarte still in den
-Nachziehstapel zurückrutschte.
+Nachziehstapel zurückrutschte. **Ausnahme seit M21.1: in einer Zone, die ein
+Ablagestapel *ist*** (`Ablage`, `Aktionen`, `Ausrüstung Dörfler N`), **bildet
+der Haufen von der zweiten Karte an einen Stapel** — dort ist Übereinanderliegen
+der Zweck der Zone, und ohne Stapel ließe sich nicht mischen.
 
 **Ein Stück, das seinen Rasterplatz verliert**, bekommt einen gestrichelten
 Rand. Beiseitelegen bleibt erlaubt, es ist nur nicht mehr still.
@@ -283,7 +286,8 @@ Er hat nur noch einen Knopf. Spiel die *TFT Kurzpartie*.
 **Jeder Dörfler hat jetzt fünf beschriftete Slot-Zonen** unter seinem Tableau —
 `Kopf`, `Brust`, `Beine` in der oberen Reihe, `Hände` (**zwei Plätze**) und
 `Mitbringsel` in der zweiten. Darunter liegt breit und grau der **Vorrat**
-(`Ausrüstung Dörfler N`, fünf Plätze).
+(`Ausrüstung Dörfler N`) — seit M21.4 ein Ablagestapel **ohne Obergrenze**,
+siehe „Neu seit Partie 12".
 
 **Damit heißt „angelegt" schlicht: die Karte liegt in einer Slot-Zone.**
 Alles andere beim Dörfler gilt als **weggepackt** `[DE S.9]`. Leg Ausrüstung
@@ -299,6 +303,34 @@ die Heldentaten *Nackedei* und *Anpassungsfähig* und die Nachbereitung ab.
   Hände zusammen nur einmal) zahlst du selbst. In der Dorfphase ist Anlegen frei.
 
 **Die Slot-Zonen überdauern den Kampf** — „Dorfphase beginnen" räumt sie nicht ab.
+
+## Neu seit Partie 12 (M21)
+
+**Die `Ablage` ist ein Stapel, kein Haufen.** Ab der zweiten Karte fassen sich
+die abgeworfenen Bösewicht-Aktionen zu **einem** Stapel zusammen — mit Zahl am
+Abzeichen. Damit gibt es für die `Ablage` alles, was es am Stapel gibt:
+`Shuffle`, `Flip Stack`, `Browse`, `Take Top Card`.
+
+**Und damit lässt sich §6.2 zu Ende spielen:** ist der Ziehstapel leer, zieh
+den Ablagestapel in die Zone `Aktionen`, dann `Flip Stack` (verdeckt), dann
+`Shuffle`. Danach deckt „Reveal Top Card to ‚Ablage'" wieder von oben auf.
+Drei Griffe, kein Würfeln von Hand. „Dorfphase beginnen" räumt beide Zonen ab,
+auch wenn dort Stapel liegen.
+
+**Der Vorrat kennt keine Obergrenze mehr.** `Ausrüstung Dörfler N` ist jetzt
+selbst ein Ablagestapel: beliebig viele Karten, und das Abzeichen zählt sie —
+das ist der Wert, den „BEUTE MACHEN" („der Dörfler mit der meisten
+Ausrüstung") braucht. Zum Nachsehen `Browse`, nicht acht Karten einzeln
+aufdecken; zum Anlegen im `Browse` auf die Karte klicken (sie liegt dann offen
+daneben) und in den Slot ziehen. Die fünf **Slot-Zonen** sind unverändert und
+weisen eine zweite Karte weiter ab, mit Band.
+
+**Gesperrt heißt jetzt auch undrehbar.** `Rotate Left`/`Rotate Right` stehen am
+gesperrten Token weiter im Menü, sind aber abgeschaltet und sagen „gesperrt".
+Grund: Drehen verschiebt die **Fläche**, an der Zonen und Zähler hängen — ein
+Fehlklick hatte in Partie 12 das gesperrte Sideboard samt `Aktionen`, `Ablage`
+und den beiden Bösewicht-Leisten quer über das Spielfeld gelegt. **`Flip` am
+gesperrten Token geht weiter** (ein Bild tauschen verschiebt nichts).
 
 ## Neu seit Partie 10
 
@@ -333,14 +365,32 @@ baut dann zusätzlich den Endkampf-Abschnitt auf.
   richtig und kein Befund — aber **nur im Endkampf**. In den Kämpfen davor darf
   dort **gar nichts** stehen; tut es das doch, ist das ein Befund.
 
-**Zwei Dinge baut der Aufbau bewusst nicht**, sie sind Handarbeit:
+**Vier Dinge baut der Aufbau bewusst nicht**, sie sind Handarbeit (Stand M21.5):
 
 - **Bundos ans Feld legen.** Das Tableau sagt nur „angrenzend an die
   Bundo-Königin" — vier von sechs Plättchen auf acht Nachbarfeldern, das ist
   deine Wahl, und SPREAD erzeugt im Kampf weitere. Eine feste Aufbauposition
   wäre ab Runde 2 falsch.
+  ⚠️ **Die Plättchen gibt es, bau sie nicht selbst.** Sie heißen **`Bundo 1`
+  bis `Bundo 6`** (34 × 34, Kategorie `Gelände`) und stehen im Dialog
+  **„Add Token"** unter „Bild-Token", wie jedes andere Asset dieses Spiels.
+  Dasselbe gilt für den `Karnibunker`. In Partie 12 sind daraus sechs selbst
+  gebaute blaue Kreise mit „K" geworden — das war unnötig.
+- **„SIE KOMMEN!" aus dem Verhaltensdeck nehmen.** Das Tableau verlangt
+  „Begin the fight with the *Scatter* action card in play"; die Karte heißt im
+  deutschen Deck **„SIE KOMMEN!"** (belegt in Partie 12, vorher ungeklärt).
+  Nimm sie **aus dem Deck** — nicht aus der Kartenbibliothek nachziehen, sonst
+  kommt sie später als Dublette hoch. Eine Karte aus dem Deck zu ziehen ist
+  ein Zug und kein Aufbau, darum tut der Tisch es nicht.
+- **Den neuen Sheriff ernennen.** Die Besondere Ausrüstung liegt in der
+  `Terrain-Auslage`; **wer** sie bekommt, entscheidest du nach §8.2 über die
+  Heldenpunkte aller erfüllten Heldentaten. Das ist eine Rechnung über den
+  Spielstand, nach §1 nicht die Aufgabe des Tisches.
 - **Die Blickrichtung des Bösewichts.** Er steht nach dem Aufbau auf 0°; wohin
   er schaut, hängt vom Spielstand ab (§6) — dreh ihn selbst, wie seit M13.
+
+**Die Aufbaudaten setzen die Bundo-Königin auf E10.** Dass sie in Partie 12 auf
+H10 stand, war ein Ziehfehler des Spielers; die Daten sind richtig.
 
 **Eine fehlende Geländekarte ist bekannt und kein Befund:** 34 der 62
 Geländeassets haben keine Karte in der Bibliothek, durchweg Plättchen, die erst

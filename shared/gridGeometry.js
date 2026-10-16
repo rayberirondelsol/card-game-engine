@@ -526,6 +526,18 @@ export function offGrid(obj, hit) {
  * Zurueck kommt nur, was sich aendert – der Aufrufer legt es auf sein Token.
  */
 export function rotatePlacement(token, { grids = [], step } = {}) {
+  // M21.2: gesperrt heisst auch undrehbar. `null` ist hier die **Abweisung** -
+  // "es aendert sich nichts, und das ist gemeint"; der Aufrufer bricht ab und
+  // sagt den Grund. M13.1 hatte `locked` ausdruecklich nicht geprueft
+  // ("unbeweglich, nicht undrehbar, wie schon bei Flip"); fuer ein Plaettchen
+  // war das richtig, fuer ein Brett nicht. Flip tauscht ein Bild, Drehen
+  // verschiebt eine **Flaeche**, an der Zonen und Zaehler verankert sind
+  // (`resolveBox`, M3a) - vier Zonen des Sideboards lagen danach quer ueber
+  // dem Spielfeld. Flip bleibt unveraendert erlaubt (M3d).
+  //
+  // Hier und nicht im Kontextmenue: es ist die eine Stelle, die eine Drehung
+  // ausrechnet, und sie ist aus `server/test/` pruefbar.
+  if (token?.locked) return null;
   const rotation = nextRotation(token?.rotation, step);
   // Eine halbe oder gar keine Drehung taucht den Kasten nicht: `nextRotation`
   // hat den Schritt schon beurteilt, hier steht kein zweites Urteil daneben.

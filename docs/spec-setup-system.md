@@ -5089,3 +5089,102 @@ M21.5 entschieden ist.
 Und eine Richtigstellung des Spielers an sich selbst, die festgehalten gehört:
 dass die Königin bei ihm auf H10 stand statt auf E10, war **sein eigener
 Ziehfehler**, kein Tischfehler. Die Aufbaudaten sind richtig.
+
+---
+
+> ## Nachtrag zu M21 (2026-10-16) — umgesetzt, mit fünf Richtigstellungen
+>
+> Aufgaben, Messwerte und die geprüften Gegenbelege stehen in
+> `docs/tasks-partie12.md`. Was sich an der Spec ändert:
+
+### M21.1 — `layout: 'stack'` war nur eine Ortsregel
+
+Die Frage der Spec („das Aufdecken oder die Zone?") hat eine dritte Antwort:
+**M12.5 hat die Staffelung gebaut, nicht den Stapel.** `zoneSlots` gibt einer
+`stack`-Zone einen Platz, `snapPoint` und `spotFor` versetzen jede weitere Karte
+um `STACK_OFFSET` — und **kein** Weg in eine Zone schreibt `inStack`. Am Tisch
+nachgezählt: dreizehn lose Karten auf der `Ablage`, neun gestaffelt, vier
+deckungsgleich auf dem Deckel `0,45 · min(w; h)`.
+
+Gebaut ist darum eine Regel: **eine Zone, die ein Ablagestapel *ist*, hält
+einen.** `pileUp` (`client/src/utils/cardDrop.js`, aus `server/test/` geprüft)
+fasst zusammen, was in der Zone liegt — gesperrte Karten ausgenommen, und ein
+vorhandener Stapel behält seine Id, damit das Mischabzeichen `#n` (M15.4) nicht
+von vorn zählt. Gerufen wird sie an den zwei Stellen, an denen der **Tisch**
+eine Karte in eine Zone legt: `handleCardDragEnd` und `revealTopCardToZone`.
+
+**Abnahme 3 brauchte keinen Code.** Ein Stapel ist ein Ding (M9.4), und
+`Flip Stack` + `Shuffle` stehen in seinem Menü: „in die Zone `Aktionen` ziehen,
+umdrehen, mischen" sind drei vorhandene Griffe.
+
+**Ein Loch, das die Spec nicht nennt, und ohne das ihre Abnahme geschadet
+hätte:** „Dorfphase beginnen" räumt die `Ablage` mit `clear_zone` ab, und
+`clear_zone` liest `state.cards` — die Karten eines Stapels liegen in
+`stack.cards` und sind dort unsichtbar. Ein Stapel hätte die Rundenwende
+**still** überlebt. `clear_zone` löst darum einen **namenlosen** Stapel in der
+Zone vorher in lose Karten auf; ein benannter Stapel bleibt `remove_stack`
+vorbehalten, wie bisher. Dazu ein Schritt `clear_zone Aktionen` in den Daten,
+für den Fall, den Abnahme 3 ausdrücklich erlaubt.
+
+### M21.2 — gebaut, und die Daten geben der Begründung recht
+
+`rotatePlacement` antwortet für ein gesperrtes Token **`null`** — eine Stelle,
+aus `server/test/` prüfbar, und das Kontextmenü zeigt die beiden Einträge
+weiter, abgeschaltet und mit Grund. Am Sideboard hängen laut `zone_data`
+tatsächlich vier Zonen (`Aktionen`, `Ablage`, `Bösewicht: Bewegung`,
+`Bösewicht: Leben`) über `anchor.assetId`; „Drehen verschiebt eine Fläche, an
+der anderes hängt" ist kein Argument, sondern ein Datenbefund.
+
+**Karten bleiben drehbar, auch gesperrte.** An einer Karte hängt keine Zone, und
+das Kartendrehen liegt an fünf Stellen — eine Wache an fünf Stellen ist, was M6
+verbietet. Eigene Aufgabe, kein Befund.
+
+### M21.3 — Artefakt, mit Zahlen
+
+Mit echten `MouseEvent`s und einem Bildwechsel zwischen je zwei Ereignissen
+landet ein Zug über die **ganze Brettbreite** (816 Weltpunkte, 18 Felder) beim
+**ersten** Versuch auf dem gewollten Feld; dieselbe Folge **ohne** Bildwechsel
+bewegt **gar nichts**. Ursache ist die aus M19.2 (`draggingObj` über
+`setDraggingObj`), und sie trifft lange Züge härter, weil sie aus mehr
+Ereignissen bestehen. **Nichts gebaut, die Abnahme entfällt über ihren zweiten
+Zweig.**
+
+### M21.4 — die Abweisung meldet sich; die Obergrenze fällt
+
+**Erste Hälfte widerlegt.** Am laufenden Tisch nachgestellt: die abgewiesene
+Karte stand exakt wieder auf ihrer Ausgangsstelle, und das orange Band stand da
+(„zone ‚Bösewicht-Tableau' does not accept cards"). „Voll" und „nimmt keine
+Karten" kommen aus derselben `zoneRejects` und laufen durch denselben Zweig in
+`handleCardDragEnd`, der die Karte zurücksetzt **und** meldet — stumm gibt es
+nicht. Der Bericht hat den Zustand durchweg per DOM abgefragt (A5).
+
+**Zweite Hälfte gebaut, als Daten.** Der Vorrat wird `layout: "stack"` **ohne**
+`capacity`: `zoneCapacity === null`, also sagt `zoneRejects` nie „voll" — die
+Regel `[BR S.8]` ohne eine erfundene Zahl. M18s Rechnung bleibt gültig und ist
+der Grund: in 580 × 140 passen höchstens fünf Plätze in **eine** Reihe, jede
+größere Kapazität ergibt zwei, und die liegt in der ersten oder hinter der
+Werkzeugleiste. Geändert ist das Layout, nicht der Kasten; die fünfzehn
+Slot-Zonen sind unberührt. Kosten, benannt: das Stapelmenü bietet nun fünf
+statt zwei „Reveal Top Card to …"-Zonen an.
+
+### M21.5 — die Grenze läuft, wo M20.3 sie gezogen hat
+
+**„Es gibt keine Karni-Marker" ist falsch.** `Bundo 1`–`Bundo 6` liegen in
+`table_assets` (34 × 34, Kategorie `Gelände`), und weil **alle** 212 Assets
+dieses Spiels `type = 'token'` tragen, zeigt der Dialog „Add Token" sie alle.
+Die Plättchen stehen also bereit; was fehlte, war die Auskunft darüber. Die
+Zahl ist fest, **der Platz ist Wahl** („angrenzend an die Bundo-Königin", dazu
+SPREAD) — M20.3s Kriterium (keine Position behaupten, die nirgends gedruckt
+steht) gilt unverändert.
+
+**„SIE KOMMEN!" und *Scatter* sind dieselbe Karte** — die Spec führt sie als
+zwei von drei Punkten. M20.3s Grund („im deutschen Deck nicht identifizierbar")
+ist damit überholt, die Entscheidung steht aber weiter: eine Karte aus dem Deck
+zu nehmen ist ein Zug, und `place_card` kopiert aus der **Bibliothek** — ein
+Aufbauschritt dafür wäre genau die Dublette, die der Spieler in Runde 5
+abwerfen musste.
+
+**Gebaut wurde nichts; nachgezogen ist die Rolle.**
+`.claude/agents/tft-spieler.md` nennt jetzt **vier** bewusst manuelle Schritte
+(Bundos ans Feld, „SIE KOMMEN!" aus dem Deck, Sheriff ernennen, Blickrichtung),
+die sechs Plättchen bei ihrem Namen, und die Richtigstellung zu E10.

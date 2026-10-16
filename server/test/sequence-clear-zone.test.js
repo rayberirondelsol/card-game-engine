@@ -531,3 +531,80 @@ test('das Stapelziel ist im Editor wählbar, lesbar und geprüft (M5.1)', () => 
     'beide Ziele zugleich sind ein Autorenfehler, auch wenn die Zone gewinnt'
   );
 });
+
+// ── BT / M21.1: ein Stapel in der Zone ist ein Ding in der Zone ───────────────
+//
+// Seit M21.1 bildet eine Zone mit `layout: 'stack'` am Tisch einen Stapel.
+// `objectsInZone` liest `state.cards`, und die Karten eines Stapels liegen in
+// `stack.cards` - ohne diese Regel ueberlebte die `Ablage` die Rundenwende
+// still, und "Dorfphase beginnen" liesse dreizehn alte Aktionskarten liegen.
+// Aufgabe BT in docs/tasks-partie12.md.
+
+/** Ein namenloser Haufen von `n` Karten auf dem Platz der Zone `Nur Karten`. */
+function pileState(n, label) {
+  return {
+    ...emptyState(),
+    stacks: [{
+      stackId: 'haufen', ...(label ? { label } : {}), x: 1580, y: 640,
+      cards: Array.from({ length: n }, (_, i) => ({
+        tableId: `p${i}`, cardId: `c${i}`, name: `Aktion ${i}`, image_path: `/uploads/cards/${i}.png`, zIndex: i + 1,
+      })),
+    }],
+  };
+}
+
+test('BT Abnahme 5: clear_zone ohne Ziel raeumt auch einen Stapel in der Zone ab', () => {
+  const { state, log } = executeSequenceWithLog(
+    pileState(3),
+    [{ type: 'clear_zone', zoneLabel: 'Nur Karten' }],
+    ZONES,
+    opts()
+  );
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.deepEqual(state.stacks, []);
+  assert.deepEqual(state.cards, []);
+});
+
+test('BT Abnahme 5: ein **benannter** Stapel bleibt liegen – dafuer gibt es remove_stack', () => {
+  const { state, log } = executeSequenceWithLog(
+    pileState(3, 'Nachschub (Tante Emma)'),
+    [{ type: 'clear_zone', zoneLabel: 'Nur Karten' }],
+    ZONES,
+    opts()
+  );
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.equal(state.stacks.length, 1);
+  assert.equal(state.stacks[0].cards.length, 3);
+  assert.deepEqual(state.cards, []);
+});
+
+test('BT: ein Stapel ausserhalb der Zone bleibt unangetastet', () => {
+  const far = pileState(2);
+  far.stacks[0].x = 100;
+  far.stacks[0].y = 900;
+  const { state } = executeSequenceWithLog(
+    far,
+    [{ type: 'clear_zone', zoneLabel: 'Nur Karten' }],
+    ZONES,
+    opts()
+  );
+  assert.equal(state.stacks.length, 1);
+});
+
+test('BT: mit Zielstapel gehen die Karten des Haufens mit zurueck', () => {
+  const before = pileState(2);
+  before.stacks.push({
+    stackId: 'deck', label: 'Nachschub (Tante Emma)', x: 0, y: 0,
+    cards: [{ tableId: 'd1', cardId: 'cd1', name: 'unten', image_path: '/uploads/cards/d.png', zIndex: 1 }],
+  });
+  const { state, log } = executeSequenceWithLog(
+    before,
+    [{ type: 'clear_zone', zoneLabel: 'Nur Karten', targetStackLabel: 'Nachschub (Tante Emma)' }],
+    ZONES,
+    opts()
+  );
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.equal(state.stacks.length, 1, 'der Haufen ist weg, das Deck steht');
+  assert.equal(state.stacks[0].cards.length, 3);
+  assert.deepEqual(state.cards, []);
+});

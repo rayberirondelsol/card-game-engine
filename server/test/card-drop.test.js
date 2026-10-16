@@ -188,3 +188,85 @@ test('BE: nichts Lesbares gibt dieselbe Antwort wie stackAt und wirft nicht', ()
   assert.deepEqual(resolveDrop({}), { stack: null, refusal: null });
   assert.deepEqual(resolveDrop({ point: null, stacks: null, refusal: '' }), { stack: null, refusal: null });
 });
+
+// ── BT / M21.1: in einer Zone, die ein Ablagestapel ist, ist der Haufen ein
+// Stapel ───────────────────────────────────────────────────────────────────────
+//
+// `layout: 'stack'` war bis hierher nur eine Ortsregel (`stackPoint`, M12.5):
+// dreizehn abgeworfene Boesewicht-Aktionen lagen als dreizehn lose Karten mit
+// 6 Punkt Versatz auf der `Ablage`, und ohne Stapel gibt es kein Mischen.
+// Aufgabe BT in docs/tasks-partie12.md.
+
+const { pileUp } = await import('../../client/src/utils/cardDrop.js');
+
+/** Die `Ablage` des Aufbaus *TFT Kurzpartie*, am Tisch gemessen. */
+const ablage = { label: 'Ablage', layout: 'stack', shape: 'rect', x: 1479.6, y: 638.921, width: 117, height: 179.82 };
+const MITTE = { x: ablage.x + ablage.width / 2, y: ablage.y + ablage.height / 2 };
+
+/** Eine lose Karte auf der Ablage, `n` Lagen hoch gestaffelt (6 px je Lage). */
+function abgelegt(id, n) {
+  return { tableId: id, x: MITTE.x + n * 6, y: MITTE.y + n * 6, zIndex: 10 + n, inStack: null };
+}
+
+test('BT Abnahme 1: zwei abgelegte Karten werden ein Stapel, auf dem Stapelplatz', () => {
+  const out = pileUp([abgelegt('a', 0), abgelegt('b', 1)], ablage, 's-neu');
+  assert.deepEqual(out.map(c => c.inStack), ['s-neu', 's-neu']);
+  for (const c of out) {
+    assert.equal(c.x, MITTE.x);
+    assert.equal(c.y, MITTE.y);
+  }
+});
+
+test('BT Abnahme 1: die Reihenfolge bleibt – unten bleibt unten', () => {
+  const out = pileUp([abgelegt('b', 1), abgelegt('a', 0), abgelegt('c', 2)], ablage, 's');
+  const byZ = [...out].sort((p, q) => p.zIndex - q.zIndex).map(c => c.tableId);
+  assert.deepEqual(byZ, ['a', 'b', 'c']);
+  // Fortlaufend, damit "oberste Karte" eindeutig bleibt.
+  assert.deepEqual([...out].map(c => c.zIndex).sort((p, q) => p - q), [10, 11, 12]);
+});
+
+test('BT Abnahme 2: ein vorhandener Stapel behaelt seine Id – sonst zaehlt #n neu', () => {
+  const vorhanden = [
+    { tableId: 'a', x: MITTE.x, y: MITTE.y, zIndex: 10, inStack: 's-alt' },
+    { tableId: 'b', x: MITTE.x, y: MITTE.y, zIndex: 11, inStack: 's-alt' },
+  ];
+  const out = pileUp([...vorhanden, abgelegt('c', 1)], ablage, 's-neu');
+  assert.deepEqual(out.map(c => c.inStack), ['s-alt', 's-alt', 's-alt']);
+  // Die Hinzukommende liegt oben.
+  assert.equal(out.find(c => c.tableId === 'c').zIndex, 12);
+});
+
+test('BT Abnahme 4: eine gesperrte Karte tritt nicht bei', () => {
+  const out = pileUp([{ ...abgelegt('a', 0), locked: true }, abgelegt('b', 1), abgelegt('c', 2)], ablage, 's');
+  assert.equal(out.find(c => c.tableId === 'a').inStack, null);
+  assert.equal(out.find(c => c.tableId === 'b').inStack, 's');
+  assert.equal(out.find(c => c.tableId === 'c').inStack, 's');
+});
+
+test('BT: nichts zu tun gibt die Liste unveraendert zurueck', () => {
+  const eine = [abgelegt('a', 0)];
+  assert.equal(pileUp(eine, ablage, 's'), eine, 'eine Karte ist kein Stapel');
+  const row = { ...ablage, layout: 'row', capacity: 3 };
+  const zwei = [abgelegt('a', 0), abgelegt('b', 1)];
+  assert.equal(pileUp(zwei, row, 's'), zwei, 'nur eine Stapel-Zone staplt');
+  const schon = zwei.map(c => ({ ...c, x: MITTE.x, y: MITTE.y, inStack: 's-alt' }));
+  assert.equal(pileUp(schon, ablage, 's'), schon, 'liegt schon alles in einem Stapel');
+  assert.equal(pileUp(null, ablage, 's'), null);
+});
+
+test('BT: was neben der Zone liegt, bleibt liegen – gefragt ist die Form', () => {
+  const daneben = { tableId: 'x', x: ablage.x - 10, y: MITTE.y, zIndex: 20, inStack: null };
+  const out = pileUp([abgelegt('a', 0), abgelegt('b', 1), daneben], ablage, 's');
+  assert.equal(out.find(c => c.tableId === 'x').inStack, null);
+  assert.equal(out.find(c => c.tableId === 'x').x, daneben.x);
+});
+
+test('BT: ein Stapel aus zwei Stapeln bekommt eine neue Id, und keine zweite bleibt', () => {
+  const mix = [
+    { tableId: 'a', x: MITTE.x, y: MITTE.y, zIndex: 1, inStack: 's1' },
+    { tableId: 'b', x: MITTE.x, y: MITTE.y, zIndex: 2, inStack: 's1' },
+    { tableId: 'c', x: MITTE.x + 6, y: MITTE.y + 6, zIndex: 3, inStack: 's2' },
+  ];
+  const out = pileUp(mix, ablage, 's-neu');
+  assert.deepEqual(new Set(out.map(c => c.inStack)), new Set(['s-neu']));
+});
