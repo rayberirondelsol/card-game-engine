@@ -24,7 +24,7 @@ ganzen Kampfaufbau ausfallen. Danach `CD` (M25.1, der stille Fehlgriff) und
 
 **Gilt für jede Aufgabe.** Erst der rote Test, dann die kleinste Änderung, die
 ihn grün macht. Tests: `cd server && npm test` (Stand vorher: **1278**, alle
-grün). Bau: `cd client && npx vite build` — keine **neue** Warnung (zwei sind
+grün; nachher **1288**). Bau: `cd client && npx vite build` — keine **neue** Warnung (zwei sind
 vorbestehend). Der Client hat keine Testinfrastruktur (CLAUDE.md): reine
 Rechnung gehört nach `shared/` oder `client/src/utils/` und wird aus
 `server/test/` geprüft. Es gibt genau **eine** Stelle je Sache (M6).
