@@ -5469,3 +5469,99 @@ darübergelaufen.
 
 **Abnahme.** Je Punkt: behoben, oder mit Beleg als erledigt/gegenstandslos
 abgehakt.
+
+
+## M25 — Was die erste gewonnene Partie fand
+
+Belegt in `docs/partie14-bericht.md`. **Nach vierzehn Anläufen die erste
+gewonnene Partie:** Endkampf *The Old Sheriff's Debt* gegen Virginia Fitz,
+Runde 8, Virginia auf 1 LEB und die Schuld mit 36 Münzen beglichen.
+
+**Die Antwort auf die Frage, um die es ging, ist eindeutig: das Spiel ist
+schwer, nicht der Tisch.** Gewonnen wurde über zwei Entscheidungen — die Gruppe
+auf Fernkampf plus MUMM-Ersparnis umbauen, und im Endkampf bewusst
+**angrenzend** kämpfen, weil fast jede Aktionskarte den „nahesten *nicht
+angrenzenden*" Dörfler trifft. Das ist Spielverständnis, nicht Bedienung.
+
+Die fünf Neuerungen aus M23 und M24 haben getragen; keine stand im Weg.
+
+Drei Dinge haben trotzdem Züge gekostet.
+
+### M25.1 — Ein Zug greift das oberste Token, nicht die Figur
+
+**Befund, und er schlägt still zu.** Dreimal wanderte ein **Grabhügel** statt
+des Dörflers, der darauf stand — ohne Meldung, und es sah jedes Mal aus wie ein
+fehlgeschlagener Zug. Am Ende lagen vier Tokens falsch; die Reparatur kostete
+rund **zwanzig Züge**.
+
+**Das ist M19.1 in neuer Gestalt.** Dort wurde entschieden: eine Figur schlägt
+das Gelände unter ihr, und `fieldAt` liefert dafür das echte Feldmaß statt der
+geratenen Kantenlänge. Partie 13 hat das bestätigt. **Hier liegt der Fall
+anders** — der Grabhügel ist kein Gelände aus dem Szenarioaufbau, sondern ein
+Token, das **später** auf dasselbe Feld kommt und dann obenauf liegt.
+
+**Zu klären, bevor gebaut wird:** Entscheidet die Auswahl nach **Größe** (M19.1,
+„höchstens zwei Felder") oder nach **Stapelreihenfolge**? Wenn ein später
+gelegtes Token die Figur überdeckt, ist die Größenregel allein zu schwach —
+dann braucht es eine Aussage darüber, **was eine Figur ist**. `tableLayers` und
+`pickTopmost` in `client/src/utils/tokenLayer.js` sind die Stelle.
+
+**Und zuerst messen.** Vier gemeldete Befunde dieser Reihe waren Artefakte der
+Fernsteuerung; die Ursache ist bekannt (ohne `requestAnimationFrame` zwischen
+zwei Ereignissen sieht jedes `mousemove` den Zustand als `null`). Reproduzier
+den Fall mit echten Mausereignissen **und** Bildwechsel, bevor Du etwas änderst.
+
+**Abnahme.**
+1. Steht eine Dörflerfigur auf einem Feld, auf dem später ein Token abgelegt
+   wurde, bewegt ein Zug auf der Figur **die Figur**.
+2. Das Token lässt sich weiterhin bewegen, wenn keine Figur darauf steht.
+3. Bewegt sich etwas anderes als das Angefasste, sagt der Tisch es.
+
+### M25.2 — Eine Meldung, die Vertrauen kostet, obwohl nichts fehlt
+
+**Befund.** `build_scenario` meldet **fünfmal** „no terrain card named
+Grabhügel", obwohl **alle fünf Hügel korrekt liegen**. Der Spieler hat deswegen
+angefangen, das Szenario von Hand nachzubauen — also Arbeit getan, die der Tisch
+schon erledigt hatte.
+
+M20.2 hat diesen Fall untersucht und als **strukturell** eingestuft: 34 von 62
+Geländeassets haben keine Karte in der Bibliothek, durchweg Plättchen, die erst
+im Endkampf oder über eine Fähigkeit aufs Brett kommen. Die Entscheidung
+damals, **nichts zu erfinden**, war richtig.
+
+**Falsch ist die Meldung.** „no terrain card named X" liest sich wie ein
+Fehlschlag; tatsächlich liegt das Plättchen. Eine Meldung, die zum Nachbauen
+verleitet, ist schlimmer als keine.
+
+**Änderung.** Die Unterscheidung sichtbar machen: **das Plättchen liegt, nur
+seine Karte gibt es in dieser Bibliothek nicht.** Ob das ein anderer Wortlaut
+ist, ein anderer Status als `failed`, oder beides, entscheidet, wer es baut —
+aber **nicht unterdrücken.** Unterdrückte Meldungen sind der Fehler aus M20.1.
+
+**Abnahme.** Nach einem Aufbau mit fehlender Geländekarte ist am Wortlaut zu
+erkennen, dass nichts zu tun ist.
+
+### M25.3 — Ein offen liegendes Plättchen lässt den ganzen Kampfaufbau ausfallen
+
+**Befund, und das ist der schwerste.** „Kampf beginnen" setzt voraus, dass das
+nächste Bösewicht-Plättchen **verdeckt** liegt. Nach einem Tausch durch das
+Dorf-Ereignis *DIE STRASSENSPERRE* lag es offen — worauf `reveal_next` nichts
+band und **14 Folgeschritte** mit „`$revealedBase` is not bound" durchfielen.
+**Es wurde gar nichts aufgebaut.**
+
+Vierzehn gescheiterte Schritte sind kein Hinweis, sondern Lärm; und der eine
+Satz, der zählt — *das Plättchen liegt offen* — steht nirgends.
+
+**Zwei Dinge, die zu trennen sind:**
+- **Soll `reveal_next` ein offen liegendes Plättchen annehmen?** Am echten
+  Tisch ist ein getauschter Bösewicht schlicht der nächste Gegner, ob verdeckt
+  oder nicht. Prüf die Regel (§5.1, Bosseleiste) und entscheide begründet.
+- **Falls nicht:** dann muss der Aufbau **vorher** anhalten und den Grund
+  nennen, statt vierzehnmal ins Leere zu laufen. Dafür gibt es `require_zone`
+  (M11.2) und `require_counter` (M19.5) als Muster — eine Wache, die einen Satz
+  sagt, statt einer Lawine.
+
+**Abnahme.**
+1. Liegt das nächste Plättchen offen, baut „Kampf beginnen" entweder den Kampf
+   auf — oder es hält an und sagt **in einem Satz**, warum.
+2. In keinem Fall stehen vierzehn Folgefehler im Protokoll.
