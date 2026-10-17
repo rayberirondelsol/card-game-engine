@@ -1230,7 +1230,18 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // wegräumt**. Ohne Zielzone bleibt es liegen, und dann ist „verdeckt"
       // das einzige Kennzeichen, an dem der nächste Aufruf merkt, welches
       // schon dran war - ohne es deckte er ewig dasselbe auf.
-      const hit = step.targetZoneLabel ? entries[0] : entries.find(e => e.o.faceDown);
+      //
+      // **Und aufgedeckt wird nur, was zwei Seiten hat.** Auf dem ersten Platz
+      // der Bösewicht-Leiste der Kurzpartie liegt offen ein Marker („erste
+      // Runde überspringen") - er sagt, dass dieser Platz kein Kampf ist. Er
+      // hat kein Rückseitenbild, lag also nie verdeckt und kann es nicht; „den
+      // ersten Platz nehmen, egal welche Seite" hätte in der Sichtprüfung
+      // prompt *ihn* aufgedeckt. Eine Seite ist eine Eigenschaft des Stücks,
+      // kein Name und keine Sorte - `place_asset` und `set_asset_face` fragen
+      // sie an derselben Stelle (M7.6).
+      const hit = step.targetZoneLabel
+        ? entries.find(e => e.o.backImageUrl)
+        : entries.find(e => e.o.faceDown);
       if (!hit) {
         return halt(entries.length
           ? `nothing face down in zone "${step.zoneLabel}"`

@@ -157,6 +157,20 @@ Produktionsdaten eingetragen:
     { type: "reveal_next", zoneLabel: "Bösewicht-Leiste",
       targetZoneLabel: "Bösewicht-Platz" }
 
+**Und der Filter trug noch etwas, das erst die Sichtprüfung gezeigt hat.** Auf
+dem **ersten** Platz der Bösewicht-Leiste (`CHUMP`) liegt in der *Kurzpartie*
+offen ein Marker: `Kurzpartie: erste Runde überspringen`, bei 185/664, mitten
+in der Zone (134–230 × 634–985). Er sagt, dass dieser Platz kein Kampf ist.
+„Den ersten Platz nehmen, egal welche Seite" hat prompt **ihn** aufgedeckt und
+auf den Bösewicht-Platz gelegt — dreizehn Folgefehler statt vierzehn.
+
+Der Marker hat **kein Rückseitenbild** (`back_image_path` ist leer; alle 20
+Bösewicht-Plättchen haben eines). Er lag also nie verdeckt und kann es nicht.
+Daraus die Aussage, die den Platz allein nicht hat: **aufgedeckt wird, was
+zwei Seiten hat.** Das ist eine Eigenschaft des Stücks, kein Name und keine
+Sorte — dieselbe, die `place_asset` und `set_asset_face` seit M7.6 an genau
+dieser Stelle abfragen.
+
 ### 4. M25.3: eine Wache nach dem Muster von `require_zone` ist **nicht** die Lösung
 
 Die Spec bietet sie für den Fall an, dass `reveal_next` ein offen liegendes
@@ -192,18 +206,19 @@ wurde nichts aufgebaut, und der eine Satz, der zählt, stand nirgends.
 
 **Änderung.** `shared/sequenceExecutor.js`, `case 'reveal_next'`, zwei Zeilen:
 
-1. **Die Seite wählt nicht mehr aus, der Platz tut es.** Findet sich nichts
-   Verdecktes, nimmt der Schritt den **ersten Eintrag in Platzreihenfolge** —
-   aber nur, wenn `targetZoneLabel` gesetzt ist, der Schritt das Plättchen also
-   aus der Zone wegräumt (Begründung oben, Abweichung 3). `assetFace(obj, false)`
-   ist auf einem offen liegenden Plättchen ohnehin ein Nullgriff.
+1. **Die Seite wählt nicht mehr aus, der Platz tut es.** Mit `targetZoneLabel`
+   nimmt der Schritt den **ersten Eintrag in Platzreihenfolge, der eine
+   Rückseite hat** — verdeckt oder nicht. Ohne Zielzone bleibt es beim alten
+   Filter (Begründung oben, Abweichung 3). `assetFace(obj, false)` ist auf
+   einem offen liegenden Plättchen ohnehin ein Nullgriff.
 2. **Ein gescheitertes `reveal_next` hält an** (`ctx.halted = true`), wie
    `require_zone` und `require_counter`. Nicht als neuer Schritttyp, sondern
    am vorhandenen: der Schritt **ist** die Vorbedingung für alles dahinter.
 
 **Abnahme.**
 1. Liegt das nächste Plättchen offen und hat der Schritt eine Zielzone, wird es
-   aufgedeckt, umgelegt und gebunden — der Kampf wird aufgebaut.
+   aufgedeckt, umgelegt und gebunden — der Kampf wird aufgebaut. Ein einseitiger
+   Marker auf einem Platz davor wird dabei übergangen und bleibt liegen.
 2. Ist die Leiste leer, der Zonenname falsch oder die Zielzone voll, steht
    **eine** Protokollzeile mit dem Grund und „(n further steps skipped)"; keine
    einzige Zeile „`$revealedBase` is not bound".

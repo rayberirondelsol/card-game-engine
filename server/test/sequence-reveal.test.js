@@ -42,6 +42,9 @@ function assetFixture() {
     { id: 'tab-solo', name: 'Tableau: Einzelgänger', type: 'board', category: 'Tableaus', image_path: '/uploads/boards/solo.png', back_image_path: null, width: 400, height: 300 },
     // Die Falle: ein Asset, das wirklich so heißt wie der Platzhalter.
     { id: 'trap', name: '$revealed', type: 'token', category: 'Sonder', image_path: '/uploads/tokens/trap.png', back_image_path: null, width: 60, height: 60 },
+    // M25.3/CC: der einseitige Marker, der in der Kurzpartie auf dem ersten
+    // Platz der Leiste liegt - offen, ohne Rückseite, und kein Bösewicht.
+    { id: 'skip', name: 'Kurzpartie: erste Runde überspringen', type: 'token', category: 'Sonder', image_path: '/uploads/tokens/skip.png', back_image_path: null, width: 60, height: 60 },
   ];
 }
 
@@ -531,6 +534,34 @@ test('reveal_next takes a face-up tile when it moves it to a target zone', () =>
   assert.equal(bindings.revealed, 'Bösewicht: Klaus');
   assert.equal(bindings.revealedBase, 'Klaus');
   assert.equal(bindings.revealedSlot, '1', 'der Platz, von dem er kam');
+});
+
+// Aus der Sichtprüfung am echten Tisch: auf Platz 1 der Bösewicht-Leiste der
+// *Kurzpartie* liegt offen ein Marker („erste Runde überspringen"), der sagt,
+// dass dieser Platz kein Kampf ist. Er hat keine Rückseite. „Den ersten Platz
+// nehmen, egal welche Seite" hat prompt ihn aufgedeckt und auf den
+// Bösewicht-Platz gelegt - dreizehn Folgefehler statt vierzehn.
+test('reveal_next skips a face-up marker without a back side and takes the tile behind it', () => {
+  const state = barState(['Bertha', 'Grimm']);
+  // Der Marker kommt vor die beiden auf den ersten Platz.
+  const marker = executeSequence(
+    state,
+    [{ type: 'place_asset', assetName: 'Kurzpartie: erste Runde überspringen', x: 150, y: 140 }],
+    ZONES,
+    opts()
+  );
+  assert.equal(marker.tokens.find(t => t.label.startsWith('Kurzpartie')).backImageUrl, null, 'der Marker hat keine Rückseite');
+
+  const { state: out, log, bindings } = executeSequenceWithLog(
+    marker,
+    [{ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }],
+    ZONES,
+    opts()
+  );
+
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  assert.equal(bindings.revealedBase, 'Bertha', 'der Marker ist kein Bösewicht');
+  assert.equal(byLabel(out, 'Kurzpartie: erste Runde überspringen').x, 150, 'und er bleibt liegen, wo er liegt');
 });
 
 test('without a target zone a face-up zone is still skipped - nothing moves it out of the way', () => {
