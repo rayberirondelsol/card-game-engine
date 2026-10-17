@@ -1243,9 +1243,16 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         ? entries.find(e => e.o.backImageUrl)
         : entries.find(e => e.o.faceDown);
       if (!hit) {
-        return halt(entries.length
-          ? `nothing face down in zone "${step.zoneLabel}"`
-          : `zone "${step.zoneLabel}" is empty`);
+        // Der eine Satz, der zählt. „nothing face down" war in der
+        // Sichtprüfung die halbe Wahrheit: in der Leiste lag noch der
+        // Kurzpartie-Marker, verdeckt war trotzdem nichts, und zu tun gab es
+        // nichts mehr. Mit Zielzone sagt der Satz deshalb, was wirklich
+        // fehlt - etwas zum Aufdecken.
+        return halt(!entries.length
+          ? `zone "${step.zoneLabel}" is empty`
+          : step.targetZoneLabel
+            ? `nothing left to reveal in zone "${step.zoneLabel}"`
+            : `nothing face down in zone "${step.zoneLabel}"`);
       }
       const obj = hit.o;
 

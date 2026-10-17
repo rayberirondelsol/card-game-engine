@@ -562,6 +562,20 @@ test('reveal_next skips a face-up marker without a back side and takes the tile 
   assert.equal(log[0].status, 'ok', log[0].reason);
   assert.equal(bindings.revealedBase, 'Bertha', 'der Marker ist kein Bösewicht');
   assert.equal(byLabel(out, 'Kurzpartie: erste Runde überspringen').x, 150, 'und er bleibt liegen, wo er liegt');
+
+  // Bleibt nur noch der Marker übrig, ist die Leiste nicht leer - und
+  // „nothing face down" wäre die halbe Wahrheit. Der Satz sagt, was fehlt.
+  const done = executeSequence(
+    marker,
+    [{ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' },
+     { type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }],
+    ZONES, opts()
+  );
+  const last = executeSequenceWithLog(
+    done, [{ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }], ZONES, opts()
+  );
+  assert.equal(last.log[0].status, 'skipped');
+  assert.match(last.log[0].reason, /nothing left to reveal in zone "Bosseleiste"/);
 });
 
 test('without a target zone a face-up zone is still skipped - nothing moves it out of the way', () => {
