@@ -193,16 +193,19 @@ Beide behaupten, die Datenbank trage noch den alten Namen; beide Sätze müssen
 weg. In der Rolle zusätzlich der falsche Satz über die `Beute: …`-Kategorien
 (Abweichung 1).
 
-**Abnahme.**
-1. `select name from categories where name like '%Üble%'` liefert null Zeilen,
-   dasselbe für `card_backs`.
-2. Die vier Kategorien haben unverändert 5 / 33 / 13 / 7 Karten.
-3. Ein Durchlauf des Aufbaus *TFT Kurzpartie* meldet keinen übersprungenen
-   `place_stack`; der Stapel `Dorf-Ereignisse` liegt mit 80 Karten da wie vorher.
-4. `validateScenarioData` gegen die echte Assetliste und das echte Raster ist
-   sauber.
-5. Regeldatei und Rolle nennen „Üble Nachbarn" nur noch als historischen Namen,
-   nicht mehr als Zustand der Datenbank.
+**Abnahme, am 2026-10-17 gegen die Produktionsdatenbank geprüft.**
+1. Null Zeilen mit `%Üble%` in `categories` **und** `card_backs`
+   (Kontrollausgabe des Schalters: „Rest mit altem Namen: 0"). ✔
+2. Die vier Kategorien haben unverändert 5 / 33 / 13 / 7 Karten. ✔
+3. Ein Durchlauf des Aufbaus *TFT Kurzpartie* über `executeSequenceWithLog`
+   (65 Schritte, echte Karten-, Asset-, Zonen- und Rasterlisten) meldet
+   **null** fehlgeschlagene Schritte; am Tisch liegt `Dorf-Ereignisse (80)`
+   wie vorher, kein Meldeband. ✔
+4. `validateScenarioData` gegen dieselbe Assetliste und dasselbe Raster:
+   **null** Beanstandungen. ✔
+5. Regeldatei und Rolle nennen „Üble Nachbarn" nur noch als historischen Namen.
+   In der Rolle ist zusätzlich die falsche Behauptung über die
+   `Beute: …`-Kategorien korrigiert (Abweichung 1). ✔
 
 ## CD — „Dorfphase beginnen" bekommt eine `id` (M24.3)
 
@@ -217,11 +220,13 @@ Schreibweise wie die drei vorhandenen (`kampf-beginnen`, `dorfereignis`,
 `laden-nachfuellen`). Nur `action_data`, nur dieses eine Feld; die 45 Schritte
 der Aktion werden Zeichen für Zeichen durchgereicht.
 
-**Abnahme.**
-1. Alle fünf Aktionen tragen eine `id`, alle `id` sind verschieden.
-2. Am Tisch gibt es `[data-testid="table-action-dorfphase-beginnen"]`, und
-   kein `data-testid` enthält `undefined`.
-3. Die Aktion tut dasselbe wie vorher (45 Schritte, unverändert).
+**Abnahme, am deployten Tisch geprüft.**
+1. Alle vier Aktionen der *Kurzpartie* tragen eine `id`, alle verschieden:
+   `kampf-beginnen`, `dorfereignis`, `laden-nachfuellen`,
+   `dorfphase-beginnen`. ✔
+2. Am Tisch gibt es `[data-testid="table-action-dorfphase-beginnen"]`;
+   `document.querySelectorAll('[data-testid*="undefined"]').length === 0`. ✔
+3. Die Aktion tut dasselbe wie vorher (45 Schritte, unverändert). ✔
 
 ## CE — Ein Suchfeld für „Add Token" (M24.2)
 
@@ -236,7 +241,11 @@ Kartenbibliothek (M6), keine zweite Suche. Dieselben Eigenheiten wie dort:
 `Escape` räumt erst die Suche, eine leere Anfrage zeigt alles, und eine Anfrage
 ohne Treffer sagt das, statt einen leeren Kasten zu zeigen.
 
-**Abnahme.**
+**Abnahme, am deployten Tisch geprüft.**
+0. Die Eingabe `karni` liefert „1 von 212" und zeigt genau den Karnibunker —
+   die Marke, die in Partie 12 unauffindbar war. ✔ `Escape` räumt die Suche
+   und lässt den Dialog offen (212 zurück); eine Anfrage ohne Treffer sagt
+   „Kein Token passt zu …". ✔
 1. Die Eingabe `marker 1` lässt nur die „Marker 1: …"-Assets stehen.
 2. Groß-/Kleinschreibung und Umlaute verhalten sich wie in der Bibliothek
    (`PINATA` findet `"Sheriff"-Piñata` nicht — `squashName` normalisiert keine
@@ -260,13 +269,28 @@ angeboten werden, ist eine Regelfrage (M8.9, M11.5, M23.3) und keine
 Platzfrage; wer hier filterte, nähme dem Spieler ein Ziel weg, weil der Kasten
 zu groß ist.
 
-**Abnahme.**
-1. Zugeklappt hat das Stapelmenü 15 statt 23 Einträge.
-2. Der Kasten ist am selben Tisch schmaler als 400 und kürzer als 600 Punkte.
-3. Ein Klick auf den Sammeleintrag zeigt alle 9 Zonen; ein Klick auf eine Zone
-   deckt auf wie bisher.
+**Abnahme, am deployten Tisch gemessen (932 × 742, Spielzoom 43 %).**
+
+| | vorher | nachher |
+|---|---:|---:|
+| Einträge im Stapelmenü | 23 | **15** |
+| Kasten | 924 × 726 | **553 × 653** |
+| Anteil des Fensters | 99 % × 98 % | **59 % × 88 %** |
+
+1. Zugeklappt hat das Stapelmenü 15 statt 23 Einträge, und neben dem Kasten
+   ist wieder Tisch zu sehen (Brett, Zähler, Zonen).
+2. Ein Klick auf den Sammeleintrag zeigt alle 9 Zonen; der Kasten wird dabei
+   **neu vermessen** (924 × 726, `max-height: 726px`, gescrollt) und bleibt im
+   Fenster — ohne das Neuvermessen liefe er unten heraus.
+3. Ein Klick auf eine Zone deckt auf wie bisher.
 4. Bei genau einem Ablagestapel (dem Normalfall aus M8.9) steht der eine
    Eintrag weiterhin unmittelbar da — kein zusätzlicher Klick.
+
+**Was bleibt.** Die Höhe ist mit 653 Punkten weiterhin groß; fünfzehn Einträge
+sind fünfzehn Einträge. Und der Kasten misst mit 553 Punkten deutlich mehr, als
+sein breitester Text braucht (190) — dieselbe Eigenheit hatte er vorher schon
+(924 bei rund 400 Punkten Text), sie kommt aus dem Messdurchlauf und ist hier
+nicht entstanden. Das Menü einer **Einzelkarte** misst sauber 180 × 371.
 
 ## CG — Das Kontextmenü nennt das angefasste Stück (M24.4 / Ä2)
 
@@ -285,13 +309,15 @@ down" für ein verdeckt liegendes Stück.** Das ist Absicht (Spec Abschnitt 6):
 die acht gleichen Rückseiten aus Partie 9 bleiben acht gleiche Rückseiten,
 aufgedeckte Stücke stehen künftig mit Namen da.
 
-**Abnahme.**
+**Abnahme, am deployten Tisch geprüft.**
 1. Rechtsklick auf den Stapel `Dorf-Ereignisse` zeigt in der Kopfzeile
-   „Dorf-Ereignisse (80)".
-2. Rechtsklick auf eine offene Einzelkarte zeigt ihren Namen.
-3. Rechtsklick auf eine verdeckte Einzelkarte zeigt „Face down" und nirgends
-   den Namen.
-4. `title=` und Schwebeschild sagen weiterhin dasselbe wie vorher.
+   „Dorf-Ereignisse (80)". ✔
+2. Rechtsklick auf eine offene Einzelkarte zeigt ihren Namen
+   („GIGANTISCHE SOCKE"). ✔
+3. Eine verdeckte Einzelkarte zeigt „Face down" und nirgends den Namen —
+   dieselbe Entscheidung wie bei der Löschabfrage, geprüft in
+   `server/test/context-menu-name.test.js` (CG4).
+4. `title=` und Schwebeschild sagen weiterhin dasselbe wie vorher (CG3/CG5). ✔
 
 ## CH — Die englische Abweisungsmeldung (M24.4 / Ä6)
 
