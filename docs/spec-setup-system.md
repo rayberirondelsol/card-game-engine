@@ -5387,3 +5387,85 @@ Zähler umzuhängen betrifft `zone_data` und die Ansichten gleichzeitig.
 
 **Abnahme.** Während eines Kampfes sind Schlachtfeld und die Werte des gerade
 ziehenden Dörflers gleichzeitig lesbar, ohne Ansichtswechsel.
+
+
+## M24 — Der Kleinkram aus dreizehn Partien
+
+Alles, was über die Partien liegengeblieben ist, weil Größeres davor lag. Jedes
+für sich klein; zusammen das, was den Tisch von „spielbar" zu „angenehm"
+bringt.
+
+**Jeder Punkt ist zuerst nachzuprüfen.** Mehrere stammen aus Partie 9, und
+seitdem sind M14 bis M23 darübergelaufen — es ist gut möglich, dass einer
+beiläufig erledigt wurde. **Ein „gibt es nicht mehr" ist ein vollwertiges
+Ergebnis**, kein Grund, etwas zu bauen.
+
+### M24.1 — Die Erweiterung heißt „Neue Nachbarn"
+
+**Befund.** Die deutsche Anleitung von Frosted Games trägt auf der Titelseite
+**„Neue Nachbarn"**. Regeldatei und Spielerrolle sind seit dem Abgleich
+nachgezogen; **die Kategorienamen der Produktionsdatenbank nicht**:
+`Dorf-Ereignisse (Üble Nachbarn)`, `Nachschub (Üble Nachbarn)`,
+`Startausrüstung (Üble Nachbarn)`, `Einzigartige Ausrüstung (Üble Nachbarn)`
+und die `Beute: …`-Kategorien der acht Erweiterungs-Bösewichte.
+
+**Das hängt an mehr als einem Namen** — darum ist es bisher liegengeblieben:
+
+- `place_stack.category` in `sequence_data` nennt Kategorien **beim Namen**.
+- Vorgebaute Stapel in `state_data` binden über `card_ids` — **eine Textsuche
+  findet die nicht** (M13.6, die Lehre, die diese Reihe zweimal gelernt hat).
+- Die Spielerrolle sucht Kategorien nach diesen Namen.
+
+**Beides prüfen, bevor umbenannt wird.** Danach Regeldatei und Rolle gegenlesen,
+damit nichts auf den alten Namen zeigt.
+
+**Abnahme.** Keine Kategorie heißt mehr „(Üble Nachbarn)"; der Aufbau *TFT
+Kurzpartie* läuft unverändert durch, und `validateScenarioData` bleibt sauber.
+
+### M24.2 — „Add Token" zeigt 212 Einträge ohne Suchfeld
+
+**Befund** (aus der Sichtprüfung zu M21). Der Dialog listet **alle 212** Assets
+in einem 144 Punkt hohen Rollkasten. Das war der eigentliche Grund, warum in
+Partie 12 die Karni-Marker nicht gefunden wurden — sie **existierten**, nur
+sah sie niemand.
+
+Für die Kartenbibliothek gibt es die Suche längst (`shared/cardSearch.js`,
+`squashName`/`matchesCardSearch`). **Dieselbe Stelle benutzen**, keine zweite
+Suche daneben (M6).
+
+**Abnahme.** Ein Asset lässt sich über ein Suchfeld finden; Groß- und
+Kleinschreibung und Umlaute verhalten sich wie in der Kartenbibliothek.
+
+### M24.3 — Die Aktion „Dorfphase beginnen" hat keine `id`
+
+**Befund** (gefunden bei M17, bestätigt bei M22). Sie ist die einzige Aktion in
+`action_data` ohne `id`; React-`key` und `data-testid` heißen `undefined`. Es
+funktioniert — aber zwei solche Aktionen wären nicht auseinanderzuhalten, und
+ein `data-testid="table-action-undefined"` ist für jede Prüfung wertlos.
+
+**Reine Datenarbeit.** Prüf, ob der Editor beim Anlegen überhaupt eine `id`
+vergibt — wenn nicht, ist **das** der Befund und die nächste Aktion hat
+dasselbe Problem.
+
+**Abnahme.** Jede Aktion trägt eine `id`; kein `data-testid` enthält
+`undefined`.
+
+### M24.4 — Die Reste aus Partie 9 (Ä1, Ä2, Ä6)
+
+Alle drei **zuerst nachprüfen** — seit Partie 9 sind neun Meilensteine
+darübergelaufen.
+
+- **Ä1:** Das Stapel-Kontextmenü füllte bei 932 × 790 den ganzen Bildschirm.
+  M14.10 hat es scrollbar gemacht; **M23.2 hat sechs Einträge hinzugefügt.**
+  Nachsehen, wie es jetzt aussieht — die sechs waren bewusst bezahlt, aber der
+  Preis war auf einen kurzen Zustand gerechnet.
+- **Ä2:** Das Kontextmenü nennt den Namen des angefassten Stücks nicht. Bei
+  acht gleichen Rückseiten kostet jede Identifizierung zwei Klicks über
+  „Enlarge". **M23.1 hat für die Löschabfrage schon einen Namen besorgt** —
+  dieselbe Stelle dürfte reichen.
+- **Ä6:** Die Abweisungsmeldung ist englisch („zone … is full (1)"), der Rest
+  des Tisches deutsch. Prüf, ob es eine Stelle ist oder viele; eine halbe
+  Übersetzung ist schlechter als gar keine.
+
+**Abnahme.** Je Punkt: behoben, oder mit Beleg als erledigt/gegenstandslos
+abgehakt.
