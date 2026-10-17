@@ -43,6 +43,29 @@ export function tableObjectView(obj, fallback = '') {
 }
 
 /**
+ * Wie ein Stapel am Tisch heißt (Spec M24.4, Ä2).
+ *
+ * Dieselbe Auskunft stand bis hierher **zweimal** abgeschrieben im JSX: beim
+ * `title=` der Stapelkarte und im Schwebeschild darüber. Ä2 brauchte sie ein
+ * drittes Mal, in der Kopfzeile des Kontextmenüs — bei acht gleich aussehenden
+ * Rückseiten kostete jede Identifizierung bis dahin zwei Klicks über „Enlarge".
+ * Drei Abschriften einer Formel sind drei Gelegenheiten, auseinanderzulaufen
+ * (M6), also steht sie ab jetzt hier.
+ *
+ * **Kein `tableObjectView` davor.** Ein Stapelname ist kein Kartenname: er
+ * kommt aus dem Aufbau (`place_stack.label`), steht auf keiner Karte und
+ * verrät nichts über die oberste. „Verdeckt heißt überall verdeckt" (Spec
+ * Abschnitt 6) gilt für die **Einzelkarte**, und dafür ist `tableObjectView`
+ * zuständig — der Aufrufer entscheidet, welche der beiden Fragen er stellt.
+ *
+ * Der Wortlaut ist unverändert der von vorher, damit `title=` und Schwebeschild
+ * dasselbe sagen wie seit je.
+ */
+export function stackCaption(name, size) {
+  return name ? `${name} (${size})` : `Stack: ${size} cards`;
+}
+
+/**
  * Was die Vergrößerung eines Tokens zeigt – oder `null`, wenn es nichts zu
  * zeigen gibt (Spec M11.6).
  *

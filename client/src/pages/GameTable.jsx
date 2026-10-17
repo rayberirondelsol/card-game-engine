@@ -16,7 +16,7 @@ import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog, shuffleStack } from '../../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../../shared/anchoring.js';
-import { tableObjectView, tokenPreview, previewBox } from '../utils/tableObjectView';
+import { tableObjectView, tokenPreview, previewBox, stackCaption } from '../utils/tableObjectView';
 import { assetToken, assetFace } from '../../../shared/assetToken.js';
 import { normalizeCounter, counterDisplay, newCounterValue, counterEdit } from '../../../shared/counters.js';
 import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo, isTouchDevice, isMobileDevice, isTabletDevice, isSmartphone, getTouchDistance, getTouchCenter } from '../utils/touchUtils';
@@ -675,6 +675,16 @@ export default function GameTable({ room = null }) {
   const [newTokenColor, setNewTokenColor] = useState('#3b82f6');
   const [newTokenLabel, setNewTokenLabel] = useState('');
   const [imageTokenLibrary, setImageTokenLibrary] = useState([]);
+  // M24.2/CE: 212 Bild-Token in einem Kasten von 144 Punkten Hoehe waren der
+  // Grund, warum die Karni-Marker in Partie 12 unauffindbar blieben - sie
+  // existierten, nur sah sie niemand. Gesucht wird mit **derselben** Stelle
+  // wie in der Kartenbibliothek (`matchesCardSearch`, M6); eine zweite,
+  // freundlichere Suche hier waeren zwei Antworten auf dieselbe Frage.
+  const [tokenSearch, setTokenSearch] = useState('');
+  const tokenSearchHits = useMemo(
+    () => imageTokenLibrary.filter(t => matchesCardSearch(t.name, tokenSearch)),
+    [tokenSearch, imageTokenLibrary]
+  );
   const [customDiceLibrary, setCustomDiceLibrary] = useState([]);
   const [showTextFieldModal, setShowTextFieldModal] = useState(false);
   const [newTextFieldText, setNewTextFieldText] = useState('');
@@ -729,7 +739,16 @@ export default function GameTable({ room = null }) {
   // der Layout-Effekt die *ungebremste* Höhe misst und nicht die zuletzt
   // gekappte; sonst beantwortet sich „passt es?" selbst mit ja.
   const [placedMenu, setPlacedMenu] = useState(null);
-  const menuPlace = placedMenu && placedMenu.for === contextMenu ? placedMenu : null;
+  // M24.4/CF: die neun Aufdeck-Ziele haengen hinter einem Sammeleintrag, und
+  // ihn aufzuklappen aendert die Hoehe des Menues. Die Platzierung gehoert
+  // deshalb auch zu *dieser* Lage - sonst behaelt ein zugeklappt gemessenes
+  // Menue sein `maxHeight: null` und laeuft aufgeklappt unten aus dem Bild.
+  const [revealOpen, setRevealOpen] = useState(false);
+  const menuPlace = placedMenu && placedMenu.for === contextMenu && placedMenu.open === revealOpen ? placedMenu : null;
+
+  // Ein neues Menue faengt zugeklappt an. Vor dem Zeichnen, damit die Messung
+  // darunter nicht einen Lidschlag lang die Hoehe des vorigen Menues sieht.
+  useLayoutEffect(() => { setRevealOpen(false); }, [contextMenu]);
 
   useLayoutEffect(() => {
     const el = contextMenuRef.current;
@@ -742,6 +761,7 @@ export default function GameTable({ room = null }) {
     const inset = (side) => parseFloat(rootStyle.getPropertyValue(`--safe-area-inset-${side}`)) || 0;
     setPlacedMenu({
       for: contextMenu,
+      open: revealOpen,
       ...menuPlacement({
         x: contextMenu.x,
         y: contextMenu.y,
@@ -752,7 +772,7 @@ export default function GameTable({ room = null }) {
         insets: { top: inset('top'), right: inset('right'), bottom: inset('bottom'), left: inset('left') },
       }),
     });
-  }, [contextMenu]);
+  }, [contextMenu, revealOpen]);
 
   // M10.12: Das offene Menue schliesst beim naechsten Zeigerdruck daneben -
   // am `document`, nicht mit einer Flaeche davor. `pointerdown` deckt Maus und
@@ -4896,7 +4916,7 @@ export default function GameTable({ room = null }) {
   }
   function dismissDiceModal() { setShowDiceModal(false); }
   function dismissNoteModal() { setShowNoteModal(false); setNewNoteText(''); }
-  function dismissTokenModal() { setShowTokenModal(false); }
+  function dismissTokenModal() { setShowTokenModal(false); setTokenSearch(''); }
   function dismissTextFieldModal() { setShowTextFieldModal(false); setNewTextFieldText(''); setNewTextFieldFontSize(16); setNewTextFieldColor('#ffffff'); }
   function dismissSaveModal() { setShowSaveModal(false); setSaveName(''); }
   function dismissSetupSaveModal() { setShowSetupSaveModal(false); }
@@ -5144,7 +5164,7 @@ export default function GameTable({ room = null }) {
                   stackId: stackId,
                 });
               }}
-              title={isStack ? (stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`) : view.caption}
+              title={isStack ? stackCaption(stackNames[stackId], stackSize) : view.caption}
             >
               {/* Stack offset visual - ghost cards behind */}
               {isStack && (
@@ -5307,7 +5327,7 @@ export default function GameTable({ room = null }) {
                   data-testid={`stack-tooltip-${stackId}`}
                   className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/90 text-white sm:text-[10px] text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20"
                 >
-                  {stackNames[stackId] ? `${stackNames[stackId]} (${stackSize})` : `Stack: ${stackSize} cards`}
+                  {stackCaption(stackNames[stackId], stackSize)}
                 </div>
               )}
             </div>
@@ -7161,9 +7181,39 @@ export default function GameTable({ room = null }) {
           {/* Bild-Tokens aus der Bibliothek */}
           {imageTokenLibrary.length > 0 && (
             <div className="mb-4">
-              <label className="block text-slate-300 text-sm mb-2">Bild-Token</label>
+              <label className="block text-slate-300 text-sm mb-2">
+                Bild-Token
+                <span className="ml-2 text-slate-400 text-xs">
+                  {tokenSearch.trim()
+                    ? `${tokenSearchHits.length} von ${imageTokenLibrary.length}`
+                    : imageTokenLibrary.length}
+                </span>
+              </label>
+              {/* M24.2/CE: dasselbe Feld wie in der Kartenbibliothek, bis auf
+                  den Platz. Escape raeumt erst die Suche; ist sie leer, bleibt
+                  es dem Dialog ueberlassen (dann schliesst er). */}
+              <input
+                type="search"
+                value={tokenSearch}
+                onChange={(e) => setTokenSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && tokenSearch) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTokenSearch('');
+                  }
+                }}
+                placeholder="Token suchen…"
+                data-testid="token-search-input"
+                className="mb-2 w-full px-2 py-1 bg-slate-900/80 border border-white/15 rounded text-white text-xs placeholder-white/30 focus:outline-none focus:border-blue-400"
+              />
+              {tokenSearchHits.length === 0 ? (
+                <p className="text-slate-400 text-xs py-2" data-testid="token-search-empty">
+                  Kein Token passt zu „{tokenSearch}".
+                </p>
+              ) : (
               <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
-                {imageTokenLibrary.map(token => (
+                {tokenSearchHits.map(token => (
                   <button
                     key={token.id}
                     onClick={() => {
@@ -7194,6 +7244,7 @@ export default function GameTable({ room = null }) {
                   </button>
                 ))}
               </div>
+              )}
               <div className="mt-2 border-t border-slate-600 pt-2">
                 <label className="block text-slate-300 text-sm mb-2">Geometrische Form</label>
               </div>
@@ -7840,9 +7891,27 @@ export default function GameTable({ room = null }) {
             {/* Card-specific actions (shown when right-clicking a card or stack) */}
             {contextMenu.cardTableId && (
               <>
-                <div className="px-3 py-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                  {contextMenu.stackId ? 'Stack Actions' : 'Card Actions'}
-                </div>
+                {/* M24.4/CG (Ae2): die Kopfzeile sagt, **was** angefasst ist.
+                    Bei acht gleich aussehenden Rueckseiten kostete jede
+                    Identifizierung bis hierher zwei Klicks ueber "Enlarge".
+                    Der Stapelname kommt aus `stackCaption` - dieselbe Stelle
+                    wie `title=` und Schwebeschild; eine Einzelkarte geht
+                    ueber `tableObjectView`, also sagt sie verdeckt "Face
+                    down" und nicht ihren Namen (Spec Abschnitt 6). */}
+                {(() => {
+                  const caption = contextMenu.stackId
+                    ? stackCaption(stackNames[contextMenu.stackId], tableCards.filter(c => c.inStack === contextMenu.stackId).length)
+                    : tableObjectView(tableCards.find(c => c.tableId === contextMenu.cardTableId), 'Card').caption;
+                  return (
+                    <div
+                      className="px-3 py-1 text-xs text-slate-300 font-semibold truncate"
+                      data-testid="context-title"
+                      title={caption}
+                    >
+                      {caption}
+                    </div>
+                  );
+                })()}
                 {/* M10.2 Abnahme 1: ein Griff zeigt die Karte lesbar. Das
                     Kontextmenue hatte dafuer keinen Eintrag - die Grossansicht
                     gab es nur ueber ALT (Desktop) und Langdruck/Doppeltipp
@@ -8040,19 +8109,51 @@ export default function GameTable({ room = null }) {
                         von Vorder- und Rueckseite, und genau darum bot das
                         Menue die beiden Buchseiten an, waehrend das Brett die
                         Dorfphase zeigte. */}
-                    {revealZones(tableZones).map(zone => (
-                      <button
-                        key={zone.label}
-                        onClick={() => {
-                          revealTopCardToZone(contextMenu.stackId, zone.label);
-                          setContextMenu(null);
-                        }}
-                        data-testid={`context-reveal-${zone.label}`}
-                        className="w-full px-4 py-2 text-left text-sm text-amber-300 hover:bg-slate-700 hover:text-amber-200 transition-colors"
-                      >
-                        Reveal Top Card to "{zone.label}"
-                      </button>
-                    ))}
+                    {/* M24.4/CF (Ae1): bei mehr als einem Ziel stehen sie
+                        hinter **einem** Eintrag. Gemessen am 932 x 742 grossen
+                        Fenster war das Stapelmenue mit neun Zielen 924 x 726
+                        Punkte gross - 99 % der Breite, 98 % der Hoehe, und die
+                        Breite kommt von den langen Zonennamen, nicht von ihrer
+                        Zahl. M23.2 hat sechs Ablagestapel gebaut, jeder ist ein
+                        Eintrag.
+                        Welche Zonen zur Wahl stehen, bleibt eine Regelfrage
+                        (`revealZones`, M8.9/M11.5/M23.3) und wird hier nicht
+                        gefiltert: ein Ziel wegzulassen, weil der Kasten zu gross
+                        ist, nimmt dem Spieler einen Griff. */}
+                    {(() => {
+                      const revealTargets = revealZones(tableZones);
+                      const eintrag = (zone) => (
+                        <button
+                          key={zone.label}
+                          onClick={() => {
+                            revealTopCardToZone(contextMenu.stackId, zone.label);
+                            setContextMenu(null);
+                          }}
+                          data-testid={`context-reveal-${zone.label}`}
+                          className="w-full px-4 py-2 text-left text-sm text-amber-300 hover:bg-slate-700 hover:text-amber-200 transition-colors"
+                        >
+                          Reveal Top Card to "{zone.label}"
+                        </button>
+                      );
+                      // Der Normalfall der Spec (M8.9 Regel 2): genau ein
+                      // Ablagestapel. Dann steht er unmittelbar da - ein
+                      // Sammeleintrag davor machte aus einem Griff zwei.
+                      if (revealTargets.length <= 1) return revealTargets.map(eintrag);
+                      return (
+                        <>
+                          <button
+                            onClick={() => setRevealOpen(o => !o)}
+                            data-testid="context-reveal-toggle"
+                            aria-expanded={revealOpen}
+                            className="w-full px-4 py-2 text-left text-sm text-amber-300 hover:bg-slate-700 hover:text-amber-200 transition-colors flex items-center gap-2"
+                          >
+                            <span>Reveal Top Card to …</span>
+                            <span className="ml-auto text-xs text-slate-500">{revealOpen ? '▾' : `${revealTargets.length} ▸`}</span>
+                          </button>
+                          {revealOpen && revealTargets.map(eintrag)}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
 

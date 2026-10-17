@@ -15,8 +15,10 @@ nicht mehr öffnen müssen.
 >
 > **Die Erweiterung heißt auf Deutsch „Neue Nachbarn"** (Titelseite `[NN S.1]`:
 > „Townsfolk Tussle / Neue Nachbarn / Erweiterung"), **nicht „Üble Nachbarn"** —
-> so stand es bis 2026-10-14 in diesen Unterlagen, und so heißen noch die
-> Kategorien in der Produktionsdatenbank (`Dorf-Ereignisse (Üble Nachbarn)` usw.).
+> so stand es bis 2026-10-14 in diesen Unterlagen. Die vier Kategorien der
+> Produktionsdatenbank sind am 2026-10-17 nachgezogen (M24.1) und heißen jetzt
+> `Dorf-Ereignisse (Neue Nachbarn)`, `Einzigartige Ausrüstung (Neue Nachbarn)`,
+> `Gelände (Neue Nachbarn)` und `Startausrüstung (Neue Nachbarn)`.
 > Auch die Anleitung selbst nennt sie so: „Flut ist ein Terrain aus der **Neue
 > Nachbarn**-Erweiterung" `[DE S.32]`.
 >

@@ -24,7 +24,7 @@ Datenbank. Du spielst und **protokollierst, was sich nicht spielen lässt.**
    „Rempeln"), **besiegt** (nicht „ausgeschaltet"), **Mitbringsel** (nicht
    „Zubehör"), **Snack** (nicht „Verzehrbares"), **Shoppen-/Kloppen-Reihenfolge**,
    **Neue Nachbarn** (nicht „Üble Nachbarn" — die Kategorienamen in der Datenbank
-   tragen noch den alten Namen, das ist bekannt und kein Befund), und die
+   sind seit M24.1 nachgezogen und heißen ebenfalls so), und die
    Rasterbuchstaben der Schlachtfeld-Übersicht heißen **`D`/`B`/`EG`**
    (nicht `T`/`R`/`FF`) — in `docs/spec-setup-system.md` und den Szenariodaten
    steht teils noch die alte Schreibung, ebenfalls bekannt und kein Befund.
@@ -487,8 +487,12 @@ auf dem Plättchen steht, und zwar „als wäre sie in deinem Besitz" — §9.3.
 **Die Ausrüstungskategorien folgen der Rahmenfarbe** (`[DE S.8]`): `Nachschub`
 blau (= Tante Emma Ausrüstung), `Startausrüstung` grau, gelb = **Besondere
 Ausrüstung** (die Kategorie heißt am Tisch noch „Einzigartige Ausrüstung";
-„einzigartig" ist kein Regelbegriff), `Beute: …` lila —
-jeweils mit dem Erweiterungszusatz `(Üble Nachbarn)` bzw. `(Hookbox)`.
+„einzigartig" ist kein Regelbegriff), `Beute: …` lila.
+Den Erweiterungszusatz `(Neue Nachbarn)` bzw. `(Hookbox)` tragen nur die
+Ausrüstungskategorien — `Einzigartige Ausrüstung (Neue Nachbarn)`,
+`Startausrüstung (Neue Nachbarn)`, `Ausrüstung (Hookbox)`,
+`Startausrüstung (Hookbox)`. **Die 20 `Beute: …`-Kategorien tragen ihn nicht**,
+sie heißen schlicht `Beute: <Bösewicht>`.
 
 ## Deine Partie
 
