@@ -98,8 +98,21 @@ export function widgetScale(zoom) {
  * `GameTable` beim Zeichnen benutzt (`token.width || token.size || 30`).
  * Zwei Rechnungen waeren zwei Antworten: ein Stueck, das anders einsortiert
  * wird, als es aussieht.
+ *
+ * **M25.1/CD: auf einem Raster zaehlen Felder, nicht Bildpunkte.** Eine
+ * Doerflerfigur misst 50 x 50 (genau ein Feld), ein Grabhuegel desselben
+ * Szenarios 46 x 45 – flaechenkleiner, also gewann bisher immer der Huegel,
+ * obwohl der Doerfler darauf stand. Der Unterschied ist das Seitenverhaeltnis
+ * eines eingescannten Plaettchens, kein Spielmass; beide belegen ein Feld.
+ *
+ * Darum darf ein Stueck seine **Feldflaeche** mitbringen (`area`, aus
+ * `fieldArea` in `shared/gridGeometry.js` – derselben Rechnung, mit der
+ * `snapToGrid` es setzt). Ohne Raster ist sie `0`, und es bleibt bei der rohen
+ * Flaeche: Karten, Wuerfel, Zaehler und Notizen stehen auf keinem Feld.
  */
 export function tokenArea(token) {
+  const given = Number(token?.area);
+  if (Number.isFinite(given) && given > 0) return given;
   const w = Number(token?.width) || Number(token?.size) || 30;
   const h = Number(token?.height) || Number(token?.size) || w;
   return w * h;
@@ -202,7 +215,10 @@ export function pickTopmost(point, items, field = 0) {
     if (Math.abs(dx) > w / 2 || Math.abs(dy) > h / 2) return;
     under.push({
       key: item.key, index,
-      area: w * h,
+      // M25.1/CD: dieselbe Flaeche, die `tableLayers` zeichnet – auf einem
+      // Raster in ganzen Feldern. `side` und das Feldmass darunter bleiben
+      // **roh**: sie messen eine Laenge und keine Flaeche.
+      area: tokenArea(item),
       dist: dx * dx + dy * dy,
       // Der Abstand in Feldern gemessen, nicht in Luftlinie: „in der Mitte"
       // heisst auf einem Raster „nicht mehr als ein halbes Feld daneben", und

@@ -11,7 +11,7 @@ import ZoneEditor from '../components/ZoneEditor';
 import GridOverlay from '../components/GridOverlay';
 import GridEditor from '../components/GridEditor';
 import { zoneAt, zoneContains, zoneRejects, countInZone, zoneShownInPlay, cardTint } from '../../../shared/zoneGeometry.js';
-import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement, fieldAt } from '../../../shared/gridGeometry.js';
+import { resolveGrids, snapInto, placeOnGrids, gridAddress, offGrid, rotatePlacement, fieldAt, fieldArea } from '../../../shared/gridGeometry.js';
 import SetupSequenceEditor from '../components/SetupSequenceEditor';
 import { assetPools, assetNames } from '../utils/sequenceSteps.js';
 import { executeSequenceWithLog, shuffleStack } from '../../../shared/sequenceExecutor.js';
@@ -579,6 +579,16 @@ export default function GameTable({ room = null }) {
   // what was saved, `tableGrids` is where the fields are right now.
   const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors]);
 
+  /**
+   * M25.1/CD: wie viel Fläche ein Token belegt, **in ganzen Feldern** – oder
+   * `0`, wo kein Raster liegt. Eine Stelle für alle drei Listen, die daraus
+   * eine Reihenfolge machen (`layerZ`, `barObjectAt`, `handleObjDragStart`);
+   * drei Aufrufe derselben Funktion, nicht drei Rechnungen (M6).
+   */
+  function tokenFieldArea(t) {
+    return fieldArea(tableGrids, t.x, t.y, { width: t.width || t.size, height: t.height || t.size });
+  }
+
   // Card state
   const [availableCards, setAvailableCards] = useState([]); // cards from game's card library
   const [categories, setCategories] = useState([]); // card categories/folders
@@ -618,8 +628,14 @@ export default function GameTable({ room = null }) {
   // `boards` stehen ausdruecklich nicht drin: sie sind das groesste am Tisch
   // und liegen mit `zIndex: 1` schon ganz hinten. Sie hochzuheben brachte sie
   // nur ueber die Raster-Ueberlagerung (z-10).
+  //
+  // M25.1/CD: ein Token bringt seine **Feldflaeche** mit (`fieldArea`), wo ein
+  // Raster unter ihm liegt. Ein Grabhuegel (46 x 45) und eine Doerflerfigur
+  // (50 x 50) belegen dasselbe eine Feld; dass das Plaettchen ein paar Punkte
+  // kleiner eingescannt ist, hat es bisher ueber die Figur gelegt. Nur Token:
+  // Karten und Bedienwidgets stehen auf keinem Feld.
   const layerZ = useMemo(() => tableLayers([
-    ...tokens.map(t => ({ key: `token:${t.id}`, width: t.width, height: t.height, size: t.size })),
+    ...tokens.map(t => ({ key: `token:${t.id}`, width: t.width, height: t.height, size: t.size, area: tokenFieldArea(t) })),
     ...[...tableCards]
       .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
       .map(c => {
@@ -632,7 +648,7 @@ export default function GameTable({ room = null }) {
     ...customDiceOnTable.map(d => ({ key: `customDie:${d.id}`, ...WIDGET_BOX.customDie })),
     ...hitDice.map(d => ({ key: `hitDie:${d.id}`, ...WIDGET_BOX.hitDie })),
     ...dice.map(d => ({ key: `die:${d.id}`, ...WIDGET_BOX.die })),
-  ]), [tokens, tableCards, counters, notes, textFields, customDiceOnTable, hitDice, dice]);
+  ]), [tokens, tableCards, counters, notes, textFields, customDiceOnTable, hitDice, dice, tableGrids]);
   const [gridHighlight, setGridHighlight] = useState(null); // {x, y} of grid highlight position
   const [stackDropTarget, setStackDropTarget] = useState(null); // stackId of stack being targeted for drop
   // M10.9/U7: die **lose** Karte, auf der die gezogene liegenbleibt, wenn man
@@ -2413,7 +2429,7 @@ export default function GameTable({ room = null }) {
     const items = [];
     const add = (type, o, box) => items.push({ key: String(items.length), type, obj: o, x: o.x, y: o.y, ...box });
 
-    tokens.forEach(t => add('token', t, { width: t.width, height: t.height, size: t.size }));
+    tokens.forEach(t => add('token', t, { width: t.width, height: t.height, size: t.size, area: tokenFieldArea(t) }));
     [...tableCards]
       .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
       .forEach(c => { const { w, h } = getCardDims(c); add('card', c, { width: w, height: h }); });
@@ -2511,7 +2527,7 @@ export default function GameTable({ room = null }) {
       // dann 0), und `pickTopmost` verhaelt sich wie vorher.
       const hit = pickTopmost(worldPointer, tokens
         .filter(t => !t.locked)
-        .map(t => ({ key: t.id, x: t.x, y: t.y, width: t.width, height: t.height, size: t.size })),
+        .map(t => ({ key: t.id, x: t.x, y: t.y, width: t.width, height: t.height, size: t.size, area: tokenFieldArea(t) })),
       fieldAt(tableGrids, worldPointer.x, worldPointer.y));
       const picked = hit == null ? null : tokens.find(t => t.id === hit);
       if (picked) {
@@ -6254,8 +6270,15 @@ export default function GameTable({ room = null }) {
                   <path d="M12 17h.01" />
                 </svg>
                 <div className="text-sm">
+                  {/* M25.2/CE: „did not work" ueber einem Vermerk ist die
+                      Meldung, die zum Nachbauen verleitet. Ein Schritt mit
+                      Status `note` hat getan, was er sagt - die Ueberschrift
+                      behauptet dann nichts anderes. Unterdrueckt wird nichts
+                      (M20.1), der Kasten steht wie bisher da. */}
                   <div className="font-medium mb-1">
-                    {setupIssues.length} action{setupIssues.length > 1 ? 's' : ''} did not work
+                    {setupIssues.some(e => e.status !== 'note')
+                      ? `${setupIssues.length} action${setupIssues.length > 1 ? 's' : ''} did not work`
+                      : `${setupIssues.length} note${setupIssues.length > 1 ? 's' : ''} — nothing to do`}
                   </div>
                   <ul className="space-y-0.5 text-white/90">
                     {/* K2: der Satz, der fuer den Spieler geschrieben ist,

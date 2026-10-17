@@ -578,6 +578,21 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
   const skip = (reason) => { entry.status = 'skipped'; entry.reason = reason; return state; };
   /** The step ran but did not achieve what it says. */
   const fail = (reason) => { entry.status = 'failed'; entry.reason = reason; return state; };
+  /**
+   * M25.2/CE: der Schritt hat getan, was er sagt – hier ist trotzdem etwas,
+   * das der Spieler wissen sollte.
+   *
+   * Der Befund der vierzehnten Partie: `build_scenario` meldete fünf fehlende
+   * Geländekarten als `failed`, während alle fünf Plättchen korrekt lagen. Der
+   * Spieler hat daraufhin angefangen, das Szenario von Hand nachzubauen – also
+   * Arbeit getan, die der Tisch schon erledigt hatte. 34 von 62 Geländeassets
+   * haben keine Karte in der Bibliothek (M20.2); das ist ein bekannter
+   * Normalfall und kein Fehlschlag.
+   *
+   * **Nicht unterdrückt:** die Oberfläche zeigt `status !== 'ok'`, ein Vermerk
+   * steht also weiterhin da. Unterdrückte Meldungen sind der Fehler aus M20.1.
+   */
+  const note = (reason) => { entry.status = 'note'; entry.reason = reason; return state; };
 
   const idx = buildStackIndex(state);
 
@@ -1190,24 +1205,49 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     // Reihe ist, weiß erst der Moment, in dem man es aufdeckt - feste Namen
     // reichen dafür nicht.
     case 'reveal_next': {
+      // M25.3/CC: **jeder** Schritt dahinter liest `$revealed…`. Deckt dieser
+      // nicht auf, kann keiner von ihnen etwas Sinnvolles tun - in Partie 14
+      // standen vierzehn Zeilen „$revealedBase is not bound" im Protokoll und
+      // der eine Satz, der zählt, nirgends. Darum hält ein gescheitertes
+      // `reveal_next` die Folge an, derselbe `ctx.halted`-Weg wie bei
+      // `require_zone` (M9.3) - ohne einen zweiten Schritttyp daneben: der
+      // Schritt *ist* die Vorbedingung für alles dahinter.
+      const halt = (reason) => { ctx.halted = true; return skip(reason); };
+
       const zone = findZone(zones, step.zoneLabel);
-      if (!zone) return skip(`zone "${step.zoneLabel}" not found`);
+      if (!zone) return halt(`zone "${step.zoneLabel}" not found`);
 
       const { entries, slotCount } = slotOrder(zone, objectsInZone(zone, state.tokens, state.boards));
-      const hit = entries.find(e => e.o.faceDown);
-      if (!hit) return skip(`nothing face down in zone "${step.zoneLabel}"`);
+      // M25.3/CC: die Regel wählt über den **Platz**, nicht über die Seite
+      // (`docs/tft-regeln.md` §5.1 Schritt 2: „auf dem nächsten Kampf-Platz
+      // von oben nach unten … so dass ihr den Namen seht"). Offen zu liegen
+      // ist das *Ergebnis* des Schritts, keine Vorbedingung - nach einem
+      // Tausch durch ein Dorf-Ereignis liegt der nächste Gegner offen da und
+      // ist trotzdem der nächste Gegner. Dieselbe Entscheidung wie bei
+      // `clear_zone`: was schon so ist, wie es sein soll, ist gelungen.
+      //
+      // Nachsichtig ist der Schritt aber **nur, wenn er das Plättchen
+      // wegräumt**. Ohne Zielzone bleibt es liegen, und dann ist „verdeckt"
+      // das einzige Kennzeichen, an dem der nächste Aufruf merkt, welches
+      // schon dran war - ohne es deckte er ewig dasselbe auf.
+      const hit = step.targetZoneLabel ? entries[0] : entries.find(e => e.o.faceDown);
+      if (!hit) {
+        return halt(entries.length
+          ? `nothing face down in zone "${step.zoneLabel}"`
+          : `zone "${step.zoneLabel}" is empty`);
+      }
       const obj = hit.o;
 
       if (step.targetZoneLabel) {
         const target = findZone(zones, step.targetZoneLabel);
-        if (!target) return skip(`zone "${step.targetZoneLabel}" not found`);
+        if (!target) return halt(`zone "${step.targetZoneLabel}" not found`);
         // Same counting as place_asset: moving inside its own zone must not
         // count the object twice. A full zone skips the whole step - turning it
         // over and leaving it where it was would be half a move.
         const here = zoneContains(target, obj.x, obj.y) ? 1 : 0;
         const taken = occupancy(state, target) - here;
         const refusal = zoneRejects(target, 'asset', taken);
-        if (refusal) return skip(refusal);
+        if (refusal) return halt(refusal);
         const slots = zoneSlots(target);
         const pos = slots ? slots[Math.min(taken, slots.length - 1)] : zoneCenter(target);
         obj.x = pos.x;
@@ -1577,6 +1617,11 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // Vermerke lassen liegen, was liegt - ein Teil ohne Rueckseite (M7.6) und
       // eine fehlende Gelaendekarte (M8.3) sind bekannte Normalfaelle.
       const notes = [];
+      // M25.2/CE: die fehlenden Gelaendekarten stehen fuer sich - sie sind der
+      // eine Vermerk, der **kein** Fehlschlag ist (M20.2: 34 von 62
+      // Gelaendeassets haben keine Karte, durchweg Plaettchen, die erst im
+      // Endkampf oder ueber eine Faehigkeit aufs Brett kommen).
+      const absent = [];
       // Eintraege, die `assetToken` verweigert hat: ihre Karte gehoert nicht
       // daneben, denn das Teil liegt nicht (M7.6/M8.3 - eine falsche Karte ist
       // schlimmer als keine).
@@ -1692,7 +1737,11 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           const part = side(name, down);
           const card = cards.find(c => norm(c.name) === norm(name))
             || (part ? cards.find(c => norm(c.name) === norm(part)) : null);
-          if (!card) notes.push(`no terrain card named "${name}"`);
+          // M25.2/CE: **das Plaettchen liegt** - nur seine Karte gibt es in
+          // dieser Bibliothek nicht. Getrennt gesammelt, weil daraus kein
+          // Fehlschlag wird, solange sonst nichts klemmt; der Wortlaut sagt
+          // beides in einem Satz statt fuenfmal "no terrain card named X".
+          if (!card) absent.push(name);
           else if (!found.includes(card)) found.push(card);
         }
 
@@ -1752,7 +1801,15 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       }
       // Die Platzhalter binden auch dann, wenn eine Gelaendekarte fehlte: der
       // Boesewicht kommt trotzdem auf sein Feld.
-      return notes.length ? fail(notes.join('; ')) : state;
+      //
+      // M25.2/CE: steht ein echtes Problem dabei, bleibt es beim Fehlschlag -
+      // und die fehlenden Karten stehen dahinter, damit nichts verschwindet.
+      // Steht nur das da, ist der Schritt gelungen und sagt es trotzdem.
+      const missingCards = absent.length
+        ? `${absent.length} terrain tile${absent.length === 1 ? '' : 's'} on the table ${absent.length === 1 ? 'has' : 'have'} no terrain card in this library (nothing to do): ${absent.map(n => `"${n}"`).join(', ')}`
+        : '';
+      if (notes.length) return fail([...notes, missingCards].filter(Boolean).join('; '));
+      return missingCards ? note(missingCards) : state;
     }
 
     // M4a: ein Zähler ist kein Asset – er hat kein Bild und keinen Vorrat, nur

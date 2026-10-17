@@ -214,9 +214,41 @@ test('ein Geländeteil ohne Karte lässt Gelände und Reihe stehen und steht im 
   assert.ok(state.tokens.some(t => t.label === 'Die Bundo-Königin'));
   // … die drei Karten der übrigen Teile liegen …
   assert.deepEqual(names(state), ['Hohler Heuhaufen', 'Holzzaun', 'Wunschbrunnen']);
-  // … und der Schritt sagt, welche fehlt.
-  assert.equal(log[1].status, 'failed');
+  // … und der Schritt sagt, welche fehlt. M25.2/CE: als **Vermerk**, nicht als
+  // Fehlschlag - das Plättchen liegt ja. Partie 14 hat deswegen angefangen,
+  // ein fertiges Szenario von Hand nachzubauen.
+  assert.equal(log[1].status, 'note');
   assert.match(log[1].reason, /Bundo-Königin/);
+  assert.match(log[1].reason, /nothing to do/, 'am Wortlaut muss zu erkennen sein, dass nichts zu tun ist');
+  assert.match(log[1].reason, /^1 terrain tile on the table has no terrain card/);
+});
+
+test('M25.2/CE: ein echtes Problem bleibt ein Fehlschlag und nennt beides', () => {
+  const data = scenarioFixture();
+  data.cardZoneLabel = 'Tippfehler';
+
+  const { log } = build(data, [REVEAL, { type: 'build_scenario', final: true }]);
+  assert.equal(log[1].status, 'failed');
+  assert.match(log[1].reason, /Tippfehler/, 'das echte Problem steht vorn');
+  assert.match(log[1].reason, /Bundo-Königin/, 'und der Vermerk verschwindet nicht');
+});
+
+test('M25.2/CE: mehrere fehlende Geländekarten sind ein Satz, nicht fünf Meldungen', () => {
+  const data = scenarioFixture();
+  data.bosses.Waggums.terrain = [
+    { assetName: 'Die Bundo-Königin', cells: ['C7'] },
+    { assetName: 'Hohler Heuhaufen', cells: ['D7'] },
+  ];
+  // Auch der Heuhaufen bekommt keine Karte mehr.
+  const { state, log } = executeSequenceWithLog(
+    barWithBoss(), [REVEAL, BUILD], ZONES,
+    { ...opts(data), cards: opts().cards.filter(c => c.name !== 'Hohler Heuhaufen') }
+  );
+
+  assert.equal(log[1].status, 'note');
+  assert.equal((log[1].reason.match(/nothing to do/g) || []).length, 1, 'ein Satz');
+  assert.match(log[1].reason, /^2 terrain tiles on the table have no terrain card/);
+  assert.equal(state.tokens.filter(t => t.gridId === 'g1').length, 2, 'beide Plättchen liegen');
 });
 
 test('eine fehlende Zone lässt das Gelände liegen und steht im Protokoll', () => {
@@ -373,7 +405,8 @@ test('der Vergleich bleibt zeichengenau: ein fehlender Bindestrich trifft nicht'
   const { state, log } = buildWith(pairScenario('Doofster-Glocke / Kochtopf'), pairAssets(), cards);
 
   assert.equal(state.cards.length, 0);
-  assert.equal(log[1].status, 'failed');
+  // M25.2/CE: das Plättchen liegt, nur seine Karte fehlt - ein Vermerk.
+  assert.equal(log[1].status, 'note');
   assert.match(log[1].reason, /Doofster-Glocke \/ Kochtopf/);
 });
 

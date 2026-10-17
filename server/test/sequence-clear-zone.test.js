@@ -321,17 +321,19 @@ test('four runs of "Kampf beginnen" reveal four different bosses, each clearing 
   assert.equal(state.tokens.filter(t => t.y === 640).length, 3, 'die drei Besiegten liegen in der Trophäenreihe');
   assert.equal(byLabel(state, 'Sideboard').faceDown, false);
 
-  // Fünfter Druck: es ist nichts mehr aufzudecken, und es kommt nichts dazu.
+  // Fünfter Druck: es ist nichts mehr aufzudecken. Das Abräumen davor läuft
+  // noch, dann hält die Folge an (M25.3/CC) - die zwei Schritte hinter
+  // `reveal_next` laufen nicht mehr ins Leere.
   const fifth = executeSequenceWithLog(state, action, ZONES, opts());
-  assert.equal(fifth.log[2].status, 'skipped');
+  assert.deepEqual(fifth.log.map(e => e.status), ['ok', 'ok', 'skipped']);
   assert.match(fifth.log[2].reason, /Bösewicht-Leiste/);
-  assert.equal(fifth.log[4].status, 'skipped', 'ohne neue Bindung bleibt der Platzhalter unaufgelöst');
+  assert.match(fifth.log[2].reason, /2 further steps skipped/);
   assert.equal(fifth.state.tokens.filter(t => t.label.startsWith('Tableau: ')).length, 0);
   assert.equal(fifth.state.tokens.filter(t => t.y === 640).length, 4, 'der letzte Kampf wird noch aufgeräumt');
 
   // Und ein sechster Druck ändert wirklich gar nichts mehr.
   const sixth = executeSequenceWithLog(fifth.state, action, ZONES, opts());
-  assert.deepEqual(sixth.log.map(e => e.status), ['ok', 'ok', 'skipped', 'ok', 'skipped']);
+  assert.deepEqual(sixth.log.map(e => e.status), ['ok', 'ok', 'skipped']);
   assert.deepStrictEqual(sixth.state, fifth.state);
 });
 

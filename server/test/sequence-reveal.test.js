@@ -239,7 +239,10 @@ test('a placeholder without a preceding reveal_next is skipped, never taken lite
   assert.ok(state.tokens.every(t => t.faceDown === true), 'und nichts umgedreht');
 });
 
-test('a skipped reveal_next binds nothing, so the placeholder behind it stays unresolved', () => {
+// M25.3/CC: vorher stand hier eine zweite Zeile „$revealed is not bound".
+// Der Schritt dahinter kann ohne Bindung nichts Sinnvolles tun, also halt die
+// Folge an - eine Zeile mit dem Grund statt einer Lawine dahinter.
+test('a reveal_next that binds nothing halts: one line with the reason, none behind it', () => {
   const { state, log } = executeSequenceWithLog(
     emptyState(),
     [
@@ -250,7 +253,9 @@ test('a skipped reveal_next binds nothing, so the placeholder behind it stays un
     opts()
   );
 
-  assert.deepEqual(log.map(e => e.status), ['skipped', 'skipped']);
+  assert.deepEqual(log.map(e => e.status), ['skipped']);
+  assert.match(log[0].reason, /Leer/);
+  assert.match(log[0].reason, /1 further step skipped/);
   assert.equal(state.tokens.length, 0);
 });
 
@@ -311,11 +316,13 @@ test('four runs of "Kampf beginnen" reveal a different boss each time, the fifth
   assert.equal(state.tokens.filter(t => t.label.startsWith('Tableau: ')).length, 4);
   assert.equal(byLabel(state, 'Sideboard').faceDown, false);
 
-  // Der fünfte Druck findet nichts mehr - und sagt das.
+  // Der fünfte Druck findet nichts mehr - und sagt das in **einer** Zeile
+  // (M25.3/CC): die Schritte dahinter laufen gar nicht erst ins Leere.
   const fifth = executeSequenceWithLog(state, action, ZONES, opts());
+  assert.equal(fifth.log.length, 1, 'eine Zeile, nicht drei');
   assert.equal(fifth.log[0].status, 'skipped');
   assert.match(fifth.log[0].reason, /Bosseleiste/);
-  assert.equal(fifth.log[2].status, 'skipped', 'ohne neue Bindung bleibt der Platzhalter unaufgelöst');
+  assert.match(fifth.log[0].reason, /2 further steps skipped/);
   assert.equal(fifth.state.tokens.length, state.tokens.length, 'und es kommt nichts mehr dazu');
 });
 
@@ -490,4 +497,72 @@ test('an under-filled bar does not promote its last object to the last slot', ()
   assert.equal(out.bindings.revealedSlot, '3');
   assert.equal(out.bindings.revealedTier, 'TROUBLEMAKER');
   assert.equal(out.revealedLast, false, 'der Platz zählt, nicht wie viel darauf liegt');
+});
+
+// ── M25.3/CC: ein offen liegendes Plättchen ──────────────────────────────────
+//
+// Partie 14: nach dem Tausch durch DIE STRASSENSPERRE lag der nächste
+// Bösewicht offen auf der Leiste. `reveal_next` band nichts, und die 14
+// Schritte dahinter fielen einzeln mit „$revealedBase is not bound" durch.
+//
+// Die Regel wählt über den **Platz**, nicht über die Seite (tft-regeln §5.1
+// Schritt 2); „so dass ihr den Namen seht" ist das Ergebnis, nicht die
+// Vorbedingung. Nachsichtig ist der Schritt nur, wenn er das Plättchen
+// wegräumt - ohne Zielzone bleibt „verdeckt" das einzige Kennzeichen dafür,
+// welches schon dran war.
+
+test('reveal_next takes a face-up tile when it moves it to a target zone', () => {
+  // Klaus liegt offen (getauscht), die drei dahinter verdeckt.
+  const state = barState();
+  const klaus = state.tokens.find(t => t.label === 'Bösewicht: Klaus');
+  Object.assign(klaus, { faceDown: false, imageUrl: '/uploads/tokens/boss-0.png' });
+
+  const { state: out, log, bindings } = executeSequenceWithLog(
+    state,
+    [{ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }],
+    ZONES,
+    opts()
+  );
+
+  assert.equal(log[0].status, 'ok', log[0].reason);
+  const moved = byLabel(out, 'Bösewicht: Klaus');
+  assert.equal(moved.faceDown, false);
+  assert.deepEqual([moved.x, moved.y], [840, 150], 'er kommt auf den ersten freien Platz der Zielzone');
+  assert.equal(bindings.revealed, 'Bösewicht: Klaus');
+  assert.equal(bindings.revealedBase, 'Klaus');
+  assert.equal(bindings.revealedSlot, '1', 'der Platz, von dem er kam');
+});
+
+test('without a target zone a face-up zone is still skipped - nothing moves it out of the way', () => {
+  const faceUp = executeSequence(
+    emptyState(),
+    BOSSES.map(n => ({ type: 'place_asset', assetName: `Bösewicht: ${n}`, targetZoneLabel: 'Bosseleiste' })),
+    ZONES,
+    opts()
+  );
+
+  const { log } = executeSequenceWithLog(
+    faceUp, [{ type: 'reveal_next', zoneLabel: 'Bosseleiste' }], ZONES, opts()
+  );
+  assert.equal(log[0].status, 'skipped');
+});
+
+test('a reveal_next that cannot reveal halts the sequence instead of fourteen follow-up failures', () => {
+  const rest = [
+    { type: 'place_asset', assetName: 'Tableau: $revealedBase', targetZoneLabel: 'Leer' },
+    { type: 'place_stack', category: 'Aktionen: $revealedBase', label: 'Deck', x: 0, y: 0 },
+    { type: 'build_scenario' },
+  ];
+
+  const { log } = executeSequenceWithLog(
+    emptyState(),
+    [{ type: 'reveal_next', zoneLabel: 'Bosseleiste', targetZoneLabel: 'Reihenfolge' }, ...rest],
+    ZONES,
+    opts()
+  );
+
+  assert.equal(log.length, 1, 'eine Zeile, nicht vier');
+  assert.equal(log[0].status, 'skipped');
+  assert.match(log[0].reason, /3 further steps skipped/);
+  assert.doesNotMatch(log[0].reason, /is not bound/);
 });

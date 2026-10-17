@@ -21,7 +21,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { pickTopmost } = await import('../../client/src/utils/tokenLayer.js');
+const { pickTopmost, tableLayers } = await import('../../client/src/utils/tokenLayer.js');
 
 // Die Masse der Partie: 82 x 82 Einheiten fuer zwei mal zwei Felder, also
 // 41 Einheiten je Feld. Benachbarte Figuren stehen 41 auseinander und
@@ -184,4 +184,67 @@ test('BK: ein kaputtes Feldmaß fällt auf das geratene zurück', () => {
   for (const bad of [0, -1, NaN, null, undefined, 'viel']) {
     assert.equal(pickTopmost({ x: 500, y: 500 }, [boss, doerfler], bad), 'boss', String(bad));
   }
+});
+
+// ── M25.1/CD: ein Grabhuegel ist kein kleineres Stueck ───────────────────────
+//
+// Partie 14, gemessen am laufenden Tisch: eine Doerflerfigur misst 50 x 50
+// (genau ein Feld), die fuenf Grabhuegel messen 45x44 bis 48x48 - alle
+// flaechenkleiner. Beide stehen auf demselben Feld, haben also denselben
+// Mittelpunkt; der Abstand ist immer gleich, die Flaeche entscheidet immer,
+// und sie entscheidet immer fuer den Huegel. Dreimal wanderte der Huegel statt
+// des Doerflers, stumm.
+//
+// Der Unterschied ist Bildrauschen, kein Spielmass: ein eingescanntes
+// Plaettchen behaelt sein Seitenverhaeltnis. Deshalb misst die Ordnung in
+// **Feldern**, wo ein Raster liegt - mit `fieldArea`, derselben Rechnung, mit
+// der `snapToGrid` das Stueck schon setzt.
+
+const { fieldArea } = await import('../../shared/gridGeometry.js');
+
+const KAMPFFELD = [{
+  id: 'g1', label: 'Kampffeld', x: 0, y: 0, width: 950, height: 700,
+  cols: 19, rows: 14, type: 'square', labels: { cols: 'alpha', rows: 'numeric' },
+}];
+
+/** Ein Stueck wie am Tisch: mit der Feldflaeche, die unter ihm liegt. */
+const piece = (key, x, y, width, height) => ({
+  key, x, y, width, height, area: fieldArea(KAMPFFELD, x, y, { width, height }),
+});
+
+test('M25.1: Figur und Grabhuegel auf demselben Feld sind gleich gross - der spaetere gewinnt', () => {
+  const FELD = 50;
+  const cx = 425, cy = 325; // Feldmitte irgendwo auf dem Kampffeld
+  const huegel = piece('huegel', cx, cy, 46, 45);
+  const figur = piece('figur', cx, cy, 50, 50);
+
+  // Reihenfolge wie im Spielstand: `build_scenario` legt das Gelaende, die
+  // Doerfler kommen in der Sequenz danach.
+  assert.equal(pickTopmost({ x: cx, y: cy }, [huegel, figur], FELD), 'figur');
+  assert.equal(pickTopmost({ x: cx + 10, y: cy - 8 }, [huegel, figur], FELD), 'figur');
+
+  // Und die Zeichnung sagt dasselbe: die Figur liegt oben.
+  const z = tableLayers([huegel, figur]);
+  assert.ok(z('figur') > z('huegel'), 'was den Zeiger bekommt, wird auch oben gezeichnet');
+});
+
+test('M25.1: ohne Figur bleibt der Grabhuegel greifbar', () => {
+  const huegel = piece('huegel', 425, 325, 46, 45);
+  assert.equal(pickTopmost({ x: 425, y: 325 }, [huegel], 50), 'huegel');
+});
+
+test('M25.1: ein mehrfeldriges Gelaendeteil liegt weiter unter der Figur darauf (M19.1)', () => {
+  // Sieben mal vier Felder, die Figur steht mitten darauf.
+  const gelaende = piece('gelaende', 425, 325, 350, 200);
+  const figur = piece('figur', 425, 325, 50, 50);
+  assert.equal(pickTopmost({ x: 425, y: 325 }, [gelaende, figur], 50), 'figur');
+  const z = tableLayers([gelaende, figur]);
+  assert.ok(z('figur') > z('gelaende'));
+});
+
+test('M25.1: ohne Raster rechnet alles wie bisher', () => {
+  const a = { key: 'a', x: 100, y: 100, width: 46, height: 45 };
+  const b = { key: 'b', x: 100, y: 100, width: 50, height: 50 };
+  assert.equal(fieldArea(KAMPFFELD, 5000, 5000, { width: 50, height: 50 }), 0, 'kein Raster, keine Feldflaeche');
+  assert.equal(pickTopmost({ x: 100, y: 100 }, [a, b]), 'a', 'die kleinere Flaeche gewinnt wie bisher');
 });

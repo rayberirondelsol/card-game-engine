@@ -385,6 +385,35 @@ export function fieldAt(grids, x, y) {
   return Math.min(d.cellW, d.cellH);
 }
 
+/**
+ * Die Fläche eines Stücks **in ganzen Feldern**, in Weltpunkten² – oder `0`,
+ * wenn an dieser Stelle kein Raster liegt (Spec M25.1/CD).
+ *
+ * Der Befund der vierzehnten Partie: eine Dörflerfigur misst 50 × 50 (genau
+ * ein Feld), die fünf Grabhügel desselben Szenarios messen 45 × 44 bis
+ * 48 × 48. Alle sind flächenkleiner als die Figur, und `pickTopmost` lässt
+ * die kleinere Fläche gewinnen (M8.2/M10.1) – also bekam dreimal der Hügel
+ * den Zeiger, obwohl der Dörfler darauf stand. Der Unterschied ist das
+ * Seitenverhältnis eines eingescannten Plättchens, kein Spielmaß: **beide
+ * belegen ein Feld.**
+ *
+ * Gerechnet wird deshalb mit `footprint` – **der** Rechnung, mit der
+ * `snapToGrid` das Stück schon setzt. Ein Stück anders einzusortieren, als es
+ * gesetzt wird, wären zwei Antworten auf dieselbe Frage (M6).
+ *
+ * Die Einheit bleibt Weltpunkte², damit die Ordnung in `tableLayers` Stücke
+ * mit und ohne Raster in derselben Reihe vergleichen kann: eine Karte, ein
+ * Würfel oder ein Zähler steht auf keinem Feld und behält seine rohe Fläche.
+ */
+export function fieldArea(grids, x, y, size) {
+  const grid = gridAt(grids, x, y);
+  if (!grid) return 0;
+  const foot = footprint(grid, size);
+  if (!foot) return 0;
+  const d = dims(grid);
+  return foot.cols * foot.rows * d.cellW * d.cellH;
+}
+
 // ── Snapping ─────────────────────────────────────────────────────────────────
 
 /**
