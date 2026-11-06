@@ -92,7 +92,16 @@ export const STEP_TYPES = [
   // M19.5/BM: dieselbe Wache ueber einen **Zaehler**. „Besiegt" ist kein
   // Zustand, den der Tisch kennt - die Definition steht im Aufbau, nicht hier.
   // `confirm` macht aus dem Halt eine Rueckfrage.
-  { value: 'require_counter', label: 'Require Counter', fields: ['name', 'above', 'confirm', 'message'] },
+  //
+  // M26.2/CM: `atStart` ist die zweite Lesart - jeder genannte Zaehler steht auf
+  // seinem Ausgangswert („hat dieser Doerfler schon gespielt?"). `above` gilt
+  // dann nicht mehr und wird nicht angeboten (siehe `stepFields`).
+  { value: 'require_counter', label: 'Require Counter', fields: ['name', 'above', 'atStart', 'confirm', 'message'] },
+  // M26.2/CM: einen Doerfler gegen einen anderen tauschen. Der Platz ist eine
+  // Nummer (der Aufbau nennt seine Plaetze `Doerfler 1` ...), der Doerfler sein
+  // voller Name - was an ihm haengt, steht in den Doerferdaten des Setups
+  // (`scenario_data.villagers`), nicht im Schritt.
+  { value: 'swap_villager', label: 'Swap Villager', fields: ['seat', 'villager'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -144,6 +153,12 @@ export function stepFields(step) {
   // ein Versprechen, das der Aufbau nicht hält.
   if (spec.value === 'clear_grid' && typeof step === 'object' && !step?.targetZoneLabel) {
     return spec.fields.filter(f => f !== 'pool');
+  }
+  // M26.2/CM: `atStart` und `above` sind zwei Lesarten derselben Wache. Mit
+  // `atStart` liest der Executor `above` nicht - ein Feld ohne Wirkung ist ein
+  // Versprechen, das der Aufbau nicht haelt.
+  if (spec.value === 'require_counter' && typeof step === 'object' && step?.atStart === true) {
+    return spec.fields.filter(f => f !== 'above');
   }
   return [...spec.fields];
 }
@@ -240,6 +255,11 @@ export function defaultStep(type, ctx = {}) {
     case 'rotate_zone':
       // Wie `reveal_next`: die Zone *ist* die Adresse, also steht die erste da.
       return { type, zoneLabel: zone };
+    case 'swap_villager':
+      // Der Dörfler bleibt leer: den kennt nur der Autor, und geraten wäre er
+      // eine Behauptung darüber, wer am Platz sitzen soll (§1: der Tisch
+      // entscheidet nicht, wer getauscht wird).
+      return { type, seat: 1, villager: '' };
     case 'require_counter':
       // Keine geratenen Zaehler, kein geratener Satz - und `confirm: true`,
       // weil eine Wache ueber einem handgefuehrten Zaehler im Zweifel fragen
@@ -373,9 +393,18 @@ function describeWork(step) {
       const namen = categoryList(step?.name);
       const say = String(step?.message ?? '').trim();
       const ask = step?.confirm ? 'ask before going on' : 'stop the sequence';
-      return `Require one of ${namen.length ? namen.map(n => `"${n}"`).join(', ') : '(no counter)'}`
+      const list = namen.length ? namen.map(n => `"${n}"`).join(', ') : '(no counter)';
+      // M26.2/CM: die zweite Lesart steht in der Zeile, sonst läse sich der
+      // Schritt wie die erste.
+      if (step?.atStart === true) {
+        return `Require every one of ${list} to stand at its starting value, else ${ask}${say ? `: "${say}"` : ''}`;
+      }
+      return `Require one of ${list}`
         + ` to be above ${Number(step?.above) || 0}, else ${ask}${say ? `: "${say}"` : ''}`;
     }
+    case 'swap_villager':
+      return `Swap the villager at seat ${Number.isFinite(Number(step?.seat)) && step?.seat !== '' ? Number(step.seat) : '(none)'}`
+        + ` for ${q(step?.villager)}`;
     case 'require_zone': {
       const want = step?.expect === 'occupied' ? 'occupied' : 'empty';
       const say = String(step?.message ?? '').trim();
@@ -617,6 +646,16 @@ export function validateStep(step, ctx = {}) {
     && step.onlyFinal !== null && step.onlyFinal !== '') {
     problems.push(`"${String(step.onlyFinal).trim()}" is not an answer:`
       + ' every fight, only the final fight, or only before it');
+  }
+  // M26.2/CM: ein Platz ist eine Nummer ab 1, und ohne Dörfler gibt es nichts zu
+  // tauschen. Welche Plätze und welche Dörfler es gibt, steht in den
+  // Szenariodaten des Setups; der Editor kennt sie nicht (dieselbe Regel wie bei
+  // `slot`: der Executor meldet den Rest am Tisch mit demselben Satz).
+  if (typeOf(step) === 'swap_villager') {
+    if (!Number.isInteger(Number(step?.seat)) || step?.seat === '' || step?.seat === null || Number(step.seat) < 1) {
+      problems.push('seat must be a whole number from 1');
+    }
+    if (!String(step?.villager ?? '').trim()) problems.push('no villager named');
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

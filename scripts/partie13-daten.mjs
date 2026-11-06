@@ -19,6 +19,7 @@
 // und `scenario_data` fremder Aufträge.
 
 import { SETUP_ID, DOERFLER, BAND } from './equipment-zones.mjs';
+import { CARD_SLOTS } from './doerfler-daten.mjs';
 
 export { SETUP_ID };
 
@@ -105,25 +106,17 @@ export const MEASURED_NEIGHBOURS = [
 // ── BY: wohin die Startausrüstung gehört ─────────────────────────────────────
 
 /**
- * Kartenname → Slot-Zone, abgelesen von der Zeile unter dem Namen auf den sechs
- * Kartenbildern (`/uploads/072123c0-…/`), nicht geraten:
+ * Kartenname → Slot-Zone der sechs Karten der Kurzpartie, abgelesen von der Zeile
+ * unter dem Namen auf den Kartenbildern (`/uploads/072123c0-…/`), nicht geraten.
  *
- *   BAUERNLATZHOSE  „Beine"                        ROSTIGE SICHEL  „1-Hand, Waffe …"
- *   KÜHL-PACK       „Brust"                        GEFRIERFACHTÜR  „2-Hand, Waffe …"
- *   OMMAS GEHSTOCK  „1-Hand, Waffe …"              DAS ALTE EISEN  „1-Hand, Waffe …"
- *
- * Keine der sechs trägt eine schwarz markierte Wertveränderung `[DE S.35]`, die
- * Zähler bleiben deshalb unberührt (docs/tasks-partie13.md, „Wo die Spec nicht
- * stimmt", 2).
+ * **Seit M26 steht sie nicht mehr hier:** die Slots gehören zu den Dörferdaten
+ * (`doerfler-daten.mjs`, `ROSTER[…].gear`), und die Ziele der Kurzpartie sind
+ * daraus abgeleitet — eine zweite Liste wäre eine zweite Antwort auf „wo liegt
+ * die Sichel" (M6). Keine der sechs trägt eine schwarz markierte
+ * Wertveränderung `[DE S.35]`, die Zähler bleiben deshalb unberührt
+ * (docs/tasks-partie13.md, „Wo die Spec nicht stimmt", 2).
  */
-export const CARD_SLOTS = {
-  'BAUERNLATZHOSE': 'Dörfler 1: Beine',
-  'ROSTIGE SICHEL': 'Dörfler 1: Hände',
-  'GEFRIERFACHTÜR': 'Dörfler 2: Hände',
-  'KÜHL-PACK': 'Dörfler 2: Brust',
-  'OMMAS GEHSTOCK': 'Dörfler 3: Hände',
-  'DAS ALTE EISEN': 'Dörfler 3: Hände',
-};
+export { CARD_SLOTS };
 
 // ── CA: wohin die Lebenszähler gehören ───────────────────────────────────────
 
@@ -133,18 +126,9 @@ export const CARD_SLOTS = {
  */
 export const HAUPTPLAN = { x: 100, y: 60, width: 1200, height: 1000 };
 export const SIDEBOARD = { x: 1320, y: 60.5, width: 300, height: 999 };
-/**
- * Der Kasten eines Zählers in Weltpunkten, am laufenden Tisch nachgemessen:
- * gezeichnet wird mit `left: x − 70`, `top: y − 40`, und der breiteste Zähler
- * (ein zweizeiliger Lebenszähler) ist 185 × 102 groß. **`x`/`y` sind nicht die
- * obere linke Ecke** — der erste Entwurf hat das angenommen und die Zonen
- * neben dem Tableau 70 Punkte zu weit links gerechnet.
- */
-export const COUNTER_SIZE = { width: 185, height: 102, offsetX: -70, offsetY: -40 };
-export const counterBox = (c) => ({
-  x: c.x + COUNTER_SIZE.offsetX, y: c.y + COUNTER_SIZE.offsetY,
-  width: COUNTER_SIZE.width, height: COUNTER_SIZE.height,
-});
+// COUNTER_SIZE / counterBox stehen seit M26 in `equipment-zones.mjs` (CJ braucht sie
+// ebenfalls, und partie13 ↔ doerfler-daten dürfen sich nicht im Kreis importieren).
+export { COUNTER_SIZE, counterBox } from './equipment-zones.mjs';
 
 /**
  * Eine Reihe **über** dem Schlachtfeld, außerhalb beider Bretter.

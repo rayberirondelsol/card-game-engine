@@ -88,7 +88,9 @@ test('BM Abnahme 1: `confirm` steht am Protokolleintrag, damit der Tisch fragen 
 
 test('BM Abnahme 2: der Schritt steht im Vokabular', () => {
   assert.ok(STEP_TYPES.find(t => t.value === 'require_counter'), 'require_counter fehlt');
-  assert.deepEqual(stepFields({ type: 'require_counter' }), ['name', 'above', 'confirm', 'message']);
+  // M26.2/CM: `atStart` ist seither die zweite Lesart (sequence-villager-steps.test.js);
+  // die vier Felder von M19.5 stehen unverändert da.
+  assert.deepEqual(stepFields({ type: 'require_counter' }), ['name', 'above', 'atStart', 'confirm', 'message']);
   assert.deepEqual(defaultStep('require_counter'), {
     type: 'require_counter', name: [], above: 0, confirm: true, message: '',
   });

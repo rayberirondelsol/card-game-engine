@@ -5677,3 +5677,28 @@ Drei Dinge gelten aber:
    Figur bleibt liegen.
 5. Ein Aufbau, der danach gespeichert und neu geladen wird, zeigt den neuen
    Dörfler (M22).
+
+### M26 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `CI`–`CN` in `docs/tasks-doerfler.md`, dort auch die acht Stellen, an
+denen dieser Abschnitt nicht stimmte. Die vier, die den Entwurf ändern:
+
+1. **Beide Zahlen stimmen.** 580 − 300 = **280** ist die Lücke zwischen zwei
+   Tableaus; die **60** sind der Rest neben der Zählerspalte (`left: x − 70`, 170
+   breit) und stammen aus M23.2, nicht aus M18. Beides zugleich passt nicht — die
+   **Zähler** ziehen unter das Tableau, nicht die Plätze (CJ).
+2. **Die 50 × 50-Figur ist nicht ungenutzt.** *Kampf beginnen* und *Dorfphase
+   beginnen* setzen und räumen sie; ein Tausch ersetzt Spielstein **und** Figur.
+3. **Die Aktionen nennen die Dörfler beim Namen** (31 Schritte). Ohne
+   Umschreibung hielte *Dorfphase beginnen* nach dem ersten Tausch an der Wache
+   an. Sie benennen den Dörfler jetzt nach dem **Platz** (`$V1`, `$F1`, `$V1LEB`).
+4. **Die Zonen hängen an der Asset-Id des Tableaus** (36 Zonen). Ein getauschtes
+   Tableau trägt darum `anchorId`; das Feld reist durch Speichern und Laden.
+
+**Entschieden:** der Streifen unter den Tableaus behält Vorrat und Ablagen, die
+beiden freigewordenen Reihen tragen die Zähler; ausgelöst wird der Tausch über das
+Kontextmenü am Tableau (Schrittwort `swap_villager` im Vokabular); gesperrt ist er,
+**solange ein Kampf läuft**, gewarnt (Rückfrage „Trotzdem"), **wenn der Dörfler
+schon gespielt hat** (`require_counter … atStart`). Offen bleibt die Lage der
+Marker auf den aufgedruckten Kreisen je Tableau (drei Spaltenlagen, bis 8 Weltpunkte
+Abweichung bei einem Tausch über die Lagen hinweg).

@@ -17,6 +17,7 @@ import {
   HAUPTPLAN, SIDEBOARD, counterBox, GRID_BOX, VIEWPORT, STRIP,
 } from '../../scripts/partie13-daten.mjs';
 import { equipmentZones, MEASURED_ANCHORS, BAND } from '../../scripts/equipment-zones.mjs';
+import { counterSpots } from '../../scripts/doerfler-daten.mjs';
 import { resolveBox } from '../../shared/anchoring.js';
 import { zoneCapacity, zoneRejects, zoneLabelAbove, zoneSlots } from '../../shared/zoneGeometry.js';
 import { executeSequenceWithLog } from '../../shared/sequenceExecutor.js';
@@ -72,7 +73,14 @@ test('CB: die vierte Reihe bleibt im Feld ihres Dörflers und unter dem M18-Band
 test('CB: keine neue Zone liegt unter einer Zählerspalte', () => {
   // Der Befund hinter dieser Stelle: ein Zähler wird mit `left: x − 70`
   // gezeichnet, die Spalte liegt also 70 Punkte weiter links als ihr `x`.
-  const spalten = [580, 1160, 1740].flatMap(x => [1430, 1520, 1610, 1700].map(y => counterBox({ x, y })));
+  // Seit M26 (CJ) stehen die drei Zähler je Dörfler in einer Reihe unter dem
+  // Tableau, nicht mehr in der Lücke; geprüft wird gegen **beide** Stände, damit
+  // ein alter Spielstand mit den Zählern in der Lücke ebenfalls keine der
+  // Ablagen verdeckt.
+  const spalten = [
+    ...[580, 1160, 1740].flatMap(x => [1430, 1520, 1610, 1700].map(y => counterBox({ x, y }))),
+    ...Object.values(counterSpots()).map(counterBox),
+  ];
   for (const z of neu) {
     for (const c of spalten) {
       assert.ok(!overlaps({ ...z, width: z.width, height: z.height }, c),

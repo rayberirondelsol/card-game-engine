@@ -1,0 +1,2107 @@
+{
+ "comment": "Auszug aus der Produktionsdatenbank (Spiel Townsfolk Tussle, Stand 2026-11-06) für server/test/doerfler-daten.test.js und villagers.test.js: die Assets und Karten der neun Dörfler, die zwölf Leistenzonen, die Dörfler-Schritte der Kurzpartie VOR M26 und die beiden Aktionen VOR der Umschreibung.",
+ "assets": [
+  {
+   "id": "4d4e0dfd-8d78-4d1e-b6e9-b8be159a807a",
+   "name": "Georgie Irongut",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Georgie_Irongut.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "b924e1b7-eecb-44e0-95f2-5aca16b3ee46",
+   "name": "Marker 1: Leben",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-leben.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "c5cd8e7d-eb79-41d4-8b77-7c6514a40969",
+   "name": "Marker 2: Leben",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-leben.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "bfa5e48e-620a-43a4-81b8-25cfb6fecc2a",
+   "name": "Marker 3: Leben",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-leben.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "6cde3a15-7914-4861-b143-beba9e7a26a8",
+   "name": "Marker 1: Bewegung",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-bewegung.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "d1da7e66-74c0-48bd-b8ad-acda6c6410f4",
+   "name": "Marker 2: Bewegung",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-bewegung.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "68526800-ef1b-4232-b377-5bb79117c355",
+   "name": "Marker 3: Bewegung",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-bewegung.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "eec95f26-3f86-4426-9750-c1c9384b590f",
+   "name": "Marker 1: Mumm",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-mumm.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "c68e6f19-51e3-45b6-a5fa-d1d955edd548",
+   "name": "Marker 2: Mumm",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-mumm.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "6e508ba2-8d9b-4d46-9f4b-cf431534f309",
+   "name": "Marker 3: Mumm",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-mumm.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "76893a6e-47f8-45a8-91a1-6527c4c6ff8c",
+   "name": "Marker 1: Präzision",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-treffer.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "481528a6-e440-4849-9d7c-20a824fcd296",
+   "name": "Marker 2: Präzision",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-treffer.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "92879831-2d07-450c-869c-b0d6bbd1102b",
+   "name": "Marker 3: Präzision",
+   "type": "token",
+   "width": 22,
+   "height": 22,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/marker-treffer.png",
+   "back_image_path": null,
+   "category": "Marker"
+  },
+  {
+   "id": "d2431966-4239-44ee-8ed3-d2799c599d58",
+   "name": "Georgie",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/f306e399-e2d5-4bfe-ab02-20e474d8d18a.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/d8bd0112-b2a2-400b-9a8a-3e7b8c4a24e2.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "79eb5854-357f-4235-b151-121f81e37bed",
+   "name": "Tableau: Georgie Irongut",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/04b0c229-3e41-49c0-b344-ce556712ba3a.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/58a20345-de97-4bab-a8ae-e78352260fb7.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "96ce76b0-3cbd-4c39-b7e0-1fb5515e93b6",
+   "name": "Blopsy Twins",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Blopsy_Twins.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "c23b89d0-11be-452b-81dd-9b72c69fc3a8",
+   "name": "Norman Fishboy",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Norman_Fishboy.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "698f8a15-970d-44d1-ac94-96a8a3c4ff28",
+   "name": "Granny Melba",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Granny_Melba.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "ce350fb9-48c9-4f86-8032-a4b7a9d641ca",
+   "name": "Quintus Binch",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Quintus_Binch.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "a54cf59f-de00-4c0c-b474-c0d85a250ea5",
+   "name": "Yancy Plover",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Yancy_Plover.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "cba0395d-dbec-4c9e-b6c7-fb96154d1860",
+   "name": "Henlo Bulwark",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Henlo_Bulwark.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "f4324de8-996f-4310-b1be-efb3c48cb2c6",
+   "name": "Judy Marks",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Judy_Marks.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "51da8a04-d326-4d94-87ec-db9fa7845eeb",
+   "name": "Fridgette Jones",
+   "type": "token",
+   "width": 50,
+   "height": 50,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/tok_Fridgette_Jones.png",
+   "back_image_path": null,
+   "category": "Dörfler"
+  },
+  {
+   "id": "dae61142-a596-46c9-acba-640f82e9433c",
+   "name": "Tableau: Yancy Plover",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/854ed48a-9195-4d0f-8747-df32c84032ed.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/c5a6bfce-5918-4b3f-96c6-75ddf27efa79.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "d4691079-bd86-496a-a49b-c6b7a317c2d9",
+   "name": "Tableau: Fridgette Jones",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/4ad190d3-9d05-4834-964e-ab554bbda23d.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/5a099729-d483-42e8-aef5-568fd3e7de31.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "ea119c43-390c-4c07-8c21-710f074f002e",
+   "name": "Judy",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/73c3d19b-3b65-4033-8d0c-85f1c3c36e1c.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/8260df9a-f809-4901-ac6a-0601a0f86afd.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "a3b102ec-14af-424c-9705-2713f07c1787",
+   "name": "Fridgette",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/3da91e9a-9215-42fd-85f2-91e0f34dcdfd.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/1b2e2753-4a68-4698-808e-046fe05d7100.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "b4d3265f-d70c-4fc0-919e-40c50b28c91b",
+   "name": "Tableau: Judy Marks",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/2afb7dcd-57ff-42c6-ab8d-3e26efc07517.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/06558f8c-2c50-49ba-ac3c-42be5c87b4b6.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "bad13f49-c614-4551-9e81-fe8603dbf09a",
+   "name": "Tableau: Granny Melba",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/d3743b31-ed45-49a1-8126-00cd96ef023e.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/5987a4df-5d1d-4903-a381-363ead8939cb.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "98e26309-d1d5-432c-b2ea-26289f26fb75",
+   "name": "Tableau: Henlo Bulwark",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/de146faa-0f8c-46ef-8d7b-9b938ae26efc.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/9b6bfa5b-86c9-448c-8f80-e99f9191e838.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "bec17f09-3a2c-48e5-9c1e-c0738c6032c7",
+   "name": "Norman",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/167ecc6d-2a02-4fbc-a34a-e171f934e16d.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/f8763e7f-dcbc-4c60-ac27-3ab37c986c35.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "e7ad92e1-d49d-4f58-b01a-9b84c6585a2a",
+   "name": "Yancy",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/a84dafad-7212-4208-9e7f-fd3784411297.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/671617a5-0c3e-4a85-8f7a-2e869d38224d.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "6b91d58e-2e88-4c00-b8ea-93277bdeb36a",
+   "name": "Quintus",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/0ad54d9f-a242-4fb3-8fe4-87dcb7d1dccc.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/20b963c5-6251-4f7b-99ba-08d20f3f7dfa.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "3492343b-7307-49c9-9036-940548926a89",
+   "name": "Granny",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/692a0d1e-795b-4b9c-a770-9518bde5b50e.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/2e2f183e-4c8b-4e6a-bf06-9da882721b92.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "8191b99c-2dd0-41b1-839d-691fbfafd43f",
+   "name": "Henlo",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/be4ec2d4-680d-4e09-972a-b26037e95368.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/4328ca4a-04aa-493f-9e79-daac8ab785b8.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "ff712659-2d1d-41c8-90ba-336f0df536e4",
+   "name": "Blopsy",
+   "type": "token",
+   "width": 46,
+   "height": 46,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/88be7c5c-8a06-45a5-98a7-bb91a2bd613a.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/fa442263-d57d-463f-abfd-1a5f962feaf7.png",
+   "category": "Dörfler"
+  },
+  {
+   "id": "7e2f516c-f0f7-4a14-9e66-96e60ba65972",
+   "name": "Tableau: Norman Fishboy",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/02021631-6125-4ec2-b4d0-c1014d9233ca.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/b4334b03-33a5-4beb-931d-fb41b6d92a70.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "372801ea-b3f6-4eba-b35e-f62323afe73a",
+   "name": "Tableau: Quintus Binch",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/7e2637ff-a36e-4447-9325-e43d2bd813fe.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/d3574713-32e1-48d5-8a97-80909612215f.png",
+   "category": "Dörfler-Tableaus"
+  },
+  {
+   "id": "af3a4982-a0f5-4884-834f-221447ba5377",
+   "name": "Tableau: Blopsy Twins",
+   "type": "token",
+   "width": 300,
+   "height": 400,
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/4febf2bd-5819-4297-b66d-a379779aaae4.png",
+   "back_image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/026a1d88-b2e5-4a9a-88b3-9e1deb42bd22.png",
+   "category": "Dörfler-Tableaus"
+  }
+ ],
+ "cards": [
+  {
+   "id": "6395ea5a-c493-4488-954a-23e4a043a41f",
+   "name": "STARKSTROMKABEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/b777c9d8-2b48-43ae-9f43-049f68b16715.png",
+   "category": "Startausrüstung (Hookbox)"
+  },
+  {
+   "id": "30ff74ff-21b0-40ba-8b6f-48b8661699bd",
+   "name": "SCHLEUDERSITZ",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/831d84ab-c9cb-4d23-ac75-9743671bb9b4.png",
+   "category": "Startausrüstung (Hookbox)"
+  },
+  {
+   "id": "5b4c1084-60f4-4699-8a8d-0e27f43aea1f",
+   "name": "TINTENKLECKSER",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/10510656-6dea-4818-90cd-2a6b3c02ec1e.png",
+   "category": "Startausrüstung (Hookbox)"
+  },
+  {
+   "id": "601f2552-1af2-4b8d-a9d0-053529a8b838",
+   "name": "ALTE MASKE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/5846d85d-d420-408f-a13f-45fd9e3ac1ec.png",
+   "category": "Startausrüstung (Hookbox)"
+  },
+  {
+   "id": "5b6e00de-d1ed-4acc-b723-76f1a487bd6f",
+   "name": "RIESENPINSEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/27b9b168-4547-490e-9813-9fab0073e6a5.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "edd4f155-9d15-4706-b25e-09639e1e0463",
+   "name": "KÜNSTLERSCHÄRPE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/efc07239-91ec-4232-9072-d3af6a6b8e19.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "8c600469-406e-417d-8c7c-0d416d9bc594",
+   "name": "„ACH, WIE SCHÖN!“",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/563b3047-3ee7-437d-af50-494f1e889fc8.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "29922e1b-0c76-4de8-b139-9fdd5211ad26",
+   "name": "„KLARER HIMMEL“",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/862fab8d-31e5-4e9c-9e62-0b65a8a7b3ff.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "5d0b8e5b-486d-42eb-8e55-772e0461034e",
+   "name": "„DIE GROSSE REISE“",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/05288809-024c-4066-997c-6e1ea2d00abc.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "bd3ea49b-c17e-4bbb-a478-4fb89569b53d",
+   "name": "GEFRIERFACHTÜR",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/47cadfa6-da3c-41b8-ba34-12a54baeb139.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "d1133c94-ad2f-4bb2-aad9-5135170242d4",
+   "name": "KÜHL-PACK",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/460f6f0b-e3e3-411e-ba24-ccd69517a29b.png",
+   "category": "Startausrüstung (Neue Nachbarn)"
+  },
+  {
+   "id": "8dbe7b09-777b-4a5d-bb3f-04385e64a635",
+   "name": "GEKLAUTE BONBONS",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/4769dc79-1b65-48f1-acc7-574a7b198716.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "e870b4ba-94fa-4fcc-b1c5-a65330b2ca80",
+   "name": "GUMMIKNÜPPEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/38dbf644-7fbc-49ba-9f38-f4c68f897cbc.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "c9b96589-9d94-4c6b-9180-0a9401722dd4",
+   "name": "OMMAS GEHSTOCK",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/fe638124-3a17-4064-b55a-77ff1e01cda2.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "3fa75157-84a0-4b4f-b065-1cd02631e825",
+   "name": "DAS ALTE EISEN",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/e124862b-f446-409e-b87b-cc6cc440e47c.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "a50ce885-654a-4c5e-ae8b-16a390511853",
+   "name": "BAUERNLATZHOSE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/54c1f562-3c27-43ae-b88e-97120fd1bff3.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "a8f94417-c3c0-444a-9c12-20b00b6a3841",
+   "name": "ROSTIGE SICHEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/1b884038-53e2-4a1d-b4b0-620ca03768a7.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "cac873d5-f688-490d-a1d8-077c282085d8",
+   "name": "FISCHMÜTZE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/0d75c74f-ebeb-4d8d-b863-706023369d32.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "a50f17ac-1e99-441c-86e6-8c6e33d9bc1b",
+   "name": "BEWÄHRTE ANGEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/1147ef86-a55f-40b7-8025-121ace9de7b1.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "d0ee42cd-664a-4397-8865-6d9618e154a4",
+   "name": "KRISTALLKUGEL",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/96d6063c-33bf-42b1-abae-fa1643364838.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "df7465fc-3645-4832-b674-455f40698570",
+   "name": "BLECHERNE TRÖTE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/bb9204d2-495f-4320-90d6-b1c4ee313b94.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "276c5672-4956-4317-ba91-fe27495e85ce",
+   "name": "MIESES MESSER",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/69e98fcb-a6b2-4825-912c-120326b816a2.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "f0e31e17-6894-45f7-923b-faf097ee2314",
+   "name": "SCHMIEDESCHÜRZE",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/5550575c-53ed-4a60-a77f-4391c837052f.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "140ce5c6-54e6-4806-9279-7b01772cc1cf",
+   "name": "ALTER WÄMSER",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/f76c6059-ed8e-4ece-9e23-9449d9d1a9aa.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "24e889e2-d04f-4e44-bb86-6c56ef9d53c4",
+   "name": "MUFFIGER KUCHEN",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/e41431df-b5bf-4c50-a662-dd00ce30ce52.png",
+   "category": "Startausrüstung"
+  },
+  {
+   "id": "a9261a76-5cb6-45c3-b25f-d891b2924f68",
+   "name": "PAPAS KNALLKOPF",
+   "image_path": "/uploads/072123c0-cd97-4ffb-a330-369630fab93f/9bd25467-94cc-45be-b930-b31baeee8522.png",
+   "category": "Startausrüstung"
+  }
+ ],
+ "leisten": [
+  {
+   "label": "Dörfler 1: Leben",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "98e26309-d1d5-432c-b2ea-26289f26fb75",
+    "relX": 0.546867,
+    "relY": 0.059275,
+    "relWidth": 0.095033,
+    "relHeight": 0.516275
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5875,
+     "relY": 0.943
+    },
+    {
+     "n": 2,
+     "relX": 0.4128,
+     "relY": 0.8449
+    },
+    {
+     "n": 3,
+     "relX": 0.5844,
+     "relY": 0.7467
+    },
+    {
+     "n": 4,
+     "relX": 0.416,
+     "relY": 0.6489
+    },
+    {
+     "n": 5,
+     "relX": 0.5875,
+     "relY": 0.55
+    },
+    {
+     "n": 6,
+     "relX": 0.416,
+     "relY": 0.452
+    },
+    {
+     "n": 7,
+     "relX": 0.5875,
+     "relY": 0.3538
+    },
+    {
+     "n": 8,
+     "relX": 0.416,
+     "relY": 0.256
+    },
+    {
+     "n": 9,
+     "relX": 0.5875,
+     "relY": 0.1567
+    },
+    {
+     "n": 10,
+     "relX": 0.4128,
+     "relY": 0.0571
+    }
+   ],
+   "id": "zm5eewwwk",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 1: Bewegung",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "98e26309-d1d5-432c-b2ea-26289f26fb75",
+    "relX": 0.635833,
+    "relY": 0.060575,
+    "relWidth": 0.095333,
+    "relHeight": 0.515625
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5885,
+     "relY": 0.9428
+    },
+    {
+     "n": 2,
+     "relX": 0.4143,
+     "relY": 0.8439
+    },
+    {
+     "n": 3,
+     "relX": 0.5853,
+     "relY": 0.7456
+    },
+    {
+     "n": 4,
+     "relX": 0.4143,
+     "relY": 0.6472
+    },
+    {
+     "n": 5,
+     "relX": 0.5885,
+     "relY": 0.5484
+    },
+    {
+     "n": 6,
+     "relX": 0.4143,
+     "relY": 0.4501
+    },
+    {
+     "n": 7,
+     "relX": 0.5885,
+     "relY": 0.3518
+    },
+    {
+     "n": 8,
+     "relX": 0.4143,
+     "relY": 0.2538
+    },
+    {
+     "n": 9,
+     "relX": 0.5885,
+     "relY": 0.1546
+    },
+    {
+     "n": 10,
+     "relX": 0.4115,
+     "relY": 0.0571
+    }
+   ],
+   "id": "zde0kvd02",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 1: Mumm",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "98e26309-d1d5-432c-b2ea-26289f26fb75",
+    "relX": 0.7245,
+    "relY": 0.06035,
+    "relWidth": 0.0956,
+    "relHeight": 0.515325
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5868,
+     "relY": 0.9428
+    },
+    {
+     "n": 2,
+     "relX": 0.4132,
+     "relY": 0.8448
+    },
+    {
+     "n": 3,
+     "relX": 0.5868,
+     "relY": 0.7456
+    },
+    {
+     "n": 4,
+     "relX": 0.4132,
+     "relY": 0.648
+    },
+    {
+     "n": 5,
+     "relX": 0.5868,
+     "relY": 0.5488
+    },
+    {
+     "n": 6,
+     "relX": 0.4132,
+     "relY": 0.4508
+    },
+    {
+     "n": 7,
+     "relX": 0.5868,
+     "relY": 0.3524
+    },
+    {
+     "n": 8,
+     "relX": 0.4163,
+     "relY": 0.2544
+    },
+    {
+     "n": 9,
+     "relX": 0.59,
+     "relY": 0.1551
+    },
+    {
+     "n": 10,
+     "relX": 0.4104,
+     "relY": 0.0572
+    }
+   ],
+   "id": "zt3fl9swi",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 1: Präzision",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "98e26309-d1d5-432c-b2ea-26289f26fb75",
+    "relX": 0.813733,
+    "relY": 0.060575,
+    "relWidth": 0.095333,
+    "relHeight": 0.5151
+   },
+   "slots": [
+    {
+     "n": -4,
+     "relX": 0.5888,
+     "relY": 0.9428
+    },
+    {
+     "n": -3,
+     "relX": 0.4147,
+     "relY": 0.8444
+    },
+    {
+     "n": -2,
+     "relX": 0.5888,
+     "relY": 0.7455
+    },
+    {
+     "n": -1,
+     "relX": 0.4147,
+     "relY": 0.6474
+    },
+    {
+     "n": 0,
+     "relX": 0.5857,
+     "relY": 0.549
+    },
+    {
+     "n": 1,
+     "relX": 0.4147,
+     "relY": 0.4501
+    },
+    {
+     "n": 2,
+     "relX": 0.5888,
+     "relY": 0.3521
+    },
+    {
+     "n": 3,
+     "relX": 0.4147,
+     "relY": 0.2533
+    },
+    {
+     "n": 4,
+     "relX": 0.5888,
+     "relY": 0.1552
+    },
+    {
+     "n": 5,
+     "relX": 0.4115,
+     "relY": 0.0572
+    }
+   ],
+   "id": "zxy5k4svg",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 2: Leben",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "d4691079-bd86-496a-a49b-c6b7a317c2d9",
+    "relX": 0.523467,
+    "relY": 0.04105,
+    "relWidth": 0.072067,
+    "relHeight": 0.513975
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5,
+     "relY": 0.9473
+    },
+    {
+     "n": 2,
+     "relX": 0.5,
+     "relY": 0.8478
+    },
+    {
+     "n": 3,
+     "relX": 0.5,
+     "relY": 0.7487
+    },
+    {
+     "n": 4,
+     "relX": 0.5,
+     "relY": 0.6492
+    },
+    {
+     "n": 5,
+     "relX": 0.5,
+     "relY": 0.5497
+    },
+    {
+     "n": 6,
+     "relX": 0.5,
+     "relY": 0.4502
+    },
+    {
+     "n": 7,
+     "relX": 0.5,
+     "relY": 0.3509
+    },
+    {
+     "n": 8,
+     "relX": 0.5,
+     "relY": 0.2512
+    },
+    {
+     "n": 9,
+     "relX": 0.5,
+     "relY": 0.1521
+    },
+    {
+     "n": 10,
+     "relX": 0.5,
+     "relY": 0.0527
+    }
+   ],
+   "id": "zey4vvibh",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 2: Bewegung",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "d4691079-bd86-496a-a49b-c6b7a317c2d9",
+    "relX": 0.6313,
+    "relY": 0.04105,
+    "relWidth": 0.072367,
+    "relHeight": 0.513975
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5021,
+     "relY": 0.9473
+    },
+    {
+     "n": 2,
+     "relX": 0.5021,
+     "relY": 0.848
+    },
+    {
+     "n": 3,
+     "relX": 0.5021,
+     "relY": 0.7487
+    },
+    {
+     "n": 4,
+     "relX": 0.4979,
+     "relY": 0.6492
+    },
+    {
+     "n": 5,
+     "relX": 0.5021,
+     "relY": 0.5497
+    },
+    {
+     "n": 6,
+     "relX": 0.5021,
+     "relY": 0.4502
+    },
+    {
+     "n": 7,
+     "relX": 0.5021,
+     "relY": 0.3507
+    },
+    {
+     "n": 8,
+     "relX": 0.5021,
+     "relY": 0.2517
+    },
+    {
+     "n": 9,
+     "relX": 0.5021,
+     "relY": 0.1517
+    },
+    {
+     "n": 10,
+     "relX": 0.4979,
+     "relY": 0.0527
+    }
+   ],
+   "id": "zt44tcp0o",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 2: Mumm",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "d4691079-bd86-496a-a49b-c6b7a317c2d9",
+    "relX": 0.7394,
+    "relY": 0.04105,
+    "relWidth": 0.072367,
+    "relHeight": 0.513975
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5021,
+     "relY": 0.9473
+    },
+    {
+     "n": 2,
+     "relX": 0.5021,
+     "relY": 0.8478
+    },
+    {
+     "n": 3,
+     "relX": 0.5021,
+     "relY": 0.7483
+    },
+    {
+     "n": 4,
+     "relX": 0.5021,
+     "relY": 0.6488
+    },
+    {
+     "n": 5,
+     "relX": 0.5021,
+     "relY": 0.5497
+    },
+    {
+     "n": 6,
+     "relX": 0.4984,
+     "relY": 0.4502
+    },
+    {
+     "n": 7,
+     "relX": 0.5021,
+     "relY": 0.3507
+    },
+    {
+     "n": 8,
+     "relX": 0.5021,
+     "relY": 0.2517
+    },
+    {
+     "n": 9,
+     "relX": 0.5021,
+     "relY": 0.1521
+    },
+    {
+     "n": 10,
+     "relX": 0.5021,
+     "relY": 0.0527
+    }
+   ],
+   "id": "z3jbo26cu",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 2: Präzision",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "d4691079-bd86-496a-a49b-c6b7a317c2d9",
+    "relX": 0.847533,
+    "relY": 0.04105,
+    "relWidth": 0.0735,
+    "relHeight": 0.513975
+   },
+   "slots": [
+    {
+     "n": -4,
+     "relX": 0.4943,
+     "relY": 0.9473
+    },
+    {
+     "n": -3,
+     "relX": 0.4943,
+     "relY": 0.848
+    },
+    {
+     "n": -2,
+     "relX": 0.4902,
+     "relY": 0.7487
+    },
+    {
+     "n": -1,
+     "relX": 0.4902,
+     "relY": 0.6492
+    },
+    {
+     "n": 0,
+     "relX": 0.5098,
+     "relY": 0.5497
+    },
+    {
+     "n": 1,
+     "relX": 0.4943,
+     "relY": 0.4502
+    },
+    {
+     "n": 2,
+     "relX": 0.4943,
+     "relY": 0.3509
+    },
+    {
+     "n": 3,
+     "relX": 0.4943,
+     "relY": 0.2517
+    },
+    {
+     "n": 4,
+     "relX": 0.4902,
+     "relY": 0.1521
+    },
+    {
+     "n": 5,
+     "relX": 0.4943,
+     "relY": 0.0527
+    }
+   ],
+   "id": "zzez0hzg7",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 3: Leben",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "bad13f49-c614-4551-9e81-fe8603dbf09a",
+    "relX": 0.546867,
+    "relY": 0.059275,
+    "relWidth": 0.095033,
+    "relHeight": 0.516275
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5875,
+     "relY": 0.943
+    },
+    {
+     "n": 2,
+     "relX": 0.4128,
+     "relY": 0.8449
+    },
+    {
+     "n": 3,
+     "relX": 0.5844,
+     "relY": 0.7467
+    },
+    {
+     "n": 4,
+     "relX": 0.416,
+     "relY": 0.6489
+    },
+    {
+     "n": 5,
+     "relX": 0.5875,
+     "relY": 0.55
+    },
+    {
+     "n": 6,
+     "relX": 0.416,
+     "relY": 0.452
+    },
+    {
+     "n": 7,
+     "relX": 0.5875,
+     "relY": 0.3538
+    },
+    {
+     "n": 8,
+     "relX": 0.416,
+     "relY": 0.256
+    },
+    {
+     "n": 9,
+     "relX": 0.5875,
+     "relY": 0.1567
+    },
+    {
+     "n": 10,
+     "relX": 0.4128,
+     "relY": 0.0571
+    }
+   ],
+   "id": "z6z8ymf79",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 3: Bewegung",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "bad13f49-c614-4551-9e81-fe8603dbf09a",
+    "relX": 0.635833,
+    "relY": 0.060575,
+    "relWidth": 0.095333,
+    "relHeight": 0.515625
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5885,
+     "relY": 0.9428
+    },
+    {
+     "n": 2,
+     "relX": 0.4143,
+     "relY": 0.8439
+    },
+    {
+     "n": 3,
+     "relX": 0.5853,
+     "relY": 0.7456
+    },
+    {
+     "n": 4,
+     "relX": 0.4143,
+     "relY": 0.6472
+    },
+    {
+     "n": 5,
+     "relX": 0.5885,
+     "relY": 0.5484
+    },
+    {
+     "n": 6,
+     "relX": 0.4143,
+     "relY": 0.4501
+    },
+    {
+     "n": 7,
+     "relX": 0.5885,
+     "relY": 0.3518
+    },
+    {
+     "n": 8,
+     "relX": 0.4143,
+     "relY": 0.2538
+    },
+    {
+     "n": 9,
+     "relX": 0.5885,
+     "relY": 0.1546
+    },
+    {
+     "n": 10,
+     "relX": 0.4115,
+     "relY": 0.0571
+    }
+   ],
+   "id": "zms3r94z4",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 3: Mumm",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "bad13f49-c614-4551-9e81-fe8603dbf09a",
+    "relX": 0.7245,
+    "relY": 0.06035,
+    "relWidth": 0.0956,
+    "relHeight": 0.515325
+   },
+   "slots": [
+    {
+     "n": 1,
+     "relX": 0.5868,
+     "relY": 0.9428
+    },
+    {
+     "n": 2,
+     "relX": 0.4132,
+     "relY": 0.8448
+    },
+    {
+     "n": 3,
+     "relX": 0.5868,
+     "relY": 0.7456
+    },
+    {
+     "n": 4,
+     "relX": 0.4132,
+     "relY": 0.648
+    },
+    {
+     "n": 5,
+     "relX": 0.5868,
+     "relY": 0.5488
+    },
+    {
+     "n": 6,
+     "relX": 0.4132,
+     "relY": 0.4508
+    },
+    {
+     "n": 7,
+     "relX": 0.5868,
+     "relY": 0.3524
+    },
+    {
+     "n": 8,
+     "relX": 0.4163,
+     "relY": 0.2544
+    },
+    {
+     "n": 9,
+     "relX": 0.59,
+     "relY": 0.1551
+    },
+    {
+     "n": 10,
+     "relX": 0.4104,
+     "relY": 0.0572
+    }
+   ],
+   "id": "zab69iwml",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  },
+  {
+   "label": "Dörfler 3: Präzision",
+   "shape": "rect",
+   "accepts": [
+    "asset"
+   ],
+   "snap": true,
+   "layout": "slots",
+   "anchor": {
+    "assetId": "bad13f49-c614-4551-9e81-fe8603dbf09a",
+    "relX": 0.813733,
+    "relY": 0.060575,
+    "relWidth": 0.095333,
+    "relHeight": 0.5151
+   },
+   "slots": [
+    {
+     "n": -4,
+     "relX": 0.5888,
+     "relY": 0.9428
+    },
+    {
+     "n": -3,
+     "relX": 0.4147,
+     "relY": 0.8444
+    },
+    {
+     "n": -2,
+     "relX": 0.5888,
+     "relY": 0.7455
+    },
+    {
+     "n": -1,
+     "relX": 0.4147,
+     "relY": 0.6474
+    },
+    {
+     "n": 0,
+     "relX": 0.5857,
+     "relY": 0.549
+    },
+    {
+     "n": 1,
+     "relX": 0.4147,
+     "relY": 0.4501
+    },
+    {
+     "n": 2,
+     "relX": 0.5888,
+     "relY": 0.3521
+    },
+    {
+     "n": 3,
+     "relX": 0.4147,
+     "relY": 0.2533
+    },
+    {
+     "n": 4,
+     "relX": 0.5888,
+     "relY": 0.1552
+    },
+    {
+     "n": 5,
+     "relX": 0.4115,
+     "relY": 0.0572
+    }
+   ],
+   "id": "zuvrm53eq",
+   "type": "shared",
+   "color": null,
+   "capacity": null,
+   "exclusive": false,
+   "startingHandCardIds": [],
+   "dealStackId": null,
+   "dealCount": 0,
+   "showInPlay": false
+  }
+ ],
+ "sequenceBefore": [
+  {
+   "type": "place_asset",
+   "assetName": "Henlo",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Fridgette",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Granny",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Henlo Bulwark",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 300,
+   "y": 1600
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Henlo Bulwark"
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Leben",
+   "value": 3,
+   "max": 3,
+   "x": 360,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Bewegung",
+   "value": 5,
+   "x": 580,
+   "y": 1520,
+   "base": 5
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Mumm",
+   "value": 2,
+   "x": 580,
+   "y": 1610,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Präzision",
+   "value": -1,
+   "x": 580,
+   "y": 1700,
+   "base": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Fridgette Jones",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 880,
+   "y": 1600
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Fridgette Jones"
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Leben",
+   "value": 4,
+   "max": 4,
+   "x": 700,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Bewegung",
+   "value": 5,
+   "x": 1160,
+   "y": 1520,
+   "base": 5
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Mumm",
+   "value": 2,
+   "x": 1160,
+   "y": 1610,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Präzision",
+   "value": -1,
+   "x": 1160,
+   "y": 1700,
+   "base": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Granny Melba",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 1460,
+   "y": 1600
+  },
+  {
+   "type": "place_card",
+   "cardName": "BAUERNLATZHOSE",
+   "targetZoneLabel": "Dörfler 1: Beine"
+  },
+  {
+   "type": "place_card",
+   "cardName": "ROSTIGE SICHEL",
+   "targetZoneLabel": "Dörfler 1: Hände"
+  },
+  {
+   "type": "place_card",
+   "cardName": "GEFRIERFACHTÜR",
+   "targetZoneLabel": "Dörfler 2: Hände"
+  },
+  {
+   "type": "place_card",
+   "cardName": "KÜHL-PACK",
+   "targetZoneLabel": "Dörfler 2: Brust"
+  },
+  {
+   "type": "place_card",
+   "cardName": "OMMAS GEHSTOCK",
+   "targetZoneLabel": "Dörfler 3: Hände"
+  },
+  {
+   "type": "place_card",
+   "cardName": "DAS ALTE EISEN",
+   "targetZoneLabel": "Dörfler 3: Hände"
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Granny Melba"
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Leben",
+   "value": 4,
+   "max": 4,
+   "x": 1040,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Bewegung",
+   "value": 4,
+   "x": 1740,
+   "y": 1520,
+   "base": 4
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Mumm",
+   "value": 2,
+   "x": 1740,
+   "y": 1610,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Präzision",
+   "value": -2,
+   "x": 1740,
+   "y": 1700,
+   "base": -2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Leben",
+   "targetZoneLabel": "Dörfler 1: Leben",
+   "slot": 3
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Bewegung",
+   "targetZoneLabel": "Dörfler 1: Bewegung",
+   "slot": 5
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Mumm",
+   "targetZoneLabel": "Dörfler 1: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Präzision",
+   "targetZoneLabel": "Dörfler 1: Präzision",
+   "slot": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Leben",
+   "targetZoneLabel": "Dörfler 2: Leben",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Bewegung",
+   "targetZoneLabel": "Dörfler 2: Bewegung",
+   "slot": 5
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Mumm",
+   "targetZoneLabel": "Dörfler 2: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Präzision",
+   "targetZoneLabel": "Dörfler 2: Präzision",
+   "slot": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Leben",
+   "targetZoneLabel": "Dörfler 3: Leben",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Bewegung",
+   "targetZoneLabel": "Dörfler 3: Bewegung",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Mumm",
+   "targetZoneLabel": "Dörfler 3: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Präzision",
+   "targetZoneLabel": "Dörfler 3: Präzision",
+   "slot": -2
+  }
+ ],
+ "actionsBefore": [
+  {
+   "id": "kampf-beginnen",
+   "label": "Kampf beginnen",
+   "steps": [
+    {
+     "type": "require_zone",
+     "zoneLabel": "Bösewicht-Tableau",
+     "expect": "empty",
+     "message": "Erst die Dorfphase beginnen — der vorige Kampf steht noch."
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Nachschub-Auslage",
+     "targetStackLabel": "Nachschub (Tante Emma)",
+     "faceDown": true
+    },
+    {
+     "type": "reveal_next",
+     "zoneLabel": "Bösewicht-Leiste",
+     "targetZoneLabel": "Bösewicht-Platz"
+    },
+    {
+     "type": "set_asset_face",
+     "assetName": "Sideboard",
+     "faceDown": false
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Tableau: $revealedBase",
+     "targetZoneLabel": "Bösewicht-Tableau",
+     "faceDown": true
+    },
+    {
+     "type": "build_scenario",
+     "final": "auto"
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker: Bösewicht BEW",
+     "targetZoneLabel": "Bösewicht: Bewegung",
+     "slot": "$BEW"
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker: Bösewicht LEB",
+     "targetZoneLabel": "Bösewicht: Leben",
+     "slot": "$LEB"
+    },
+    {
+     "type": "set_counter",
+     "name": "Bösewicht: Bewegung",
+     "value": "$BEW"
+    },
+    {
+     "type": "set_counter",
+     "name": "Bösewicht: Leben",
+     "value": "$LEB"
+    },
+    {
+     "type": "place_asset",
+     "assetName": "$revealed",
+     "gridLabel": "Spielfeld A–S / 1–14",
+     "cell": "$B",
+     "faceDown": false
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Henlo Bulwark",
+     "gridLabel": "Spielfeld A–S / 1–14",
+     "cell": "$D1",
+     "faceDown": false
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Fridgette Jones",
+     "gridLabel": "Spielfeld A–S / 1–14",
+     "cell": "$D2",
+     "faceDown": false
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Granny Melba",
+     "gridLabel": "Spielfeld A–S / 1–14",
+     "cell": "$D3",
+     "faceDown": false
+    },
+    {
+     "type": "set_asset_face",
+     "assetName": "Tableau: $revealedBase",
+     "faceDown": false
+    },
+    {
+     "type": "place_stack",
+     "category": "Aktionen: $revealedBase",
+     "label": "Verhaltensdeck",
+     "faceDown": true,
+     "targetZoneLabel": "Aktionen"
+    },
+    {
+     "type": "shuffle",
+     "stackLabel": "Verhaltensdeck"
+    },
+    {
+     "type": "place_card",
+     "cardName": "$SHERIFF",
+     "targetZoneLabel": "Terrain-Auslage",
+     "onlyFinal": true
+    },
+    {
+     "type": "set_asset_face",
+     "assetName": "Tableau: $revealedBase",
+     "faceDown": true,
+     "onlyFinal": true
+    }
+   ]
+  },
+  {
+   "id": "dorfphase-beginnen",
+   "label": "Dorfphase beginnen",
+   "steps": [
+    {
+     "type": "require_zone",
+     "zoneLabel": "Bösewicht-Tableau",
+     "expect": "occupied",
+     "message": "Erst einen Kampf beginnen — es gibt noch nichts abzuräumen."
+    },
+    {
+     "type": "require_counter",
+     "name": [
+      "Henlo: Leben",
+      "Fridgette: Leben",
+      "Granny: Leben"
+     ],
+     "above": 0,
+     "confirm": true,
+     "message": "Alle drei Lebenszähler stehen auf 0 — alle Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende."
+    },
+    {
+     "type": "clear_table",
+     "category": [
+      "Dorf-Ereignisse",
+      "Dorf-Ereignisse (Neue Nachbarn)"
+     ],
+     "targetStackLabel": "Dorf-Ereignisse",
+     "faceDown": true
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Bösewicht-Platz",
+     "targetZoneLabel": "Besiegte Bösewichte"
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Bösewicht-Tableau",
+     "targetZoneLabel": ""
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Terrain-Auslage"
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Ablage"
+    },
+    {
+     "type": "clear_zone",
+     "zoneLabel": "Aktionen"
+    },
+    {
+     "type": "clear_grid",
+     "gridLabel": "Spielfeld A–S / 1–14",
+     "targetZoneLabel": "Besiegte Bösewichte",
+     "pool": "Bösewichte"
+    },
+    {
+     "type": "remove_stack",
+     "stackLabel": "Verhaltensdeck"
+    },
+    {
+     "type": "clear_table",
+     "category": [
+      "Aktionen: Deputy Waggums",
+      "Aktionen: Virginia Fitz",
+      "Aktionen: The Bundits"
+     ]
+    },
+    {
+     "type": "clear_table",
+     "assetName": "Henlo Bulwark"
+    },
+    {
+     "type": "clear_table",
+     "assetName": "Fridgette Jones"
+    },
+    {
+     "type": "clear_table",
+     "assetName": "Granny Melba"
+    },
+    {
+     "type": "set_counter",
+     "name": "Bösewicht: Bewegung",
+     "value": 0
+    },
+    {
+     "type": "set_counter",
+     "name": "Bösewicht: Leben",
+     "value": 0
+    },
+    {
+     "type": "set_counter",
+     "name": "Henlo: Leben",
+     "value": "max"
+    },
+    {
+     "type": "set_counter",
+     "name": "Henlo: Bewegung",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Henlo: Mumm",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Henlo: Präzision",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Fridgette: Leben",
+     "value": "max"
+    },
+    {
+     "type": "set_counter",
+     "name": "Fridgette: Bewegung",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Fridgette: Mumm",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Fridgette: Präzision",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Granny: Leben",
+     "value": "max"
+    },
+    {
+     "type": "set_counter",
+     "name": "Granny: Bewegung",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Granny: Mumm",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Granny: Präzision",
+     "value": "base"
+    },
+    {
+     "type": "set_counter",
+     "name": "Münzen (gemeinsam)",
+     "value": "+18"
+    },
+    {
+     "type": "rotate_zone",
+     "zoneLabel": "Buyin'/Beatin'-Leiste"
+    },
+    {
+     "type": "set_asset_face",
+     "assetName": "Sideboard",
+     "faceDown": true
+    },
+    {
+     "type": "deal_to_zone",
+     "stackLabel": "Heldentaten",
+     "count": 6,
+     "targetZoneLabel": "Heldentaten-Auslage",
+     "faceDown": false,
+     "fill": true
+    },
+    {
+     "type": "deal_to_zone",
+     "stackLabel": "Nachschub (Tante Emma)",
+     "count": 10,
+     "targetZoneLabel": "Nachschub-Auslage",
+     "faceDown": false,
+     "fill": true
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 1: Leben",
+     "targetZoneLabel": "Dörfler 1: Leben",
+     "slot": 3
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 1: Bewegung",
+     "targetZoneLabel": "Dörfler 1: Bewegung",
+     "slot": 5
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 1: Mumm",
+     "targetZoneLabel": "Dörfler 1: Mumm",
+     "slot": 2
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 1: Präzision",
+     "targetZoneLabel": "Dörfler 1: Präzision",
+     "slot": -1
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 2: Leben",
+     "targetZoneLabel": "Dörfler 2: Leben",
+     "slot": 4
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 2: Bewegung",
+     "targetZoneLabel": "Dörfler 2: Bewegung",
+     "slot": 5
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 2: Mumm",
+     "targetZoneLabel": "Dörfler 2: Mumm",
+     "slot": 2
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 2: Präzision",
+     "targetZoneLabel": "Dörfler 2: Präzision",
+     "slot": -1
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 3: Leben",
+     "targetZoneLabel": "Dörfler 3: Leben",
+     "slot": 4
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 3: Bewegung",
+     "targetZoneLabel": "Dörfler 3: Bewegung",
+     "slot": 4
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 3: Mumm",
+     "targetZoneLabel": "Dörfler 3: Mumm",
+     "slot": 2
+    },
+    {
+     "type": "place_asset",
+     "assetName": "Marker 3: Präzision",
+     "targetZoneLabel": "Dörfler 3: Präzision",
+     "slot": -2
+    }
+   ]
+  }
+ ]
+}

@@ -1,20 +1,22 @@
-// BH / Spec M18 — „Angelegt" und „weggepackt": fünf Slot-Zonen je Dörfler und
-// der Vorrat darunter, für den Aufbau *TFT Kurzpartie*.
+// BH / Spec M18, umgebaut von CI / Spec M26.1 — die Ausrüstungsplätze je
+// Dörfler und der Vorrat darunter, für den Aufbau *TFT Kurzpartie*.
 //
 // Hier stehen die Zahlen **einmal** (M6): derselbe Baustein liefert die Zonen
-// für den Trockenlauf, für das Schreiben und für `server/test/
-// equipment-zones.test.js`. Begründung der Aufteilung, die Messwerte und die
-// fünf verworfenen Varianten stehen in `docs/tasks-ausruestung.md`.
+// für den Trockenlauf (`scripts/doerfler-daten.mjs`), für das Schreiben und für
+// `server/test/equipment-zones.test.js`. Begründung der Aufteilung, die
+// Messwerte und die verworfenen Varianten stehen in `docs/tasks-doerfler.md`
+// (CI) und, für den Vorrat, in `docs/tasks-ausruestung.md` (BH).
 //
-// Aufruf (im Backend-Container, wo `better-sqlite3` liegt):
+// **Seit M26 liegen die sechs Plätze an den Längsseiten des Tableaus**, auf den
+// Höhen der aufgedruckten Pfeile — nicht mehr als Streifen darunter. Der Vorrat
+// bleibt unter dem Tableau, die Zonen aus M23.2 ebenso.
 //
-//   node scripts/equipment-zones.mjs --json            # die achtzehn Zonen
-//   node scripts/equipment-zones.mjs --check <db-pfad> # Trockenlauf
-//   node scripts/equipment-zones.mjs --write <db-pfad> # eine Transaktion
+// Aufruf:
 //
-// Gelesen und geschrieben wird **nur `zone_data`**. Wer die ganze Zeile liest
-// und zurückschreibt, überschreibt `scenario_data` und `action_data` fremder
-// Aufträge.
+//   node scripts/equipment-zones.mjs --json   # die einundzwanzig Zonen
+//
+// Geschrieben wird über `scripts/doerfler-daten.mjs`: die Zonen und die
+// Schritte, die sie beim Namen nennen, ändern sich in **einer** Transaktion.
 
 export const SETUP_ID = 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b';
 
@@ -35,7 +37,7 @@ export const MEASURED_ANCHORS = DOERFLER.map((d, i) => ({
 }));
 
 /**
- * Die Grenzen des Streifens, gemessen, nicht geschätzt.
+ * Die Grenzen des Streifens unter den Tableaus, gemessen, nicht geschätzt.
  *
  * `pitch` ist der Abstand der drei Tableaus von Mitte zu Mitte — die Breite,
  * ab der eine Zone in das Feld des Nachbarn ragt.
@@ -43,6 +45,10 @@ export const MEASURED_ANCHORS = DOERFLER.map((d, i) => ({
  * `bottom` ist die Oberkante der Werkzeugleiste in Weltkoordinaten bei der
  * gespeicherten Ansicht „Dörfler" (Mitte 1149,5/1675, Zoom 0,41, Fenster
  * 932 × 738): 1675 + (637 − 369) / 0,41.
+ *
+ * Seit M26 steht darin nur noch der **Vorrat** (und, aus M23.2, die Reihe der
+ * Ablagen darunter); die beiden Reihen darüber (y 1808 … 2110) sind frei und
+ * tragen die Zähler (`COUNTER_ROW` in `doerfler-daten.mjs`).
  */
 export const BAND = {
   pitch: 580,
@@ -51,41 +57,92 @@ export const BAND = {
   card: { width: 100, height: 140 },
 };
 
+/**
+ * Die Höhen der sechs aufgedruckten Pfeile, **gemessen** (docs/doerflerdaten.md
+ * 6.2): 0 = Oberkante, 1 = Unterkante des Tableaus, bei allen neun Tableaus
+ * gleich (acht auf drei Nachkommastellen identisch, Georgies Foto ±0,007).
+ *
+ * Das dritte Paar liegt links und rechts **nicht** gleich hoch (0,844 gegen
+ * 0,826, sieben Weltpunkte). Das ist gemessen und wird nicht geglättet: ein
+ * Platz je Pfeil, mit der Höhe seines Pfeils.
+ */
+export const ARROWS = {
+  kopf: 0.154, brust: 0.491, beine: 0.844,
+  linkeHand: 0.154, rechteHand: 0.491, mitbringsel: 0.826,
+};
+
+/**
+ * Der Fangkasten eines Platzes, in Weltpunkten.
+ *
+ * **Höhe 112:** die Pfeile stehen 134,0 … 141,2 Punkte auseinander (rechts
+ * Rechte Hand → Mitbringsel: 0,335 · 400), eine Karte ist 140 hoch. Ein Schild
+ * braucht 21 Punkte über der Zone (`ZONE_LABEL_HEIGHT`); sonst setzt
+ * `zoneLabelAbove` es auf die Nachbarzone (M16.1). 134 − 21 = 113, also 112 mit
+ * einem Punkt Reserve. Die Karte (140) ragt oben und unten je 14 Punkte über die
+ * Zone hinaus — das ist die Geometrie des Tableaus: Karten und Pfeile haben
+ * dasselbe Raster nicht. Die Zone ist der Fangkasten, die Karte wird auf ihre
+ * Mitte gesetzt (`snap`).
+ *
+ * **Breite 120** (`ZONE_LABEL_WIDTH`), am Rand des Tableaus: das Schild darf
+ * nicht breiter sein als sein Fangkasten, sonst hinge es über der Lücke zum
+ * Nachbarn. Zwischen den Zonen zweier Tableaus bleiben 40 Punkte.
+ */
+export const ZONE_BOX = { width: 120, height: 112 };
+
 const ANCHOR_W = 300;
 const ANCHOR_H = 400;
-const TOP = BAND.top - 1400;        // 408 Punkte unter der Tableau-Oberkante
-const ROW_H = BAND.card.height;     // eine Karte hoch, keinen Punkt mehr
-// Luft für die Schilder der tieferen Reihen. `ZONE_LABEL_HEIGHT` ist 21;
-// ohne diese Lücke läge über Reihe B eine Zone **und** unter ihr eine, und
-// `zoneLabelAbove` setzte das Schild auf die Karten der Reihe darüber — der
-// Fehler, den M16.1 behoben hat, eine Etage tiefer.
-const GAP = 22;
+const relW = ZONE_BOX.width / ANCHOR_W;     // 0,4
+const relH = ZONE_BOX.height / ANCHOR_H;    // 0,28
+const halfH = relH / 2;
 
-const relW = BAND.pitch / ANCHOR_W;        // 1,9333… — unverändert aus AS2
-const third = relW / 3;                    // 193,33 Weltpunkte: 100 Karte + Rand
-// Die rechte Spalte endet **auf** `relW` statt auf `3 × third`: ein Drittel
-// von 1,9333… rundet nach oben, und drei davon ragten um 1e-13 Weltpunkte in
-// das Feld des Nachbarn. Zu wenig, um es zu sehen — genug, um `zoneAt` dort
-// die falsche Zone finden zu lassen.
-const lastCol = relW - 2 * third;
-const relH = ROW_H / ANCHOR_H;             // 0,35
-const rowA = TOP / ANCHOR_H;               // 1,02
-const rowB = (TOP + ROW_H + GAP) / ANCHOR_H;
+// Der Vorrat: unverändert aus BH/BV (Zeile `rowV`). `TOP` ist der Abstand der
+// Streifenoberkante zur Tableau-Oberkante, `ROW_H` die Kartenhöhe, `GAP` die
+// Luft für das Schild der tieferen Reihe (`ZONE_LABEL_HEIGHT` ist 21; ohne die
+// Lücke läge über dem Vorrat eine Zone **und** unter ihr eine, und
+// `zoneLabelAbove` setzte das Schild auf die Karten der Reihe darüber — der
+// Fehler, den M16.1 behoben hat, eine Etage tiefer).
+const TOP = BAND.top - 1400;                // 408 Punkte unter der Tableau-Oberkante
+const ROW_H = BAND.card.height;
+const GAP = 22;
+const relVW = BAND.pitch / ANCHOR_W;        // 1,9333… — unverändert aus AS2
+const relVH = ROW_H / ANCHOR_H;             // 0,35
 const rowV = (TOP + 2 * (ROW_H + GAP)) / ANCHOR_H;
 
 /**
- * Die fünf Slots, in Leserichtung: Kopf, Brust, Beine über Hände,
- * Mitbringsel. `Hände` ist **eine** Zone mit zwei Plätzen — zwei Zonen à
- * einem Platz könnten keine Zweihandwaffe aufnehmen, und Zonen dürfen
- * einander nicht überlappen (M16).
+ * Die sechs Plätze, wie das Tableau sie führt: links Head / Chest / Leg Gear,
+ * rechts Left Hand / Right Hand / Accessory, Pfeile nach außen.
+ *
+ * `relY` setzt die **Mitte** der Zone auf die Höhe des Pfeils. Die linke Zone
+ * endet auf der Tableau-Kante (`relX = −relW`), die rechte beginnt auf ihr
+ * (`relX = 1`) — die Karte liegt neben ihrem Aufdruck, nicht auf ihm.
+ *
+ * `Hände` ist seit M26 **zwei** Zonen. M18 hatte eine daraus gemacht („eine
+ * Zweihandwaffe belegt beide") — das war die Vereinfachung des Entwurfs, nicht
+ * die des Spiels: das Tableau führt Left Hand und Right Hand getrennt, auf
+ * verschiedenen Höhen. Dass eine Zweihandwaffe beide belegt, bleibt eine Regel
+ * über zwei Plätze `[DE S.9]`.
  */
 const SLOTS = [
-  { key: 'kopf', name: 'Kopf', relX: 0, relY: rowA, relWidth: third, capacity: 1 },
-  { key: 'brust', name: 'Brust', relX: third, relY: rowA, relWidth: third, capacity: 1 },
-  { key: 'beine', name: 'Beine', relX: 2 * third, relY: rowA, relWidth: lastCol, capacity: 1 },
-  { key: 'haende', name: 'Hände', relX: 0, relY: rowB, relWidth: 2 * third, capacity: 2 },
-  { key: 'mitbringsel', name: 'Mitbringsel', relX: 2 * third, relY: rowB, relWidth: lastCol, capacity: 1 },
+  { key: 'kopf', name: 'Kopf', relX: -relW, arrow: ARROWS.kopf },
+  { key: 'brust', name: 'Brust', relX: -relW, arrow: ARROWS.brust },
+  { key: 'beine', name: 'Beine', relX: -relW, arrow: ARROWS.beine },
+  { key: 'linke', name: 'Linke Hand', relX: 1, arrow: ARROWS.linkeHand },
+  { key: 'rechte', name: 'Rechte Hand', relX: 1, arrow: ARROWS.rechteHand },
+  { key: 'mitbringsel', name: 'Mitbringsel', relX: 1, arrow: ARROWS.mitbringsel },
 ];
+
+/**
+ * Der Kasten eines Zählers in Weltpunkten, am laufenden Tisch nachgemessen:
+ * gezeichnet wird mit `left: x − 70`, `top: y − 40`, und der breiteste Zähler
+ * (ein zweizeiliger Lebenszähler) ist 185 × 102 groß. **`x`/`y` sind nicht die
+ * obere linke Ecke** — der erste Entwurf hat das angenommen und die Zonen
+ * neben dem Tableau 70 Punkte zu weit links gerechnet.
+ */
+export const COUNTER_SIZE = { width: 185, height: 102, offsetX: -70, offsetY: -40 };
+export const counterBox = (c) => ({
+  x: c.x + COUNTER_SIZE.offsetX, y: c.y + COUNTER_SIZE.offsetY,
+  width: COUNTER_SIZE.width, height: COUNTER_SIZE.height,
+});
 
 /** Die IDs der drei vorhandenen Vorrats-Zonen (aus `zone_data`, AS2). */
 export const VORRAT_IDS = { 1: 'zv8uzad70', 2: 'z6glzvxld', 3: 'znbu9aao8' };
@@ -97,7 +154,8 @@ const base = (id, label, capacity, layout, color) => ({
 });
 
 /**
- * Die achtzehn Zonen: fünfzehn Slots und die drei Vorräte.
+ * Die einundzwanzig Zonen: achtzehn Plätze (sechs je Dörfler) und die drei
+ * Vorräte.
  *
  * **BV / M21.4: der Vorrat ist ein Ablagestapel ohne Obergrenze.** „Es gibt
  * keine Obergrenze, wie viel Ausrüstung ein Dörfler besitzen darf" `[BR S.8]`,
@@ -110,10 +168,11 @@ const base = (id, label, capacity, layout, color) => ({
  * erfundene Grenze. `capacity` weg heißt `zoneCapacity === null` heißt
  * `zoneRejects` sagt nie „voll" — die Regel ohne Obergrenze, ohne eine Zahl.
  *
- * Der **Kasten bleibt**, wie M18 ihn gemessen hat; geändert ist nur das
- * Layout. Die fünfzehn Slot-Zonen sind unberührt.
+ * Der **Vorrat bleibt**, wo M18 ihn gemessen hat — M26 hat ihn nicht
+ * angefasst: er ist Besitz, der nicht getragen wird (und nimmt Judys drei
+ * Gemälde auf), und er hat am Rand des Tableaus keinen Aufdruck.
  *
- * Grün für die Slots, grau für den Vorrat: bei Zoom 0,41 ist das Namensschild
+ * Grün für die Plätze, grau für den Vorrat: bei Zoom 0,41 ist das Namensschild
  * 4,5 Bildschirmpunkte hoch und damit unlesbar. Was eine angelegte Karte von
  * einer weggepackten unterscheidet, sind Rahmen, Farbe und Abstand.
  */
@@ -123,102 +182,39 @@ export function equipmentZones() {
     const anchor = (rel) => ({ assetId: d.assetId, ...rel });
     for (const s of SLOTS) {
       out.push({
-        ...base(`z${s.key}${d.n}`, `Dörfler ${d.n}: ${s.name}`, s.capacity, 'row', 'green'),
-        anchor: anchor({ relX: s.relX, relY: s.relY, relWidth: s.relWidth, relHeight: relH }),
+        ...base(`z${s.key}${d.n}`, `Dörfler ${d.n}: ${s.name}`, 1, 'row', 'green'),
+        anchor: anchor({ relX: s.relX, relY: s.arrow - halfH, relWidth: relW, relHeight: relH }),
       });
     }
     out.push({
       ...base(VORRAT_IDS[d.n], `Ausrüstung Dörfler ${d.n}`, null, 'stack', null),
-      anchor: anchor({ relX: 0, relY: rowV, relWidth: relW, relHeight: relH }),
+      anchor: anchor({ relX: 0, relY: rowV, relWidth: relVW, relHeight: relVH }),
     });
   }
   return out;
 }
 
-// ── CLI ──────────────────────────────────────────────────────────────────────
+/**
+ * Die Ids, die **dieser** Baustein früher geschrieben hat und heute nicht mehr:
+ * die Zone `Hände` mit zwei Plätzen (M18), je Dörfler eine. Beim Schreiben
+ * verschwinden sie — und nur sie; fremde Zonen bleiben.
+ */
+export const RETIRED_IDS = DOERFLER.map(d => `zhaende${d.n}`);
 
 /**
- * Der Stand, den dieser Schalter **vorfindet**: das Ergebnis von BH/M18.
- *
- * Vor M18 stand hier `{ relY: 1.02, relHeight: 0.7, capacity: 10 }` — der
- * Stand davor. Eine Vorprüfung, die gegen einen überholten Stand vergleicht,
- * beanstandet die eigene letzte Änderung; sie zieht darum mit.
+ * Die Zonenliste nach der Änderung: die einundzwanzig ersetzen ihre Vorgänger
+ * gleicher Id (an ihrer Stelle), neue kommen hinten dran, `Hände` verschwindet.
+ * Alles andere bleibt Zeichen für Zeichen, wie es war.
  */
-const CURRENT_VORRAT = { relY: 1.83, relHeight: 0.35, capacity: 5, layout: 'grid' };
-
-async function main(argv) {
-  const [mode, dbPath] = argv;
-  const zones = equipmentZones();
-
-  if (mode === '--json') {
-    console.log(JSON.stringify(zones, null, 1));
-    return 0;
-  }
-  if (mode !== '--check' && mode !== '--write') {
-    console.error('usage: equipment-zones.mjs --json | --check <db> | --write <db>');
-    return 2;
-  }
-
-  const { default: Database } = await import('better-sqlite3');
-  const db = new Database(dbPath, { readonly: mode === '--check' });
-  const read = () => JSON.parse(db.prepare('select zone_data from setups where id = ?').get(SETUP_ID).zone_data);
-  const current = read();
-  const complaints = [];
-
-  // 45 seit BH/M18: die fünfzehn Slot-Zonen kamen zu den dreißig hinzu. Vor
-  // M18 stand hier 30 — dieselbe Falle wie bei CURRENT_VORRAT.
-  if (current.length !== 45) complaints.push(`erwartet 45 Zonen, gefunden ${current.length}`);
-  for (const d of DOERFLER) {
-    const z = current.find(q => q.id === VORRAT_IDS[d.n]);
-    if (!z) { complaints.push(`Vorrat ${d.n} (${VORRAT_IDS[d.n]}) fehlt`); continue; }
-    if (z.anchor?.assetId !== d.assetId) complaints.push(`Vorrat ${d.n}: fremder Anker`);
-    if (z.anchor?.relY !== CURRENT_VORRAT.relY) complaints.push(`Vorrat ${d.n}: relY ${z.anchor?.relY}`);
-    if (z.anchor?.relHeight !== CURRENT_VORRAT.relHeight) complaints.push(`Vorrat ${d.n}: relHeight ${z.anchor?.relHeight}`);
-    if (z.capacity !== CURRENT_VORRAT.capacity) complaints.push(`Vorrat ${d.n}: capacity ${z.capacity}`);
-    if (z.layout !== CURRENT_VORRAT.layout) complaints.push(`Vorrat ${d.n}: layout ${z.layout}`);
-  }
-  // BV: die fünfzehn Slot-Zonen sind seit M18 **vorhanden**, und dieser Lauf
-  // schreibt sie unverändert zurück. Vor M18 stand hier die umgekehrte
-  // Prüfung („ID ist schon vergeben"); sie träfe jetzt jede der fünfzehn.
-  const byId = new Map(current.map(z => [z.id, z]));
-  for (const z of zones) {
-    if (Object.values(VORRAT_IDS).includes(z.id)) continue;
-    const have = byId.get(z.id);
-    if (!have) { complaints.push(`Slot-Zone ${z.id} ("${z.label}") fehlt`); continue; }
-    if (have.label !== z.label) complaints.push(`${z.id}: Name "${have.label}" statt "${z.label}"`);
-    if (JSON.stringify(have) !== JSON.stringify(z)) complaints.push(`${z.id} ("${z.label}") weicht ab`);
-  }
-  if (new Set(current.map(z => z.label)).size !== current.length) {
-    complaints.push('zwei Zonen tragen denselben Namen');
-  }
-
-  console.log(`${mode === '--check' ? 'Trockenlauf' : 'Vorprüfung'}: ${complaints.length} Beanstandungen`);
-  for (const c of complaints) console.log('  - ' + c);
-  if (complaints.length) return 1;
-  if (mode === '--check') return 0;
-
-  const replace = new Map(zones.map(z => [z.id, z]));
-  const next = current.map(z => replace.get(z.id) || z);
-  for (const z of zones) if (!current.some(c => c.id === z.id)) next.push(z);
-
-  db.transaction(() => {
-    db.prepare('update setups set zone_data = ? where id = ?').run(JSON.stringify(next), SETUP_ID);
-  })();
-
-  const after = read();
-  console.log(`geschrieben: ${after.length} Zonen`);
-  for (const d of DOERFLER) {
-    const z = after.find(q => q.id === VORRAT_IDS[d.n]);
-    console.log(`  Vorrat ${d.n}: relY ${z.anchor.relY} relHeight ${z.anchor.relHeight} layout ${z.layout} capacity ${JSON.stringify(z.capacity)}`);
-  }
-  const slots = after.filter(z => /: (Kopf|Brust|Beine|Hände|Mitbringsel)$/.test(z.label));
-  console.log(`  Slot-Zonen: ${slots.length}, davon layout row: ${slots.filter(z => z.layout === 'row').length}`);
-  const untouched = current.filter(c => !replace.has(c.id));
-  const same = untouched.every(c => JSON.stringify(c) === JSON.stringify(after.find(a => a.id === c.id)));
-  console.log(`  unberührt: ${untouched.length} Zonen, unverändert: ${same}`);
-  return 0;
+export function patchZones(zones) {
+  const list = Array.isArray(zones) ? zones : [];
+  const neu = new Map(equipmentZones().map(z => [z.id, z]));
+  const kept = list.filter(z => !RETIRED_IDS.includes(z?.id)).map(z => neu.get(z?.id) || z);
+  const present = new Set(list.map(z => z?.id));
+  return [...kept, ...[...neu.values()].filter(z => !present.has(z.id))];
 }
 
 if (process.argv[1] && process.argv[1].endsWith('equipment-zones.mjs')) {
-  main(process.argv.slice(2)).then(code => { process.exitCode = code; });
+  if (process.argv[2] === '--json') console.log(JSON.stringify(equipmentZones(), null, 1));
+  else { console.error('usage: equipment-zones.mjs --json  (geschrieben wird über doerfler-daten.mjs)'); process.exitCode = 2; }
 }

@@ -24,6 +24,8 @@ import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement, closesMenu } from '../utils/menuPlacement.js';
 import { revealZones, revealPlan } from '../utils/revealToZone.js';
+import { swapChoices, swapAction } from '../utils/swapVillager.js';
+import { hasVillagers } from '../../../shared/villagers.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
 import { escapeTarget } from '../utils/escapeLayers.js';
 import { getCardDims } from '../utils/cardDims.js';
@@ -945,13 +947,20 @@ export default function GameTable({ room = null }) {
   }, [id]);
 
   // Fetch table assets for the sequence editor (pools = their categories)
+  //
+  // M26.2: und fuer das Tausch-Menue am Tableau. `swapChoices` ordnet ein Token
+  // ueber die **Asset-Id** seinem Platz zu (`seat.anchor` ist ein Assetname), und
+  // am Tisch standen die Assets bisher nicht im Zustand - nur im Setup-Editor.
+  // Geladen wird nur, wo es etwas zu tauschen gibt: ein Setup ohne Doerferdaten
+  // (der Grundaufbau) bleibt bei einer Abfrage weniger.
+  const hasVillagerData = hasVillagers(scenarioData?.villagers);
   useEffect(() => {
-    if (!id || !setupMode) return;
+    if (!id || !(setupMode || hasVillagerData)) return;
     apiFetch(`/api/games/${id}/table-assets`)
       .then(r => (r.ok ? r.json() : []))
       .then(setTableAssets)
       .catch(() => {});
-  }, [id, setupMode]);
+  }, [id, setupMode, hasVillagerData]);
 
   // Fetch card backs for the game
   useEffect(() => {
@@ -3637,6 +3646,11 @@ export default function GameTable({ room = null }) {
         offGrid: t.offGrid || false,
         // set by the setup sequence's asset steps (place_asset / draw_assets)
         assetId: t.assetId || null,
+        // M26.2: der Platz, den dieses Tableau von einem getauschten Doerfler
+        // uebernommen hat. Die Zonen des Platzes haengen an der Asset-Id des
+        // Tableaus, das dort zuerst lag; ohne dieses Feld in **beiden**
+        // Feldlisten wuerden sie nach dem Speichern `anchorMissing`.
+        anchorId: t.anchorId || null,
         faceDown: t.faceDown || false,
         frontImageUrl: t.frontImageUrl || null,
         backImageUrl: t.backImageUrl || null,
@@ -4286,6 +4300,8 @@ export default function GameTable({ room = null }) {
         // im Moment des Zugs.
         offGrid: t.offGrid || false,
         assetId: t.assetId || null,
+        // M26.2: siehe `getGameState` - die zweite der zwei Feldlisten.
+        anchorId: t.anchorId || null,
         faceDown: t.faceDown || false,
         frontImageUrl: t.frontImageUrl || null,
         backImageUrl: t.backImageUrl || null,
@@ -8394,6 +8410,41 @@ export default function GameTable({ room = null }) {
                     Enlarge
                   </button>
                 )}
+                {/* M26.2: einen Doerfler gegen einen anderen tauschen. Nur am
+                    Tableau eines Platzes und nur, wo das Setup Doerferdaten
+                    hat - `swapChoices` antwortet sonst `null`, und ein Eintrag,
+                    der nichts tut, ist der Fehler aus
+                    docs/audit-dead-controls.md. Das Menue rechnet nichts: es
+                    schreibt eine Aktion (Wache ueber den Kampf, Wache ueber
+                    erspielte Werte, Tausch), und `runSetupAction` fuehrt sie
+                    aus - mit derselben Rueckfrage wie jede Aktion des Aufbaus.
+                    Im Raum nicht: er fuehrt die Aufbausequenz aus, keine
+                    Aktionen (docs/tasks-doerfler.md). */}
+                {contextMenu.objType === 'token' && !room && (() => {
+                  const swap = swapChoices(scenarioData?.villagers, tokens, tableAssets, contextMenu.objId);
+                  if (!swap || !swap.choices.length) return null;
+                  return (
+                    <>
+                      <div className="px-3 pt-2 pb-1 sm:text-[10px] text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                        Swap villager
+                      </div>
+                      {swap.choices.map(name => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            setContextMenu(null);
+                            runSetupAction(swapAction(scenarioData.villagers, swap.seat, swap.current, name));
+                          }}
+                          disabled={runningActionId !== null}
+                          data-testid={`context-swap-villager-${name}`}
+                          className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-50 transition-colors"
+                        >
+                          {'\u{1F501} '}{name}
+                        </button>
+                      ))}
+                    </>
+                  );
+                })()}
                 {/* M11.4: Maximum und Ausgangswert eines Zaehlers aendern. Sie
                     stehen nicht am Widget selbst - das traegt schon Name, Wert
                     und zwei 44-px-Knoepfe, und zwei weitere Eingabefelder

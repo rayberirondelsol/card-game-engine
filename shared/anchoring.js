@@ -39,15 +39,21 @@ const num = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) ? 
  * has.
  *
  * `id` is the table_assets id: tokens carry it in `assetId` (set by the asset
- * steps), imported boards use it as their own id. A token drawn by hand has
- * neither – only a uuid that is new on every table – so it cannot be named by
- * a saved anchor and is not offered as one. Boards are told apart by having a
+ * steps), imported boards use it as their own id. A token that took over
+ * another one's place carries that place in `anchorId`, and it wins (M26).
+ * A token drawn by hand has none of them – only a uuid that is new on every
+ * table – so it cannot be named by a saved anchor and is not offered as one. Boards are told apart by having a
  * width and a height; a hand-drawn token has neither.
  */
 export function assetBox(obj) {
   if (typeof obj?.x !== 'number' || typeof obj?.y !== 'number') return null;
   const sized = Number.isFinite(obj.width) && Number.isFinite(obj.height);
-  const id = obj.assetId || (sized ? obj.id : null);
+  // M26: ein getauschtes Tableau trägt `anchorId` – die Id des **Platzes**, den es
+  // übernommen hat. Die Zonen hängen an der Asset-Id des Tableaus, das dort
+  // zuerst lag (`98e26309…` für Henlo), und ein anderes Tableau hat eine andere.
+  // Ohne diese Zeile würden alle Zonen des Platzes `anchorMissing`. Ein Token
+  // ohne das Feld verhält sich wie bisher.
+  const id = obj.anchorId || obj.assetId || (sized ? obj.id : null);
   if (!id) return null;
   const width = num(obj.width, num(obj.size, 60));
   const height = num(obj.height, num(obj.size, 60));

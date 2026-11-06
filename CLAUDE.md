@@ -103,6 +103,19 @@ liefern. Ein Objekt merkt sich `gridId` + `cell` (`C7`), nicht nur Koordinaten;
 `placeOnGrids` setzt es beim Laden wieder auf sein Feld. Zonenplätze schlagen
 das Raster darunter (`snapInto`). Raster liegen in `setups.grid_data`.
 
+**Dörfler (M26):** `docs/tasks-doerfler.md` (Aufgaben CI–CN, mit „Wo die Spec nicht
+stimmt"). Die sechs Ausrüstungsplätze liegen **am Rand des Tableaus** (nicht mehr
+darunter), Linke und Rechte Hand getrennt. Einen Dörfler tauscht
+`swap_villager { seat, villager }` (`shared/sequenceExecutor.js`; alles oder nichts, durch
+dieselben Handler wie der Aufbau), ausgelöst über das Kontextmenü am Tableau
+(`client/src/utils/swapVillager.js` → `runSetupAction`). Die Daten der neun Dörfler
+stehen in `setups.scenario_data.villagers` und werden aus `scripts/doerfler-daten.mjs`
+geschrieben; `shared/villagers.js` beantwortet „wer sitzt wo" **aus dem Tisch**
+(Tableau-Token), nicht aus einem Gedächtnis. Zwei Dinge, die nicht auffallen: ein
+getauschtes Tableau trägt `anchorId` (die Asset-Id des Platzes — **die Zonen hängen an
+ihr**; das Feld gehört in beide Token-Feldlisten von `GameTable.jsx`), und die Aktionen
+nennen die Dörfler als Platzhalter (`$V1`, `$F1`, `$V1LEB`), nicht beim Namen.
+
 ## Produktionsdaten
 
 Wer an den echten Spieldaten arbeitet: **`docs/datenzugriff.md`** — zwei geprüfte

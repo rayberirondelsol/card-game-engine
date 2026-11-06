@@ -27,8 +27,9 @@ import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
-import { normalizeCounter, counterValue } from './counters.js';
+import { normalizeCounter, counterValue, counterMax } from './counters.js';
 import { findCardByName } from './cardSearch.js';
+import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -83,7 +84,16 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // hat (`final: auto` folgt `revealedLast`, `true`/`false` überstimmen es).
   // `null` heißt „noch keine getroffen" - dann gilt der Platz der Leiste
   // (M20.1).
-  const ctx = { vars: {}, revealedLast: false, halted: false, finalFight: null };
+  //
+  // `seatVars` ist das fünfte und steht **neben** `vars`, nicht darin (M26.2/CL):
+  // die Dörfler am Tisch (`$V1`, `$F1`, `$V1LEB` …). `reveal_next` setzt `vars`
+  // bei jedem Aufdecken auf `{}` zurück - die Dörfler dürfen dabei nicht
+  // verschwinden. Gebunden wird aus dem Zustand, den der Lauf **vorfindet**; nach
+  // einem `swap_villager` neu.
+  const ctx = {
+    vars: {}, seatVars: seatVars(state, assets, scenarioData?.villagers),
+    revealedLast: false, halted: false, finalFight: null,
+  };
 
   for (let index = 0; index < sequenceData.length; index++) {
     const step = sequenceData[index];
@@ -142,7 +152,7 @@ function stepTarget(step) {
   const category = Array.isArray(step?.category) ? step.category.join(' + ') : step?.category;
   // M19.5/BM: `name` kann seither ebenfalls eine Liste sein (require_counter).
   const name = Array.isArray(step?.name) ? step.name.join(' + ') : step?.name;
-  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? category ?? step?.label ?? name ?? null;
+  return step?.assetName ?? step?.cardName ?? step?.pool ?? step?.stackLabel ?? step?.zoneLabel ?? step?.targetZoneLabel ?? step?.gridLabel ?? category ?? step?.label ?? name ?? step?.villager ?? null;
 }
 
 /** Build a label→stack map from stateData.stacks (rebuilt before every step) */
@@ -554,6 +564,148 @@ function fullZones(usable, free, kind) {
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
+/**
+ * M26.2: der Tausch. Gibt `{ skip }` (nichts getan, Voraussetzung fehlt),
+ * `{ fail }` (gelaufen, aber nicht gelungen) oder `{ state, notes }` zurueck.
+ *
+ * **Alles oder nichts.** Der Schritt arbeitet an einer Kopie und gibt sie nur
+ * zurueck, wenn jedes Teilstueck gelungen ist - wie `build_scenario`: ein halb
+ * getauschter Doerfler ist schlimmer als keiner, weil man den leeren Platz sieht
+ * und den halben nicht.
+ *
+ * **Hin und weg laufen durch dieselben Handler wie ein Aufbau** (`place_asset`,
+ * `place_counter`, `place_card`). Eine zweite Lesart des Legens daneben waere
+ * eine zweite Antwort darauf, wo ein Marker auf dem Startwert 4 liegt oder wie
+ * eine Karte in einen Platz kommt (M6). Neu ist nur, was der Aufbau nicht
+ * kennt: **was** vom alten Doerfler weggeht und **wohin** das Neue kommt - an die
+ * Stelle des Alten, nicht an eine eigene Koordinate.
+ *
+ * Weg geht, was an ihm haengt und in den Daten benannt ist: sein Tableau, sein
+ * Spielstein, seine Figur, seine vier Zaehler und die Karten seiner
+ * Startausruestung. **Nicht**, was er dazugekauft hat - es steht in keinen Daten,
+ * und der Tisch wuerde raten, wem es danach gehoert.
+ */
+function swapVillager(state, step, allZones, allGrids, assets, cards, scenarioData, rng) {
+  const villagers = scenarioData?.villagers;
+  if (!hasVillagers(villagers)) return { skip: 'no villager data in the scenario data' };
+
+  const n = Number(step.seat);
+  if (step.seat === '' || step.seat === null || !Number.isInteger(n) || n < 1 || n > villagers.seats.length) {
+    return { skip: `no seat "${step.seat ?? ''}"` };
+  }
+  const wanted = findVillager(villagers, step.villager);
+  if (!wanted) return { skip: `"${step.villager ?? ''}" is not in the roster` };
+
+  const seated = seatedVillagers(state, assets, villagers);
+  const here = seated.find(s => s.n === n);
+  if (!here) return { skip: `nobody sits at seat ${n}` };
+  if (!here.data) return { skip: `seat ${n} holds "${here.name ?? '?'}", who is not in the roster` };
+  if (here.data.name === wanted.name) return { skip: `"${wanted.name}" already sits at seat ${n}` };
+  // Zwei Henlos gibt es nicht: wer schon an einem anderen Platz sitzt, wird nicht
+  // ein zweites Mal hingesetzt.
+  const elsewhere = seated.find(s => s.data?.name === wanted.name);
+  if (elsewhere) return { skip: `"${wanted.name}" already sits at seat ${elsewhere.n}` };
+
+  const seat = villagers.seats[n - 1];
+  const old = here.data;
+  const work = JSON.parse(JSON.stringify(state));
+  const oldTableau = seatedVillagers(work, assets, villagers).find(s => s.n === n).token;
+
+  // Der Platzhalter-Kontext der Teilschritte ist leer: sie tragen ihre Namen
+  // ausgeschrieben.
+  const problems = [];
+  const notes = [];
+  const sub = (s) => {
+    const e = { status: 'ok', reason: null };
+    try {
+      applyStep(work, s, allZones, allGrids, assets, cards, scenarioData, rng, e, { vars: {}, seatVars: {} });
+    } catch (err) {
+      e.status = 'failed';
+      e.reason = err.message;
+    }
+    return e;
+  };
+  const isAsset = (t, name) => {
+    const a = findAsset(assets, name);
+    return Boolean(a) && String(t.assetId) === String(a.id);
+  };
+
+  // ── weg ──
+  const stones = work.tokens.filter(t => isAsset(t, old.short));
+  const figures = work.tokens.filter(t => isAsset(t, old.name));
+  const oldCounters = STATS.map(st => ({
+    st, c: work.counters.find(c => norm(c.name) === norm(counterName(old, st.key))),
+  }));
+  const gone = new Set(gearCards(cards, old).map(c => String(c.id)));
+  work.tokens = work.tokens.filter(t => t !== oldTableau && !stones.includes(t) && !figures.includes(t));
+  work.counters = work.counters.filter(c => !oldCounters.some(o => o.c === c));
+  work.cards = work.cards.filter(c => !gone.has(String(c.cardId)));
+
+  // ── hin ──
+  // Das Tableau zuerst, und mit `anchorId`: die Zonen des Platzes finden es erst
+  // damit wieder, und Marker und Karten zielen auf diese Zonen.
+  const tableauName = `${TABLEAU_PREFIX}${wanted.name}`;
+  const placed = sub({
+    type: 'place_asset', assetName: tableauName, x: oldTableau.x, y: oldTableau.y,
+    rotation: oldTableau.rotation || 0, faceDown: false,
+  });
+  if (placed.status !== 'ok') return { fail: `${tableauName}: ${placed.reason}` };
+  const tableau = findPlaced(work, findAsset(assets, tableauName), tableauName);
+  tableau.anchorId = oldTableau.anchorId || oldTableau.assetId;
+  tableau.locked = oldTableau.locked === true;
+
+  if (stones.length) {
+    const e = sub({
+      type: 'place_asset', assetName: wanted.short, x: stones[0].x, y: stones[0].y,
+      rotation: stones[0].rotation || 0, faceDown: false,
+    });
+    if (e.status !== 'ok') problems.push(`${wanted.short}: ${e.reason}`);
+  } else {
+    notes.push(`no "${old.short}" on the table, so none was put down for "${wanted.short}"`);
+  }
+
+  for (const { st, c } of oldCounters) {
+    const value = wanted.start?.[st.key];
+    if (!Number.isFinite(value)) { problems.push(`${wanted.name}: no start value for ${st.key}`); continue; }
+    if (!c) { notes.push(`no counter "${counterName(old, st.key)}" to take the place of "${counterName(wanted, st.key)}"`); continue; }
+    // Leben traegt sein Maximum (= Startwert), die anderen drei ihren Ausgangswert.
+    const e = sub({
+      type: 'place_counter', name: counterName(wanted, st.key), value,
+      ...(st.life ? { max: value } : { base: value }), x: c.x, y: c.y,
+    });
+    if (e.status !== 'ok') { problems.push(`${counterName(wanted, st.key)}: ${e.reason}`); continue; }
+    work.counters.find(k => k.name === counterName(wanted, st.key)).locked = c.locked === true;
+  }
+
+  for (const st of STATS) {
+    const e = sub({
+      type: 'place_asset', assetName: `${seat.markers}: ${st.key}`,
+      targetZoneLabel: `${seat.zones}: ${st.key}`, slot: wanted.start?.[st.key],
+    });
+    if (e.status !== 'ok') problems.push(`${seat.markers}: ${st.key}: ${e.reason}`);
+  }
+
+  for (const g of wanted.gear || []) {
+    const target = g.slot ? `${seat.zones}: ${g.slot}` : seat.vorrat;
+    let e = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: target });
+    // Liegt dort schon etwas (ein Kauf, den der Spieler angelegt hat), geht die
+    // Karte in den Vorrat - und der Tausch **sagt es**. Eine andere Ursache (die
+    // Zone gibt es nicht) ist ein Fehler in den Daten und wird nicht zugedeckt.
+    if (e.status !== 'ok' && g.slot && /is full/.test(e.reason || '')) {
+      const again = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: seat.vorrat });
+      if (again.status === 'ok') {
+        notes.push(`${g.card}: "${target}" is taken, put into "${seat.vorrat}"`);
+        e = again;
+      }
+    }
+    if (e.status !== 'ok') problems.push(`${g.card}: ${e.reason}`);
+  }
+
+  if (problems.length) return { fail: problems.join('; ') };
+  if (wanted.unverified) notes.push(`"${wanted.name}": ${wanted.unverified}`);
+  return { state: work, notes };
+}
+
 function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData, rng, entry, ctx = {}) {
   if (!state.stacks) state.stacks = [];
   if (!state.cards) state.cards = [];
@@ -613,7 +765,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     const filled = parts.map(part => {
       if (!hasPlaceholder(part)) return part;
       return part.replace(PLACEHOLDER, (m) => {
-        const value = ctx.vars[m.slice(1)];
+        const value = ctx.vars[m.slice(1)] ?? ctx.seatVars?.[m.slice(1)];
         if (value === undefined) { missing = missing || m; missingIn = missingIn ?? part; return m; }
         return value;
       });
@@ -713,10 +865,32 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       const missing = names.filter((n, i) => !found[i]);
       if (missing.length) return halt(`no counter named ${missing.map(n => `"${n}"`).join(', ')}`);
 
-      if (found.some(c => Number(c.value) > above)) return state;
+      // M26.2/CM: die zweite Lesart derselben Wache - **jeder** genannte Zaehler
+      // steht auf seinem Ausgangswert. Gefragt ist "hat dieser Doerfler schon
+      // gespielt?", und die Antwort steht an den Zaehlern: ein Tausch in Runde 3
+      // loeschte erspielte Werte. Der Ausgangswert ist `base`, sonst `max`
+      // (Leben traegt nur das Maximum, Regel "Maximales LEBEN"); ein Zaehler ohne
+      // beides hat keinen, und was sich nicht pruefen laesst, gilt nicht als
+      // erfuellt. `above` bleibt bei `atStart` unbeachtet - es ist die andere
+      // Lesart.
+      const atStart = step.atStart === true || step.atStart === 'true';
+      let stand;
+      let fallback;
+      if (atStart) {
+        const starts = found.map(c => counterMax(c.base) ?? counterMax(c.max));
+        const unknown = found.filter((c, i) => starts[i] === undefined);
+        if (unknown.length) return halt(`no starting value: ${unknown.map(c => `"${c.name}"`).join(', ')}`);
+        const off = found.map((c, i) => ({ c, start: starts[i] })).filter(({ c, start }) => Number(c.value) !== start);
+        if (!off.length) return state;
+        stand = off.map(({ c, start }) => `${c.name}: ${c.value}, started at ${start}`).join('; ');
+        fallback = 'a counter has left its starting value';
+      } else {
+        if (found.some(c => Number(c.value) > above)) return state;
+        stand = found.map(c => `${c.name}: ${c.value}`).join(', ');
+        fallback = `no counter above ${above}`;
+      }
 
-      const stand = found.map(c => `${c.name}: ${c.value}`).join(', ');
-      if (!step.message) return halt(`no counter above ${above} [${stand}]`);
+      if (!step.message) return halt(`${fallback} [${stand}]`);
       // K2: der Satz, der fuer den Spieler geschrieben ist, steht fuer sich;
       // `reason` bleibt die Diagnose und geht ins Protokoll.
       entry.message = step.message;
@@ -1883,6 +2057,24 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (!obj) return skip(`"${step.assetName}" is not on the table`);
       obj.locked = step.type === 'lock_asset';
       return state;
+    }
+
+    // M26.2: einen Doerfler gegen einen anderen tauschen. Alles Rechnen steht in
+    // `swapVillager` oben; hier nur, was ein Schritt dem Protokoll schuldet.
+    //
+    // Gibt der Schritt einen Zustand zurueck, ist es die **Kopie**, an der er
+    // gearbeitet hat - `skip`/`fail` geben den unberuehrten zurueck (alles oder
+    // nichts). Ein Hinweis (`note`) heisst: getauscht, aber der Spieler sollte
+    // etwas wissen - Georgies ungepruefte Werte, eine Karte, die in den Vorrat
+    // gehen musste.
+    case 'swap_villager': {
+      const r = swapVillager(state, step, allZones, allGrids, assets, cards, scenarioData, rng);
+      if (r.skip) return skip(r.skip);
+      if (r.fail) return fail(r.fail);
+      // Wer jetzt wo sitzt, hat sich geaendert; die Schritte dahinter sehen es.
+      ctx.seatVars = seatVars(r.state, assets, scenarioData?.villagers);
+      if (r.notes.length) { entry.status = 'note'; entry.reason = r.notes.join('; '); }
+      return r.state;
     }
 
     case 'move': {

@@ -383,6 +383,34 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     // eine andere Zahl ist dieselbe Frage mit anderem Mass.
     above: () => field('Above', number(step.above, 0, undefined, n => set({ above: n }))),
 
+    // M26.2/CM: die zweite Lesart der Wache - alle genannten Zaehler stehen auf
+    // ihrem Ausgangswert. Mit dem Haekchen entfaellt `Above` (stepFields).
+    atStart: () => field('At start value',
+      <input
+        type="checkbox"
+        checked={!!step.atStart}
+        onChange={e => set({ atStart: e.target.checked })}
+        className="accent-emerald-400"
+        data-testid={`step-${index}-at-start`}
+      />),
+
+    // M26.2/CM: der Platz eines Doerflers - eine Nummer ab 1, wie die Zonen sie
+    // fuehren (`Doerfler 1: Kopf`).
+    seat: () => field('Seat', number(step.seat, 1, 1, n => set({ seat: n }))),
+
+    // M26.2/CM: der volle Name aus den Doerferdaten des Setups. Ein Textfeld, kein
+    // Auswahlfeld: der Editor kennt die Szenariodaten nicht, und ein Name, den es
+    // nicht gibt, meldet der Executor am Tisch.
+    villager: () => field('Villager',
+      <input
+        type="text"
+        value={step.villager || ''}
+        onChange={e => set({ villager: e.target.value })}
+        placeholder="e.g. Judy Marks"
+        className={`flex-1 ${INPUT}`}
+        data-testid={`step-${index}-villager`}
+      />),
+
     // M19.5/BM: fragen statt sperren. Eine Wache ueber einem handgefuehrten
     // Zaehler soll den Spieler entscheiden lassen - er weiss, wie die Partie
     // steht, der Tisch nicht.

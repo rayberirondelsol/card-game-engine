@@ -29,6 +29,12 @@ Spiel `072123c0-cd97-4ffb-a330-369630fab93f`. Quellen: `table_assets`
    50 × 50); der `max` eines Lebenszählers ist der **Startwert**, nicht das
    Spaltenende.
 
+   > **Berichtigung vom 2026-11-06 (M26, `docs/tasks-doerfler.md`, „Wo die Spec
+   > nicht stimmt", 2):** die 50 × 50-Figur wird **doch** benutzt — nicht von
+   > `sequence_data`, aber von den Aktionen *Kampf beginnen* (Schritte 12–14, auf
+   > das Spielfeld) und *Dorfphase beginnen* (Schritte 12–14, wieder weg). Die
+   > Aussage „in keinem Aufbau benutzt" in 0 und 7 gilt nur für die Sequenz.
+
 ---
 
 ## 1. Methode
@@ -467,6 +473,12 @@ Kurznamen; *TFT Basis-Aufbau* keinen. **Für M26.2 ist der Spielstein
 (Kurzname) maßgeblich**, weil das der ist, der heute gelegt und getauscht wird;
 die 50 × 50-Figuren sind ungenutzt und gehören nicht zur Aufgabe, solange niemand
 entscheidet, sie zu verwenden.
+
+> **Berichtigung (M26):** das stimmt nicht. Die **Aktionen** der Kurzpartie
+> (*Kampf beginnen* 12–14, *Dorfphase beginnen* 12–14) setzen und räumen die
+> 50 × 50-Figur auf dem Spielfeld; der 46 × 46-Spielstein liegt auf der
+> *Buyin'/Beatin'-Leiste*. Beide gehören zu einem Dörfler, und ein Tausch ersetzt
+> beide.
 
 **Marker auf den Leisten** heißen nach der **Position**, nicht nach dem Dörfler:
 `Marker 1: Leben` … `Marker 3: Präzision` (zwölf Assets, 22 × 22, nur für die
