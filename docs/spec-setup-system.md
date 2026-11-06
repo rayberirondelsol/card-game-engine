@@ -5565,3 +5565,115 @@ Satz, der zählt — *das Plättchen liegt offen* — steht nirgends.
 1. Liegt das nächste Plättchen offen, baut „Kampf beginnen" entweder den Kampf
    auf — oder es hält an und sagt **in einem Satz**, warum.
 2. In keinem Fall stehen vierzehn Folgefehler im Protokoll.
+
+
+## M26 — Die Ausrüstungsplätze gehören neben das Tableau, und Dörfler sollen tauschbar sein
+
+Zwei Wünsche des Auftraggebers vom 2026-11-06. Der zweite korrigiert eine
+Entscheidung aus M18, und zwar mit einem Beleg, den damals niemand angesehen
+hat: **dem Aufdruck des Dörfler-Tableaus selbst.**
+
+### M26.1 — Die sechs Plätze stehen auf dem Tableau angeschrieben
+
+**Befund, belegt am Bild von `Tableau: Henlo Bulwark` (1748 × 2327).** Beide
+Längsseiten tragen Beschriftungen mit **nach außen zeigenden Pfeilen**:
+
+| linker Rand (Pfeil nach links) | rechter Rand (Pfeil nach rechts) |
+|---|---|
+| **Head Gear** | **Left Hand** |
+| **Chest Gear** | **Right Hand** |
+| **Leg Gear** | **Accessory** |
+
+Je drei, paarweise auf gleicher Höhe. Das ist genau die Stelle, an die man im
+echten Spiel die Ausrüstungskarte legt, und es deckt sich mit den sechs Slots
+der Regel: Kopf, Brust, Beine, Linke Hand, Rechte Hand, Mitbringsel
+(`[DE S.7]`).
+
+**M18 hat zwei Dinge falsch entschieden, und beide Begründungen waren verkehrt
+herum:**
+
+1. **„Slots aufs Tableau verdeckt den Aufdruck" — der Aufdruck *zeigt* die
+   Plätze.** Heute liegen die Zonen als Streifen **unter** dem Tableau
+   (`relY: 1.02` und `1.425`), also dort, wo auf dem echten Tableau nichts
+   steht.
+2. **„Die beiden Handslots werden eine Zone mit zwei Plätzen."** Das Tableau
+   führt **Left Hand und Right Hand getrennt**, auf verschiedenen Höhen. Die
+   Vereinfachung war meine, nicht die des Spiels.
+
+Dass eine **Zweihandwaffe beide Handslots belegt** `[DE S.9]`, bleibt wahr —
+aber das ist eine Regel über zwei Plätze, kein Grund, einen daraus zu machen.
+
+**Änderung.** Sechs Zonen je Dörfler, drei links und drei rechts vom Tableau,
+auf den Höhen der aufgedruckten Pfeile, je ein Platz.
+
+**Zu messen, bevor gebaut wird:**
+- Die **Höhen der sechs Pfeile** am Bild, als relative Werte.
+- Ob der Platz reicht. Die Tableaus stehen **580 Weltpunkte Mitte-zu-Mitte**
+  und sind **300** breit — zwischen zweien liegen also 280, und dort treffen
+  sich die rechten Plätze des einen und die linken des anderen. Eine Karte ist
+  100 breit. **Rechne das nach**: M18 hat „neben dem Tableau sind nur 60 Punkte
+  frei" gemessen und daraus den Streifen abgeleitet; diese Zahl passt nicht zu
+  580 − 300. Eine der beiden stimmt nicht.
+- Was mit dem **Vorrat** geschieht (heute ein Stapel unter dem Tableau, M21.4)
+  und mit den **zwei Ablagezonen** aus M23.2. Die Plätze gehen weg vom Streifen
+  — **wird der Streifen dadurch frei, oder brauchen die anderen ihn weiter?**
+
+**Abnahme.**
+1. Jeder Dörfler hat sechs Zonen auf den Höhen seiner Aufdrucke, drei links,
+   drei rechts; keine überlappt eine andere oder ein Nachbartableau.
+2. `Linke Hand` und `Rechte Hand` sind getrennt, je ein Platz.
+3. Bei Spielzoom (um 40 %) ist zu sehen, welche Karte zu welchem Aufdruck
+   gehört.
+4. Die Startausrüstung landet beim Aufbau in den richtigen der sechs.
+
+### M26.2 — Einen Dörfler austauschen, nachdem der Aufbau gelaufen ist
+
+**Wunsch.** Nach dem Einstieg über ein Setup (etwa die Kurzpartie) soll sich ein
+Dörfler gegen einen anderen tauschen lassen — **und alles mitziehen, was an ihm
+hängt**: Tableau, Figur, die vier Wertemarker und die Startausrüstung.
+
+Heute stellt die Kurzpartie Henlo Bulwark, Fridgette Jones und Granny Melba
+fest. In der Bibliothek stehen **neun** Dörfler-Tableaus und neun Figuren.
+
+**Was an einem Dörfler hängt:**
+
+| Stück | heute |
+|---|---|
+| Tableau | `Tableau: <Name>`, 300 × 400 |
+| Figur | rundes Token, 46 × 46 |
+| vier Zähler | **nach dem Dörfler benannt** („Henlo: Präzision"), mit Wert, Ausgangswert und Maximum |
+| vier Leistenmarker | auf den Leisten des Tableaus |
+| Startausrüstung | zwei Karten, auf dem Tableau unten angeschrieben („Starting Gear: Farmer's Overalls, Wheat Sickle") |
+
+**Die Werte stehen auf dem Tableau:** vier Spalten (HEALTH, MOVEMENT, MOXIE,
+ACCURACY) mit der Startzahl **türkis hervorgehoben**; bei Henlo 3 / 5 / 2 / −1.
+Die Spaltenenden geben das Maximum (10 / 10 / 10 / 5 bei Henlo, Accuracy von
+−4 bis 5). **Für alle neun abzulesen** — dieselbe Methode, mit der die
+Bösewicht-Werte erfasst wurden (`docs/szenariodaten-erweiterung.md`).
+
+**Die Startausrüstung steht am Fuß des Tableaus** und ist gegen die
+Kartenbibliothek zu prüfen; die deutschen Namen weichen ab.
+
+**Entwurf, nicht vorgegeben.** Ob das eine Aufbau-Aktion „Dörfler tauschen"
+wird, ein Schritt im Vokabular, oder etwas am Tisch, entscheidet, wer es baut.
+Drei Dinge gelten aber:
+
+1. **Der Tisch baut auf, er spielt nicht** (§1). Tauschen heißt: Material
+   ersetzen, Werte auf den Startwert des Neuen setzen. **Nicht**: entscheiden,
+   wer getauscht werden soll.
+2. **Mitten in der Partie getauscht wird nicht.** Der Wunsch ist „nach dem
+   Einstieg", also vor dem ersten Kampf. Ob der Tausch danach gesperrt wird
+   oder nur gewarnt, ist zu entscheiden — aber ein Tausch in Runde 3 würde
+   erspielte Werte löschen.
+3. **Die Zähler heißen nach dem Dörfler.** Ein Tausch benennt sie um; wer das
+   übersieht, hinterlässt „Henlo: Leben" an einem Tableau von Judy Marks.
+
+**Abnahme.**
+1. Nach dem Tausch stehen Tableau, Figur und Startausrüstung des neuen
+   Dörflers am Platz des alten.
+2. Seine vier Zähler tragen seinen Namen, seinen Startwert und sein Maximum.
+3. Die Leistenmarker stehen auf den Startwerten.
+4. Der alte Dörfler ist vollständig weg — kein Zähler, keine Karte, keine
+   Figur bleibt liegen.
+5. Ein Aufbau, der danach gespeichert und neu geladen wird, zeigt den neuen
+   Dörfler (M22).
