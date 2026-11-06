@@ -467,3 +467,48 @@ Tableau ohne `anchorId` verhält sich wie bisher.
 - **Tausch im Aufbau *TFT Grundaufbau (Dorfphase)*.** Er hat keine
   Ausrüstungszonen und keine Dörferdaten.
 - **Spielregeln.** Der Tisch entscheidet nicht, **wer** getauscht wird (§1).
+
+---
+
+## Stand nachher (2026-11-06)
+
+**Tests:** 1288 → **1362**, alle grün (`cd server && npm test`). Neu: `doerfler-daten`
+(19), `villagers` (36), `swap-villager` (8), `sequence-villager-steps` (8),
+`equipment-zones` neu geschrieben (13, vorher 10). Bau: `cd client && npx vite build`,
+dieselben zwei Warnungen wie vorher (doppeltes `data-testid`, Chunkgröße).
+
+**Daten:** *TFT Kurzpartie* — `zone_data` 51 → 54 (18 Plätze, `Hände` weg, 33 Zonen
+unberührt), `sequence_data` 13 Schritte (vier Karten, neun Zähler), `action_data` 31
+Schritte, `scenario_data` + `villagers`. `state_data`, `grid_data` und alle
+benannten Spielstände unverändert (Prüfsumme vor/nach gleich). Ein zweiter Lauf
+des Skripts findet nichts mehr zu tun.
+
+**Rauchtest in der Produktion** (nur lesend, mit dem ausgelieferten Executor und den
+geschriebenen Daten): Aufbau 65 Schritte ohne Beanstandung → Tausch Platz 1 gegen
+Judy und Platz 3 gegen Blopsy → *Kampf beginnen* stellt `Judy Marks`, `Fridgette
+Jones`, `Blopsy Twins` auf K11/M11/H12 → *Dorfphase beginnen* setzt alle zwölf
+Zähler zurück und räumt die Figuren ab.
+
+**Sichtprüfung:** der Browser-Bereich war an `gaming.benjathi.de` **nicht angemeldet**
+(leeres `localStorage`, Anmeldeseite); ein Passwort trägt der Agent nicht ein. Geprüft
+wurde stattdessen eine **lokale Probeinstanz** (eigene Ports, eigene Datenbank aus
+einem Auszug der Produktion, Testkonto, Bilder aus der Produktion), mit denselben
+Daten und demselben Client, bei Fenster 932 × 742:
+
+- Bei Spielzoom 41 % (Ansicht „Dörfler") stehen die Karten neben den Pfeilen ihres
+  Aufdrucks; die gedruckten Beschriftungen sind dort nicht lesbar (3–4 Bildpunkte),
+  die Zuordnung trägt die **Lage**, nicht der Text. Bei 82 % liegt jede Karte
+  neben `Head Gear` / `Chest Gear` / `Leg Gear` bzw. `Left Hand` / `Right Hand` /
+  `Accessory`.
+- Echter Tausch am Tableau: Henlo → Norman (Platz 1), Fridgette → Judy (Platz 2).
+  Zähler heißen um (`Norman: Mumm`, `Judy: Präzision 1`), die Fischmütze liegt in
+  `Kopf`, Judys drei Gemälde im Vorrat, die Marker auf den Startwerten.
+- Rückfrage: nach einem Klick auf einen Zähler fragt der Tausch („hat schon
+  gespielt"); *Abbrechen* ändert nichts.
+- Spielstand mit eigenem Namen gespeichert, Seite neu geladen, Stand geöffnet: die
+  getauschten Dörfler, ihre Zonen und `anchorId` sind da; *Kampf beginnen* und
+  *Dorfphase beginnen* laufen danach auf den **neuen** Dörflern.
+- **Offen:** am laufenden Tisch der Produktion ist das Menü nicht angeschaut worden.
+  Die sechs Einträge machen das Kontextmenü bei 742 Pixeln Höhe so hoch wie das
+  Fenster (es scrollt, `menuPlacement` klemmt es). Brauchbar, nicht schön — ein
+  Untermenü wäre die nächste Stufe.
