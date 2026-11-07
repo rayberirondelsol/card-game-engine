@@ -443,3 +443,148 @@ test('CY: das Skript fasst nur `Kampf beginnen` an – kein anderer Schritt, kei
   assert.ok(patchActions(ac).complaints.some(c => /2 Schritte/.test(c)));
   assert.ok(patchActions([]).complaints.length > 0);
 });
+
+// ── Das Skript selbst, gegen eine echte SQLite-Datei ────────────────────────
+//
+// Die reinen Umschreibungen oben beweisen die Rechnung. Hier läuft `main` - lesen,
+// prüfen, schreiben, neu lesen - gegen eine Datenbank mit dem echten Schema und den
+// Zeilen aus dem Auszug. Es fand schon einen Fehler, den die reinen Tests nicht
+// sehen konnten: der zweite Lauf verglich die **neuen** Daten mit sich selbst als
+// „alten Aufbau" und meldete eine Abweichung, statt „nichts zu schreiben".
+
+import os from 'node:os';
+import path from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+
+const { main, GAME_ID, SETUP_ID, fingerprint } = await import('../../scripts/auslagen-daten.mjs');
+const { default: Database } = await import('better-sqlite3');
+
+function frischeDatenbank() {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'cge-auslagen-'));
+  const file = path.join(tmp, 'test.db');
+  // Das echte Schema: `setupDatabase` legt es an (CGE_DB_PATH wird beim Import gelesen).
+  execFileSync(process.execPath, ['--input-type=module', '-e',
+    'const { setupDatabase, closeDatabase } = await import("./src/database.js"); await setupDatabase(); closeDatabase();'],
+  { cwd: new URL('..', import.meta.url), env: { ...process.env, CGE_DB_PATH: file }, stdio: 'pipe' });
+  const db = new Database(file);
+  db.prepare("insert into games (id, name) values (?, 'TFT')").run(GAME_ID);
+  const cat = new Map();
+  const catId = (name) => {
+    if (!name) return null;
+    if (!cat.has(name)) { cat.set(name, randomUUID()); db.prepare('insert into categories (id, game_id, name) values (?, ?, ?)').run(cat.get(name), GAME_ID, name); }
+    return cat.get(name);
+  };
+  for (const a of assets) {
+    db.prepare('insert into table_assets (id, game_id, type, name, image_path, back_image_path, width, height, category_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(a.id, GAME_ID, a.type, a.name, a.image_path, a.back_image_path, a.width, a.height, catId(a.category));
+  }
+  for (const c of cards) {
+    db.prepare('insert into cards (id, game_id, category_id, name, image_path, width, height) values (?, ?, ?, ?, ?, ?, ?)')
+      .run(c.id, GAME_ID, catId(c.category), c.name, c.image_path, c.width, c.height);
+  }
+  db.prepare('insert into setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(SETUP_ID, GAME_ID, 'TFT Kurzpartie', JSON.stringify(state), JSON.stringify(zones), JSON.stringify(fx.sequenceBefore),
+      JSON.stringify(grids), JSON.stringify(fx.actionsBefore), JSON.stringify(fx.scenarioBefore));
+  // Ein Aufbau daneben, den das Skript nicht anfassen darf, und ein Spielstand.
+  db.prepare("insert into setups (id, game_id, name, sequence_data, scenario_data, action_data) values (?, ?, 'Grundaufbau', '[{\"type\":\"shuffle\"}]', '{}', '[]')").run(randomUUID(), GAME_ID);
+  db.prepare("insert into save_states (id, game_id, name, state_data, setup_id) values (?, ?, 'Partie 14', '{\"a\":1}', ?)").run(randomUUID(), GAME_ID, SETUP_ID);
+  db.close();
+  return { tmp, file };
+}
+
+/** `main` laufen lassen und aufschreiben, was es ausgibt. */
+async function lauf(args) {
+  const zeilen = [];
+  const orig = console.log;
+  console.log = (...a) => zeilen.push(a.join(' '));
+  try {
+    const code = await main(args, { Database });
+    return { code, out: zeilen.join('\n') };
+  } finally {
+    console.log = orig;
+  }
+}
+
+const spalten = (file) => {
+  const db = new Database(file, { readonly: true });
+  const r = db.prepare('select sequence_data, scenario_data, action_data, zone_data, grid_data, state_data from setups where id = ?').get(SETUP_ID);
+  const fp = fingerprint(db);
+  db.close();
+  return { r, fp };
+};
+
+test('CY: `--check` ändert nichts, `--write` schreibt genau die drei Spalten, ein zweiter Lauf schreibt nichts', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = spalten(file);
+
+    const check = await lauf(['--check', file]);
+    assert.equal(check.code, 0, check.out);
+    assert.match(check.out, /Trockenlauf: 0 Beanstandungen/);
+    assert.deepEqual(spalten(file).r, vorher.r, '--check hat nichts geschrieben');
+
+    const write = await lauf(['--write', file]);
+    assert.equal(write.code, 0, write.out);
+    assert.match(write.out, /Fingerabdruck aller Tabellen .* unverändert: true/);
+    assert.match(write.out, /bosses byteweise gleich: true/);
+    assert.match(write.out, /villagers.roster byteweise gleich: true/);
+    assert.match(write.out, /action_data: Schritte geändert: kampf-beginnen 17/);
+    const nachher = spalten(file);
+    assert.equal(nachher.r.sequence_data, JSON.stringify(seq.next));
+    assert.equal(nachher.r.scenario_data, JSON.stringify(sce.next));
+    assert.equal(nachher.r.action_data, JSON.stringify(act.next));
+    // Was nicht geschrieben wird, bleibt gleich - Spalte für Spalte und als Fingerabdruck.
+    for (const c of ['zone_data', 'grid_data', 'state_data']) assert.equal(nachher.r[c], vorher.r[c], c);
+    assert.deepEqual(nachher.fp, vorher.fp);
+
+    const zweiter = await lauf(['--write', file]);
+    assert.equal(zweiter.code, 0, zweiter.out);
+    assert.match(zweiter.out, /nichts zu schreiben/);
+    assert.deepEqual(spalten(file).r, nachher.r, 'der zweite Lauf hat nichts überschrieben');
+    const check2 = await lauf(['--check', file]);
+    assert.equal(check2.code, 0, check2.out);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('CY: weicht ein vorhandener Wert ab, bricht `--write` ab – und die Datenbank bleibt, wie sie war', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const db = new Database(file);
+    // Jemand hat `options` schon anders hingeschrieben.
+    const sc = copy(fx.scenarioBefore);
+    sc.options = { partie: { label: 'eigene Arbeit' } };
+    db.prepare('update setups set scenario_data = ? where id = ?').run(JSON.stringify(sc), SETUP_ID);
+    db.close();
+    const vorher = spalten(file);
+
+    const r = await lauf(['--write', file]);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /options steht schon da und weicht ab/);
+    assert.deepEqual(spalten(file), vorher, 'nichts geschrieben');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('CY: trifft der UPDATE keine Zeile (die Spalten haben sich seit dem Lesen geändert), wird nichts geschrieben', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    // Ein zweiter Schreiber zwischen Lesen und Schreiben lässt sich hier nicht
+    // zeitlich treffen; ein Trigger, der den UPDATE ignoriert, ist derselbe Fall von
+    // außen: der Vergleich-und-Tausch findet keine Zeile, und die Transaktion bricht ab.
+    const db = new Database(file);
+    db.exec(`create trigger fremd before update on setups when old.id = '${SETUP_ID}' begin select raise(ignore); end;`);
+    db.close();
+    const vorher = spalten(file);
+    const r = await lauf(['--write', file]).catch(e => ({ code: 'wirft', out: String(e.message) }));
+    assert.equal(r.code, 'wirft', 'ein UPDATE ohne Treffer ist kein Erfolg');
+    assert.match(r.out, /seit dem Lesen geändert/);
+    assert.deepEqual(spalten(file), vorher);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});

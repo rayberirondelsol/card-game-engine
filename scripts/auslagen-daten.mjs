@@ -460,7 +460,11 @@ export function bauen({ state, sequence, zones, grids, assets, cards, scenarioDa
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
 
-async function main(argv) {
+/**
+ * `deps.Database` ist der SQLite-Treiber. Auf dem Server liegt `better-sqlite3` neben der
+ * Datei (`/app/node_modules`); im Repo liegt es unter `server/` - der Test reicht es herein.
+ */
+export async function main(argv, deps = {}) {
   const [mode, dbPath] = argv;
 
   if (mode === '--json') {
@@ -472,8 +476,17 @@ async function main(argv) {
     return 2;
   }
 
-  const { default: Database } = await import('better-sqlite3');
+  const Database = deps.Database ?? (await import('better-sqlite3')).default;
   const db = new Database(dbPath, { readonly: mode === '--check' });
+  // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
+  try {
+    return await run(db, mode);
+  } finally {
+    db.close();
+  }
+}
+
+async function run(db, mode) {
   const complaints = [];
 
   // ── lesen: genau diese drei Spalten, als Text ──
@@ -527,8 +540,15 @@ async function main(argv) {
 
   // ── Durchrechnen: vier Kombinationen, Protokoll leer; kurz/mit = heute + Rollenstapel ──
   const env = { state: row.state_data, zones, grids, assets, cards };
-  const alt = bauen({ ...env, sequence: before.sequence_data, scenarioData: before.scenario_data }, undefined, 1);
-  console.log(`alter Aufbau (heutige Daten): ${alt.log.filter(e => e.status !== 'ok').length} Zeilen ohne ok`);
+  // Den „alten Aufbau" gibt es nur, solange die Daten noch die alten sind. Beim zweiten Lauf
+  // wäre die Folge aus der Datenbank schon die neue - sie ohne Wahl zu bauen scheiterte laut
+  // an jedem Gate, und der Vergleich meldete eine Abweichung, die keine ist.
+  const alt = before.sequence_data.some(s => s?.type === 'seat_villager')
+    ? null
+    : bauen({ ...env, sequence: before.sequence_data, scenarioData: before.scenario_data }, undefined, 1);
+  console.log(alt
+    ? `alter Aufbau (heutige Daten): ${alt.log.filter(e => e.status !== 'ok').length} Zeilen ohne ok`
+    : 'alter Aufbau: nicht mehr vorhanden (die Daten sind schon umgestellt) - die Gleichwertigkeit prüft server/test/auslagen-daten.test.js');
   for (const choices of COMBINATIONS) {
     const r = bauen({ ...env, sequence: seq.next, scenarioData: sce.next }, choices, 1);
     const schlecht = r.log.filter(e => e.status !== 'ok');
@@ -538,7 +558,7 @@ async function main(argv) {
     const stones = r.state.tokens.filter(t => /^Bösewicht: |^Kurzpartie/.test(t.label ?? '')).length;
     console.log(`  ${choices.partie}/${choices.troedel}: ${r.log.length} Zeilen, ohne ok: ${schlecht.length}; Nachschub ${n} Karten, Rollen ${rollen}, Münzen ${muenzen}, Leiste ${stones} Objekte`);
     for (const e of schlecht) complaints.push(`${choices.partie}/${choices.troedel}: Schritt ${e.index} ${e.type} ${e.status}: ${e.reason}`);
-    if (choices.partie === 'kurz' && choices.troedel === 'mit') {
+    if (alt && choices.partie === 'kurz' && choices.troedel === 'mit') {
       // Gleichwertigkeit: derselbe Tisch wie vor M27 - bis auf den Rollenstapel, der neu ist.
       const ohneRollen = { ...r.state, stacks: r.state.stacks.filter(s => s.label !== ROLLEN.label) };
       const key = (o) => `${o.assetId ?? o.cardId ?? o.name ?? o.label ?? ''}|${o.x}|${o.y}`;
