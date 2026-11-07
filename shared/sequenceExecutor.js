@@ -29,6 +29,7 @@ import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter, counterValue, counterMax } from './counters.js';
 import { findCardByName } from './cardSearch.js';
+import { resolveChoices, checkGate } from './setupOptions.js';
 import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, coordOf, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
@@ -59,8 +60,29 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   state = JSON.parse(JSON.stringify(state));
 
   const log = [];
+
+  // M27.3/CT: die Wahl des Spielers - **die letzte Wache**. Aufgelöst wird sie
+  // über dieselbe Funktion wie im Dialog und im Server (`resolveChoices`), und
+  // mit Problemen wird **nichts** aufgebaut: der Zustand bleibt, wie er
+  // hineinkam, und eine Zeile `failed` (`index: -1`, wie beim kaputten JSON) sagt
+  // warum. Ein Tippfehler in der Adresse baut sonst die Standardvariante, und
+  // niemand merkt es.
+  //
+  // `choices` ist **gegeben oder nicht**: eine Aktion ruft den Executor ohne Wahl
+  // auf (ein Spielstand kennt sie nicht, M22), und dann bleibt `$opt…` ungebunden
+  // und ein Gate scheitert laut - statt still die Standardvariante zu meinen.
+  // Ein leeres Objekt heißt „die Vorgaben".
+  const scenarioOptions = options?.scenarioData?.options;
+  const given = options?.choices !== undefined && options?.choices !== null;
+  const resolved = given ? resolveChoices(scenarioOptions, options.choices) : { choices: {}, vars: {}, problems: [] };
+  if (resolved.problems.length) {
+    return {
+      state,
+      log: [{ index: -1, type: '(sequence)', target: null, status: 'failed', reason: `choices: ${resolved.problems.join('; ')} - nothing was built` }],
+    };
+  }
   if (!Array.isArray(sequenceData) || sequenceData.length === 0) {
-    return { state, log };
+    return { state, log, choices: resolved.choices };
   }
 
   // `cards` ist die Kartenbibliothek des Spiels, jede Zeile mit dem *Namen*
@@ -90,8 +112,14 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // bei jedem Aufdecken auf `{}` zurück - die Dörfler dürfen dabei nicht
   // verschwinden. Gebunden wird aus dem Zustand, den der Lauf **vorfindet**; nach
   // einem `swap_villager` neu.
+  //
+  // `optionVars` ist das sechste und steht aus demselben Grund **neben** `vars`
+  // (M27.2/CT): die Werte, die die Wahl des Spielers trägt (`$optNachschub`,
+  // `$optMuenzen`). `options`/`choices` sind das Gate dazu - `choices` ist
+  // `undefined`, wenn der Aufruf keine Wahl mitbrachte (siehe oben).
   const ctx = {
     vars: {}, seatVars: seatVars(state, assets, scenarioData?.villagers),
+    optionVars: resolved.vars, options: scenarioOptions, choices: given ? resolved.choices : undefined,
     revealedLast: false, halted: false, finalFight: null,
   };
 
@@ -110,8 +138,12 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     // Eine zweite Rechnung daneben wäre die Regel, die M6 verbietet - und sie
     // ginge auseinander, sobald jemand `final: true` erzwingt, um einen
     // Endkampf zu prüfen.
-    const gate = onlyFinalOf(step?.onlyFinal);
-    if (gate !== null && gate !== Boolean(ctx.finalFight ?? ctx.revealedLast)) continue;
+    const gate = stepApplies(step, ctx);
+    if (gate.problem) {
+      log.push({ index, type: step?.type, target: stepTarget(step), status: 'failed', reason: gate.problem });
+      continue;
+    }
+    if (!gate.applies) continue;
     const entry = { index, type: step?.type, target: stepTarget(step), status: 'ok', reason: null };
     log.push(entry);
     try {
@@ -135,7 +167,37 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
     }
   }
 
-  return { state, log, bindings: ctx.vars, revealedLast: ctx.revealedLast };
+  return { state, log, bindings: ctx.vars, revealedLast: ctx.revealedLast, choices: resolved.choices };
+}
+
+/**
+ * Läuft dieser Schritt? Die **eine** Stelle, die beide Gates fragt (M27.2/CT):
+ * `{ applies }`, oder `{ applies: false, problem }`, wenn ein Gate nicht zu
+ * verstehen ist.
+ *
+ * - `onlyFinal` (M20.1): **fail-open** - ein unverstandener Wert lässt den Schritt
+ *   laufen, weil ein lautlos ausfallender Schritt der größere Fehler wäre.
+ * - `onlyChoice` (M27.2): **fail-loud** - ein unverstandener Wert lässt ihn **nicht**
+ *   laufen und ergibt eine `failed`-Zeile; „laufen lassen" hieße, Kurz- und
+ *   Lang-Aufbau zugleich zu bauen (`checkGate`, `shared/setupOptions.js`).
+ *
+ * `onlyChoice` wird zuerst gefragt: ein kaputtes Gate wird auch dann gemeldet,
+ * wenn der Schritt aus anderem Grund nicht liefe.
+ */
+function stepApplies(step, ctx) {
+  if (step?.onlyChoice !== undefined) {
+    const r = checkGate(step.onlyChoice, ctx.options, ctx.choices);
+    if (!r.ok) return { applies: false, problem: r.problem };
+    if (!r.applies) return { applies: false };
+  }
+  // M20.1: ein Schritt, der nur zum Endgegner-Kampf gehört (oder nur zu den
+  // Kämpfen davor), läuft sonst **gar nicht** - und bekommt dann auch keine
+  // Protokollzeile (siehe oben in der Schleife). Gefragt wird **eine** Stelle:
+  // was `build_scenario` entschieden hat (`ctx.finalFight`), sonst der Platz, von
+  // dem `reveal_next` genommen hat.
+  const gate = onlyFinalOf(step?.onlyFinal);
+  if (gate !== null && gate !== Boolean(ctx.finalFight ?? ctx.revealedLast)) return { applies: false };
+  return { applies: true };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -862,7 +924,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     const filled = parts.map(part => {
       if (!hasPlaceholder(part)) return part;
       return part.replace(PLACEHOLDER, (m) => {
-        const value = ctx.vars[m.slice(1)] ?? ctx.seatVars?.[m.slice(1)];
+        const value = ctx.vars[m.slice(1)] ?? ctx.seatVars?.[m.slice(1)] ?? ctx.optionVars?.[m.slice(1)];
         if (value === undefined) { missing = missing || m; missingIn = missingIn ?? part; return m; }
         return value;
       });
