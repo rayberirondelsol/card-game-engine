@@ -6,6 +6,7 @@ import {
   describeStep,
   validateStep,
   stackLabelsFor,
+  toggleChoice,
 } from '../utils/sequenceSteps.js';
 import {
   createAction,
@@ -351,6 +352,66 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
         <option value="false">Only before the final fight</option>
       </select>),
 
+    // M27.2/CV: das zweite Gate, an jedem Schritt wie `onlyFinal` - eine Zeile,
+    // eine Stelle. Je Option des Setups eine Gruppe Haken (kein Haken = die
+    // Option sagt nichts, einer = diese Wahl, mehrere = eine davon). Was der
+    // Editor nicht kennt - eine Option oder Wahl, die es nicht gibt, ein Gate,
+    // das kein Objekt ist - steht sichtbar da und lässt sich entfernen: das
+    // Umschalten einer Wahl darf keine andere still löschen, und `validateStep`
+    // meldet das Unverstandene darunter. Ohne Optionen im Setup und ohne Gate am
+    // Schritt gibt es nichts zu zeichnen; in einer Aktion nur, was schon dasteht.
+    onlyChoice: () => {
+      const options = ctx.options && typeof ctx.options === 'object' ? ctx.options : {};
+      const valid = step.onlyChoice && typeof step.onlyChoice === 'object' && !Array.isArray(step.onlyChoice);
+      const gate = valid ? step.onlyChoice : {};
+      const names = Object.keys(options);
+      if (step.onlyChoice === undefined && (ctx.inAction || names.length === 0)) return null;
+      const apply = (next) => {
+        const s = { ...step };
+        if (next === undefined) delete s.onlyChoice;
+        else s.onlyChoice = next;
+        onChange(s);
+      };
+      const unknownKeys = Object.keys(gate).filter(k => !options[k]);
+      return field('Only with',
+        <div className="flex-1 flex flex-col gap-0.5" data-testid={`step-${index}-only-choice`}>
+          {names.map(name => {
+            const choices = options[name]?.choices || {};
+            const chosen = gate[name] === undefined ? [] : Array.isArray(gate[name]) ? gate[name] : [gate[name]];
+            const keys = [...Object.keys(choices), ...chosen.filter(c => !choices[c])];
+            return (
+              <div key={name} className="flex flex-wrap items-center gap-x-2">
+                <span className="text-slate-400 text-xs">{options[name]?.label || name}</span>
+                {keys.map(key => (
+                  <label key={key} className="text-xs text-slate-200 flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={chosen.includes(key)}
+                      onChange={e => apply(toggleChoice(step.onlyChoice, name, key, e.target.checked))}
+                      data-testid={`step-${index}-only-choice-${name}-${key}`}
+                    />
+                    {choices[key]?.label || `${key} (unknown)`}
+                  </label>
+                ))}
+              </div>
+            );
+          })}
+          {unknownKeys.map(k => (
+            <div key={k} className="text-xs text-amber-300">
+              {k}={[].concat(gate[k]).join(' or ')} (unknown option)
+              <button className="ml-2 text-red-400 hover:text-red-300"
+                onClick={() => { const { [k]: _drop, ...rest } = gate; apply(Object.keys(rest).length ? rest : undefined); }}>remove</button>
+            </div>
+          ))}
+          {!valid && (
+            <div className="text-xs text-amber-300">
+              not a gate
+              <button className="ml-2 text-red-400 hover:text-red-300" onClick={() => apply(undefined)}>remove</button>
+            </div>
+          )}
+        </div>);
+    },
+
     x: () => field('X', number(step.x, 0, undefined, n => set({ x: n }), 'w-20')),
     y: () => field('Y', number(step.y, 0, undefined, n => set({ y: n }), 'w-20')),
 
@@ -534,6 +595,7 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
           das Gate liest die Schleife darueber. Hier gezeichnet, nicht
           fuenfundzwanzigmal in `STEP_TYPES.fields` eingetragen. */}
       {render.onlyFinal()}
+      {render.onlyChoice()}
 
       {problems.length > 0 && (
         <div className="mt-1 text-xs text-amber-400" data-testid={`sequence-step-${index}-problems`}>
@@ -559,6 +621,9 @@ export default function SetupSequenceEditor({
   availableGrids = [],
   availableCardCategories = [],
   availableCards = [],
+  // M27.2/CV: `scenario_data.options` des Setups - die Gate-Zeile und die Prüfung
+  // kennen daran Optionen und Wahlen. Ohne sie wird nichts erfunden.
+  options = null,
   isOpen,
   onToggle,
 }) {
@@ -602,6 +667,9 @@ export default function SetupSequenceEditor({
     // eine Karte bei Namen, und ob der Name genau eine trifft, entscheidet
     // sich an den Namen und Bildpfaden (M8.8/A3).
     cards: availableCards,
+    // M27.2/CV: nur in einer Aktion ist `onlyChoice` falsch (Spielstände kennen die Wahl nicht).
+    options,
+    inAction: Boolean(current),
   };
 
   function addStep() {

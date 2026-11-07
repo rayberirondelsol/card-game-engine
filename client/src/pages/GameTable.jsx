@@ -9043,6 +9043,7 @@ export default function GameTable({ room = null }) {
           availableGrids={grids}
           availableCardCategories={categories.map(c => c.name).filter(Boolean)}
           availableCards={availableCards}
+          options={scenarioData?.options}
           isOpen={showSequenceEditor}
           onToggle={() => setShowSequenceEditor(prev => !prev)}
         />

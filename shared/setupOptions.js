@@ -138,8 +138,8 @@ const VAR = /^[A-Za-z][A-Za-z0-9]*$/;
 const TAKEN = /^(V\d|F\d|revealed)/;
 const OPT_PLACEHOLDER = new RegExp(`\\$${OPTION_VAR_PREFIX}[A-Za-z0-9]*`, 'g');
 
-/** Die `$opt…`-Platzhalter, die irgendwo in diesem Schritt stehen. */
-const optPlaceholdersIn = (step) => JSON.stringify(step ?? null).match(OPT_PLACEHOLDER) || [];
+/** Die `$opt…`-Platzhalter, die irgendwo in diesem Schritt stehen (mit `$`). Auch der Editor fragt das. */
+export const optPlaceholdersIn = (step) => JSON.stringify(step ?? null).match(OPT_PLACEHOLDER) || [];
 
 /**
  * Was an den Optionen nicht stimmt, **gegen die Folge und die Aktionen** - eine

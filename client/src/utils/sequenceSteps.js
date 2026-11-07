@@ -16,6 +16,7 @@ import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder, categoryList, onlyFinalOf } from '../../../shared/sequenceExecutor.js';
 import { findCardByName } from '../../../shared/cardSearch.js';
+import { checkGate, optPlaceholdersIn } from '../../../shared/setupOptions.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -323,7 +324,36 @@ export function describeStep(step) {
   // hinten, weil die Zeile zuerst sagt, *was* der Schritt tut.
   const gate = onlyFinalOf(step?.onlyFinal);
   const when = gate === null ? '' : gate ? ' · only in the final fight' : ' · not in the final fight';
-  return describeWork(step) + when;
+  return describeWork(step) + describeChoiceGate(step?.onlyChoice) + when;
+}
+
+/**
+ * M27.2/CV: `onlyChoice` als Nachsatz („· only with partie=kurz, troedel=mit"),
+ * und nur an Schritten, die eines tragen. Eine Liste liest sich „kurz or lang".
+ * Etwas, das kein Objekt ist, steht gar nicht da: `validateStep` meldet es.
+ */
+function describeChoiceGate(gate) {
+  if (!gate || typeof gate !== 'object' || Array.isArray(gate)) return '';
+  const parts = Object.entries(gate).map(([option, v]) => `${option}=${(Array.isArray(v) ? v : [v]).join(' or ')}`);
+  return parts.length ? ` · only with ${parts.join(', ')}` : '';
+}
+
+/**
+ * M27.2/CV: eine Wahl in `onlyChoice` an- oder ausschalten - das, was die
+ * Gate-Zeile im Editor tut. Gibt das **neue** Gate zurück, oder `undefined`, wenn
+ * keines mehr übrig ist (das Feld entfällt dann ganz, wie bei `onlyFinal`).
+ *
+ * Eine Wahl ist ein Text, mehrere sind eine Liste; Optionen und Werte, die der
+ * Editor nicht kennt, bleiben stehen - das Umschalten einer Wahl darf keine
+ * andere still löschen (derselbe Fehler, den die Prüfliste von CV nennt).
+ */
+export function toggleChoice(gate, option, choice, on) {
+  const next = { ...(gate && typeof gate === 'object' && !Array.isArray(gate) ? gate : {}) };
+  const now = next[option] === undefined ? [] : Array.isArray(next[option]) ? [...next[option]] : [next[option]];
+  const after = on ? (now.includes(choice) ? now : [...now, choice]) : now.filter(c => c !== choice);
+  if (after.length === 0) delete next[option];
+  else next[option] = after.length === 1 ? after[0] : after;
+  return Object.keys(next).length ? next : undefined;
 }
 
 function describeWork(step) {
@@ -653,6 +683,28 @@ export function validateStep(step, ctx = {}) {
     && step.onlyFinal !== null && step.onlyFinal !== '') {
     problems.push(`"${String(step.onlyFinal).trim()}" is not an answer:`
       + ' every fight, only the final fight, or only before it');
+  }
+  // M27.2/CV: das Gate `onlyChoice`. Ein Gate, das kein Objekt ist, ist immer
+  // falsch; ob es Option und Wahl gibt, sagt der Editor nur, wenn er die
+  // Optionen des Setups kennt (sonst erfände er Probleme, wie bei Pools und
+  // Zonen). In einer Aktion gehört es nirgends hin: ein Spielstand kennt die
+  // Wahl nicht (M22), die Aktion liefe danach mit einer Wahl, die niemand mehr
+  // hat - bei `onlyChoice` hieße das „läuft nie", bei `$opt…` „is not bound".
+  if (step?.onlyChoice !== undefined) {
+    if (ctx?.inAction) {
+      problems.push('onlyChoice does not belong in an action: a saved game does not know the choice');
+    } else if (!step.onlyChoice || typeof step.onlyChoice !== 'object' || Array.isArray(step.onlyChoice)) {
+      problems.push('onlyChoice must be an object { <option>: <choice> }');
+    } else if (ctx?.options && typeof ctx.options === 'object' && Object.keys(ctx.options).length) {
+      const known = Object.fromEntries(Object.keys(ctx.options).map(k => [k, '']));
+      const r = checkGate(step.onlyChoice, ctx.options, known);
+      if (!r.ok) problems.push(r.problem);
+    }
+  }
+  if (ctx?.inAction) {
+    for (const ph of new Set(optPlaceholdersIn(step))) {
+      problems.push(`${ph} does not belong in an action: a saved game does not know the choice`);
+    }
   }
   // M26.2/CM: ein Platz ist eine Nummer ab 1, und ohne Dörfler gibt es nichts zu
   // tauschen. Welche Plätze und welche Dörfler es gibt, steht in den

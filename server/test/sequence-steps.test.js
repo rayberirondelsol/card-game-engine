@@ -718,3 +718,90 @@ test('die Zeile eines place_counter nennt den Ausgangswert, wenn er abweicht', (
   // Zusammenfassung, kein Feldabzug.
   assert.ok(!/from/i.test(describeStep({ type: 'place_counter', name: 'Münzen', value: 0, x: 1, y: 2 })));
 });
+
+// ── CV / M27.2: das Gate `onlyChoice` im Editor ─────────────────────────────
+//
+// Wie `onlyFinal` (M20.1) gehört es keinem Schrittwort, sondern jedem Schritt:
+// es steht nicht in `STEP_TYPES.fields`, sondern als eigene Zeile an jedem
+// Schritt. Was der Editor darüber weiß, steht in `sequenceSteps.js` - hier die
+// Zeile, die Prüfung und das Umschalten einer Wahl.
+
+const { toggleChoice } = await import('../../client/src/utils/sequenceSteps.js');
+
+const OPTS = {
+  partie: { label: 'Spiellänge', default: 'kurz', choices: { kurz: { label: 'Kurz', vars: {} }, lang: { label: 'Lang', vars: {} } } },
+  troedel: { label: 'Toller Trödel', default: 'mit', choices: { mit: { label: 'mit', vars: {} }, ohne: { label: 'ohne', vars: {} } } },
+};
+
+test('CV: `onlyChoice` steht nicht in den Feldern eines Schritts – es gehört jedem', () => {
+  for (const t of STEP_TYPES) assert.ok(!t.fields.includes('onlyChoice'), t.value);
+  assert.ok(!stepFields({ type: 'place_asset', onlyChoice: { partie: 'kurz' } }).includes('onlyChoice'));
+});
+
+test('CV: die Zeile hängt das Gate hinten an – und nur an Schritten, die eines tragen', () => {
+  const plain = { type: 'shuffle', stackLabel: 'A' };
+  assert.equal(describeStep(plain), 'Shuffle "A"');
+  assert.equal(describeStep({ ...plain, onlyChoice: { partie: 'kurz' } }), 'Shuffle "A" · only with partie=kurz');
+  assert.equal(describeStep({ ...plain, onlyChoice: { partie: 'kurz', troedel: 'mit' } }), 'Shuffle "A" · only with partie=kurz, troedel=mit');
+  assert.equal(describeStep({ ...plain, onlyChoice: { partie: ['kurz', 'lang'] } }), 'Shuffle "A" · only with partie=kurz or lang');
+});
+
+test('CV: `onlyFinal` und `onlyChoice` zugleich ergeben beide Nachsätze', () => {
+  const both = { type: 'shuffle', stackLabel: 'A', onlyChoice: { partie: 'lang' }, onlyFinal: true };
+  assert.equal(describeStep(both), 'Shuffle "A" · only with partie=lang · only in the final fight');
+});
+
+test('CV: ein Gate, das kein Objekt ist, wird gemeldet – auch ohne Optionen im Kontext', () => {
+  for (const bad of ['kurz', ['partie'], 3, null]) {
+    const p = validateStep({ type: 'shuffle', stackLabel: 'A', onlyChoice: bad }, {});
+    assert.ok(p.some(x => /onlyChoice/.test(x)), JSON.stringify(bad));
+  }
+  assert.deepEqual(validateStep({ type: 'shuffle', stackLabel: 'A', onlyChoice: { partie: 'kurz' } }, {}), [],
+    'ohne Optionen im Kontext wird nichts erfunden');
+});
+
+test('CV: unbekannte Option oder Wahl wird gemeldet, mit den Optionen des Setups', () => {
+  const step = (gate) => ({ type: 'shuffle', stackLabel: 'A', onlyChoice: gate });
+  const ctx = { options: OPTS };
+  assert.deepEqual(validateStep(step({ partie: 'kurz', troedel: 'ohne' }), ctx), []);
+  assert.ok(validateStep(step({ laenge: 'kurz' }), ctx).some(p => /no option "laenge"/.test(p)));
+  assert.ok(validateStep(step({ partie: 'mittel' }), ctx).some(p => /"mittel"/.test(p)));
+  assert.ok(validateStep(step({}), ctx).some(p => /names no option/.test(p)));
+});
+
+test('CV: in einer Aktion ist `onlyChoice` ein Fehler – Spielstände kennen die Wahl nicht', () => {
+  const p = validateStep({ type: 'shuffle', stackLabel: 'A', onlyChoice: { partie: 'kurz' } }, { options: OPTS, inAction: true });
+  assert.ok(p.some(x => /action/.test(x) && /saved game/.test(x)), p.join('\n'));
+  // In der Aufbaufolge dagegen nicht.
+  assert.deepEqual(validateStep({ type: 'shuffle', stackLabel: 'A', onlyChoice: { partie: 'kurz' } }, { options: OPTS, inAction: false }), []);
+});
+
+test('CV: ein Platzhalter `$opt…` in einer Aktion ist ein Fehler, in der Aufbaufolge nicht', () => {
+  const counter = { type: 'place_counter', name: 'Münzen', value: '$optMuenzen', x: 0, y: 0 };
+  assert.ok(validateStep(counter, { inAction: true }).some(x => /\$optMuenzen/.test(x) && /saved game/.test(x)));
+  assert.deepEqual(validateStep(counter, {}), [], '`$optMuenzen` ist keine unlesbare Zahl');
+  const stack = { type: 'place_stack', category: ['$optNachschub'], label: 'N', x: 1, y: 2, faceDown: true };
+  assert.deepEqual(validateStep(stack, { cardCategories: ['Nachschub'] }), [], 'kein „Kategorie unbekannt" für einen Platzhalter');
+  assert.ok(validateStep(stack, { inAction: true }).some(x => /\$optNachschub/.test(x)));
+});
+
+test('CV: `toggleChoice` schaltet eine Wahl an und aus – und lässt alles andere stehen', () => {
+  assert.deepEqual(toggleChoice(undefined, 'partie', 'kurz', true), { partie: 'kurz' });
+  assert.deepEqual(toggleChoice({ partie: 'kurz' }, 'partie', 'lang', true), { partie: ['kurz', 'lang'] });
+  assert.deepEqual(toggleChoice({ partie: ['kurz', 'lang'] }, 'partie', 'kurz', false), { partie: 'lang' });
+  assert.deepEqual(toggleChoice({ partie: 'kurz', troedel: 'mit' }, 'partie', 'kurz', false), { troedel: 'mit' });
+  assert.equal(toggleChoice({ partie: 'kurz' }, 'partie', 'kurz', false), undefined, 'kein Gate mehr – das Feld entfällt');
+  // Ein Wert, den der Editor nicht kennt, geht nicht verloren (kein stiller Verlust beim Umschalten).
+  assert.deepEqual(toggleChoice({ partie: 'kurz', unbekannt: 'x' }, 'partie', 'lang', true), { partie: ['kurz', 'lang'], unbekannt: 'x' });
+  // Doppelt anschalten ändert nichts.
+  assert.deepEqual(toggleChoice({ partie: 'kurz' }, 'partie', 'kurz', true), { partie: 'kurz' });
+});
+
+test('CV: der Editor zeichnet die Gate-Zeile an jedem Schritt – eine Stelle, neben `onlyFinal`', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../../client/src/components/SetupSequenceEditor.jsx', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('const render = {'));
+  assert.ok(body.includes('\n    onlyChoice: () =>'), 'onlyChoice hat keinen Renderer');
+  assert.ok(/render\.onlyChoice\(\)/.test(src), 'der Renderer wird nirgends aufgerufen - die Zeile bliebe still unsichtbar');
+  assert.equal((src.match(/render\.onlyChoice\(\)/g) || []).length, 1, 'genau eine Stelle');
+});
