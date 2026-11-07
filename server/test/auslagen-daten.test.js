@@ -633,7 +633,7 @@ test('CZ: der Rauchtest schlägt an – vor dem Schreiben (alte Daten) kennt der
     // Der Spielstand ohne Stapel wird beim Namen genannt, samt den Folgen auf seinem leeren Tisch -
     // und **nur** er: die vier Kombinationen und alle Kämpfe sind in Ordnung.
     assert.ok(r2.problems.length >= 1, 'ein Spielstand ohne Stapel muss auffallen');
-    assert.match(r2.problems[0], /Partie 14: Stapel fehlen: Nachschub \(Tante Emma\), Heldentaten, Dorf-Ereignisse/);
+    assert.ok(r2.problems.some(p => /Partie 14: Stapel fehlen: Nachschub \(Tante Emma\), Heldentaten, Dorf-Ereignisse/.test(p)), r2.problems.join('\n'));
     assert.ok(r2.problems.every(p => /^Partie 14/.test(p)), r2.problems.join('\n'));
   } finally {
     rmSync(tmp, { recursive: true, force: true });

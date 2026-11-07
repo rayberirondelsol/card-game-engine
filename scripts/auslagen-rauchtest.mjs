@@ -180,18 +180,28 @@ export function rauchtest(db) {
     const fehlt = ['Nachschub (Tante Emma)', 'Heldentaten', 'Dorf-Ereignisse'].filter(l => !labels.includes(l));
     const seats = seatVars(state, env.assets, env.scenarioData.villagers);
     const imKampf = (state.tokens ?? []).some(t => /^Tableau: /.test(t.label ?? '') && !/Henlo|Fridgette|Granny|Judy|Norman|Blopsy|Georgie|Quintus|Yancy/.test(t.label));
-    const id = imKampf ? 'dorfphase-beginnen' : 'kampf-beginnen';
-    const a = aktion(env, id, state);
-    const sl = schlecht(a.log);
-    const n = aktion(env, 'laden-nachfuellen', a.state);
-    say(`  ${sv.name.slice(0, 48).padEnd(50)} Stapel ${labels.length}${fehlt.length ? ` (FEHLT ${fehlt.join(', ')})` : ''}; Dörfler ${seats.V1 ?? '?'}/${seats.V2 ?? '?'}/${seats.V3 ?? '?'}; ${id}: ${a.log.length} Zeilen/${sl.length} ohne ok; nachfüllen: ${schlecht(n.log).length} ohne ok`);
-    if (fehlt.length) bad(`${sv.name}: Stapel fehlen: ${fehlt.join(', ')}`);
-    // Eine Wache, die der Spielstand nicht erfüllt (der Kampf läuft noch / es gibt keinen), ist eine Auskunft, kein Fehler.
-    for (const e of sl) {
-      if (/Erst /.test(e.reason ?? '') || e.status === 'skipped' && /Wache|require/.test(e.type)) say(`      Wache: ${e.reason}`);
-      else bad(`${sv.name} ${id}: ${zeile(e)}`);
+    // Die Reihenfolge, in der der Spielstand die Aktionen **zulässt**: in der Dorfphase füllt der Laden
+    // nach, dann beginnt der Kampf; im Kampf endet er zuerst (der Laden liegt auf der Rückseite des
+    // Sideboards - „Kampf beginnen" dreht es, und die Auslage ist dann gesperrt, das ist gewollt).
+    const folge = imKampf ? ['dorfphase-beginnen', 'laden-nachfuellen'] : ['laden-nachfuellen', 'kampf-beginnen'];
+    let s = state;
+    const teile = [];
+    let gehalten = false;
+    for (const id of folge) {
+      if (gehalten) break;
+      const a = aktion(env, id, s);
+      const sl = schlecht(a.log);
+      teile.push(`${id}: ${a.log.length} Zeilen/${sl.length} ohne ok`);
+      // Eine Wache, die der Spielstand nicht erfüllt (alle Dörfler besiegt, der Kampf läuft noch), ist eine
+      // Auskunft über den Stand, kein Fehler des Aufbaus - und danach geht die Folge nicht weiter.
+      for (const e of sl) {
+        if ((e.type === 'require_counter' || e.type === 'require_zone') && /further steps? skipped/.test(e.reason ?? '')) { say(`      Wache bei „${id}": ${e.reason}`); gehalten = true; }
+        else bad(`${sv.name} ${id}: ${zeile(e)}`);
+      }
+      s = a.state;
     }
-    for (const e of schlecht(n.log)) bad(`${sv.name} nachfüllen: ${zeile(e)}`);
+    say(`  ${sv.name.slice(0, 48).padEnd(50)} Stapel ${labels.length}${fehlt.length ? ` (FEHLT ${fehlt.join(', ')})` : ''}; Dörfler ${seats.V1 ?? '?'}/${seats.V2 ?? '?'}/${seats.V3 ?? '?'}; ${teile.join(' → ')}`);
+    if (fehlt.length) bad(`${sv.name}: Stapel fehlen: ${fehlt.join(', ')}`);
   }
 
   say(`\nRauchtest: ${problems.length} Beanstandungen`);
