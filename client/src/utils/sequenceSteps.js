@@ -14,7 +14,7 @@
 import { counterMax, counterValueForm } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
-import { hasPlaceholder, categoryList, onlyFinalOf } from '../../../shared/sequenceExecutor.js';
+import { hasPlaceholder, categoryList, onlyFinalOf, cardsInCategories } from '../../../shared/sequenceExecutor.js';
 import { findCardByName } from '../../../shared/cardSearch.js';
 import { checkGate, optPlaceholdersIn } from '../../../shared/setupOptions.js';
 
@@ -44,7 +44,12 @@ export const STEP_TYPES = [
   // M8.8/A3: eine benannte Karte aus der Bibliothek. Keine Stelle - „vor dem
   // Dörfler" ist eine am Brett verankerte Zone, und eine feste x/y ist das,
   // was M3a abgeschafft hat. Kein `label`: eine angelegte Karte ist kein Stapel.
-  { value: 'place_card', label: 'Place Card', fields: ['cardName', 'targetZoneLabel'] },
+  //
+  // M27.5/DA: `category` ist ein **optionaler Filter** - gesetzt, sucht der Schritt
+  // nur in diesen Kategorien (Text oder Liste, wie bei `place_stack`), leer in der
+  // ganzen Bibliothek. Eine Karte, die es zweimal gibt (`TRILLERPFEIFE`), wird so
+  // eindeutig; ein frischer Schritt trägt keines.
+  { value: 'place_card', label: 'Place Card', fields: ['cardName', 'category', 'targetZoneLabel'] },
   // M8.10/L3: `slot` nennt einen Platz der Zielzone bei seiner Nummer - die,
   // die auf dem Brett steht. Nur mit Zone, siehe `stepFields`.
   { value: 'place_asset', label: 'Place Asset', fields: ['assetName', 'targetZoneLabel', 'slot', 'gridLabel', 'cell', 'x', 'y', 'rotation', 'faceDown'] },
@@ -379,7 +384,13 @@ function describeWork(step) {
       return `Place card categor${cats.length > 1 ? 'ies' : 'y'} ${what} as stack ${q(step.label)} ${where}${down(step)}`;
     }
     case 'remove_stack': return `Remove stack ${q(step.stackLabel)} from the table`;
-    case 'place_card': return `Place the card named ${q(step.cardName)} in ${zone}`;
+    case 'place_card': {
+      // M27.5/DA: der Filter steht nur da, wenn es einen gibt - ohne ihn sucht der
+      // Schritt in der ganzen Bibliothek, und "from everywhere" wäre Rauschen.
+      const only = categoryList(step?.category);
+      const from = only.length ? ` (only from ${only.map(c => `"${c}"`).join(' + ')})` : '';
+      return `Place the card named ${q(step.cardName)}${from} in ${zone}`;
+    }
     case 'place_asset': {
       // Der Platz steht nur da, wo er gilt und wenn er gesetzt ist - ohne ihn
       // fuellt der Schritt der Reihe nach, und "on place " waere Rauschen.
@@ -578,8 +589,11 @@ export function validateStep(step, ctx = {}) {
   // erfunden, das ist dieselbe Regel wie bei Pools und Zonen.
   if (fields.has('cardName')) {
     if (!String(step?.cardName ?? '').trim()) problems.push('no card name given');
-    else if (!hasPlaceholder(step.cardName) && Array.isArray(cards) && cards.length) {
-      const { card, reason } = findCardByName(cards, step.cardName);
+    else if (!hasPlaceholder(step.cardName) && Array.isArray(cards) && cards.length
+      // M27.5: ein Platzhalter in der Kategorie sagt erst der Tisch - dann wird nicht
+      // geraten, in welcher Kategorie gesucht wird.
+      && !categoryList(step?.category).some(hasPlaceholder)) {
+      const { card, reason } = findCardByName(cardsInCategories(cards, step?.category), step.cardName);
       if (!card) problems.push(reason);
     }
     // Anders als bei `deal_to_zone` ist „keine Zone" keine gültige Wahl: eine

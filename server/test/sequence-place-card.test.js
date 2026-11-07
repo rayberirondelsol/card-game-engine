@@ -186,14 +186,16 @@ test('A2: ohne Zone, mit unbekannter Zone und in einer vollen Zone liegt nichts'
 
 // ── A3: das Schrittvokabular ─────────────────────────────────────────────────
 
-test('A3 / Abnahme 4: place_card steht im Editor, mit genau seinen zwei Feldern', () => {
+test('A3 / Abnahme 4: place_card steht im Editor, mit genau seinen drei Feldern', () => {
   assert.ok(STEP_TYPES.some(t => t.value === 'place_card'), 'place_card fehlt im Editor');
-  assert.deepEqual(stepFields('place_card'), ['cardName', 'targetZoneLabel']);
+  // M27.5/DA: `category` kam als **optionaler Filter** dazu (zwei gleichnamige
+  // Karten in verschiedenen Kategorien). Vorher: genau zwei Felder.
+  assert.deepEqual(stepFields('place_card'), ['cardName', 'category', 'targetZoneLabel']);
 
   // Keine Stelle: „vor dem Doerfler" ist eine am Brett verankerte Zone, und
   // eine feste x/y ist das, was M3a abgeschafft hat. Kein `label`: eine
   // angelegte Karte ist kein Stapel.
-  for (const f of ['x', 'y', 'gridLabel', 'cell', 'label', 'stackLabel', 'count', 'category']) {
+  for (const f of ['x', 'y', 'gridLabel', 'cell', 'label', 'stackLabel', 'count']) {
     assert.ok(!stepFields('place_card').includes(f), `place_card darf kein ${f} anbieten`);
   }
 });

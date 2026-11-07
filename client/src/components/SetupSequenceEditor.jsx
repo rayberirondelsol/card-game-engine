@@ -138,7 +138,7 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     // M15.1/AQ1: bei `clear_zone` liest derselbe Renderer den **Filter** statt
     // der Bauliste - nur die Beschriftung sagt, in welche Richtung.
     // M17.4/BF: `clear_table` liest ihn ebenfalls als Filter.
-    category: () => field(step.type === 'clear_zone' || step.type === 'clear_table' ? 'Only cards' : 'Cards', (
+    category: () => field(step.type === 'clear_zone' || step.type === 'clear_table' || step.type === 'place_card' ? 'Only cards' : 'Cards', (
       <div className="flex-1 space-y-1">
         <textarea
           rows={Math.max(2, categoryLines.length)}

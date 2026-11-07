@@ -314,6 +314,27 @@ export function categoryList(category) {
   return out;
 }
 
+/**
+ * M27.5/DA: die Kartenliste, auf **die Kategorien** eingeschränkt, die ein
+ * Schritt nennt - `place_card` ruft es **vor** der Suche auf, und der Editor
+ * fragt dieselbe Funktion (M6).
+ *
+ * Ohne Angabe (fehlt, leer, `[]`, `[""]`) kommt **dieselbe Liste** zurück, keine
+ * Kopie und kein Filter: `place_card` ohne `category` verhält sich so, wie es
+ * sich vor M27 verhalten hat. Verglichen wird wie bei `place_stack`: exakt, mit
+ * demselben `norm` - `Einzigartige Ausrüstung` zieht `(Neue Nachbarn)` nicht mit.
+ *
+ * `findCardByName` bleibt, wie es ist. Es wird auch **kein Vorrang** gebaut
+ * („nimm die aus der Einzigartigen Ausrüstung"): der wäre beim nächsten
+ * Namensgleichstand in der anderen Richtung falsch.
+ */
+export function cardsInCategories(cards, category) {
+  const wanted = categoryList(category);
+  if (!wanted.length) return cards;
+  const names = new Set(wanted.map(norm));
+  return (Array.isArray(cards) ? cards : []).filter(c => names.has(norm(c?.category)));
+}
+
 /** Look up a table_asset row by its name. */
 function findAsset(assets, name) {
   if (!name) return null;
@@ -1236,7 +1257,10 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
 
       // Kein Treffer ist eine fehlende Voraussetzung, mehrere sind ein Fehler:
       // die Spec unterscheidet das, und das Protokoll soll es auch.
-      const { card, reason, ambiguous } = findCardByName(cards, step.cardName);
+      // M27.5: `category` schränkt die Liste **vor** der Suche ein - die Karte, die es
+      // zweimal gibt (`TRILLERPFEIFE`), wird so eindeutig, ohne dass die Suche
+      // einen Vorrang kennt.
+      const { card, reason, ambiguous } = findCardByName(cardsInCategories(cards, step.category), step.cardName);
       if (!card) return ambiguous ? fail(reason) : skip(reason);
 
       const { usable, occupied, spots, problems } = zoneRoom(state, [zone], 'card');
