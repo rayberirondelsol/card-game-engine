@@ -29,7 +29,7 @@ import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter, counterValue, counterMax } from './counters.js';
 import { findCardByName } from './cardSearch.js';
-import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, STATS, TABLEAU_PREFIX } from './villagers.js';
+import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, coordOf, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -664,6 +664,71 @@ function placeVillager(work, n, wanted, spots, env) {
 }
 
 /**
+ * M27.1/CQ: was `swap_villager` und `seat_villager` zuerst fragen - gibt es
+ * Dörferdaten, gibt es den Platz, kennt der Roster den Dörfler? Gibt
+ * `{ skip }` oder `{ n, wanted, seated }` zurück, `seated` ist, wer jetzt wo sitzt.
+ */
+function pickSeat(state, step, assets, villagers) {
+  if (!hasVillagers(villagers)) return { skip: 'no villager data in the scenario data' };
+
+  const n = Number(step.seat);
+  if (step.seat === '' || step.seat === null || !Number.isInteger(n) || n < 1 || n > villagers.seats.length) {
+    return { skip: `no seat "${step.seat ?? ''}"` };
+  }
+  const wanted = findVillager(villagers, step.villager);
+  if (!wanted) return { skip: `"${step.villager ?? ''}" is not in the roster` };
+  return { n, wanted, seated: seatedVillagers(state, assets, villagers) };
+}
+
+/**
+ * M27.1/CQ: einen Dörfler an einen **leeren** Platz stellen - das Hin des
+ * Tauschs ohne das Weg. Gibt `{ skip }`, `{ fail }` oder `{ state, notes }`
+ * zurück, alles oder nichts wie `swapVillager`.
+ *
+ * Was dem Platz gehört, kommt aus dem Platz (`seat.tableau`, `seat.counters`,
+ * `villagers.barZone`), was dem Dörfler gehört, aus dem Roster. Fehlt eine
+ * Stelle, wird **nichts** gestellt: ein Tableau ohne seine Zähler ist ein halber
+ * Dörfler.
+ *
+ * Das Tableau trägt `anchorId` nur, wenn es **nicht** das Asset des Platzes ist
+ * (Judy an Platz 1): die Zonen des Platzes hängen an dessen Id. Henlo an Platz 1
+ * ist sein eigener Anker - dort stünde es doppelt da, und der Tisch sähe anders
+ * aus als der, den die hartverdrahteten Schritte bis M26 gebaut haben.
+ */
+function seatVillager(state, step, allZones, allGrids, assets, cards, scenarioData, rng) {
+  const villagers = scenarioData?.villagers;
+  const picked = pickSeat(state, step, assets, villagers);
+  if (picked.skip) return { skip: picked.skip };
+  const { n, wanted, seated } = picked;
+
+  const here = seated.find(s => s.n === n);
+  if (here) return { skip: `seat ${n} holds "${here.name ?? '?'}" - use swap_villager to change who sits there` };
+  const elsewhere = seated.find(s => s.data?.name === wanted.name);
+  if (elsewhere) return { skip: `"${wanted.name}" already sits at seat ${elsewhere.n}` };
+
+  const seat = villagers.seats[n - 1];
+  const geometry = seatGeometryProblems(seat, n);
+  if (!String(villagers.barZone ?? '').trim()) geometry.push('no barZone');
+  if (geometry.length) return { skip: geometry.join('; ') };
+  const anchor = findAsset(assets, seat.anchor);
+  if (!anchor) return { skip: `seat ${n}: asset "${seat.anchor}" not found` };
+  const own = findAsset(assets, `${TABLEAU_PREFIX}${wanted.name}`);
+
+  const work = JSON.parse(JSON.stringify(state));
+  const spot = (p) => ({ x: coordOf(p.x), y: coordOf(p.y) });
+  const spots = {
+    tableau: { ...spot(seat.tableau), rotation: 0, anchorId: own && own.id !== anchor.id ? anchor.id : undefined, locked: true },
+    stone: { zone: villagers.barZone },
+    counters: Object.fromEntries(STATS.map(st => [st.key, spot(seat.counters[st.key])])),
+  };
+  const placed = placeVillager(work, n, wanted, spots, { allZones, allGrids, assets, cards, scenarioData, rng });
+  if (placed.fail) return { fail: placed.fail };
+  if (placed.problems.length) return { fail: placed.problems.join('; ') };
+  if (wanted.unverified) placed.notes.push(`"${wanted.name}": ${wanted.unverified}`);
+  return { state: work, notes: placed.notes };
+}
+
+/**
  * M26.2: der Tausch. Gibt `{ skip }` (nichts getan, Voraussetzung fehlt),
  * `{ fail }` (gelaufen, aber nicht gelungen) oder `{ state, notes }` zurueck.
  *
@@ -686,16 +751,10 @@ function placeVillager(work, n, wanted, spots, env) {
  */
 function swapVillager(state, step, allZones, allGrids, assets, cards, scenarioData, rng) {
   const villagers = scenarioData?.villagers;
-  if (!hasVillagers(villagers)) return { skip: 'no villager data in the scenario data' };
+  const picked = pickSeat(state, step, assets, villagers);
+  if (picked.skip) return { skip: picked.skip };
+  const { n, wanted, seated } = picked;
 
-  const n = Number(step.seat);
-  if (step.seat === '' || step.seat === null || !Number.isInteger(n) || n < 1 || n > villagers.seats.length) {
-    return { skip: `no seat "${step.seat ?? ''}"` };
-  }
-  const wanted = findVillager(villagers, step.villager);
-  if (!wanted) return { skip: `"${step.villager ?? ''}" is not in the roster` };
-
-  const seated = seatedVillagers(state, assets, villagers);
   const here = seated.find(s => s.n === n);
   if (!here) return { skip: `nobody sits at seat ${n}` };
   if (!here.data) return { skip: `seat ${n} holds "${here.name ?? '?'}", who is not in the roster` };
@@ -2105,8 +2164,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     // nichts). Ein Hinweis (`note`) heisst: getauscht, aber der Spieler sollte
     // etwas wissen - Georgies ungepruefte Werte, eine Karte, die in den Vorrat
     // gehen musste.
-    case 'swap_villager': {
-      const r = swapVillager(state, step, allZones, allGrids, assets, cards, scenarioData, rng);
+    case 'swap_villager':
+    case 'seat_villager': {
+      const r = (step.type === 'seat_villager' ? seatVillager : swapVillager)(state, step, allZones, allGrids, assets, cards, scenarioData, rng);
       if (r.skip) return skip(r.skip);
       if (r.fail) return fail(r.fail);
       // Wer jetzt wo sitzt, hat sich geaendert; die Schritte dahinter sehen es.

@@ -58,6 +58,22 @@ export const coordOf = (v) => (v === null || v === undefined || v === '' ? NaN :
 /** Ist das eine Stelle `{ x, y }` mit zwei endlichen Zahlen? */
 export const isSpot = (p) => Boolean(p) && Number.isFinite(coordOf(p.x)) && Number.isFinite(coordOf(p.y));
 
+/**
+ * Was an der **Geometrie** von Platz `n` (1-based) fehlt, eine Meldung je Stück:
+ * das Tableau, ein Zähler je Wert. Eine Stelle für die Frage - die Prüfung der
+ * Daten und `seat_villager` fragen dasselbe (M6): was die Daten nicht sagen,
+ * stellt der Aufbau nicht halb hin.
+ */
+export function seatGeometryProblems(seat, n) {
+  const who = `seat ${n}`;
+  const problems = [];
+  if (!isSpot(seat?.tableau)) problems.push(`${who}: no tableau position`);
+  for (const st of STATS) {
+    if (!isSpot(seat?.counters?.[st.key])) problems.push(`${who}: no counter position for ${st.key}`);
+  }
+  return problems;
+}
+
 /** Das Tableau eines Dörflers heißt als Asset `Tableau: <voller Name>`. */
 export const TABLEAU_PREFIX = 'Tableau: ';
 
@@ -198,10 +214,7 @@ export function validateVillagers(villagers, { assets = [], cards = [], zones = 
       if (!String(seat?.[key] ?? '').trim()) problems.push(`${who}: no "${key}"`);
     }
     // M27.1: die Stellen. Eine je Wert – ein fehlender Zähler wird einzeln genannt.
-    if (!isSpot(seat?.tableau)) problems.push(`${who}: no tableau position`);
-    for (const st of STATS) {
-      if (!isSpot(seat?.counters?.[st.key])) problems.push(`${who}: no counter position for ${st.key}`);
-    }
+    problems.push(...seatGeometryProblems(seat, i + 1));
     if (!seat?.anchor) return;
     needAsset(seat.anchor, who);
     needZone(seat.vorrat, who);

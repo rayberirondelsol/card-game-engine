@@ -71,3 +71,30 @@ test('der Editor hat für seat, villager und atStart je einen Renderer', async (
     assert.ok(body.includes(`\n    ${f}: () =>`), `"${f}" hat keinen Renderer in SetupSequenceEditor.jsx`);
   }
 });
+
+// ── CQ / M27.1: `seat_villager` – derselbe Platz und derselbe Dörfler, ohne Tausch ──
+
+test('seat_villager steht im Vokabular, mit denselben zwei Feldern wie swap_villager', () => {
+  assert.ok(STEP_TYPES.find(x => x.value === 'seat_villager'), 'seat_villager fehlt in STEP_TYPES');
+  assert.deepEqual(stepFields('seat_villager'), ['seat', 'villager']);
+  assert.equal(stepTypeLabel({ type: 'seat_villager' }), 'Seat Villager');
+  // Beide Felder haben schon einen Renderer (siehe unten) – kein neues Feld, kein neuer Renderer.
+});
+
+test('ein frischer seat_villager-Schritt nimmt keinen Dörfler vorweg', () => {
+  assert.deepEqual(defaultStep('seat_villager', {}), { type: 'seat_villager', seat: 1, villager: '' });
+});
+
+test('seat_villager liest sich in einer Zeile', () => {
+  assert.equal(describeStep({ type: 'seat_villager', seat: 1, villager: 'Henlo Bulwark' }),
+    'Seat "Henlo Bulwark" at seat 1');
+  assert.match(describeStep({ type: 'seat_villager', seat: '', villager: '' }), /Seat \(none\) at seat \(none\)/);
+});
+
+test('seat_villager: dieselben zwei Regeln wie bei swap_villager', () => {
+  assert.deepEqual(validateStep({ type: 'seat_villager', seat: 1, villager: 'Judy Marks' }, ctx), []);
+  for (const seat of [0, 'x', '', null]) {
+    assert.ok(validateStep({ type: 'seat_villager', seat, villager: 'Judy Marks' }, ctx).some(p => /seat/.test(p)), String(seat));
+  }
+  assert.ok(validateStep({ type: 'seat_villager', seat: 1, villager: '  ' }, ctx).some(p => /no villager/.test(p)));
+});

@@ -1,5 +1,5 @@
 {
- "comment": "Auszug aus der Produktionsdatenbank (Spiel Townsfolk Tussle, Stand 2026-11-06) für server/test/doerfler-daten.test.js und villagers.test.js: die Assets und Karten der neun Dörfler, die zwölf Leistenzonen, die Dörfler-Schritte der Kurzpartie VOR M26 und die beiden Aktionen VOR der Umschreibung.",
+ "comment": "Auszug aus der Produktionsdatenbank (Spiel Townsfolk Tussle, Stand 2026-11-06) für server/test/doerfler-daten.test.js und villagers.test.js: die Assets und Karten der neun Dörfler, die zwölf Leistenzonen, die Dörfler-Schritte der Kurzpartie VOR M26 und die beiden Aktionen VOR der Umschreibung. sequenceHardwired: dieselben 39 Schritte nach der Umschreibung von M26 (so stehen sie in der Datenbank, bis M27 sie durch drei seat_villager ersetzt) - nur fuer den Gleichwertigkeitstest von seat_villager.",
  "assets": [
   {
    "id": "4d4e0dfd-8d78-4d1e-b6e9-b8be159a807a",
@@ -2102,6 +2102,260 @@
      "slot": -2
     }
    ]
+  }
+ ],
+ "sequenceHardwired": [
+  {
+   "type": "place_asset",
+   "assetName": "Henlo",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Fridgette",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Granny",
+   "targetZoneLabel": "Buyin'/Beatin'-Leiste",
+   "faceDown": false
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Henlo Bulwark",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 300,
+   "y": 1600
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Henlo Bulwark"
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Leben",
+   "value": 3,
+   "max": 3,
+   "x": 360,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Bewegung",
+   "value": 5,
+   "x": 220,
+   "y": 1870,
+   "base": 5
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Mumm",
+   "value": 2,
+   "x": 415,
+   "y": 1870,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Henlo: Präzision",
+   "value": -1,
+   "x": 610,
+   "y": 1870,
+   "base": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Fridgette Jones",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 880,
+   "y": 1600
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Fridgette Jones"
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Leben",
+   "value": 4,
+   "max": 4,
+   "x": 700,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Bewegung",
+   "value": 5,
+   "x": 800,
+   "y": 1870,
+   "base": 5
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Mumm",
+   "value": 2,
+   "x": 995,
+   "y": 1870,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Fridgette: Präzision",
+   "value": -1,
+   "x": 1190,
+   "y": 1870,
+   "base": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Tableau: Granny Melba",
+   "targetZoneLabel": "",
+   "faceDown": false,
+   "x": 1460,
+   "y": 1600
+  },
+  {
+   "type": "place_card",
+   "cardName": "BAUERNLATZHOSE",
+   "targetZoneLabel": "Dörfler 1: Beine"
+  },
+  {
+   "type": "place_card",
+   "cardName": "ROSTIGE SICHEL",
+   "targetZoneLabel": "Dörfler 1: Rechte Hand"
+  },
+  {
+   "type": "place_card",
+   "cardName": "GEFRIERFACHTÜR",
+   "targetZoneLabel": "Dörfler 2: Rechte Hand"
+  },
+  {
+   "type": "place_card",
+   "cardName": "KÜHL-PACK",
+   "targetZoneLabel": "Dörfler 2: Brust"
+  },
+  {
+   "type": "place_card",
+   "cardName": "OMMAS GEHSTOCK",
+   "targetZoneLabel": "Dörfler 3: Rechte Hand"
+  },
+  {
+   "type": "place_card",
+   "cardName": "DAS ALTE EISEN",
+   "targetZoneLabel": "Dörfler 3: Linke Hand"
+  },
+  {
+   "type": "lock_asset",
+   "assetName": "Tableau: Granny Melba"
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Leben",
+   "value": 4,
+   "max": 4,
+   "x": 1040,
+   "y": -110
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Bewegung",
+   "value": 4,
+   "x": 1380,
+   "y": 1870,
+   "base": 4
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Mumm",
+   "value": 2,
+   "x": 1575,
+   "y": 1870,
+   "base": 2
+  },
+  {
+   "type": "place_counter",
+   "name": "Granny: Präzision",
+   "value": -2,
+   "x": 1770,
+   "y": 1870,
+   "base": -2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Leben",
+   "targetZoneLabel": "Dörfler 1: Leben",
+   "slot": 3
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Bewegung",
+   "targetZoneLabel": "Dörfler 1: Bewegung",
+   "slot": 5
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Mumm",
+   "targetZoneLabel": "Dörfler 1: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 1: Präzision",
+   "targetZoneLabel": "Dörfler 1: Präzision",
+   "slot": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Leben",
+   "targetZoneLabel": "Dörfler 2: Leben",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Bewegung",
+   "targetZoneLabel": "Dörfler 2: Bewegung",
+   "slot": 5
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Mumm",
+   "targetZoneLabel": "Dörfler 2: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 2: Präzision",
+   "targetZoneLabel": "Dörfler 2: Präzision",
+   "slot": -1
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Leben",
+   "targetZoneLabel": "Dörfler 3: Leben",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Bewegung",
+   "targetZoneLabel": "Dörfler 3: Bewegung",
+   "slot": 4
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Mumm",
+   "targetZoneLabel": "Dörfler 3: Mumm",
+   "slot": 2
+  },
+  {
+   "type": "place_asset",
+   "assetName": "Marker 3: Präzision",
+   "targetZoneLabel": "Dörfler 3: Präzision",
+   "slot": -2
   }
  ]
 }

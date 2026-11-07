@@ -102,6 +102,10 @@ export const STEP_TYPES = [
   // voller Name - was an ihm haengt, steht in den Doerferdaten des Setups
   // (`scenario_data.villagers`), nicht im Schritt.
   { value: 'swap_villager', label: 'Swap Villager', fields: ['seat', 'villager'] },
+  // M27.1/CQ: der Aufbau stellt einen Doerfler an einen **leeren** Platz - das
+  // Hin des Tauschs ohne das Weg. Dieselben zwei Felder, und alles andere (wohin
+  // das Tableau, wohin die Zaehler, was er traegt) steht in den Doerferdaten.
+  { value: 'seat_villager', label: 'Seat Villager', fields: ['seat', 'villager'] },
 ];
 
 const typeOf = (step) => (typeof step === 'string' ? step : step?.type);
@@ -256,6 +260,7 @@ export function defaultStep(type, ctx = {}) {
       // Wie `reveal_next`: die Zone *ist* die Adresse, also steht die erste da.
       return { type, zoneLabel: zone };
     case 'swap_villager':
+    case 'seat_villager':
       // Der Dörfler bleibt leer: den kennt nur der Autor, und geraten wäre er
       // eine Behauptung darüber, wer am Platz sitzen soll (§1: der Tisch
       // entscheidet nicht, wer getauscht wird).
@@ -405,6 +410,8 @@ function describeWork(step) {
     case 'swap_villager':
       return `Swap the villager at seat ${Number.isFinite(Number(step?.seat)) && step?.seat !== '' ? Number(step.seat) : '(none)'}`
         + ` for ${q(step?.villager)}`;
+    case 'seat_villager':
+      return `Seat ${q(step?.villager)} at seat ${Number.isFinite(Number(step?.seat)) && step?.seat !== '' ? Number(step.seat) : '(none)'}`;
     case 'require_zone': {
       const want = step?.expect === 'occupied' ? 'occupied' : 'empty';
       const say = String(step?.message ?? '').trim();
@@ -651,7 +658,7 @@ export function validateStep(step, ctx = {}) {
   // tauschen. Welche Plätze und welche Dörfler es gibt, steht in den
   // Szenariodaten des Setups; der Editor kennt sie nicht (dieselbe Regel wie bei
   // `slot`: der Executor meldet den Rest am Tisch mit demselben Satz).
-  if (typeOf(step) === 'swap_villager') {
+  if (typeOf(step) === 'swap_villager' || typeOf(step) === 'seat_villager') {
     if (!Number.isInteger(Number(step?.seat)) || step?.seat === '' || step?.seat === null || Number(step.seat) < 1) {
       problems.push('seat must be a whole number from 1');
     }
