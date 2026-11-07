@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
+import SetupChoiceDialog from '../components/SetupChoiceDialog';
+import { optionsOfSetup, formatChoices } from '../utils/setupChoices.js';
 import JoinRoomModal from '../components/JoinRoomModal';
 import CameraCardScanner from '../components/CameraCardScanner';
 import { isTouchDevice } from '../utils/touchUtils';
@@ -14,6 +16,8 @@ export default function GameDetail() {
   const [error, setError] = useState(null);
   const [saves, setSaves] = useState([]);
   const [setups, setSetups] = useState([]);
+  // M27.3/CW: das Setup, dessen Optionen der Dialog gerade abfragt (oder null).
+  const [choosingSetup, setChoosingSetup] = useState(null);
   const [cards, setCards] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState(null);
@@ -2015,7 +2019,11 @@ export default function GameDetail() {
                       </div>
                       <div className="flex items-center gap-1 ml-2">
                         <button
-                          onClick={() => navigate(`/games/${id}/play?setupId=${setup.id}`)}
+                          // M27.3/CW: hat das Setup Optionen, fragt zuerst der Dialog;
+                          // sonst wie bisher.
+                          onClick={() => (optionsOfSetup(setup)
+                            ? setChoosingSetup(setup)
+                            : navigate(`/games/${id}/play?setupId=${setup.id}`))}
                           data-testid={`setup-load-btn-${setup.id}`}
                           className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
                           title="Load this setup"
@@ -3041,6 +3049,20 @@ export default function GameDetail() {
         )}
       </div>
     </div>
+
+    {/* M27.3/CW: die Wahl vor dem Aufbau. Sie reist in der Adresse, damit ein
+        Neuladen derselben Adresse denselben Aufbau baut. */}
+    {choosingSetup && (
+      <SetupChoiceDialog
+        setup={choosingSetup}
+        options={optionsOfSetup(choosingSetup)}
+        onCancel={() => setChoosingSetup(null)}
+        onStart={(choices) => {
+          const extra = formatChoices(choices);
+          navigate(`/games/${id}/play?setupId=${choosingSetup.id}${extra ? `&${extra}` : ''}`);
+        }}
+      />
+    )}
 
     {/* Multiplayer Modals */}
     {showCreateRoomModal && (

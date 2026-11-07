@@ -45,6 +45,8 @@ import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 import { resolveTableSource, scaffoldNotice } from '../utils/tableSource.js';
+import { choicesFromSearch } from '../utils/setupChoices.js';
+import { resolveChoices, describeChoices } from '../../../shared/setupOptions.js';
 import { createTextureCache } from '../utils/textureCache.js';
 
 // Table background configurations
@@ -4580,6 +4582,21 @@ export default function GameTable({ room = null }) {
             return;
           }
           const setup = await res.json();
+          // M27.3/CW: die Wahl des Spielers (`?opt=partie:lang`) **vor** dem
+          // Gerüst. Ohne `opt` gelten die Vorgaben - alte Lesezeichen bauen
+          // die Kurzpartie von vor M27. Mit einem Problem (unlesbar, unbekannte
+          // Option oder Wahl) wird **nichts** aufgebaut und der Tisch sagt es:
+          // ein Tippfehler baut sonst still die Standardvariante.
+          const given = choicesFromSearch(searchParams);
+          const wanted = resolveChoices(parseScenarioData(setup.scenario_data).options, given.choices);
+          const choiceProblems = [...given.problems, ...wanted.problems];
+          if (choiceProblems.length) {
+            const why = choiceProblems.join('; ');
+            setSetupIssues([{ index: -1, type: '(setup)', target: setup.name, status: 'failed', reason: `choices: ${why} - nothing was built` }]);
+            setSaveToast(`Setup not loaded: ${why}`);
+            setTimeout(() => setSaveToast(null), 8000);
+            return;
+          }
           // Zonen, Raster, Aktionen und Szenariodaten - dieselbe Stelle, die
           // auch der Spielstandzweig benutzt (M6/M22). Die Werte kommen
           // zurueck, weil der Executor sie *jetzt* braucht: im Zustand stehen
@@ -4605,7 +4622,7 @@ export default function GameTable({ room = null }) {
               const cardLibrary = await loadCardLibrary();
               // Die Raster wie die Zonen frisch aus dem Setup: `grids` im State
               // ist an dieser Stelle noch leer (M7/T1).
-              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, cards: cardLibrary, grids: parsedGrids, scenarioData: parsedScenario });
+              const { state: built, log } = executeSequenceWithLog(parsed, parsedSeq, parsedZones, { assets, cards: cardLibrary, grids: parsedGrids, scenarioData: parsedScenario, choices: wanted.choices });
               stateToLoad = built;
               const bad = log.filter(e => e.status !== 'ok');
               setSetupIssues(bad.length ? bad : null);
@@ -4616,8 +4633,11 @@ export default function GameTable({ room = null }) {
           // The grids go along explicitly: `grids` is only set on the next
           // render, and the objects have to be placed now.
           loadGameState(stateToLoad, parsedGrids);
-          setSaveToast(`Loaded setup: "${setup.name}"`);
-          setTimeout(() => setSaveToast(null), 4000);
+          // M27.3: der Tisch sagt, womit er aufgebaut wurde - der Schutz gegen
+          // den leisen Standard.
+          const used = describeChoices(parsedScenario.options, wanted.choices);
+          setSaveToast(`Loaded setup: "${setup.name}"${used ? ` - ${used}` : ''}`);
+          setTimeout(() => setSaveToast(null), used ? 8000 : 4000);
         } catch (err) {
           console.error('Failed to load setup:', err);
         }

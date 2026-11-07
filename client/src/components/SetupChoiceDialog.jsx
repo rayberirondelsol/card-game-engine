@@ -1,0 +1,42 @@
+import React, { useState } from 'react';
+import SetupChoiceFields from './SetupChoiceFields';
+import { resolveChoices } from '../../../shared/setupOptions.js';
+
+/**
+ * M27.3/CW: der kleine Dialog vor dem Aufbau - je Option eine Auswahl, das
+ * `default` vorbelegt, „Starten" navigiert mit der Wahl in der Adresse. Ein
+ * Setup ohne Optionen bekommt ihn nie (der Aufrufer fragt `optionsOfSetup`).
+ *
+ * Die Vorbelegung kommt aus `resolveChoices` - derselben Funktion, die der
+ * Server beim Anlegen eines Raums und der Executor als letzte Wache fragen.
+ */
+export default function SetupChoiceDialog({ setup, options, onStart, onCancel }) {
+  const [choices, setChoices] = useState(() => resolveChoices(options, {}).choices);
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="setup-choice-dialog">
+      <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <h2 className="text-xl font-semibold mb-1">Start setup</h2>
+        <p className="text-sm text-[var(--color-text-secondary)] mb-4">{setup?.name}</p>
+        <SetupChoiceFields options={options} value={choices} onChange={setChoices} />
+        <div className="flex gap-3 justify-end pt-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            data-testid="setup-choice-cancel"
+            className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onStart(choices)}
+            data-testid="setup-choice-start"
+            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors"
+          >
+            Start
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
