@@ -45,6 +45,7 @@ import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
 import { isEmptyTableState } from '../../../shared/tableState.js';
 import { matchesCardSearch } from '../../../shared/cardSearch.js';
 import { resolveTableSource, scaffoldNotice } from '../utils/tableSource.js';
+import { createTextureCache } from '../utils/textureCache.js';
 
 // Table background configurations
 const TABLE_BACKGROUNDS = {
@@ -104,16 +105,10 @@ function shouldSnap(value) {
   return Math.abs(value - nearest) < SNAP_THRESHOLD;
 }
 
-// Texture cache - generate once, reuse on every frame
-const textureCache = {};
-
-function getOrCreateTexture(type, width, height, baseColor) {
-  const key = `${type}-${width}-${height}-${baseColor}`;
-  if (textureCache[key]) return textureCache[key];
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width = width;
-  offscreen.height = height;
+// Texture cache - generate once, reuse on every frame. Die Entscheidung, ob
+// ueberhaupt eine Textur gemalt werden kann (Breite/Hoehe 0 -> nein), steht in
+// utils/textureCache.js; hier wird nur gemalt (docs/befund-leerer-tisch.md).
+function paintTexture(offscreen, type, width, height, baseColor) {
   const ctx = offscreen.getContext('2d');
 
   if (type === 'felt') {
@@ -166,9 +161,17 @@ function getOrCreateTexture(type, width, height, baseColor) {
     ctx.fillRect(0, 0, width, height);
   }
 
-  textureCache[key] = offscreen;
-  return offscreen;
 }
+
+const getOrCreateTexture = createTextureCache(
+  (width, height) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  },
+  paintTexture,
+);
 
 // Draw cached texture pattern onto context
 function drawFeltPattern(ctx, width, height, baseColor) {
