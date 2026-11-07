@@ -15,15 +15,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
-  VILLAGERS, ROSTER, INITIAL, CARD_SLOTS, COUNTER_ROW, counterSpots,
-  patchSequence, patchActions, patchScenario, patchZones,
+  VILLAGERS, ROSTER, INITIAL, CARD_SLOTS, COUNTER_ROW,
+  patchActions, patchScenario, patchZones,
 } from '../../scripts/doerfler-daten.mjs';
+import * as Skript from '../../scripts/doerfler-daten.mjs';
 import { equipmentZones, MEASURED_ANCHORS, BAND, counterBox, COUNTER_SIZE } from '../../scripts/equipment-zones.mjs';
 import { MEASURED_NEIGHBOURS, extraZones } from '../../scripts/partie13-daten.mjs';
 import { resolveBox } from '../../shared/anchoring.js';
 import { validateVillagers, STATS, SLOTS } from '../../shared/villagers.js';
 
 const fx = JSON.parse(fs.readFileSync(new URL('./fixtures/doerfler-kurzpartie.json', import.meta.url), 'utf8'));
+
+/**
+ * Die neun Zählerstellen der Reihe unter dem Tableau, aus den **Platzdaten**: `{ 'Henlo: Bewegung': { x, y }, … }`.
+ * Bis M27 rechnete `counterSpots()` sie für das Umschreiben der Folge; die Folge liest sie seither selbst
+ * (`seat_villager`), und die Zahlen stehen in `VILLAGERS.seats[].counters`.
+ */
+const reihe = () => Object.fromEntries(INITIAL.flatMap((name, i) =>
+  COUNTER_ROW.order.map(stat => [`${ROSTER[name].short}: ${stat}`, VILLAGERS.seats[i].counters[stat]])));
 
 const anchors = new Map(MEASURED_ANCHORS.map(a => [a.id, a]));
 const resolve = (list) => list.map(z => ({ ...z, ...resolveBox(z.anchor, anchors.get(z.anchor.assetId)) }));
@@ -147,27 +156,21 @@ test('BY: jedes Ziel ist eine Platz-Zone, keines der Vorrat, keine heißt noch `
   assert.notEqual(CARD_SLOTS['OMMAS GEHSTOCK'], CARD_SLOTS['DAS ALTE EISEN']);
 });
 
-test('BY/CJ: die Umschreibung der Sequenz fasst genau dreizehn Schritte an und ist idempotent', () => {
-  const vorher = fx.sequenceBefore;
-  const nachher = patchSequence(vorher);
-  assert.equal(nachher.length, vorher.length);
-  const geaendert = nachher.filter((s, i) => JSON.stringify(s) !== JSON.stringify(vorher[i]));
-  // Vier Karten wechseln das Ziel (die beiden Hände-Zonen fallen weg); die Hose
-  // und das Kühl-Pack heißen weiter `Dörfler 1: Beine` und `Dörfler 2: Brust`.
-  assert.equal(geaendert.length, 13, 'vier Karten und neun Zähler');
-  assert.equal(geaendert.filter(s => s.type === 'place_card').length, 4);
-  assert.equal(geaendert.filter(s => s.type === 'place_counter').length, 9);
-  // Leben (M23.5) und alles andere bleibt Zeichen für Zeichen.
-  for (const s of vorher.filter(x => x.type === 'place_counter' && /: Leben$/.test(x.name))) {
-    assert.deepEqual(nachher.find(x => x.name === s.name), s);
+// CZ / M27: `patchSequence` ist weg. Die 39 Dörfler-Schritte schreibt dieses Skript nicht mehr um - die Folge
+// stellt die Dörfler selbst aus den Daten (`seat_villager`, `scripts/auslagen-daten.mjs`). Ein zweiter Lauf
+// des alten `--write` hätte die Folge zurückgeschrieben; es gibt nichts mehr, was er schreiben könnte.
+test('CZ: das Skript schreibt **keine** Folge mehr – `patchSequence`, `counterSpots` und `rowBox` sind weg', () => {
+  for (const weg of ['patchSequence', 'counterSpots', 'rowBox']) assert.equal(Skript[weg], undefined, weg);
+  // Was bleibt: die Daten und was zu ihnen gehört.
+  for (const da of ['VILLAGERS', 'ROSTER', 'INITIAL', 'CARD_SLOTS', 'COUNTER_ROW', 'patchActions', 'patchScenario', 'patchZones']) {
+    assert.notEqual(Skript[da], undefined, da);
   }
-  assert.deepEqual(patchSequence(nachher), nachher);
 });
 
 // ── CJ: die Zähler ──────────────────────────────────────────────────────────
 
 test('CJ: neun Zähler in einer Reihe unter dem Tableau, drei je Dörfler, in der Reihenfolge Bewegung/Mumm/Präzision', () => {
-  const spots = counterSpots();
+  const spots = reihe();
   assert.equal(Object.keys(spots).length, 9);
   INITIAL.forEach((name, i) => {
     const a = MEASURED_ANCHORS[i];
@@ -176,12 +179,12 @@ test('CJ: neun Zähler in einer Reihe unter dem Tableau, drei je Dörfler, in de
     for (const stat of COUNTER_ROW.order) assert.equal(spots[`${ROSTER[name].short}: ${stat}`].y, 1870);
   });
   // Die Werte aus der Aufgabenliste.
-  assert.deepEqual(Object.values(counterSpots()).map(s => s.x),
+  assert.deepEqual(Object.values(reihe()).map(s => s.x),
     [220, 415, 610, 800, 995, 1190, 1380, 1575, 1770]);
 });
 
 test('CJ: kein Zählerkasten überlappt eine Zone, ein Tableau oder einen anderen Zähler', () => {
-  const kaesten = Object.entries(counterSpots()).map(([name, s]) => ({ name, ...counterBox(s) }));
+  const kaesten = Object.entries(reihe()).map(([name, s]) => ({ name, ...counterBox(s) }));
   // Dazu die Lebenszähler, die liegen bleiben (M23.5).
   const leben = [['Henlo: Leben', 360], ['Fridgette: Leben', 700], ['Granny: Leben', 1040]]
     .map(([name, x]) => ({ name, ...counterBox({ x, y: -110 }) }));
@@ -202,7 +205,7 @@ test('CJ: jeder Zähler bleibt im Feld seines Dörflers und im Fenster der Ansic
   INITIAL.forEach((name, i) => {
     const a = MEASURED_ANCHORS[i];
     for (const stat of COUNTER_ROW.order) {
-      const k = counterBox(counterSpots()[`${ROSTER[name].short}: ${stat}`]);
+      const k = counterBox(reihe()[`${ROSTER[name].short}: ${stat}`]);
       assert.ok(k.x >= a.x - 1e-6 && k.x + k.width <= a.x + BAND.pitch + 1e-6, `${name}: ${stat} ragt aus dem Feld`);
       // Fenster 932 × 738 bei Zoom 0,41, Mitte 1149,5 / 1675, abzüglich der
       // Werkzeugleiste (BAND.bottom); oben beginnt die Ansicht bei 775.
@@ -302,7 +305,7 @@ test('CO: die Platzdaten bestehen die Prüfung – ein Platz hat Tableau, vier Z
 });
 
 test('CO: die Zahlen sind die der alten Schritte – Tableau, Lebenszähler und die drei Zählerreihen', () => {
-  const steps = patchSequence(fx.sequenceBefore);
+  const steps = fx.sequenceHardwired;
   INITIAL.forEach((name, i) => {
     const seat = VILLAGERS.seats[i];
     const tab = steps.find(s => s.type === 'place_asset' && s.assetName === seat.anchor);

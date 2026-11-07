@@ -2,15 +2,21 @@
 // sechs Ausrüstungsplätze am Tableaurand, die Zähler aus der Lücke, die Daten
 // der neun Dörfler und Aktionen, die keinen Dörfler mehr beim Namen nennen.
 //
-// Vier Spalten, ein Schalter, **eine Transaktion**: `zone_data` (die Plätze),
-// `sequence_data` (die Ziele der Startausrüstung, die Zählerstellen),
+// Drei Spalten, ein Schalter, **eine Transaktion**: `zone_data` (die Plätze),
 // `action_data` (Platzhalter statt Namen) und `scenario_data` (der Abschnitt
-// `villagers`). Sie hängen aneinander — die Zonen heißen anders, die Schritte
-// nennen sie beim Namen — und eine Hälfte allein ließe jede Karte der
-// Startausrüstung ins Leere zielen. Hier stehen die Zahlen **einmal** (M6):
-// derselbe Baustein liefert sie für den Trockenlauf, für das Schreiben und für
+// `villagers`). Hier stehen die Zahlen **einmal** (M6): derselbe Baustein liefert
+// sie für den Trockenlauf, für das Schreiben und für
 // `server/test/doerfler-daten.test.js`. Begründung, Messwerte und die
 // verworfenen Varianten stehen in `docs/tasks-doerfler.md`.
+//
+// **Seit M27 schreibt dieses Skript keine Folge mehr** (`sequence_data`): die 39
+// hartverdrahteten Schritte (Tableaus, Zähler, Karten, Marker) sind drei
+// `seat_villager`, die die Folge aus `VILLAGERS` selbst liest - `patchSequence`,
+// `counterSpots` und `rowBox` sind weg. Geschrieben hat das
+// `scripts/auslagen-daten.mjs`. `VILLAGERS` trägt dafür die Platzdaten (`barZone`,
+// `tableau`, `counters`), und `auslagen-daten.mjs` hat `villagers` Zeichen für
+// Zeichen auf diese Konstante gebracht: ein weiterer Lauf **dieses** Skripts
+// ändert an `villagers` nichts (Befund 10 in `docs/tasks-auslagen.md`).
 //
 // Aufruf (im Backend-Container, wo `better-sqlite3` liegt):
 //
@@ -18,11 +24,11 @@
 //   node scripts/doerfler-daten.mjs --check <db-pfad> # Trockenlauf
 //   node scripts/doerfler-daten.mjs --write <db-pfad> # eine Transaktion
 //
-// Gelesen und geschrieben werden **nur die vier Spalten**, und jede einzeln. Wer
+// Gelesen und geschrieben werden **nur die drei Spalten**, und jede einzeln. Wer
 // die ganze Zeile zurückschreibt, überschreibt `state_data` und `grid_data`
 // fremder Aufträge.
 
-import { SETUP_ID, DOERFLER, MEASURED_ANCHORS, counterBox, equipmentZones, patchZones, RETIRED_IDS } from './equipment-zones.mjs';
+import { SETUP_ID, DOERFLER, MEASURED_ANCHORS, equipmentZones, patchZones, RETIRED_IDS } from './equipment-zones.mjs';
 import { STATS, validateVillagers } from '../shared/villagers.js';
 
 export { SETUP_ID, patchZones };
@@ -59,18 +65,6 @@ function seatSpots(i) {
   // In der Reihenfolge von `STATS`, damit der Abschnitt wie alle anderen liest.
   return { tableau: { x: cx, y: a.y + a.height / 2 }, counters: Object.fromEntries(STATS.map(st => [st.key, counters[st.key]])) };
 }
-
-/** Die neun Zählerstellen: `{ 'Henlo: Bewegung': { x, y }, … }`. */
-export function counterSpots() {
-  const out = {};
-  INITIAL.forEach((name, i) => {
-    for (const stat of COUNTER_ROW.order) out[`${ROSTER[name].short}: ${stat}`] = seatSpots(i).counters[stat];
-  });
-  return out;
-}
-
-/** Der Kasten eines Zählers der neuen Reihe, in Weltpunkten. */
-export const rowBox = (spot) => counterBox(spot);
 
 // ── CK: die Daten der neun Dörfler ───────────────────────────────────────────
 
@@ -159,26 +153,9 @@ export const VILLAGERS = { fightZone: 'Bösewicht-Tableau', barZone: "Buyin'/Bea
 export const CARD_SLOTS = Object.fromEntries(INITIAL.flatMap((name, i) =>
   ROSTER[name].gear.map(g => [g.card, `${SEATS[i].zones}: ${g.slot ?? 'Vorrat'}`])));
 
-// ── Die vier Umschreibungen, als reine Funktionen ────────────────────────────
+// ── Die drei Umschreibungen, als reine Funktionen ────────────────────────────
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-/**
- * BY + CJ: die Ziele der sechs Karten und die neun Zählerstellen. Mehr fasst die
- * Umschreibung nicht an: jeder andere Schritt bleibt Zeichen für Zeichen.
- */
-export function patchSequence(steps) {
-  const spots = counterSpots();
-  return (Array.isArray(steps) ? steps : []).map(s => {
-    if (s?.type === 'place_card' && CARD_SLOTS[s.cardName]) {
-      return { ...s, targetZoneLabel: CARD_SLOTS[s.cardName] };
-    }
-    if (s?.type === 'place_counter' && spots[s.name]) {
-      return { ...s, ...spots[s.name] };
-    }
-    return s;
-  });
-}
 
 /**
  * CL: die Dörflernamen der Aktionen werden zu Platzhaltern (`$F1`, `$V1: Leben`,
@@ -223,7 +200,6 @@ export function patchScenario(scenario) {
 
 const COLUMNS = [
   ['zone_data', patchZones, 'Zonen'],
-  ['sequence_data', patchSequence, 'Schritte'],
   ['action_data', patchActions, 'Aktionen'],
   ['scenario_data', patchScenario, 'Abschnitte'],
 ];
@@ -233,7 +209,7 @@ async function main(argv) {
 
   if (mode === '--json') {
     console.log(JSON.stringify({
-      villagers: VILLAGERS, cardSlots: CARD_SLOTS, counterSpots: counterSpots(),
+      villagers: VILLAGERS, cardSlots: CARD_SLOTS,
       zones: equipmentZones(),
     }, null, 1));
     return 0;
@@ -279,9 +255,6 @@ async function main(argv) {
   // alles schon vor und darf nichts mehr melden (dieselbe Falle wie
   // `CURRENT_VORRAT` in der alten `equipment-zones.mjs`).
   const col = (name) => plan.find(p => p.col === name);
-  const seq = col('sequence_data');
-  if (seq.after !== seq.before) complaints.push('sequence_data: es darf kein Schritt dazukommen');
-  if (seq.weg > 13 || seq.neu !== seq.weg) complaints.push(`sequence_data: höchstens 13 ersetzte Schritte, gefunden ${seq.weg}/${seq.neu}`);
   const act = col('action_data');
   if (act.after !== act.before) complaints.push('action_data: es darf keine Aktion dazukommen');
   const steps = (l) => l.flatMap(a => a.steps || []).length;
@@ -326,9 +299,6 @@ async function main(argv) {
   const z = read('zone_data');
   const slots = z.filter(q => /^Dörfler \d: (Kopf|Brust|Beine|Linke Hand|Rechte Hand|Mitbringsel)$/.test(q.label));
   console.log(`geschrieben: ${z.length} Zonen, davon ${slots.length} Plätze, Hände-Zonen: ${z.filter(q => /Hände/.test(q.label)).length}`);
-  const s = read('sequence_data');
-  console.log(`  place_card-Ziele: ${s.filter(x => x.type === 'place_card').map(x => x.targetZoneLabel).join(' | ')}`);
-  console.log(`  Zähler: ${s.filter(x => x.type === 'place_counter' && /: (Bewegung|Mumm|Präzision)$/.test(x.name) && !/^Bösewicht/.test(x.name)).map(x => `${x.name}@${x.x},${x.y}`).join(' ')}`);
   const ac = read('action_data');
   console.log(`  Aktionen mit Dörflernamen im Text: ${ac.flatMap(a => a.steps).filter(x => /Henlo|Fridgette|Granny/.test(JSON.stringify(x))).length}`);
   const sc = read('scenario_data');

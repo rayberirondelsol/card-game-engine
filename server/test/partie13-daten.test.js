@@ -17,7 +17,7 @@ import {
   HAUPTPLAN, SIDEBOARD, counterBox, GRID_BOX, VIEWPORT, STRIP,
 } from '../../scripts/partie13-daten.mjs';
 import { equipmentZones, MEASURED_ANCHORS, BAND } from '../../scripts/equipment-zones.mjs';
-import { counterSpots } from '../../scripts/doerfler-daten.mjs';
+import { VILLAGERS, INITIAL, COUNTER_ROW } from '../../scripts/doerfler-daten.mjs';
 import { resolveBox } from '../../shared/anchoring.js';
 import { zoneCapacity, zoneRejects, zoneLabelAbove, zoneSlots } from '../../shared/zoneGeometry.js';
 import { executeSequenceWithLog } from '../../shared/sequenceExecutor.js';
@@ -79,7 +79,8 @@ test('CB: keine neue Zone liegt unter einer Zählerspalte', () => {
   // Ablagen verdeckt.
   const spalten = [
     ...[580, 1160, 1740].flatMap(x => [1430, 1520, 1610, 1700].map(y => counterBox({ x, y }))),
-    ...Object.values(counterSpots()).map(counterBox),
+    // Die neun Zähler der Reihe unter dem Tableau, aus den Platzdaten (M27: `counterSpots()` ist weg).
+    ...INITIAL.flatMap((_, i) => COUNTER_ROW.order.map(stat => counterBox(VILLAGERS.seats[i].counters[stat]))),
   ];
   for (const z of neu) {
     for (const c of spalten) {
