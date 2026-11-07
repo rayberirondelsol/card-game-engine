@@ -1,11 +1,13 @@
 // Der Tisch der Dörfler-Tests: die Kurzpartie, wie sie ihre Dörfler baut.
 //
 // Geteilt von `villagers.test.js` und `swap-villager.test.js`: derselbe Aufbau
-// (Auszug aus der Datenbank, `fixtures/doerfler-kurzpartie.json`, mit den
-// Umschreibungen aus `scripts/doerfler-daten.mjs`), dieselben Zonen, dieselben
-// Dörferdaten. Nichts wird von Hand in einen Zustand geschrieben, den der
-// Aufbau nie hergestellt hätte. Kein `.test.js`: der Runner lädt es nicht
-// selbst.
+// (Auszug aus der Datenbank, `fixtures/doerfler-kurzpartie.json`), dieselben
+// Zonen, dieselben Dörferdaten. Die Dörfler setzt der Aufbau, wie er es seit M27
+// tut: drei `seat_villager` aus den Daten - nicht mehr 39 hartverdrahtete Schritte
+// (die liegen als `sequenceHardwired` in der Fixture, nur für den
+// Gleichwertigkeitstest in `seat-villager.test.js`). Nichts wird von Hand in
+// einen Zustand geschrieben, den der Aufbau nie hergestellt hätte. Kein
+// `.test.js`: der Runner lädt es nicht selbst.
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +16,7 @@ import { executeSequenceWithLog } from '../../shared/sequenceExecutor.js';
 import { resolveZones, anchorBoxes } from '../../shared/anchoring.js';
 import { zoneContains } from '../../shared/zoneGeometry.js';
 import { equipmentZones } from '../../scripts/equipment-zones.mjs';
-import { patchSequence, patchScenario } from '../../scripts/doerfler-daten.mjs';
+import { patchScenario, INITIAL } from '../../scripts/doerfler-daten.mjs';
 
 export const fx = JSON.parse(fs.readFileSync(new URL('./fixtures/doerfler-kurzpartie.json', import.meta.url), 'utf8'));
 
@@ -29,9 +31,12 @@ export const swap = (state, seat, villager, over = {}) => run(state, [{ type: 's
 
 export const copy = (x) => JSON.parse(JSON.stringify(x));
 
+/** Die Besetzung der Kurzpartie, wie der Aufbau sie nennt: Platz n – Dörfler. */
+export const LINEUP = INITIAL.map((villager, i) => ({ type: 'seat_villager', seat: i + 1, villager }));
+
 /** Der Tisch nach dem Aufbau der Kurzpartie (nur der Dörfler-Teil). */
 export function build() {
-  const { state, log } = run({}, patchSequence(fx.sequenceBefore));
+  const { state, log } = run({}, LINEUP);
   assert.deepEqual(log.filter(e => e.status !== 'ok'), [], 'der Aufbau muss ohne Beanstandung laufen');
   return state;
 }

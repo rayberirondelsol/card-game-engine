@@ -15,12 +15,11 @@ import assert from 'node:assert/strict';
 import { seatedVillagers, seatVars } from '../../shared/villagers.js';
 import { VILLAGERS, ROSTER } from '../../scripts/doerfler-daten.mjs';
 import {
-  fx, run, copy, scenarioData, tokenNamed, counterNamed, cardNamed, inZone,
+  fx, run, copy, scenarioData, tokenNamed, counterNamed, cardNamed, inZone, LINEUP,
 } from './villager-table.js';
 
 const seat = (n, villager) => ({ type: 'seat_villager', seat: n, villager });
 const asset = (name) => fx.assets.find(a => a.name === name);
-const LINEUP = [seat(1, 'Henlo Bulwark'), seat(2, 'Fridgette Jones'), seat(3, 'Granny Melba')];
 const unveraendert = (vorher, nachher) => assert.equal(JSON.stringify(nachher), JSON.stringify(vorher));
 const gestellt = (steps = LINEUP, over = {}) => run({}, steps, over);
 // Ein Schritt legt die leeren Listen an, auch wenn er überspringt – leer heißt: nichts liegt.
