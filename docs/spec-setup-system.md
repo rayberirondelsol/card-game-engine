@@ -1296,6 +1296,11 @@ bei den drei Dörflern in M4a.
   ehrliche Antwort, und ein Schalter, der ein Überspringen unsichtbar macht, ist
   ein Schalter, der Fehler unsichtbar macht. Der Endkampf ist deshalb keine
   Bedingung, sondern ein Abschnitt in den Daten.
+
+  > **Berichtigung (M27):** dieser Satz gilt so nicht mehr und galt seit M9.3
+  > nicht mehr. `require_zone`/`require_counter` halten eine Folge an (M9.3,
+  > M19.5), und `onlyFinal` (M20.1) lässt jeden Schritt einzeln aus. Was gilt,
+  > steht in **M27.2**, „Die Regel ‚keine Bedingungen'".
 - **Die Werte des Bösewichts.** MVMT und HEALTH sind regelseitig ungeklärt: das
   Regelvideo leitet sie ab (Bewegung = höchste + 1, Leben = Summe + 3), das
   Tableau druckt sie in Spalten 2P–5P. Solange das nicht entschieden ist, wäre
@@ -5702,3 +5707,506 @@ Kontextmenü am Tableau (Schrittwort `swap_villager` im Vokabular); gesperrt ist
 schon gespielt hat** (`require_counter … atStart`). Offen bleibt die Lage der
 Marker auf den aufgedruckten Kreisen je Tableau (drei Spaltenlagen, bis 8 Weltpunkte
 Abweichung bei einem Tausch über die Lagen hinweg).
+
+
+## M27 — Die Auslage steht einmal im Setup, und ein Aufbau hat Schalter
+
+Zwei Wünsche des Auftraggebers vom 2026-11-07, wörtlich:
+
+> „Ich hätte die Engine gerne so, dass man im Setup definierte Auslagen
+> definieren kann, sodass man einmal im Setup definiert, welcher Dörfler mit
+> welchen Gegenständen wie ausgerüstet wird und wo seine Token auf den Stats
+> liegen. Außerdem, dass im normalen Spiel die Standardgegenstände (Nachschub)
+> des Shops gemischt neben den Shop gelegt werden, oder aber, wenn man mit
+> Toller Trödel spielt, nur die Toller-Trödel-Nachschub-Karten neben den Shop
+> gelegt werden."
+
+Und seine Antwort auf die Frage nach dem Zuschnitt:
+
+> „Gerne so, dass man am Anfang des Spiels wählen kann, ob man ein kurzes oder
+> langes Spiel spielt, und ob man mit oder ohne Toller Trödel spielt. Neue
+> Nachbarn kann ruhig immer enthalten sein."
+
+Das ist **entschieden**: **ein** Aufbau, **zwei** Schalter, **Neue Nachbarn ist
+kein Schalter**, die Wahl fällt **beim Start**. Aufgaben `CO`–`CZ` in
+`docs/tasks-auslagen.md`, dort auch die Stellen, an denen die Annahmen des
+Auftrags im Code oder in den Daten nicht zutrafen — **„Wo die Spec nicht stimmt"
+vor dem Bauen lesen**, zwei davon ändern den Zuschnitt.
+
+**Neue Nachbarn ist fester Bestandteil jedes Starts** und bleibt es: die fünf
+Ereignisse im Stapel `Dorf-Ereignisse`, die acht Bösewichte im Pool, die
+Überfall-Karten in den Aktionsdecks. Es gibt dafür **keinen** Schalter, keinen
+Platzhalter und kein Gate. Wer es später zum dritten Schalter machen will,
+widerspricht dieser Entscheidung und soll sie hier lesen.
+
+### M27.1 — Der Aufbau liest die Dörferdaten, statt sie zu wiederholen
+
+**Befund, belegt an der Produktion (Aufbau `b1e10f4e…`, Stand 2026-11-07).**
+Die Hälfte des Wunsches existiert — aber als **Kopie**. `scenario_data.villagers`
+(M26, `shared/villagers.js`) führt je Dörfler Startwerte und Startausrüstung samt
+Slot. Gelesen wird sie von `swap_villager`, von den Platzhaltern `$V1`/`$F1` und
+vom Datenskript. **Der Aufbau liest sie nicht.** Seine Folge trägt dieselben
+Angaben noch einmal hartverdrahtet, **39 von 65 Schritten** (Schrittnummern
+0-basiert, wie in `docs/doerflerdaten.md`):
+
+| Schritte | Inhalt |
+|---|---|
+| 23–25 | drei Spielsteine auf die Leiste |
+| 26–27, 32–33, 38, 45 | drei Tableaus samt `lock_asset` |
+| 28–31, 34–37, 46–49 | zwölf Zähler mit Startwert, `max`/`base`, x/y |
+| 39–44 | sechs `place_card` mit Zielzone |
+| 53–64 | zwölf Leistenmarker mit `slot` = Startwert |
+
+Dass beides auseinanderlaufen kann, ist keine Vermutung: `scripts/doerfler-daten.mjs`
+(`patchSequence`, `counterSpots`) schreibt die Schritte **aus dem Roster in die
+Folge um** — eine Synchronisation von Hand, ausgelöst von einem Skript. Heute
+stimmen beide überein (Gegenprobe M26). Ein Dörfler im Roster zu ändern ändert den
+Aufbau **nicht**.
+
+**Zwei Dinge, die der Wunsch größer klingen lässt, als sie sind, und eines, das
+kleiner klingt.**
+
+1. **„Wo seine Token auf den Stats liegen" ist ein Wert, keine Lage.** Der Wert
+   (Feld 3 auf der Lebensleiste) steht im Roster (`start`). Die **Lage** der
+   Felder steht nicht beim Dörfler, sondern in den **Zonen des Platzes**
+   (`Dörfler n: Bewegung` usw., `layout: "slots"`, je zehn `relX/relY`),
+   verankert an dem Tableau, das ursprünglich dort saß. Gemessen: Platz 1 und 3
+   (Henlo, Granny) tragen das **Zickzack-Layout** (`relX` 0,5885 / 0,4143
+   abwechselnd), Platz 2 (Fridgette) das **gerade** (0,5021). Ein Marker folgt dem
+   Platz, nicht dem Tableau. Das ist die offene Frage aus M26 (bis 8 Weltpunkte
+   Abweichung) und bleibt hier **offen** (siehe „Bewusst nicht Teil davon").
+2. **Es sind drei Layouts, nicht zwei.** M8.10 spricht von A und B;
+   `docs/doerflerdaten.md` 6.3 zählt Georgie (Foto, eigene Geometrie) als dritte.
+3. **Die Ausrüstung ist schon vollständig definiert** — Karte, Slot, auch der
+   Vorrat für Karten ohne Slot (Judys Gemälde). Dort fehlt nichts.
+
+**Änderung.** Ein Schritt `seat_villager { seat, villager }` stellt einen Dörfler
+an einen **leeren** Platz: Tableau (mit `anchorId`, wie beim Tausch), Spielstein,
+vier Zähler, vier Marker, Startausrüstung. Alles kommt aus dem Roster; was nur der
+Platz weiß — wohin das Tableau, wohin die Zähler, welche Leiste für die
+Spielsteine —, kommt aus dem Platz:
+
+```
+villagers: {
+  fightZone: "Bösewicht-Tableau",
+  barZone: "Buyin'/Beatin'-Leiste",                         // neu
+  seats: [ { anchor, zones, markers, vorrat,
+             tableau: { x: 300, y: 1600 },                  // neu
+             counters: { Leben: {x,y}, Bewegung: {x,y}, Mumm: {x,y}, Präzision: {x,y} } }, … ],
+  roster: { … unverändert … }
+}
+```
+
+Die 39 Schritte werden **drei**: `seat_villager 1 "Henlo Bulwark"`, `2 "Fridgette
+Jones"`, `3 "Granny Melba"`. **Wer wo sitzt, steht damit als Schritt in der Folge**
+— im Sequenz-Editor sichtbar und änderbar, und im selben Vokabular wie
+`swap_villager`. Beide Schritte rufen **dieselbe** Platzfunktion auf (M6): das
+„Hin" des Tauschs wird herausgelöst, `seat_villager` ist es ohne das „Weg".
+
+Regeln des Schritts, jede mit der Antwort, die der Executor gibt:
+
+- Der Platz muss **leer** sein. Sitzt dort schon jemand: `skipped`, Grund „seat n
+  holds X — use swap_villager". Kein stilles Überschreiben.
+- Ein Dörfler sitzt nur **einmal** (wie beim Tausch).
+- Fehlt an einem Platz die Geometrie (`tableau`, `counters`): `skipped` mit Grund.
+  Es wird **nichts** halb gestellt: alles oder nichts, wie `swap_villager`.
+- Danach gilt `ctx.seatVars` neu, damit die Schritte dahinter `$V1`/`$F1` sehen.
+- Georgies `unverified` kommt als Hinweis (`note`), wie beim Tausch.
+
+**Was bewusst nicht in den Daten steht:** die Spaltenenden (gelten für alle) und die
+Lage der Marker je Layout (offen).
+
+**Abnahme.**
+1. Die 39 hartverdrahteten Schritte sind weg, drei `seat_villager` stehen an ihrer
+   Stelle. Der Tisch nach dem Aufbau ist **gleichwertig**: dieselben Objekte, an
+   denselben Stellen, mit denselben Werten (Gleichwertigkeitstest gegen die alte
+   Folge, ohne die zufälligen Ids).
+2. Ändert man im Roster Henlos Startwert Leben von 3 auf 4 und baut neu auf, steht
+   am Tisch 4 / 4 — **ohne** einen Schritt anzufassen.
+3. `seat_villager 1 "Judy Marks"` im Aufbau stellt Judy an Platz 1: Tableau mit
+   `anchorId`, ihre vier Zähler (`Judy: …`), ihre Startausrüstung in den Slots,
+   drei Gemälde im Vorrat. Die Aktionen laufen danach durch (`$V1` ist „Judy").
+4. Ein belegter Platz, ein doppelter Dörfler, ein Platz ohne Geometrie: `skipped`
+   mit Grund, der Zustand bleibt unberührt.
+5. `swap_villager` verhält sich wie vorher (alle M26-Tests unverändert grün).
+
+### M27.2 — Zwei Schalter: Spiellänge und Toller Trödel
+
+#### Befund: was die echten Daten sagen
+
+**Der heutige Aufbau ist Kurzpartie *und* Toller Trödel.** Beides ist fest
+verdrahtet; die anderen beiden Aufbauten sind keine Alternative (M27.4).
+
+**Kurz oder lang** ist der **offizielle 3-Runden-Modus** `[DE S.34]`
+(`docs/tft-regeln.md` §1.2): das 3-Runden-Plättchen liegt statt eines
+Bösewicht-Plättchens auf dem obersten Kampfplatz, jeder erhält 5 Münzen extra
+(10 + 5 → 45 im gemeinsamen Topf bei drei Dörflern). Kein Hausentwurf. Der
+Unterschied in der **Folge**, an den echten Schritten gemessen:
+
+| | kurz (heute) | lang |
+|---|---|---|
+| Schritt 11 | `place_asset "Kurzpartie: erste Runde überspringen"` auf die Leiste | **fehlt** |
+| Schritte 12–14 | drei benannte Bösewichte (Waggums, Fitz, Bundits) verdeckt | `draw_assets pool "Bösewichte" count 4`, verdeckt |
+| Schritt 50 | Münzen `value: 45` | `value: 30` |
+| alles andere | gleich — Aktionen, Zonen, Szenariodaten, `final: auto` (letzter Platz der Leiste), `reveal_next` (erstes **verdeckt** liegendes Objekt) | |
+
+Das sind **fünf Schritte und ein Wert**: kein Eingriff in Aktionen oder Zonen.
+Die Kampf-Aktionen sind von der Länge unabhängig (Stufe und Endkampf kommen vom
+**Platz**, M7).
+
+**Teurer, als die fünf Schritte vermuten lassen:** die lange Partie zieht vier
+Bösewichte zufällig aus dem **ganzen** Pool von 20 — aber `scenario_data.bosses`
+führt Kampffeld, Gelände und Werte nur für **11**. Die neun fehlenden sind
+Bösewichte des Grundspiels: Bort Dovis, Handsy, Lawman Dozy, Penny Pinchetti,
+Pepin Milkfrog, Qing & Kween, Samuel Strawman, Umbrello, Will Barlow. Die
+Wahrscheinlichkeit, dass **alle vier** gezogenen einen Eintrag haben, ist
+C(11,4)/C(20,4) = **6,8 %**; in **93 %** aller langen Partien kommt mindestens ein
+Bösewicht, dessen Kampf nicht aufgebaut wird („nichts liegt, das Protokoll nennt
+ihn", Abnahme 5 zu `build_scenario`). Die Kurzpartie hat das Problem nicht, weil
+ihre drei Bösewichte **genau die ersten drei erfassten** sind — das ist keine
+Spielwahl, sondern der Stand der Datenerfassung.
+
+**Toller Trödel** ersetzt das Nachschubdeck **vollständig** `[TT S.4]`
+(`docs/tft-regeln.md` §9.1). Welche Kartenkategorien es in der Produktion wirklich
+gibt, und welche davon der **Aufbau** anfasst:
+
+| Kategorie | Karten | im Aufbau? |
+|---|---|---|
+| `Nachschub` | 177 | **ohne** Toller Trödel |
+| `Toller Trödel: Nachschub (Nr. 1-30)` | 30 | **mit** Toller Trödel (heute fest) |
+| `Toller Trödel: Rollen` | 20 | **mit**, als eigener Stapel neben dem Nachschub `[TT S.4]` |
+| `Nachschub (freischaltbar)` | 24 | nein — freigeschaltet durch Spezialaufgaben (Fortschritt, M4) |
+| `Ausrüstung (Hookbox)` | 12 | nein — mit `Startausrüstung (Hookbox)` (4) die 16 freischaltbaren Karten aus Neue Nachbarn |
+| `Toller Trödel: Nachschub (gesperrt, Nr. 31-162)` | 109 | nein — gesperrt |
+| `Toller Trödel: Aufstellbares` | 24 | nein — keine davon in Nr. 1–30; Teil der gesperrten Nummern |
+| `Toller Trödel: Geld (Nr. 163-166)` | 4 | nein — gesperrt |
+
+Der Aufbau fasst also **drei** Kategorien an. Alle übrigen setzen einen Fortschritt
+voraus, den der Tisch nicht führt (M4 steht aus); die **Ausnahme** `[TT S.4]` —
+freigeschaltete Ausrüstung des Grundspiels und anderer Erweiterungen darf unter das
+Toller-Trödel-Deck gemischt werden — ist **Fortschritt, kein Aufbau**, und gilt in
+**beiden** Varianten gleich. Sie wird später als **Aktion** gebaut („Freigeschaltete
+Karte in den Nachschub mischen"), die den Stapel am Tisch liest und die Wahl
+**nicht** kennen muss.
+
+`place_stack` vergleicht Kategorienamen **exakt** (`norm(c.category) ===
+norm(name)`): `Nachschub` zieht **nicht** die 24 von `Nachschub (freischaltbar)`
+mit.
+
+**Eine Kategorie wird auf drei Arten gebunden, nicht auf zwei** (`docs/datenzugriff.md`
+kennt zwei):
+
+1. beim **Namen** — `place_stack.category` in `sequence_data` (Schritt 5);
+2. bei den **Karten** — `card_ids` des Stapels in `state_data`. Kurzpartie und
+   Grundaufbau tragen dort einen Stapel `Nachschub (Tante Emma)` mit den 30 Toller-Trödel-Karten.
+   Bei der Kurzpartie ist das harmlos: ihr Schritt 4 (`remove_stack`) räumt ihn ab,
+   bevor Schritt 5 neu baut. Der *Grundaufbau* hat **kein** `place_stack` — für ihn
+   ist die `card_ids`-Bindung die **einzige**, und sie lässt sich nicht umschalten;
+3. beim **Etikett** — `stackLabel: "Nachschub (Tante Emma)"` in drei Schritten der
+   Aktionen (`kampf-beginnen` 1, `laden-nachfuellen` 0, `dorfphase-beginnen` 32)
+   und im Zustand **jedes** gespeicherten Spiels. Das Etikett bleibt in **beiden**
+   Varianten **gleich**. Wer den Stapel ohne Toller Trödel „Nachschub" nennt, lässt
+   die Aktionen ihn nicht mehr finden — und `executeSequence` wirft nie.
+
+#### Änderung: Optionen in den Daten, Platzhalter für Werte, ein Gate für Anwesenheit
+
+**1. Die Optionen stehen in `scenario_data.options`** — neben `bosses` und
+`villagers`, kein neues Feld und keine Migration. Belegt: `GET /api/games/:id/setups`
+liefert die ganze Zeile (`SELECT *`), `GameDetail` kennt die Optionen also ohne neue
+Route; und der Editor schreibt `scenario_data` als **ganzes Objekt** zurück
+(`GameTable.jsx`, Speichern) — unbekannte Schlüssel gehen dabei nicht verloren.
+
+```
+options: {
+  partie:  { label: "Spiellänge", default: "kurz",
+             choices: { kurz: { label: "Kurz (3-Runden-Modus)", vars: { Muenzen: "45" } },
+                        lang: { label: "Lang (4 Runden)",       vars: { Muenzen: "30" } } } },
+  troedel: { label: "Toller Trödel", default: "mit",
+             choices: { mit:  { label: "mit Toller Trödel",  vars: { Nachschub: "Toller Trödel: Nachschub (Nr. 1-30)" } },
+                        ohne: { label: "ohne Toller Trödel", vars: { Nachschub: "Nachschub" } } } }
+}
+```
+
+Die Schlüssel (`partie`, `kurz`, `Muenzen`) sind ASCII: ein Platzhalter trägt nur
+Buchstaben und Ziffern (`/\$[A-Za-z][A-Za-z0-9]*/`), und `ü` fiele heraus. Jede
+`vars`-Angabe wird als `$opt<Name>` gebunden — `$optMuenzen`, `$optNachschub`. Das
+Präfix verhindert Zusammenstöße mit `$B`, `$D1`, `$V1`, `$F1`, `$revealedBase` und
+den Feldschlüsseln der Bösewichte; `validateOptions` meldet trotzdem einen Namen,
+der mit `V<Ziffer>`/`F<Ziffer>` oder `revealed` beginnt.
+
+**2. Werte sind Platzhalter, keine Bedingung.** Der Verdacht aus dem Auftrag trägt
+hier. Im Aufbau stehen danach:
+
+- Schritt 5: `place_stack { category: ["$optNachschub"], label: "Nachschub (Tante
+  Emma)", … }` — `category` steht in `NAME_FIELDS`, und Listeneinträge werden je
+  Eintrag ersetzt.
+- Schritt 50: `place_counter { name: "Münzen (gemeinsam)", value: "$optMuenzen", … }`
+  — `value` steht in `NAME_FIELDS`, und `normalizeCounter` liest `"45"` als Zahl.
+
+Eine dritte Bindungsquelle neben `ctx.vars` und `ctx.seatVars`: `ctx.optionVars`.
+**Neben**, nicht in `vars`: `reveal_next` setzt `vars` bei jedem Aufdecken auf `{}`
+zurück, dieselbe Begründung wie bei `seatVars` (M26.2).
+
+**3. Anwesenheit ist ein Gate.** Ein Platzhalter liefert **Text**, nie „nichts".
+Drei Dinge hängen daran, dass ein Bauteil da ist oder nicht: der 3-Runden-Marker,
+die Bösewichte (drei benannte oder ein `draw_assets`) und der Rollenstapel. Dafür
+gibt es ein neues Feld an **jedem** Schritt, in der Form von `onlyFinal`:
+
+```
+{ "type": "place_stack", "category": ["Toller Trödel: Rollen"], "label": "Rollen",
+  "x": …, "y": …, "faceDown": false, "onlyChoice": { "troedel": "mit" } }
+```
+
+`onlyChoice` ist ein Objekt `{ <Option>: <Wert> | [<Wert>, …] }`; **alle** genannten
+Optionen müssen passen (UND). **Sechs** Schritte tragen es: der Marker (`partie:
+kurz`), die drei benannten Bösewichte (`partie: kurz`), das `draw_assets` mit vier
+(`partie: lang`) und der Rollenstapel (`troedel: mit`).
+
+> **Zahl, die man leicht falsch rechnet:** die Folge hat nach M27.1 **29** Schritte
+> (65 − 39 + 3), nach M27.2 **31** (`draw_assets` lang, `place_stack` Rollen). Acht
+> davon ändern sich: zwei tragen einen Platzhalter, sechs ein Gate; die übrigen 23
+> laufen in jeder Variante gleich.
+
+#### Die Regel „keine Bedingungen"
+
+**Wo die Spec nicht stimmt.** Der Satz „Keine Bedingungen im Vokabular. Kein `if`,
+kein `when`, kein `optional`" steht unter „Bewusst nicht Teil davon" (Zeile 1294)
+und ist seit M9.3 **nicht mehr wahr**:
+
+| Wo | Was es tut | seit |
+|---|---|---|
+| `require_zone`, `require_counter` | hält die **ganze Folge** an | M9.3, M19.5 |
+| `onlyFinal` an jedem Schritt | lässt einen Schritt aus, je nach Endkampf | M20.1 |
+
+Beide sind Bedingungen im Vokabular, und die Spec hat beide gebaut, **ohne den Satz
+nachzuführen**. M27 bricht die Regel also nicht still; er findet sie schon
+gebrochen vor — **und er sagt, was von ihr bleibt.**
+
+**Eine Bedingung ist zulässig, wenn alle vier gelten:**
+
+1. **Eine Stelle wertet sie aus** — die Schleife in `executeSequenceWithLog`,
+   dieselbe wie bei `onlyFinal`. Kein Handler liest sie.
+2. **Die Antwort kommt aus Daten**, nicht aus einer Rechnung: aus der Wahl des
+   Spielers (`ctx.choices`) oder aus dem, was die Folge selbst entschieden hat
+   (`ctx.finalFight`).
+3. **Ein Schritt, der nicht zu diesem Aufbau gehört, bekommt keine Protokollzeile.**
+   Er ist nicht gescheitert (M20.1: Lärm, der genau dort aufhört, wo es darauf
+   ankommt, ist schlimmer als keine Meldung).
+4. **Ein unverstandener Wert läuft nicht lautlos durch — er scheitert laut.** Das
+   ist **strenger als `onlyFinal`**, das bei Unverstandenem den Schritt *laufen*
+   lässt. Für Optionen ist „laufen lassen" falsch: es liefen der Kurz- **und** der
+   Lang-Aufbau zugleich. `onlyChoice` mit einer Option oder einem Wert, den
+   `options` nicht kennt, ergibt eine Zeile `failed`, und der Schritt läuft **nicht**
+   (`validateOptions` meldet es schon beim Schreiben, `validateStep` im Editor).
+
+Was **bleibt**: kein `if`/`else`, keine Ausdrücke, keine Verschachtelung, kein
+Schritt, der einen anderen überspringt. `onlyChoice` ist an der Stelle zulässig, an
+der es **ein Bauteil** an- oder abschaltet, und nur dort.
+
+**Geprüfte Wege ohne Gate, und warum sie nicht tragen:**
+
+- *Ungebundener Platzhalter* (`category: "$optRollen"`, nur mit gebunden): im
+  Lang-/Ohne-Fall steht `skipped: "$optRollen" is not bound` im Protokoll, in
+  **jedem** Start. Das ist der Fehler aus M20.1, nur häufiger.
+- *Leerer Wert* (`optRollen: ""`): `place_stack` meldet „category is empty or
+  unknown" — dieselbe Zeile unter anderem Namen. Ein Wert, der „nichts" **heißt**,
+  macht aus einem gemeldeten Überspringen ein beabsichtigtes: der Schalter, den die
+  Spec ablehnt.
+- *Abschnitt in den Daten* (wie `final` bei `build_scenario`): eine Schrittliste je
+  Wahl in `options` und ein Schritt `run_choice`, der sie ausführt. Das ist
+  **dieselbe Bedingung**, nur in die Daten verlegt — und teurer: ein zweiter
+  Ausführungsweg, verschachtelte Protokollindizes, und der Sequenz-Editor kann die
+  Unterfolge nicht bearbeiten. M7 darf `final` so bauen, weil `final` **Gelände**
+  ist, kein Schritt.
+- *Zwei getrennte Aufbauten*: entschieden dagegen (Auftraggeber); Kosten in M27.4.
+
+**Was die Wahl nicht darf.** Sie steht **nicht** im Spielstand: ein Spielstand lädt
+das Gerüst des Aufbaus (Zonen, Aktionen, Szenariodaten), **nie** die Folge (M22), und
+weiß nicht, mit welcher Wahl er entstand. Daraus folgt:
+
+- **Aktionen tragen kein `onlyChoice` und keinen `$opt…`-Platzhalter.** Sie liefen
+  nach einem Neuladen mit einer Wahl, die niemand mehr kennt: bei `onlyChoice` hieße
+  das „Schritt läuft nie", bei `$opt…` „is not bound". `validateStep` meldet es im
+  Editor, sobald der Schritt in einer Aktion steht.
+- **Die Wahl hinterlässt Spuren nur im Tisch**, nicht im Gerüst: ein Rollenstapel
+  liegt da oder nicht; der Marker liegt da oder nicht; der Nachschubstapel trägt
+  andere Karten unter **demselben** Etikett. Alle Aktionen lesen den Tisch.
+- Wird später eine Aktion wirklich von der Wahl abhängig, ist das ein **eigener
+  Meilenstein** mit einer Spalte `save_states.setup_choices` — und kein Anhängsel.
+
+**Abnahme.**
+1. Vier Kombinationen aus **einem** Aufbau: kurz/mit (= heute), kurz/ohne, lang/mit,
+   lang/ohne. Jede läuft mit **leerem Protokoll** (`status !== 'ok'` ohne Treffer;
+   ausgenommen erwartete `note`s) gegen die echte Bibliothek.
+2. kurz/mit baut **Zeichen für Zeichen** denselben Tisch wie der Aufbau vor M27
+   (Objekte, Zähler, Stapelinhalt, ohne die zufälligen Ids).
+3. `Nachschub (Tante Emma)` enthält ohne Toller Trödel genau die 177 Karten von
+   `Nachschub` und **keine** von `Nachschub (freischaltbar)`; mit Toller Trödel
+   genau die 30 von `Nr. 1-30`. Zehn liegen offen in der Auslage, der Rest im Stapel.
+4. Mit Toller Trödel liegt **ein** Stapel `Rollen` (20 Karten, offen, ungemischt)
+   neben dem Nachschub; ohne gibt es keinen und **keine Protokollzeile**.
+5. Lang: kein Marker auf dem ersten Platz, vier verdeckte Bösewichte, 30 Münzen.
+   Kurz: Marker, drei benannte, 45 Münzen.
+6. `onlyChoice` mit einer unbekannten Option: `failed`-Zeile, der Schritt läuft nicht.
+   Eine unbekannte **Wahl** beim Start: nichts wird aufgebaut, das Protokoll sagt es.
+7. „Laden nachfüllen", „Kampf beginnen" und „Dorfphase beginnen" laufen in allen vier
+   Kombinationen **ohne eine Änderung an `action_data`** durch.
+8. `action_data`, `zone_data`, `grid_data` und `state_data` sind nach der
+   Datenänderung **bytegleich** (Prüfsumme vor/nach); alle acht benannten Spielstände
+   laden wie vorher.
+
+### M27.3 — Wo die Wahl fällt: Tisch und Raum
+
+Die Wahl fällt **vor** der Folge. Der Aufbau läuft an **zwei** Stellen, beide
+tragen sie; ein Raum, der sie nicht trüge, baute **stumm die Standardvariante**.
+
+**Eine Stelle für die Regel.** `shared/setupOptions.js`:
+`resolveChoices(options, given)` gibt `{ choices, vars, problems }` zurück —
+fehlende Optionen bekommen ihr `default`, eine unbekannte Option oder Wahl ist ein
+`problem`, und **mit Problemen wird nichts aufgebaut**. Dieselbe Funktion rufen auf:
+der Dialog (für die Vorbelegung), der Server (beim Anlegen des Raums) und der
+Executor (als letzte Wache). Es gibt keine zweite Rechnung.
+
+**Am Tisch (hotseat).** Der Aufbau startet über `/games/:id/play?setupId=…` aus
+`GameDetail.jsx` („Load"). Hat das Setup `options`, öffnet der Knopf zuerst einen
+kleinen Dialog: je Option eine Auswahl, `default` vorbelegt, ein Knopf „Starten".
+Hat es keine, ändert sich nichts. Die Wahl reist in der Adresse mit —
+`?setupId=…&opt=partie:lang&opt=troedel:ohne` —, damit ein Neuladen derselben
+Adresse denselben Aufbau baut (heute baut es den Aufbau neu; ein Spielstand schlägt
+beides, M22). **Ohne** `opt` gilt der Default: alte Lesezeichen und alle, die den
+Aufbau ohne Dialog starten, bauen **genau die heutige Kurzpartie**. Format und
+Auswertung stehen als reine Funktionen in `client/src/utils/setupChoices.js` und
+werden aus `server/test/` geprüft (Client: keine Testinfrastruktur).
+
+**Im Raum.** `CreateRoomModal.jsx` wählt heute ein Setup (`setup_id`); dieselben
+Auswahlfelder erscheinen darunter. `POST /api/rooms` nimmt `setup_choices`,
+validiert sie mit `resolveChoices` (**400** bei Problem, nicht Default) und legt sie
+in einer neuen Spalte `game_rooms.setup_choices` ab (additive Migration wie
+`setup_id`). `POST /api/rooms/:code/start` liest sie dort und gibt sie dem Executor
+mit. Gewählt wird beim **Anlegen**, nicht beim Starten: die Mitspieler sehen in der
+Lobby, womit gespielt wird (`GET /api/rooms/:code` liefert `setup_choices` mit), und
+der Start vertraut dem Body nicht noch mehr (`POST …/start` vertraut ohnehin schon
+der `player_id` aus dem Body, CLAUDE.md „Bekannte Lücken").
+
+**Der Tisch sagt, womit er aufgebaut wurde:** die Meldung nach dem Laden („Loaded
+setup …") nennt die Wahl mit ihren Bezeichnungen („Kurz, mit Toller Trödel"). Das
+ist der Schutz gegen den leisen Standard.
+
+**Abnahme.**
+1. Am Tisch: „Load" auf dem Setup öffnet den Dialog mit den Defaults; „Lang" +
+   „ohne Toller Trödel" baut die vierte Kombination aus M27.2.
+2. `/play?setupId=…` ohne `opt` baut die heutige Kurzpartie, mit Toller Trödel.
+3. Im Raum: ein Raum, der mit Lang/ohne angelegt wurde, baut beim Start Lang/ohne —
+   **dasselbe Ergebnis wie am Tisch** (Paritätstest: derselbe Executor, dieselben
+   Eingaben, dieselben Stapel und Objekte).
+4. Ein Raum **ohne** `setup_choices` baut die Defaults; ein Raum mit unbekannter
+   Wahl wird gar nicht angelegt (400, deutsche Meldung).
+5. Ein Setup ohne `options` (die beiden anderen) startet an beiden Stellen
+   unverändert, ohne Dialog.
+
+### M27.4 — Was dieser Weg kostet
+
+**Die beiden anderen Aufbauten bleiben nebeneinander bestehen.**
+
+- *TFT Grundaufbau (Dorfphase)* ist laut M14.12 ein **Baustein**, kein Aufbau zum
+  Spielen: 11 von 30 Zonen, `scenario_data` leer, keine `base`-Werte, kein
+  Kampfmaterial, keine Dörfler-Zonen von M26. Er ist **nicht** der lange Aufbau, den
+  die Wahl „lang" meint — **„lang" ist die Kurzpartie ohne fünf Schritte**, nicht der
+  Grundaufbau plus Material. Zusammenlegen hieße, einen unfertigen Aufbau in einen
+  fertigen zu ziehen; sie bleiben, wie sie sind. *TFT Basis-Aufbau* hat eine leere
+  Folge und bleibt.
+- Der Grundaufbau trägt in `state_data` den Toller-Trödel-Stapel (siehe M27.2,
+  Bindung 2) und bleibt damit **ohne** Schalter; der Basis-Aufbau trägt gar keinen. Das ist so gewollt; es steht hier, damit
+  niemand sie für schaltbar hält.
+- Löschen ist **nicht** Teil von M27. Ob der Grundaufbau nach M27 überhaupt noch
+  gebraucht wird, entscheidet der Auftraggeber — er ist dann ein Duplikat mit
+  veraltetem Stapel, aber kein Schaden.
+
+**Benannte Spielstände.** `save_states.setup_id` verweist bei **fünf** von acht
+Zeilen auf die Kurzpartie (`b1e10f4e…`): *Auto Save* (heute früh geschrieben),
+*Partie 14 – Sieg gegen Virginia Fitz*, *Partie 13 – Endkampf …*, *Partie 13 – Kampf
+1 Ende (M22-Probe)*, *M22-Probe Neuladen*; die übrigen drei haben `NULL`. Ein
+Spielstand lädt vom Aufbau **nur das Gerüst** (Zonen, Raster, Aktionen,
+Szenariodaten) — **nie** die Folge. Deshalb gilt für M27:
+
+- **Die Zeile bleibt, mit derselben Id.** Aus der Kurzpartie wird der gemeinsame
+  Aufbau; es entsteht **keine** neue Zeile, und keine wird gelöscht.
+- **`zone_data` und `action_data` ändern sich nicht** (Abnahme 8, M27.2). Das ist
+  die Bedingung, unter der *Partie 14* unverändert lädt.
+- `scenario_data` bekommt **nur Schlüssel dazu** (`options`, die Geometrie in
+  `villagers`); nichts wird umbenannt oder entfernt. Spielstände lesen es beim Laden
+  mit (`applySetupScaffold`), und ein zusätzlicher Schlüssel stört sie nicht.
+- **Der Name** „TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)" stimmt nach der
+  Wahl „lang" nicht mehr. Umbenennen ist unschädlich (Spielstände verweisen per Id),
+  aber eine Entscheidung des Auftraggebers; Vorschlag: „TFT Solo (3 Dörfler)".
+- Vor jedem Schreiben eine Sicherung der drei betroffenen Spalten
+  (`docs/datenzugriff.md`, Regel 4) und nach dem Schreiben **Ladeprobe von *Partie
+  14***.
+
+**Die Reihenfolge beim Ausliefern ist keine Nebensache.** Die Daten (drei
+`seat_villager`, `onlyChoice`) nennen Schritte und Felder, die der **heutige**
+Executor nicht kennt: `unknown step type "seat_villager"` — drei Dörfler fehlen,
+übersprungen, ohne Abbruch (`executeSequence` wirft nie). **Erst der Code, dann die
+Daten.** Der Executor läuft dabei an **zwei** Orten: im Backend-Image (Räume) und im
+Client-Bundle (Tisch); beide Images bauen aus dem Wurzelkontext (CLAUDE.md,
+„`shared/`"), beide müssen neu gebaut sein, bevor die Daten gelten. Umgekehrt ist
+neuer Code mit alten Daten **harmlos**: ohne `options` gibt es keine Platzhalter und
+keine Gates.
+
+**Die Testhilfe bricht.** `server/test/villager-table.js` baut den Aufbau mit
+`patchSequence(fx.sequenceBefore)` — über die 39 hartverdrahteten Schritte. Davon
+hängen `villagers.test.js` (36) und `swap-villager.test.js` (8) ab. Nach M27.1 baut
+sie über `seat_villager`; `patchSequence`, `counterSpots` und `COUNTER_ROW` in
+`scripts/doerfler-daten.mjs` werden überflüssig (die Zählerstellen wandern in die
+Platzdaten).
+
+### Bewusst nicht Teil davon
+
+- **Die Lage der Marker je Layout** (drei Layouts, bis 8 Weltpunkte). Sie bräuchte
+  Zonen oder Slotsätze **je Layout** statt je Platz; der Wert (welches Feld) ist
+  dabei schon heute richtig. Offen aus M26, hier nicht angefasst.
+- **Ein dritter Schalter „wer sitzt wo".** Die Besetzung steht als drei
+  `seat_villager`-Schritte in der Folge und ist dort änderbar; am Tisch tauscht
+  `swap_villager`. Eine Wahl beim Start wäre eine dritte Option in `options` — nach
+  diesem Muster ohne neuen Mechanismus möglich, aber nicht verlangt.
+- **Freischaltbare Ausrüstung mischen** (die Ausnahme `[TT S.4]`) — Fortschritt (M4).
+- **Aufstellbare Ausrüstung** und ihre Plättchen (24 Karten, 24 Plättchen — die
+  Kategorie `Toller Trödel: Aufstellbares` gibt es in `cards` **und** in
+  `table_assets`; eine Textsuche nach dem Namen findet beide).
+- **Zufällige Bösewichte in der Kurzpartie.** Die drei benannten bleiben; wer sie
+  zufällig will, ändert drei Schritte in einen `draw_assets` mit `count 3` — erst
+  sinnvoll, wenn die Daten für alle 20 vorliegen.
+- **Die Aufbauanweisung auf Karla Kühls Tableau** (Fridgette Jones, `[NN S.4]`,
+  `docs/tft-regeln.md` §10.1, dort „OFFEN"): sie ist nicht erfasst, und die Auslage
+  für Fridgette bleibt, was sie ist — Startausrüstung und Werte, ohne diese
+  Anweisung.
+- **Aktionen im Mehrspielerraum** (M6, Nachtrag 2): der Raum baut auf, er führt keine
+  Aktionen aus. Die Wahl betrifft nur den Aufbau.
+- **Eine Editor-Oberfläche für `options`.** Die Daten werden wie die Szenariodaten
+  geschrieben (Skript, Trockenlauf); der Sequenz-Editor bekommt nur die Gate-Zeile.
+
+### Offene Frage an den Auftraggeber (eine, mit Empfehlung)
+
+**Woraus zieht „lang" seine vier Bösewichte, solange neun keine Szenariodaten haben?**
+
+| Weg | Kosten | Wirkung |
+|---|---|---|
+| **A** aus allen 20 ziehen, nichts tun | null | in 93 % der langen Partien baut `build_scenario` für mindestens einen Bösewicht nichts; das Protokoll sagt es, der Spieler baut von Hand |
+| **B** `draw_assets { needsScenario: true }` — nur Bösewichte **mit** Eintrag | ein Feld im Schritt, wenige Zeilen im Executor, ein Test | die lange Partie ist immer aufbaubar, zieht aber nur aus 11 von 20; sobald alle 20 erfasst sind, **ist der Filter ein No-op** und muss nicht entfernt werden |
+| **C** erst die neun erfassen | der Aufwand von `docs/szenariodaten-erweiterung.md` (acht Tableaus gelesen, geprüft, eingetragen), mal neun | die richtige Antwort; blockiert „lang" bis dahin |
+
+**Empfehlung: B jetzt, C als eigener Auftrag.** B kostet fast nichts und lügt nicht:
+es ist ein benannter Filter am Schritt, kein stilles Weglassen, und `pool` bleibt
+sichtbar. Es ist **keine Bedingung im Sinne von oben**, sondern ein Filter wie
+`pool`. A ist ehrlich, aber der Schalter „lang" wäre in 93 % der Partien halb
+kaputt; C ist richtig und groß.
+
+### Abnahme (Gesamt)
+
+1. M27.1 bis M27.3 jeweils wie oben.
+2. `cd server && npm test` grün (Stand vorher: **1391**, alle grün, 2026-11-07);
+   `cd client && npx vite build` ohne neue Warnung (zwei sind vorbestehend).
+3. Ein Rauchtest **lesend** gegen die Produktionsdaten mit dem ausgelieferten
+   Executor: alle vier Kombinationen laufen mit leerem Protokoll; *Partie 14* lädt;
+   die Prüfsummen von `zone_data`, `action_data`, `grid_data`, `state_data` und aller
+   acht `save_states` sind vor und nach dem Schreiben gleich.
