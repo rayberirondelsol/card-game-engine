@@ -612,6 +612,9 @@ test('CZ: der Rauchtest findet nach dem Schreiben nichts – vier Kombinationen,
     // ohne Karte (bekannt, M25.2). Der Schritt mit der TRILLERPFEIFE steht auf „ok", und die Karte liegt da.
     assert.match(text, /Handsy-Endkampf: \d+ Zeilen, ohne ok und unbekannt: 0, bekannte Hinweise: [1-9]\d*; Karten in der Terrain-Auslage: Einzigartige Ausrüstung$/m);
     assert.match(text, /Endkämpfe, in denen die Sheriff-Karte liegt: 19 von 20; ohne Karte \(gewollt\): Tilda Fields/);
+    // Nach jedem der 40 Kämpfe räumt *Dorfphase beginnen* das Verhaltensdeck dieses Bösewichts ab - auch bei den
+    // 17, deren `Aktionen: …`-Kategorie die Aktion nicht beim Namen nennt (`docs/szenariodaten-grundspiel.md` §13.1).
+    assert.match(text, /Dorfphase beginnen nach jedem dieser Kämpfe: .* 40 von 40/);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

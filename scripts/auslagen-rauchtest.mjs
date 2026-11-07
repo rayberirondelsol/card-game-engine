@@ -136,7 +136,7 @@ export function rauchtest(db) {
   // ── 2. Alle zwanzig Bösewichte, Vor- und Endkampf ──
   say('\n2. Alle Bösewichte: Kampf beginnen im Vorkampf und im Endkampf (Aufbau lang/ohne, 20 aus dem Pool)');
   const built = bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, { partie: 'lang', troedel: 'ohne' }, 5).state;
-  let legen = 0, ohneKarte = [];
+  let legen = 0, ohneKarte = [], sauber = 0, kaempfe = 0;
   for (const boss of Object.keys(env.scenarioData.bosses)) {
     const sheriff = env.scenarioData.bosses[boss].final?.stats?.SHERIFF;
     for (const endkampf of [false, true]) {
@@ -150,6 +150,18 @@ export function rauchtest(db) {
       const lib = sheriff ? findCardByName(env.cards.filter(c => SHERIFF_CATEGORIES.includes(c.category)), sheriff).card : null;
       const karte = lib ? a.state.cards.find(c => c.cardId === lib.id) : null;
       const tag = `${boss.padEnd(17)} ${endkampf ? 'Endkampf' : 'Vorkampf'}`;
+      // Danach *Dorfphase beginnen*: räumt sie das Verhaltensdeck dieses Bösewichts ab? Die Aktion nennt die
+      // `Aktionen: …`-Kategorien nur der drei Startbösewichte (`docs/szenariodaten-grundspiel.md` §13.1); das
+      // Deck selbst ist ein Stapel namens „Verhaltensdeck" und die Zone „Aktionen" wird geleert - beides
+      // gilt für jeden. Geprüft wird, dass nach der Dorfphase nichts von ihm am Tisch liegt.
+      const d = aktion(env, 'dorfphase-beginnen', a.state);
+      kaempfe++;
+      const rest = [
+        ...(d.state.cards ?? []).filter(c => /^Aktionen: /.test(c.category ?? '')).map(c => `Karte ${c.name}`),
+        ...(d.state.stacks ?? []).filter(x => x.label === 'Verhaltensdeck').map(() => 'Stapel Verhaltensdeck'),
+      ];
+      if (!schlecht(d.log).length && !rest.length) sauber++;
+      else bad(`${boss} ${endkampf ? 'Endkampf' : 'Vorkampf'}: nach Dorfphase beginnen ${rest.length ? `liegt noch: ${rest.join(', ')}` : schlecht(d.log).map(zeile).join('; ')}`);
       const unerwartet = sl.filter(e => !bekannt(boss, e));
       const hinweise = sl.length - unerwartet.length;
       say(`  ${tag}: ${a.log.length} Zeilen, ohne ok: ${sl.length}${hinweise ? ` (davon ${hinweise} bekannte Hinweise)` : ''}${endkampf && sheriff ? `; Karte ${karte ? `„${karte.name}" (${karte.category})` : 'FEHLT'}` : ''}`);
@@ -163,6 +175,7 @@ export function rauchtest(db) {
       }
     }
   }
+  say(`  Dorfphase beginnen nach jedem dieser Kämpfe: Verhaltensdeck und \`Aktionen: …\`-Karten weg, Protokoll ohne Beanstandung: ${sauber} von ${kaempfe}`);
   say(`  Endkämpfe, in denen die Sheriff-Karte liegt: ${legen} von ${Object.keys(env.scenarioData.bosses).length}; ohne Karte (gewollt): ${ohneKarte.join(', ') || '-'}`);
   const handsy = fuerKampf(env, built, 'Handsy', true);
   const h = aktion(env, 'kampf-beginnen', handsy.state);
