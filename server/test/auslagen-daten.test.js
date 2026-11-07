@@ -588,3 +588,54 @@ test('CY: trifft der UPDATE keine Zeile (die Spalten haben sich seit dem Lesen g
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// ── Der Rauchtest (CZ) läuft gegen dieselbe Datenbank ───────────────────────
+
+const { rauchtest } = await import('../../scripts/auslagen-rauchtest.mjs');
+
+test('CZ: der Rauchtest findet nach dem Schreiben nichts – vier Kombinationen, 20 Bösewichte im Vor- und Endkampf', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    assert.equal((await lauf(['--write', file])).code, 0);
+    const db = new Database(file);
+    // Ohne den Platzhalter-Spielstand aus der Hilfe: nur der Aufbau und seine Aktionen.
+    db.prepare('delete from save_states').run();
+    const r = rauchtest(db);
+    db.close();
+    assert.deepEqual(r.problems, [], r.out.filter(l => /!!/.test(l)).join('\n'));
+    const text = r.out.join('\n');
+    // Nicht leer: alle vier Kombinationen, 40 Kämpfe, Handsy mit leerem Protokoll und seiner Karte.
+    for (const k of ['kurz/mit', 'kurz/ohne', 'lang/mit', 'lang/ohne']) assert.match(text, new RegExp(k));
+    assert.equal((text.match(/^  .{17} Vorkampf: /gm) || []).length, 20);
+    assert.equal((text.match(/^  .{17} Endkampf: /gm) || []).length, 20);
+    // Handsys Protokoll ist nicht wörtlich leer: `build_scenario` meldet als Hinweis die Geländeplättchen
+    // ohne Karte (bekannt, M25.2). Der Schritt mit der TRILLERPFEIFE steht auf „ok", und die Karte liegt da.
+    assert.match(text, /Handsy-Endkampf: \d+ Zeilen, ohne ok und unbekannt: 0, bekannte Hinweise: [1-9]\d*; Karten in der Terrain-Auslage: Einzigartige Ausrüstung$/m);
+    assert.match(text, /Endkämpfe, in denen die Sheriff-Karte liegt: 19 von 20; ohne Karte \(gewollt\): Tilda Fields/);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('CZ: der Rauchtest schlägt an – vor dem Schreiben (alte Daten) kennt der Aufbau die Wahl nicht, und ein Spielstand ohne Stapel wird genannt', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    // Alte Daten: kein `options`, kein `seat_villager`. Die vier Kombinationen können so nicht stimmen.
+    const alt = new Database(file, { readonly: true });
+    const r1 = rauchtest(alt);
+    alt.close();
+    assert.ok(r1.problems.length > 0, 'mit den alten Daten muss der Rauchtest etwas finden');
+    // Neue Daten, aber ein Spielstand, dem die Stapel fehlen (die Hilfe legt einen an).
+    assert.equal((await lauf(['--write', file])).code, 0);
+    const neu = new Database(file, { readonly: true });
+    const r2 = rauchtest(neu);
+    neu.close();
+    // Der Spielstand ohne Stapel wird beim Namen genannt, samt den Folgen auf seinem leeren Tisch -
+    // und **nur** er: die vier Kombinationen und alle Kämpfe sind in Ordnung.
+    assert.ok(r2.problems.length >= 1, 'ein Spielstand ohne Stapel muss auffallen');
+    assert.match(r2.problems[0], /Partie 14: Stapel fehlen: Nachschub \(Tante Emma\), Heldentaten, Dorf-Ereignisse/);
+    assert.ok(r2.problems.every(p => /^Partie 14/.test(p)), r2.problems.join('\n'));
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
