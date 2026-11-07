@@ -6291,3 +6291,39 @@ in die andere Richtung falsch wäre.
    Executor: alle vier Kombinationen laufen mit leerem Protokoll; *Partie 14* lädt;
    die Prüfsummen von `zone_data`, `action_data`, `grid_data`, `state_data` und aller
    acht `save_states` sind vor und nach dem Schreiben gleich.
+
+### M27 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `CO`–`CZ` und `DA` in `docs/tasks-auslagen.md`, dort „Stand nachher" mit Zahlen, Prüfsummen und
+dem Rauchtest. **Gebaut:** `seat_villager` (M27.1), die zwei Schalter mit Platzhalter und Gate
+(`shared/setupOptions.js`, M27.2), die Wahl am Tisch und im Raum (M27.3), `place_card { category }`
+(M27.5). Ausgeliefert in der vorgeschriebenen Reihenfolge: erst der Code in beide Images, dann die Daten.
+`CU` entfiel. 1418 → 1555 Tests; Bau ohne neue Warnung.
+
+Wo dieser Abschnitt nicht stimmte (Nummern wie in `docs/tasks-auslagen.md`, 13–27):
+
+1. **17 `save_states`, nicht „acht"** (Abnahme 8, M27.4, Gesamt 3).
+2. **19 von 20 Endkämpfen legen eine Karte.** Tilda Fields hat keine Sheriff-Karte; `$SHERIFF is not bound`
+   ist dort gewollt (M27.5, Abnahme 6).
+3. **Handsys Protokoll ist nicht wörtlich leer:** `build_scenario` meldet Geländeplättchen ohne Karte als
+   bekannten Hinweis (M25.2). Der Schritt mit der Karte steht auf `ok`.
+4. **kurz/mit ist „heute plus Rollenstapel"** (Abnahme 2 gegen Abnahme 4); bewiesen bis auf diesen einen
+   Stapel.
+5. **`anchorId` nur, wenn das Tableau nicht das Asset des Platzes ist** (M27.1), sonst wäre der Tisch nicht
+   der alte. Der Tausch setzt es weiter immer.
+6. **`seat_villager` steht in der Folge an Index 25**, nicht 23 (zwei neue Schritte davor).
+7. **`category` stand schon in `NAME_FIELDS`** (M27.5, Punkt 4).
+8. **`options.choices`: undefiniert heißt „keine Wahl" (Aktion), `{}` heißt „die Vorgaben".** Anders trägt
+   „Aktion ohne Wahl: laut" nicht zusammen mit „Start ohne `opt`: die Vorgaben".
+9. **`validateOptions` prüft mehr** (Schlüssel in der Adresse, gleiche Variablen je Wahl, Kollisionen,
+   `$opt…` ohne Quelle). **Raum:** gespeichert wird die aufgelöste Wahl, `GET` liefert die Bezeichnungen,
+   und der Start gibt 409, wenn die Wahl nicht mehr passt.
+10. **Die Wahl wird nirgends gespeichert, außer im Raum.** Ein geladener Spielstand weiß nicht, ob er „lang"
+    war (gewollt, M27.2); nur die Meldung beim Aufbau nennt sie.
+11. **Die Auto-Save-Zeile ändert sich im Betrieb** — „alle Spielstände gleich" ist nur in der Transaktion exakt.
+12. **Der Rollenstapel liegt bei (1780, 790)**, gemessen: 81 × 140, 30 Punkte unter dem Nachschub, nichts
+    überlappt (`scripts/auslagen-daten.mjs`, `ROLLEN`; im Test gegen den echten Tisch nachgerechnet).
+
+**Offen geblieben:** die Sichtprüfung am Tisch der Produktion (geprüft wurde in einer lokalen Probeinstanz
+ohne Bilder), das Laden eines Spielstands im Browser, „Start Game" im Raum mit zwei Spielern, das Umbenennen
+des Aufbaus, das Löschen des Grundaufbaus, die elf Szenarien aus `docs/szenariodaten-grundspiel.md` §11.

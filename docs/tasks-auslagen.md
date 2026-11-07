@@ -748,3 +748,155 @@ erst in der langen Partie, weil Handsy in der Kurzpartie nicht vorkommt.
 
 **Nicht tun.** Keine der beiden Karten umbenennen, verschieben oder löschen; keinen
 Vorrang einer Kategorie einbauen.
+
+
+---
+
+## Stand nachher (2026-11-07)
+
+**Tests:** 1418 → **1555**, alle grün (`cd server && npm test`). Neu: `seat-villager` (14),
+`setup-options` (21), `sequence-options` (15), `setup-choices` (9), `room-setup-choices` (8),
+`sequence-place-card-category` (15), `auslagen-daten` (35), dazu je ein paar Tests in
+`doerfler-daten`, `sequence-steps` und `sequence-villager-steps`. Bau: `cd client && npx vite
+build` — dieselben zwei Warnungen wie vorher (doppeltes `data-testid`, Chunkgröße), keine dritte.
+
+**Aufgaben.** Erledigt: `CO`, `CP`, `CQ`, `CR`, `CS`, `CT`, `CV`, `CW`, `CX`, `DA`, `CY`, `CZ`.
+`CU` entfiel (Weg C). Ein Commit je Aufgabe, `CP` und `CR` ohne Änderung an den 44 Tests von
+`villagers`/`swap-villager`.
+
+**Reihenfolge beim Ausliefern, eingehalten.** Zuerst Code (`6efeaa2`, beide Images neu, geprüft:
+`seat_villager` steht im Backend-Image in `/shared/sequenceExecutor.js` **und** im Client-Bundle;
+alter Aufbau mit neuem Code: der Executor aus dem Repo und der von `edb0118` bauen auf den echten
+Produktionsdaten bei gleichem Zufall **denselben Tisch** und dasselbe Protokoll, Aufbau und alle drei
+Aktionen). Erst danach die Daten.
+
+**Daten geschrieben** (`scripts/auslagen-daten.mjs --write`, eine `IMMEDIATE`-Transaktion, Sicherung der
+drei Spalten vorher lokal im Kratzverzeichnis, **nicht** im Repo):
+
+| Spalte | vorher | nachher |
+|---|---|---|
+| `sequence_data` | 65 Schritte, 5850 Zeichen, sha 4824dd42ed3e | **31** Schritte, 2781 Zeichen, sha 33a42ffe0f71 |
+| `scenario_data` | 17 743 Zeichen, sha 7a4644d2ec78 | 18 678 Zeichen, sha 2f9cf558a0f7 (nur Schlüssel dazu) |
+| `action_data` | 6530 Zeichen, sha 55d3860b257d | 6611 Zeichen, sha 63abf4174038 (**ein** Schritt: *Kampf beginnen* 17) |
+
+Unverändert und nachgewiesen (neu gelesen): `scenario_data.bosses` (20 Einträge, sha 8c8666618388 vorher
+= nachher), `villagers.roster` (sha c19449fe1e90 vorher = nachher), `gridLabel`, `cardZoneLabel`;
+`zone_data` (c574e646476d), `grid_data` (e38ba3c68692), `state_data` (e46ad8eaba32) der Zeile; alle
+dreizehn Tabellen-Fingerabdrücke vorher/nachher gleich (die beiden anderen Aufbauten eingeschlossen);
+**alle 17 `save_states`-Zeilen** einzeln gehasht und gleich, *Partie 14* eingeschlossen. Ein zweiter
+Lauf sagt „nichts zu schreiben". Das alte `doerfler-daten.mjs --check` findet auf der Produktion nach
+dem Schreiben 0 Änderungen (Befund 10 ist damit belegt erledigt).
+
+**Rauchtest** (`scripts/auslagen-rauchtest.mjs`, nur lesend, im Backend-Container mit dem
+ausgelieferten Executor gegen die echte Datenbank, 0 Beanstandungen):
+
+- Vier Kombinationen: Aufbau mit **0 Zeilen ohne `ok`**, dann *Kampf beginnen* → *Dorfphase beginnen*
+  → *Laden nachfüllen* (und ein zweiter Kampf) jeweils 0 ohne `ok`. kurz/mit: Nachschub 20 + 10 offen,
+  Rollen 20, 45 Münzen; kurz/ohne 167 + 10, kein Rollenstapel; lang/*: 30 Münzen, vier verdeckte
+  Bösewichte, kein Marker.
+- Alle 20 Bösewichte, Vor- und Endkampf mit der echten Aktion: 40 von 40 ohne Beanstandung. **Handsy-
+  Endkampf legt die TRILLERPFEIFE aus der Einzigartigen Ausrüstung.** *Dorfphase beginnen* räumt nach
+  jedem der 40 Kämpfe Verhaltensdeck und `Aktionen: …`-Karten ab.
+- Die fünf Spielstände, die auf den Aufbau zeigen (*Auto Save*, *M22-Probe Neuladen*, *Partie 13* ×2,
+  *Partie 14*): Stapel da, Dörfler Henlo/Fridgette/Granny erkannt, die Aktionen laufen **im Speicher**
+  (*Partie 13 – Kampf 1 Ende* hält an der Wache „alle Lebenszähler 0", wie es soll).
+
+**Sichtprüfung.** Am Tisch der Produktion **nicht gemacht** (der Browser-Bereich ist dort nicht
+angemeldet, ein Passwort trägt der Agent nicht ein). Stattdessen eine **lokale Probeinstanz** (eigene
+Datenbank aus dem Auszug, Testkonto, **ohne Bilder** — Karten zeigen ihre Namen, Tableaus fehlen) mit
+dem gebauten Client und denselben Daten:
+
+- „Load" auf der Kurzpartie öffnet den Dialog mit „Kurz" / „mit Toller Trödel"; „Lang" + „ohne" →
+  Adresse `?setupId=…&opt=partie:lang&opt=troedel:ohne`, Tisch: Nachschub 167 (177 − 10 offen), kein
+  Rollenstapel, 30 Münzen, vier verdeckte Bösewichte. Kurz/mit: Nachschub 20, **Rollenstapel 20 unter
+  dem Nachschub**, 45 Münzen, Meldung „Loaded setup: „…" - Kurz (3-Runden-Modus), mit Toller Trödel".
+- `/play?setupId=…` ohne `opt` baut die Vorgaben; `opt=partie:xxx` baut **nichts** und meldet
+  „choices: option "partie" has no choice "xxx" (kurz, lang) - nothing was built"; der Basis-Aufbau
+  bekommt **keinen** Dialog.
+- Editor: 31 Schritte, jede Zeile mit Gate-Zeile („Only with" mit Haken je Wahl); Zeilen lesen sich
+  „… · only with partie=kurz", „Seat "Henlo Bulwark" at seat 1". Prüfliste CV: ein Gate setzen und
+  zugleich ein anderes Feld desselben Schritts ändern, speichern → beides steht in der Datenbank;
+  `scenario_data.options` nach dem Speichern byteweise gleich (416 Zeichen), `bosses` 20, `barZone` und
+  `tableau` bleiben.
+- Raum: das Modal zeigt unter der Setup-Auswahl die zwei Auswahlfelder (nur wenn ein Setup mit Optionen
+  gewählt ist); die Lobby zeigt „Lang (4 Runden), ohne Toller Trödel".
+
+**Offen / nicht geprüft** (vollständig):
+
+1. **Die Sichtprüfung am Tisch der Produktion** und mit den echten Bildern: Lage des Rollenstapels (am
+   Tisch gemessen **und** in der Probeinstanz als Rahmen gesehen, nicht mit Kartenbild), Lesbarkeit bei
+   Spielzoom, das Aussehen des Dialogs auf dem Boox/Handy.
+2. **Das Laden eines Spielstands im Browser** (*Partie 14*, *Auto Save*): geprüft ist nur, was der
+   Executor am gespeicherten Zustand sieht, nicht `loadGameState`/`applySetupScaffold`.
+3. **Der Raum im Betrieb:** Anlegen, Lobby und die Wahl sind in der Probeinstanz und im Test geprüft;
+   „Start Game" mit zwei Spielern und das Zeichnen des gebauten Tisches im Raum (WebSocket) nicht.
+4. **Die Wahl hinterlässt nichts im Spielstand.** Nach dem Laden eines Spielstands weiß der Tisch nicht,
+   ob er „lang" oder „kurz" war (Spec M27.2, gewollt); die Meldung nennt sie nur beim Aufbau.
+5. **Aufbau umbenennen** (Entscheidung 7) und **Grundaufbau löschen oder behalten**: offen gelassen.
+6. **Die elf alten Szenarien** (`docs/szenariodaten-grundspiel.md` §11) und **Geländekarten**, die es
+   nicht gibt (§9.10): `build_scenario` meldet sie als bekannten Hinweis; Handsys Protokoll ist deshalb
+   nicht wörtlich leer (siehe 15).
+7. **Tilda Fields** hat keine Sheriff-Karte (siehe 14); **Karla Kühls Aufbauanweisung** und die **Lage der
+   Marker je Layout** sind weiter offen.
+8. **Die Auto-Save-Zeile** (`Auto Save`, `setup_id` der Kurzpartie) schreibt der Browser, sobald ein Tisch
+   offen ist; sie hat sich zwischen den Messungen nicht verändert, **kann** es aber jederzeit. Exakt ist
+   der Beweis nur *in* der Transaktion (Schreibsperre).
+
+### Wo die Spec bei der Umsetzung nicht stimmte (13–)
+
+Fortsetzung von „Wo die Spec nicht stimmt", Belege jeweils am Code oder an den Produktionsdaten.
+
+13. **Es sind 17 `save_states`, nicht „acht".** Spec M27.2 Abnahme 8, M27.4, Abnahme (Gesamt) 3 und `CY`
+    sagen „alle acht"; die Tabelle hat 17 Zeilen (fünf zeigen auf die Kurzpartie). Gehasht sind alle 17.
+14. **Neunzehn von zwanzig Endkämpfen legen eine Sheriff-Karte, nicht zwanzig** (M27.5 Abnahme 6:
+    „Handsy plus die neunzehn übrigen"). **Tilda Fields** hat in `final.stats` keine `SHERIFF`: ihr Sheriff
+    bekommt kein benanntes Teil, sondern die oberste Karte des Gartendecks
+    (`docs/szenariodaten-erweiterung.md`). `$SHERIFF is not bound` ist dort **gewollt**. Mit der Angabe
+    `category` finden alle 19 anderen ihre Karte (alle in den zwei Kategorien).
+15. **Handsys Protokoll ist nicht wörtlich leer.** `build_scenario` meldet als `note` Geländeplättchen
+    ohne Karte in der Bibliothek (M25.2, bekannt); der Schritt mit der TRILLERPFEIFE steht auf `ok`.
+    Ähnlich bei Barry Bluff (Werte als Formel, R1) und in einigen Vorkämpfen. Der Rauchtest nennt diese
+    drei Fälle beim Namen (`bekannt()`) und zählt alles andere als Beanstandung.
+16. **kurz/mit ist nicht ganz „derselbe Tisch wie vor M27".** Abnahme 2 und Abnahme 4 widersprechen sich:
+    mit Toller Trödel liegt der **neue** Rollenstapel. Bewiesen ist die Gleichheit **bis auf diesen
+    einen Stapel** (Objekte, Zähler, Stapelinhalt ohne Ids), im Test und gegen die Produktion.
+17. **`anchorId` steht beim Platzieren nur, wenn das Tableau nicht das Platz-Asset ist.** Die Spec sagt
+    „mit `anchorId`, wie beim Tausch", und die Gleichwertigkeit „`anchorId` eingeschlossen". Die alten
+    Schritte setzten keines; Henlo an Platz 1 wäre mit `anchorId` ein anderer Tisch. Judy an Platz 1
+    trägt es (Id von Henlos Tableau); der Tausch setzt es weiter immer.
+18. **Die drei `seat_villager` stehen an Index 25, nicht 23.** Davor liegen jetzt der Rollenstapel und
+    `draw_assets`. Gemeint ist „an der Stelle des ersten entfernten Schritts" — nach dem Austeilen der
+    Heldentaten, vor den Münzen.
+19. **`category` stand schon in `NAME_FIELDS`** (M27.5, Punkt 4): Platzhalter darin liefen für
+    `place_stack` bereits; für `place_card` war nur die Einschränkung nachzutragen (`cardsInCategories`,
+    **eine** Funktion, die auch der Editor fragt). Der alte Test „`place_card` hat genau zwei Felder"
+    wurde bewusst auf drei angehoben.
+20. **`options.choices` ist „gegeben oder nicht", nicht „leer oder voll".** Spec/`CT` verlangen zugleich:
+    eine Aktion (ohne Wahl) bindet `$opt…` nicht; ein Start ohne `opt` baut die Vorgaben. Das trägt nur,
+    wenn **undefiniert** = „keine Wahl" (Aktion; `$opt…` ungebunden, Gate scheitert laut) und **`{}`** =
+    „die Vorgaben" (Tisch, Raum) heißt. Der Tisch gibt darum immer ein Objekt mit.
+21. **`validateOptions` prüft mehr als die Spec nennt:** Schlüssel der Optionen und Wahlen nur
+    `[A-Za-z0-9_-]` (sie reisen in der Adresse), jede Wahl einer Option setzt dieselben Variablen, eine
+    Variable setzt nur eine Option, und jedes `$opt…` der Folge hat eine Quelle. Jede dieser Lücken wäre
+    ein „is not bound" in jedem Start.
+22. **`parseChoices` gibt `{ choices, problems }` zurück**, nicht die bloße Wahl (`CW`): ein Problem muss
+    neben der Wahl reisen können, ohne dass es zum Default wird.
+23. **Raum: `setup_choices` ist die aufgelöste Wahl** (mit den Vorgaben für den Rest), `GET` liefert
+    zusätzlich `setup_choices_label` (die Bezeichnungen aus `describeChoices`), und der Start gibt **409**,
+    wenn das Setup sich seit dem Anlegen so geändert hat, dass die Wahl nicht mehr passt — sonst baute der
+    Executor (letzte Wache) nichts auf, und der Raum liefe mit leerem Tisch.
+24. **Der erste zweite Lauf des eigenen Skripts war falsch.** Er verglich die schon umgestellte Folge
+    ohne Wahl mit sich selbst als „alten Aufbau" und meldete eine Abweichung. Die reinen Tests konnten
+    das nicht sehen; `main` läuft darum im Test gegen eine echte SQLite-Datei (Schema aus
+    `setupDatabase`, Zeilen aus dem Auszug): `--check` ändert nichts, `--write` schreibt genau drei
+    Spalten, der zweite Lauf schreibt nichts, ein abweichender Wert bricht ab, ein UPDATE ohne Treffer
+    schreibt nichts.
+25. **`COUNTER_ROW` bleibt in `doerfler-daten.mjs`** (`CZ` wollte es entfernen): `VILLAGERS` leitet die
+    Zählerstellen daraus ab; ohne die Konstante stünden die Zahlen neu abgetippt da. Entfernt sind
+    `patchSequence`, `counterSpots`, `rowBox`.
+26. **Die Auto-Save-Zeile ändert sich im Betrieb.** Ein offener Tisch schreibt sie; „alle 17 Zeilen vorher/
+    nachher gleich" ist darum nur *in* der Transaktion exakt (`IMMEDIATE` nimmt die Schreibsperre vor dem
+    Hashen). Das Skript meldet zusätzlich je Zeile, ob sie zwischen Lesen und Schreiben abwich.
+27. **Zwei Hilfsskripte im Repo sind neu:** `scripts/auslagen-daten.mjs` (schreibt, `--check` zum Prüfen)
+    und `scripts/auslagen-rauchtest.mjs` (liest nur). Beide laufen im Backend-Container mit
+    `auslagen-daten.mjs`, `doerfler-daten.mjs`, `equipment-zones.mjs` daneben in `/app` (`docs/datenzugriff.md`).

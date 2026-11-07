@@ -116,6 +116,20 @@ getauschtes Tableau trägt `anchorId` (die Asset-Id des Platzes — **die Zonen 
 ihr**; das Feld gehört in beide Token-Feldlisten von `GameTable.jsx`), und die Aktionen
 nennen die Dörfler als Platzhalter (`$V1`, `$F1`, `$V1LEB`), nicht beim Namen.
 
+**Aufbau-Optionen (M27):** `docs/tasks-auslagen.md` (Aufgaben `CO`–`CZ`, `DA`, mit „Wo die Spec nicht
+stimmt" und „Stand nachher"). Ein Aufbau hat **Schalter**: `setups.scenario_data.options` (Spiellänge
+kurz/lang, Toller Trödel mit/ohne; Neue Nachbarn ist **kein** Schalter). Die Wahl fällt **beim Start** — am
+Tisch über einen Dialog beim „Load" und `?opt=partie:lang&opt=troedel:ohne` in der Adresse, im Raum beim
+Anlegen (`game_rooms.setup_choices`). **Eine** Stelle für die Regel: `shared/setupOptions.js`
+(`resolveChoices`, `checkGate`, `validateOptions`); der Executor ist die letzte Wache und baut mit einem
+Problem **nichts**. Werte tragen Platzhalter (`$optNachschub`, `$optMuenzen`, dritte Bindungsquelle
+`ctx.optionVars`), Anwesenheit trägt das Gate `onlyChoice` an einem Schritt (fail-loud, anders als
+`onlyFinal`); **Aktionen tragen beides nie** (ein Spielstand kennt die Wahl nicht), und ein Aufruf ohne
+`choices` ist eine Aktion. Die Dörfler stellt der Aufbau mit `seat_villager { seat, villager }` aus den Daten
+(`placeVillager` ist das „Hin" des Tauschs). `place_card` nimmt ein optionales `category`
+(`cardsInCategories`). Die Daten schreibt `scripts/auslagen-daten.mjs`, der Rauchtest lesend
+`scripts/auslagen-rauchtest.mjs` (beide im Container, siehe `docs/datenzugriff.md`).
+
 ## Produktionsdaten
 
 Wer an den echten Spieldaten arbeitet: **`docs/datenzugriff.md`** — zwei geprüfte

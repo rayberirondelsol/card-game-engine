@@ -82,6 +82,30 @@ print(json.dumps(json.loads(base64.b64decode(m.group(1))),indent=1,ensure_ascii=
 Beim Suchen nach zwei `BLOB`-Marken **nicht** `sed 's/.*BLOB//'` benutzen —
 das ist gierig und schneidet bis zur *letzten* Marke.
 
+## Ein Skript in den Container bringen (und lesen, was es sagt)
+
+Die Datenskripte (`scripts/*.mjs`) brauchen `better-sqlite3`, das nur im Backend-Container liegt.
+Sie gehören **neben** `/app`, damit `../shared/…` zu `/shared` wird:
+
+```bash
+SP="<Scratchpad>"; SSH="ssh -o UserKnownHostsFile=$SP/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes root@192.168.178.96"
+$SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin/master -q \
+  && for f in auslagen-daten.mjs auslagen-rauchtest.mjs doerfler-daten.mjs equipment-zones.mjs; do \
+       docker cp scripts/\$f card-game-engine-backend:/app/\$f; done \
+  && docker exec -w /app card-game-engine-backend node /app/auslagen-daten.mjs --check /app/data/card-game-engine.db"
+```
+
+`--check` öffnet die Datei schreibgeschützt; `--write` ist **eine** `IMMEDIATE`-Transaktion. Der Rauchtest
+(`auslagen-rauchtest.mjs <db>`) schreibt nie. `doerfler-daten.mjs` und `equipment-zones.mjs` brauchen die
+beiden anderen, weil `auslagen-daten.mjs` `VILLAGERS` daraus liest. Eine **Sicherung** der betroffenen Spalten
+liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins Scratchpad — nicht ins Repo.
+
+> ⚠️ **Der Browser schreibt mit.** Die Zeile `Auto Save` in `save_states` (mit der `setup_id` der
+> Kurzpartie) wird neu geschrieben, sobald irgendwo ein Tisch offen ist. „Alle Zeilen vorher/nachher gleich"
+> ist daher nur *innerhalb* der Transaktion exakt (sie nimmt die Schreibsperre, bevor sie hasht); zwei
+> getrennte Lesungen können eine Abweichung zeigen, die nicht vom Skript kommt. `auslagen-daten.mjs` hasht
+> darum je Zeile und nennt die abweichende beim Namen.
+
 ## Regeln fürs Schreiben
 
 1. **Erst Trockenlauf.** Ein Schalter, der nur ausgibt, was er ändern würde;
@@ -95,9 +119,23 @@ das ist gierig und schneidet bis zur *letzten* Marke.
 
 ## Fallen, die schon zugeschlagen haben
 
-- **Eine Kategorie wird auf zwei Arten gebunden:** beim **Namen**
-  (`place_stack.category` in `sequence_data`) und bei den **Karten**
-  (`card_ids` in `state_data`). Eine Textsuche findet nur die erste. (M13.6)
+- **Eine Kategorie wird auf drei Arten gebunden:** beim **Namen**
+  (`place_stack.category` in `sequence_data`), bei den **Karten** (`card_ids` in
+  `state_data`) und beim **Etikett** (`stackLabel`, z. B. `Nachschub (Tante Emma)`, in drei Schritten
+  der Aktionen **und im Zustand jedes gespeicherten Spiels**). Eine Textsuche findet nur die erste; wer
+  den Stapel umbenennt, lässt die Aktionen ihn nicht mehr finden — und `executeSequence` wirft nie.
+  Seit M27 trägt die Folge den Namen als Platzhalter (`["$optNachschub"]`, gewählt beim Start), das
+  Etikett bleibt in jeder Variante gleich. (M13.6, M27.2)
+- **Zwei Kategorien einer Karte:** `place_card` ohne `category` sucht in der ganzen Bibliothek; eine Karte,
+  die es zweimal gibt (`TRILLERPFEIFE`, zwei Bilder, zwei Kategorien), ist dort mehrdeutig und wird **nicht**
+  gelegt. Mit `category` (Text oder Liste, exakt) wird die Liste **vor** der Suche eingeschränkt. (M27.5)
+- **Eine Wahl steht nirgends im Spielstand.** `scenario_data.options` und `onlyChoice`/`$opt…` gehören in die
+  **Folge**, nie in die Aktionen — ein Spielstand lädt vom Aufbau nur das Gerüst und kennt die Wahl nicht.
+  Eine Aktion ruft den Executor **ohne** `choices` auf; ein Gate scheitert dort laut. (M27.2)
+- **Die 39 hartverdrahteten Dörfler-Schritte gibt es nicht mehr.** `seat_villager` liest `scenario_data.villagers`
+  (Roster **und** Platzdaten `barZone`, `seats[].tableau/counters`). Wer einen Startwert ändert, ändert ihn im
+  Roster; einen Schritt anfassen muss er nicht. `doerfler-daten.mjs --write` schreibt nur noch Zonen,
+  Aktionen und `villagers` (Zeichen für Zeichen die Konstante) — kein Schritt der Folge. (M27.1)
 - **Feldschlüssel in `scenario_data` binden als Variablen** (`EG` → `$EG1`…).
   Wer sie umbenennt, ohne die Schritte mitzuziehen, bekommt **keinen Fehler** —
   `executeSequence` wirft nie, die Schritte landen still als `skipped`. (M13.6)
