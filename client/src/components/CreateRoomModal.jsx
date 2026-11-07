@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../utils/api';
+import SetupChoiceFields from './SetupChoiceFields';
+import { optionsOfSetup } from '../utils/setupChoices.js';
+import { resolveChoices } from '../../../shared/setupOptions.js';
 
 const PLAYER_COLORS = [
   { value: 'red',    hex: '#ef4444', label: 'Red' },
@@ -14,6 +17,15 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
   const [displayName, setDisplayName] = useState('');
   const [color, setColor] = useState('red');
   const [setupId, setSetupId] = useState('');
+  // M27.3/CX: die Optionen des gewählten Setups und die Wahl dazu. Hat es keine
+  // (die beiden anderen Aufbauten), gibt es keine Felder und keine Wahl im Body.
+  const [choices, setChoices] = useState({});
+  const options = optionsOfSetup(setups.find(s => s.id === setupId));
+
+  function pickSetup(id) {
+    setSetupId(id);
+    setChoices(resolveChoices(optionsOfSetup(setups.find(s => s.id === id)), {}).choices);
+  }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,6 +43,7 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
           display_name: displayName.trim(),
           color,
           setup_id: setupId || undefined,
+          setup_choices: options ? choices : undefined,
         }),
       });
       const data = await res.json();
@@ -84,7 +97,7 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
             <label className="block text-sm font-medium mb-1">Starting Setup (optional)</label>
             <select
               value={setupId}
-              onChange={e => setSetupId(e.target.value)}
+              onChange={e => pickSetup(e.target.value)}
               className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-bg)] text-[var(--color-text)]"
             >
               <option value="">No setup – empty table</option>
@@ -93,6 +106,9 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
               ))}
             </select>
           </div>
+          {options && (
+            <SetupChoiceFields options={options} value={choices} onChange={setChoices} testIdPrefix="room-choice" />
+          )}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors">

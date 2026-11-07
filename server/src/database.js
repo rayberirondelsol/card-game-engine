@@ -246,6 +246,16 @@ export async function setupDatabase() {
     console.log('[DB] Migration: added setup_id column to save_states');
   }
 
+  // M27.3: die Wahl, mit der ein Raum aufbaut (`{ partie: 'lang', … }` als JSON).
+  // Gewaehlt wird beim **Anlegen**, nicht beim Start: die Mitspieler sehen in der
+  // Lobby, womit gespielt wird. Nullbar - `NULL` heisst, das Setup hat keine
+  // Optionen (oder der Raum ist aelter als M27); beides baut wie vorher.
+  const roomCols = db.prepare("PRAGMA table_info(game_rooms)").all().map(c => c.name);
+  if (!roomCols.includes('setup_choices')) {
+    db.exec('ALTER TABLE game_rooms ADD COLUMN setup_choices TEXT');
+    console.log('[DB] Migration: added setup_choices column to game_rooms');
+  }
+
   console.log('[DB] Database initialized at:', DB_PATH);
   console.log('[DB] Tables created/verified: games, categories, card_backs, cards, setups, save_states, game_rooms, room_players, table_assets, custom_dice');
 

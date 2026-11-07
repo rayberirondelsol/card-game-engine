@@ -23,6 +23,7 @@ import { broadcast, sendToPlayer } from '../websocket/broadcast.js';
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveGrids, placeOnGrids } from '../../../shared/gridGeometry.js';
 import { anchorBoxes } from '../../../shared/anchoring.js';
+import { resolveChoices, describeChoices } from '../../../shared/setupOptions.js';
 
 const VALID_COLORS = ['red', 'blue', 'green', 'purple', 'orange', 'yellow'];
 
@@ -43,10 +44,30 @@ function getNextSeat(players) {
   return null;
 }
 
+/** `scenario_data` einer Setup-Zeile als Objekt - kaputtes JSON ist `{}`, wie beim Start. */
+function scenarioOf(setup) {
+  try {
+    const parsed = JSON.parse(setup?.scenario_data || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Die gespeicherte Wahl eines Raums: ein Objekt, oder `null`. */
+function storedChoices(room) {
+  try {
+    const parsed = JSON.parse(room?.setup_choices || 'null');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function roomsRoutes(fastify) {
   // POST /api/rooms – create a new room
   fastify.post('/api/rooms', async (req, reply) => {
-    const { game_id, display_name, color, setup_id } = req.body || {};
+    const { game_id, display_name, color, setup_id, setup_choices } = req.body || {};
 
     if (!game_id || !display_name || !color) {
       return reply.code(400).send({ error: 'game_id, display_name and color are required' });
@@ -64,6 +85,32 @@ export async function roomsRoutes(fastify) {
     const game = db.prepare('SELECT id FROM games WHERE id = ?').get(game_id);
     if (!game) return reply.code(404).send({ error: 'Game not found' });
 
+    // M27.3/CX: die Wahl des Aufbaus, **vor** dem Anlegen. Dieselbe Funktion wie
+    // im Dialog und im Executor (`resolveChoices`): mit einem Problem wird gar
+    // kein Raum angelegt, statt dass er still die Standardvariante baut. Gespeichert
+    // wird die **aufgelöste** Wahl (mit den Vorgaben für den Rest) - die Lobby zeigt
+    // sie, und eine spätere Änderung der Vorgaben ändert einen angelegten Raum nicht.
+    let choices = null;
+    if (setup_choices !== undefined && setup_choices !== null && (typeof setup_choices !== 'object' || Array.isArray(setup_choices))) {
+      return reply.code(400).send({ error: 'Ungültige Wahl für diesen Aufbau: setup_choices muss ein Objekt sein' });
+    }
+    if (setup_id) {
+      const setup = db.prepare('SELECT * FROM setups WHERE id = ?').get(setup_id);
+      if (!setup && setup_choices && Object.keys(setup_choices).length) {
+        return reply.code(400).send({ error: 'Ungültige Wahl für diesen Aufbau: den Aufbau gibt es nicht' });
+      }
+      if (setup) {
+        const options = scenarioOf(setup).options;
+        const resolved = resolveChoices(options, setup_choices);
+        if (resolved.problems.length) {
+          return reply.code(400).send({ error: `Ungültige Wahl für diesen Aufbau: ${resolved.problems.join('; ')}` });
+        }
+        if (Object.keys(resolved.choices).length) choices = resolved.choices;
+      }
+    } else if (setup_choices && Object.keys(setup_choices).length) {
+      return reply.code(400).send({ error: 'Ungültige Wahl für diesen Aufbau: es ist kein Aufbau gewählt' });
+    }
+
     // Generate unique room code
     let roomCode;
     let attempts = 0;
@@ -78,9 +125,9 @@ export async function roomsRoutes(fastify) {
 
     // Persist to DB
     db.prepare(`
-      INSERT INTO game_rooms (id, game_id, room_code, host_player_id, status, setup_id)
-      VALUES (?, ?, ?, ?, 'waiting', ?)
-    `).run(roomId, game_id, roomCode, playerId, setup_id || null);
+      INSERT INTO game_rooms (id, game_id, room_code, host_player_id, status, setup_id, setup_choices)
+      VALUES (?, ?, ?, ?, 'waiting', ?, ?)
+    `).run(roomId, game_id, roomCode, playerId, setup_id || null, choices ? JSON.stringify(choices) : null);
 
     db.prepare(`
       INSERT INTO room_players (id, room_id, display_name, color, seat, is_host, is_connected)
@@ -109,6 +156,11 @@ export async function roomsRoutes(fastify) {
 
     const players = db.prepare('SELECT * FROM room_players WHERE room_id = ?').all(room.id);
 
+    // M27.3/CX: die Wahl mit ihren Bezeichnungen - die Lobby zeigt sie, und die
+    // Rechnung ist dieselbe wie bei der Meldung am Tisch.
+    const choices = storedChoices(room);
+    const setupRow = choices && room.setup_id ? db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id) : null;
+
     // Merge live connection state from in-memory store
     const liveRoom = getRoom(code.toUpperCase());
     const playersWithStatus = players.map(p => {
@@ -127,6 +179,9 @@ export async function roomsRoutes(fastify) {
       host_player_id: room.host_player_id,
       status: room.status,
       setup_id: room.setup_id,
+      // M27.3/CX: die Lobby zeigt, womit gespielt wird (aufgelöst, oder null).
+      setup_choices: choices,
+      setup_choices_label: choices ? describeChoices(scenarioOf(setupRow).options, choices) : '',
       players: playersWithStatus,
     };
   });
@@ -217,6 +272,19 @@ export async function roomsRoutes(fastify) {
     if (room.host_player_id !== player_id) return reply.code(403).send({ error: 'Only host can start' });
     if (room.status !== 'waiting') return reply.code(409).send({ error: 'Room already started' });
 
+    // M27.3/CX: die Wahl, mit der der Raum angelegt wurde, gilt noch? Hat sich das
+    // Setup seither geändert (eine Wahl umbenannt), baut der Executor nichts auf
+    // (`resolveChoices`, letzte Wache) - dann startet der Raum lieber gar nicht,
+    // als mit einem leeren Tisch zu laufen.
+    const choices = storedChoices(room) ?? {};
+    if (room.setup_id) {
+      const setupRow = db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id);
+      const resolved = resolveChoices(scenarioOf(setupRow).options, choices);
+      if (resolved.problems.length) {
+        return reply.code(409).send({ error: `Die Wahl für diesen Aufbau gilt nicht mehr: ${resolved.problems.join('; ')}` });
+      }
+    }
+
     db.prepare("UPDATE game_rooms SET status = 'active', updated_at = unixepoch() WHERE room_code = ?").run(roomCode);
 
     const liveRoom = getRoom(roomCode);
@@ -269,7 +337,7 @@ export async function roomsRoutes(fastify) {
             ).all(room.game_id);
             // Raster wie Zonen in die `options`: `place_asset` darf auf ein
             // Rasterfeld zielen, und der Raum baut auf wie der Tisch (M7/T1).
-            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, cards, grids, scenarioData });
+            const { state, log } = executeSequenceWithLog(stateJson || '{}', sequence, zones, { assets, cards, grids, scenarioData, choices });
             // Fehlgeschlagene Schritte brechen den Start nicht ab – sie werden
             // protokolliert, so wie der Tisch sie in `setupIssues` anzeigt.
             for (const e of log) {

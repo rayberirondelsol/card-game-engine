@@ -141,6 +141,14 @@ export default function RoomLobby() {
           </div>
         </div>
 
+        {/* M27.3/CX: womit gespielt wird - die Mitspieler sehen es, bevor es losgeht. */}
+        {room.setup_choices_label && (
+          <div className="bg-slate-800 rounded-2xl px-6 py-4 mb-6 text-center" data-testid="room-setup-choices">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Setup</p>
+            <p className="text-white text-sm">{room.setup_choices_label}</p>
+          </div>
+        )}
+
         {/* Player List */}
         <div className="bg-slate-800 rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
