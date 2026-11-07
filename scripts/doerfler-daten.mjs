@@ -27,6 +27,51 @@ import { STATS, validateVillagers } from '../shared/villagers.js';
 
 export { SETUP_ID, patchZones };
 
+// ── CJ: die Zähler aus der Lücke ─────────────────────────────────────────────
+
+/**
+ * Eine Reihe **unter** dem Tableau, nebeneinander: die zwei Reihen, die die
+ * Plätze am Rand freigegeben haben (y 1808 … 2110).
+ *
+ * Der breiteste Zählerkasten ist 185 (`COUNTER_SIZE`); Abstand 195 lässt 10
+ * Punkte Luft, und drei Kästen (575) passen in das 580 breite Feld eines
+ * Dörflers. `x` ist **nicht** die linke Kante: gezeichnet wird mit `left: x − 70`.
+ * Oberkante 1830 = 30 Punkte unter dem Tableau.
+ */
+export const COUNTER_ROW = { y: 1870, from: -80, step: 195, order: ['Bewegung', 'Mumm', 'Präzision'] };
+
+/**
+ * M27.1/CO: die Stellen, die dem **Platz** gehören – nicht dem Dörfler, der dort
+ * sitzt. Das Tableau steht in der Mitte seines gemessenen Ankers; die drei
+ * Zähler der Reihe daneben nach `COUNTER_ROW`; die **Lebenszähler** liegen auf dem
+ * Zusatzbrett (M23.5), `x` je Platz von Hand gesetzt, so wie die Schritte der
+ * Folge sie bis M26 trugen (360 / 700 / 1040, y −110).
+ */
+const LIFE_SPOTS = { y: -110, xs: [360, 700, 1040] };
+
+function seatSpots(i) {
+  const a = MEASURED_ANCHORS[i];
+  const cx = a.x + a.width / 2;
+  const counters = { Leben: { x: LIFE_SPOTS.xs[i], y: LIFE_SPOTS.y } };
+  COUNTER_ROW.order.forEach((stat, k) => {
+    counters[stat] = { x: cx + COUNTER_ROW.from + COUNTER_ROW.step * k, y: COUNTER_ROW.y };
+  });
+  // In der Reihenfolge von `STATS`, damit der Abschnitt wie alle anderen liest.
+  return { tableau: { x: cx, y: a.y + a.height / 2 }, counters: Object.fromEntries(STATS.map(st => [st.key, counters[st.key]])) };
+}
+
+/** Die neun Zählerstellen: `{ 'Henlo: Bewegung': { x, y }, … }`. */
+export function counterSpots() {
+  const out = {};
+  INITIAL.forEach((name, i) => {
+    for (const stat of COUNTER_ROW.order) out[`${ROSTER[name].short}: ${stat}`] = seatSpots(i).counters[stat];
+  });
+  return out;
+}
+
+/** Der Kasten eines Zählers der neuen Reihe, in Weltpunkten. */
+export const rowBox = (spot) => counterBox(spot);
+
 // ── CK: die Daten der neun Dörfler ───────────────────────────────────────────
 
 /**
@@ -39,7 +84,7 @@ const SEATS = [
   { anchor: 'Tableau: Henlo Bulwark', zones: 'Dörfler 1', markers: 'Marker 1', vorrat: 'Ausrüstung Dörfler 1' },
   { anchor: 'Tableau: Fridgette Jones', zones: 'Dörfler 2', markers: 'Marker 2', vorrat: 'Ausrüstung Dörfler 2' },
   { anchor: 'Tableau: Granny Melba', zones: 'Dörfler 3', markers: 'Marker 3', vorrat: 'Ausrüstung Dörfler 3' },
-];
+].map((seat, i) => ({ ...seat, ...seatSpots(i) }));
 
 /** Wer in der Kurzpartie sitzt, in der Reihenfolge der Plätze. */
 export const INITIAL = ['Henlo Bulwark', 'Fridgette Jones', 'Granny Melba'];
@@ -108,40 +153,11 @@ export const ROSTER = {
 };
 
 /** Der Abschnitt `scenario_data.villagers`, wie er in die Datenbank geht. */
-export const VILLAGERS = { fightZone: 'Bösewicht-Tableau', seats: SEATS, roster: ROSTER };
+export const VILLAGERS = { fightZone: 'Bösewicht-Tableau', barZone: "Buyin'/Beatin'-Leiste", seats: SEATS, roster: ROSTER };
 
 /** Kartenname → Zone der Kurzpartie-Dörfler, abgeleitet (BY): keine zweite Liste. */
 export const CARD_SLOTS = Object.fromEntries(INITIAL.flatMap((name, i) =>
   ROSTER[name].gear.map(g => [g.card, `${SEATS[i].zones}: ${g.slot ?? 'Vorrat'}`])));
-
-// ── CJ: die Zähler aus der Lücke ─────────────────────────────────────────────
-
-/**
- * Eine Reihe **unter** dem Tableau, nebeneinander: die zwei Reihen, die die
- * Plätze am Rand freigegeben haben (y 1808 … 2110).
- *
- * Der breiteste Zählerkasten ist 185 (`COUNTER_SIZE`); Abstand 195 lässt 10
- * Punkte Luft, und drei Kästen (575) passen in das 580 breite Feld eines
- * Dörflers. `x` ist **nicht** die linke Kante: gezeichnet wird mit `left: x − 70`.
- * Oberkante 1830 = 30 Punkte unter dem Tableau.
- */
-export const COUNTER_ROW = { y: 1870, from: -80, step: 195, order: ['Bewegung', 'Mumm', 'Präzision'] };
-
-/** Die neun Zählerstellen: `{ 'Henlo: Bewegung': { x, y }, … }`. */
-export function counterSpots() {
-  const out = {};
-  INITIAL.forEach((name, i) => {
-    const a = MEASURED_ANCHORS[i];
-    const cx = a.x + a.width / 2;
-    COUNTER_ROW.order.forEach((stat, k) => {
-      out[`${ROSTER[name].short}: ${stat}`] = { x: cx + COUNTER_ROW.from + COUNTER_ROW.step * k, y: COUNTER_ROW.y };
-    });
-  });
-  return out;
-}
-
-/** Der Kasten eines Zählers der neuen Reihe, in Weltpunkten. */
-export const rowBox = (spot) => counterBox(spot);
 
 // ── Die vier Umschreibungen, als reine Funktionen ────────────────────────────
 

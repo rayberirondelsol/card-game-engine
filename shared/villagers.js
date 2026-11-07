@@ -4,8 +4,9 @@
  * Die Daten stehen in `setups.scenario_data.villagers`, neben den Bösewichten
  * (M7), und werden aus `scripts/doerfler-daten.mjs` geschrieben:
  *
- *   { fightZone,
- *     seats:  [{ anchor, zones, markers, vorrat }],
+ *   { fightZone, barZone,
+ *     seats:  [{ anchor, zones, markers, vorrat,
+ *                tableau: {x,y}, counters: { Leben:{x,y}, Bewegung:…, Mumm:…, Präzision:… } }],
  *     roster: { "<voller Name>": { short, start: {Leben,Bewegung,Mumm,Präzision},
  *                                  gear: [{ card, slot? }], unverified? } } }
  *
@@ -15,6 +16,11 @@
  * Summe seiner Stücke, nicht eines Gedächtnisses daneben). Dieselbe Frage
  * beantwortet damit jeder, der sie stellt: `swap_villager`, die Platzhalter
  * `$V1`/`$F1` und das Menü am Tisch.
+ *
+ * **Was dem Platz gehört, nicht dem Dörfler** (M27.1): wohin das Tableau, wohin
+ * die vier Zähler, und welche Leiste die Spielsteine nimmt (`barZone`). Das
+ * stand bis M26 nur in den hartverdrahteten Schritten der Folge; `seat_villager`
+ * liest es von hier.
  *
  * Der Executor weiß nichts über Townsfolk Tussle (M7). Die Namen der Zähler,
  * Marker und Zonen stehen hier als **Regel**, die die Daten füllen: ein Zähler
@@ -41,6 +47,16 @@ export const STATS = [
 
 /** Die sechs Plätze eines Dörflers – so heißen die Zonen `Dörfler <n>: <Platz>`. */
 export const SLOTS = ['Kopf', 'Brust', 'Beine', 'Linke Hand', 'Rechte Hand', 'Mitbringsel'];
+
+/**
+ * Eine Koordinate, oder `NaN`. **Leer ist keine 0**: `Number('')` wäre 0 und
+ * legte ein Tableau klammheimlich in die Tischmitte, statt den fehlenden Wert
+ * zu melden – dieselbe Rechnung wie bei `place_counter` und `place_stack`.
+ */
+export const coordOf = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
+
+/** Ist das eine Stelle `{ x, y }` mit zwei endlichen Zahlen? */
+export const isSpot = (p) => Boolean(p) && Number.isFinite(coordOf(p.x)) && Number.isFinite(coordOf(p.y));
 
 /** Das Tableau eines Dörflers heißt als Asset `Tableau: <voller Name>`. */
 export const TABLEAU_PREFIX = 'Tableau: ';
@@ -171,10 +187,20 @@ export function validateVillagers(villagers, { assets = [], cards = [], zones = 
   if (!fight) problems.push('no fightZone named');
   else needZone(fight, 'fightZone');
 
+  // M27.1: die Leiste, auf die `seat_villager` die Spielsteine setzt.
+  const bar = String(villagers.barZone ?? '').trim();
+  if (!bar) problems.push('no barZone');
+  else needZone(bar, 'barZone');
+
   villagers.seats.forEach((seat, i) => {
     const who = `seat ${i + 1}`;
     for (const key of ['anchor', 'zones', 'markers', 'vorrat']) {
       if (!String(seat?.[key] ?? '').trim()) problems.push(`${who}: no "${key}"`);
+    }
+    // M27.1: die Stellen. Eine je Wert – ein fehlender Zähler wird einzeln genannt.
+    if (!isSpot(seat?.tableau)) problems.push(`${who}: no tableau position`);
+    for (const st of STATS) {
+      if (!isSpot(seat?.counters?.[st.key])) problems.push(`${who}: no counter position for ${st.key}`);
     }
     if (!seat?.anchor) return;
     needAsset(seat.anchor, who);

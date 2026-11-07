@@ -36,7 +36,7 @@ const overlaps = (a, b) =>
 const alleZonen = [
   ...equipmentZones(), ...fx.leisten, ...extraZones(),
 ].map(z => ({ ...z, ...resolveBox(z.anchor, anchors.get(z.anchor.assetId)) }));
-const zonenFuerPruefung = [...alleZonen, { label: 'Bösewicht-Tableau' }];
+const zonenFuerPruefung = [...alleZonen, { label: 'Bösewicht-Tableau' }, { label: "Buyin'/Beatin'-Leiste" }];
 
 // ── CK: die Daten ───────────────────────────────────────────────────────────
 
@@ -279,4 +279,90 @@ test('CI: `patchZones` ersetzt die fünfzehn alten Plätze, entfernt `Hände` un
   assert.equal(neu.filter(z => z.label.startsWith('Ausrüstung Dörfler ')).length, 3);
   assert.equal(neu.find(z => z.id === 'zkopf1').anchor.relX, -0.4);
   assert.deepEqual(patchZones(neu), neu);
+});
+
+// ── CO / M27.1: die Platzdaten ──────────────────────────────────────────────
+//
+// Wohin das Tableau, wohin die Zähler, welche Leiste die Spielsteine nimmt –
+// das stand nur in 18 hartverdrahteten Schritten der Folge. Hier steht es bei
+// den Plätzen, und `seat_villager` (CQ) liest es von dort. Die Zahlen sind die
+// **heutigen**: sie werden gegen die Schritte aus der Fixture gehalten, nicht
+// noch einmal abgetippt.
+
+const kopie = () => JSON.parse(JSON.stringify(VILLAGERS));
+const pruefe = (v) => validateVillagers(v, { assets: fx.assets, cards: fx.cards, zones: zonenFuerPruefung });
+
+test('CO: die Platzdaten bestehen die Prüfung – ein Platz hat Tableau, vier Zähler, und es gibt eine Spielsteinleiste', () => {
+  assert.equal(VILLAGERS.barZone, "Buyin'/Beatin'-Leiste");
+  for (const seat of VILLAGERS.seats) {
+    assert.ok(Number.isFinite(seat.tableau.x) && Number.isFinite(seat.tableau.y));
+    assert.deepEqual(Object.keys(seat.counters), STATS.map(s => s.key));
+  }
+  assert.deepEqual(pruefe(VILLAGERS), []);
+});
+
+test('CO: die Zahlen sind die der alten Schritte – Tableau, Lebenszähler und die drei Zählerreihen', () => {
+  const steps = patchSequence(fx.sequenceBefore);
+  INITIAL.forEach((name, i) => {
+    const seat = VILLAGERS.seats[i];
+    const tab = steps.find(s => s.type === 'place_asset' && s.assetName === seat.anchor);
+    assert.deepEqual(seat.tableau, { x: tab.x, y: tab.y }, `${name}: Tableau`);
+    for (const st of STATS) {
+      const c = steps.find(s => s.type === 'place_counter' && s.name === `${ROSTER[name].short}: ${st.key}`);
+      assert.deepEqual(seat.counters[st.key], { x: c.x, y: c.y }, `${name}: ${st.key}`);
+    }
+  });
+});
+
+test('CO: ohne Tableau-Stelle meldet die Prüfung den Platz', () => {
+  const v = kopie();
+  delete v.seats[0].tableau;
+  assert.ok(pruefe(v).includes('seat 1: no tableau position'), pruefe(v).join('\n'));
+});
+
+test('CO: ohne Zähler oder mit weniger als vier Werten meldet sie jeden fehlenden', () => {
+  const v = kopie();
+  delete v.seats[1].counters;
+  const alle = pruefe(v).filter(p => p.startsWith('seat 2: no counter position'));
+  assert.deepEqual(alle.map(p => p.replace(/.*for /, '')), STATS.map(s => s.key));
+
+  const w = kopie();
+  delete w.seats[2].counters['Mumm'];
+  delete w.seats[2].counters['Präzision'];
+  assert.deepEqual(pruefe(w).filter(p => /^seat 3/.test(p)),
+    ['seat 3: no counter position for Mumm', 'seat 3: no counter position for Präzision']);
+});
+
+test('CO: Koordinaten sind endlich – NaN, leer und null sind keine 0', () => {
+  for (const bad of [NaN, '', null, 'abc', Infinity]) {
+    const v = kopie();
+    v.seats[0].tableau.x = bad;
+    v.seats[0].counters.Leben.y = bad;
+    const p = pruefe(v);
+    assert.ok(p.includes('seat 1: no tableau position'), `${String(bad)}: ${p.join('\n')}`);
+    assert.ok(p.includes('seat 1: no counter position for Leben'), `${String(bad)}: ${p.join('\n')}`);
+  }
+});
+
+test('CO: ohne barZone meldet sie es; eine Zone, die es nicht gibt, ebenso', () => {
+  const v = kopie();
+  delete v.barZone;
+  assert.ok(pruefe(v).includes('no barZone'), pruefe(v).join('\n'));
+  const w = kopie();
+  w.barZone = 'Gibt es nicht';
+  assert.ok(pruefe(w).some(p => /barZone.*"Gibt es nicht" not found/.test(p)), pruefe(w).join('\n'));
+});
+
+test('CO: `patchScenario` verliert die Platzdaten nicht und ist beim zweiten Lauf gleich', () => {
+  // So sieht die Spalte nach dem Schreiben aus (CY): mit den neuen Schlüsseln und
+  // einem fremden daneben. Ein Skript, das `villagers` durch eine Konstante ohne
+  // sie ersetzte, ließe sie still verschwinden (Befund 10).
+  const inDerDatenbank = { bosses: { A: 1 }, options: { partie: { label: 'x' } }, villagers: kopie() };
+  const nachher = patchScenario(inDerDatenbank);
+  assert.equal(nachher.villagers.barZone, "Buyin'/Beatin'-Leiste");
+  assert.deepEqual(nachher.villagers.seats.map(s => s.tableau), VILLAGERS.seats.map(s => s.tableau));
+  assert.deepEqual(nachher.villagers.seats.map(s => s.counters), VILLAGERS.seats.map(s => s.counters));
+  assert.deepEqual(nachher.options, inDerDatenbank.options);
+  assert.deepEqual(nachher.bosses, inDerDatenbank.bosses);
+  assert.deepEqual(patchScenario(nachher), nachher);
 });
