@@ -565,6 +565,105 @@ function fullZones(usable, free, kind) {
 // ── Action handlers ───────────────────────────────────────────────────────────
 
 /**
+ * M27.1/CP: das **Hin** des Tauschs, herausgelöst - Tableau, Spielstein, vier
+ * Zähler, vier Marker, Startausrüstung eines Dörflers an einem Platz.
+ * `swapVillager` ruft es nach dem Wegräumen des Alten auf, `seat_villager`
+ * (CQ) ohne ein Weg: **eine** Antwort darauf, was zu einem Dörfler am Platz
+ * gehört (M6).
+ *
+ * Arbeitet an `work` (einer Kopie, die der Aufrufer hergibt) und ändert sie.
+ * Gibt `{ fail }` zurück, wenn schon das Tableau nicht zu legen war - dann ist
+ * nichts weiter geschehen -, sonst `{ problems, notes }`; bei Problemen
+ * verwirft der Aufrufer die Kopie (alles oder nichts).
+ *
+ * `spots` sagt **wohin**: `tableau { x, y, rotation, anchorId?, locked }`, `stone`
+ * (`{ x, y, rotation }` oder `{ zone }`, oder `null`: keiner), `counters` je Wert
+ * (`{ x, y, locked? }` oder `null`). Fehlt ein Spielstein oder ein Zähler, sagen
+ * `noStone`/`noCounter(stat)` den Hinweis - er hängt am Alten, das der Tausch
+ * kennt und der Aufbau nicht. Der Platzhalter-Kontext der Teilschritte ist leer:
+ * sie tragen ihre Namen ausgeschrieben.
+ */
+function placeVillager(work, n, wanted, spots, env) {
+  const { allZones, allGrids, assets, cards, scenarioData, rng } = env;
+  const seat = scenarioData.villagers.seats[n - 1];
+  const problems = [];
+  const notes = [];
+  const sub = (s) => {
+    const e = { status: 'ok', reason: null };
+    try {
+      applyStep(work, s, allZones, allGrids, assets, cards, scenarioData, rng, e, { vars: {}, seatVars: {} });
+    } catch (err) {
+      e.status = 'failed';
+      e.reason = err.message;
+    }
+    return e;
+  };
+
+  // Das Tableau zuerst, und mit `anchorId`: die Zonen des Platzes finden es erst
+  // damit wieder, und Marker und Karten zielen auf diese Zonen.
+  const tableauName = `${TABLEAU_PREFIX}${wanted.name}`;
+  const placed = sub({
+    type: 'place_asset', assetName: tableauName, x: spots.tableau.x, y: spots.tableau.y,
+    rotation: spots.tableau.rotation || 0, faceDown: false,
+  });
+  if (placed.status !== 'ok') return { fail: `${tableauName}: ${placed.reason}` };
+  const tableau = findPlaced(work, findAsset(assets, tableauName), tableauName);
+  if (spots.tableau.anchorId !== undefined) tableau.anchorId = spots.tableau.anchorId;
+  tableau.locked = spots.tableau.locked === true;
+
+  if (spots.stone) {
+    const e = sub({
+      type: 'place_asset', assetName: wanted.short,
+      ...(spots.stone.zone ? { targetZoneLabel: spots.stone.zone } : { x: spots.stone.x, y: spots.stone.y, rotation: spots.stone.rotation || 0 }),
+      faceDown: false,
+    });
+    if (e.status !== 'ok') problems.push(`${wanted.short}: ${e.reason}`);
+  } else {
+    notes.push(spots.noStone);
+  }
+
+  for (const st of STATS) {
+    const spot = spots.counters[st.key];
+    const value = wanted.start?.[st.key];
+    if (!Number.isFinite(value)) { problems.push(`${wanted.name}: no start value for ${st.key}`); continue; }
+    if (!spot) { notes.push(spots.noCounter(st)); continue; }
+    // Leben traegt sein Maximum (= Startwert), die anderen drei ihren Ausgangswert.
+    const e = sub({
+      type: 'place_counter', name: counterName(wanted, st.key), value,
+      ...(st.life ? { max: value } : { base: value }), x: spot.x, y: spot.y,
+    });
+    if (e.status !== 'ok') { problems.push(`${counterName(wanted, st.key)}: ${e.reason}`); continue; }
+    if (spot.locked !== undefined) work.counters.find(k => k.name === counterName(wanted, st.key)).locked = spot.locked;
+  }
+
+  for (const st of STATS) {
+    const e = sub({
+      type: 'place_asset', assetName: `${seat.markers}: ${st.key}`,
+      targetZoneLabel: `${seat.zones}: ${st.key}`, slot: wanted.start?.[st.key],
+    });
+    if (e.status !== 'ok') problems.push(`${seat.markers}: ${st.key}: ${e.reason}`);
+  }
+
+  for (const g of wanted.gear || []) {
+    const target = g.slot ? `${seat.zones}: ${g.slot}` : seat.vorrat;
+    let e = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: target });
+    // Liegt dort schon etwas (ein Kauf, den der Spieler angelegt hat), geht die
+    // Karte in den Vorrat - und der Tausch **sagt es**. Eine andere Ursache (die
+    // Zone gibt es nicht) ist ein Fehler in den Daten und wird nicht zugedeckt.
+    if (e.status !== 'ok' && g.slot && /is full/.test(e.reason || '')) {
+      const again = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: seat.vorrat });
+      if (again.status === 'ok') {
+        notes.push(`${g.card}: "${target}" is taken, put into "${seat.vorrat}"`);
+        e = again;
+      }
+    }
+    if (e.status !== 'ok') problems.push(`${g.card}: ${e.reason}`);
+  }
+
+  return { problems, notes };
+}
+
+/**
  * M26.2: der Tausch. Gibt `{ skip }` (nichts getan, Voraussetzung fehlt),
  * `{ fail }` (gelaufen, aber nicht gelungen) oder `{ state, notes }` zurueck.
  *
@@ -606,25 +705,11 @@ function swapVillager(state, step, allZones, allGrids, assets, cards, scenarioDa
   const elsewhere = seated.find(s => s.data?.name === wanted.name);
   if (elsewhere) return { skip: `"${wanted.name}" already sits at seat ${elsewhere.n}` };
 
-  const seat = villagers.seats[n - 1];
   const old = here.data;
   const work = JSON.parse(JSON.stringify(state));
   const oldTableau = seatedVillagers(work, assets, villagers).find(s => s.n === n).token;
 
-  // Der Platzhalter-Kontext der Teilschritte ist leer: sie tragen ihre Namen
-  // ausgeschrieben.
-  const problems = [];
-  const notes = [];
-  const sub = (s) => {
-    const e = { status: 'ok', reason: null };
-    try {
-      applyStep(work, s, allZones, allGrids, assets, cards, scenarioData, rng, e, { vars: {}, seatVars: {} });
-    } catch (err) {
-      e.status = 'failed';
-      e.reason = err.message;
-    }
-    return e;
-  };
+  const env = { allZones, allGrids, assets, cards, scenarioData, rng };
   const isAsset = (t, name) => {
     const a = findAsset(assets, name);
     return Boolean(a) && String(t.assetId) === String(a.id);
@@ -641,65 +726,18 @@ function swapVillager(state, step, allZones, allGrids, assets, cards, scenarioDa
   work.counters = work.counters.filter(c => !oldCounters.some(o => o.c === c));
   work.cards = work.cards.filter(c => !gone.has(String(c.cardId)));
 
-  // ── hin ──
-  // Das Tableau zuerst, und mit `anchorId`: die Zonen des Platzes finden es erst
-  // damit wieder, und Marker und Karten zielen auf diese Zonen.
-  const tableauName = `${TABLEAU_PREFIX}${wanted.name}`;
-  const placed = sub({
-    type: 'place_asset', assetName: tableauName, x: oldTableau.x, y: oldTableau.y,
-    rotation: oldTableau.rotation || 0, faceDown: false,
-  });
-  if (placed.status !== 'ok') return { fail: `${tableauName}: ${placed.reason}` };
-  const tableau = findPlaced(work, findAsset(assets, tableauName), tableauName);
-  tableau.anchorId = oldTableau.anchorId || oldTableau.assetId;
-  tableau.locked = oldTableau.locked === true;
-
-  if (stones.length) {
-    const e = sub({
-      type: 'place_asset', assetName: wanted.short, x: stones[0].x, y: stones[0].y,
-      rotation: stones[0].rotation || 0, faceDown: false,
-    });
-    if (e.status !== 'ok') problems.push(`${wanted.short}: ${e.reason}`);
-  } else {
-    notes.push(`no "${old.short}" on the table, so none was put down for "${wanted.short}"`);
-  }
-
-  for (const { st, c } of oldCounters) {
-    const value = wanted.start?.[st.key];
-    if (!Number.isFinite(value)) { problems.push(`${wanted.name}: no start value for ${st.key}`); continue; }
-    if (!c) { notes.push(`no counter "${counterName(old, st.key)}" to take the place of "${counterName(wanted, st.key)}"`); continue; }
-    // Leben traegt sein Maximum (= Startwert), die anderen drei ihren Ausgangswert.
-    const e = sub({
-      type: 'place_counter', name: counterName(wanted, st.key), value,
-      ...(st.life ? { max: value } : { base: value }), x: c.x, y: c.y,
-    });
-    if (e.status !== 'ok') { problems.push(`${counterName(wanted, st.key)}: ${e.reason}`); continue; }
-    work.counters.find(k => k.name === counterName(wanted, st.key)).locked = c.locked === true;
-  }
-
-  for (const st of STATS) {
-    const e = sub({
-      type: 'place_asset', assetName: `${seat.markers}: ${st.key}`,
-      targetZoneLabel: `${seat.zones}: ${st.key}`, slot: wanted.start?.[st.key],
-    });
-    if (e.status !== 'ok') problems.push(`${seat.markers}: ${st.key}: ${e.reason}`);
-  }
-
-  for (const g of wanted.gear || []) {
-    const target = g.slot ? `${seat.zones}: ${g.slot}` : seat.vorrat;
-    let e = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: target });
-    // Liegt dort schon etwas (ein Kauf, den der Spieler angelegt hat), geht die
-    // Karte in den Vorrat - und der Tausch **sagt es**. Eine andere Ursache (die
-    // Zone gibt es nicht) ist ein Fehler in den Daten und wird nicht zugedeckt.
-    if (e.status !== 'ok' && g.slot && /is full/.test(e.reason || '')) {
-      const again = sub({ type: 'place_card', cardName: g.card, targetZoneLabel: seat.vorrat });
-      if (again.status === 'ok') {
-        notes.push(`${g.card}: "${target}" is taken, put into "${seat.vorrat}"`);
-        e = again;
-      }
-    }
-    if (e.status !== 'ok') problems.push(`${g.card}: ${e.reason}`);
-  }
+  // ── hin ── an die Stellen der alten Objekte (M27.1/CP: `placeVillager`).
+  const spots = {
+    tableau: { x: oldTableau.x, y: oldTableau.y, rotation: oldTableau.rotation || 0,
+      anchorId: oldTableau.anchorId || oldTableau.assetId, locked: oldTableau.locked === true },
+    stone: stones.length ? { x: stones[0].x, y: stones[0].y, rotation: stones[0].rotation || 0 } : null,
+    noStone: `no "${old.short}" on the table, so none was put down for "${wanted.short}"`,
+    counters: Object.fromEntries(oldCounters.map(({ st, c }) => [st.key, c ? { x: c.x, y: c.y, locked: c.locked === true } : null])),
+    noCounter: (st) => `no counter "${counterName(old, st.key)}" to take the place of "${counterName(wanted, st.key)}"`,
+  };
+  const placed = placeVillager(work, n, wanted, spots, env);
+  if (placed.fail) return { fail: placed.fail };
+  const { problems, notes } = placed;
 
   if (problems.length) return { fail: problems.join('; ') };
   if (wanted.unverified) notes.push(`"${wanted.name}": ${wanted.unverified}`);
