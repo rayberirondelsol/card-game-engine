@@ -162,6 +162,10 @@ ausdrücklich eingeschlossen; eine Variante sei ein Wert in den Daten. Geprüft:
 
 ### 5. M27.2: „lang" hat Bösewichte ohne Kampffeld — 9 von 20
 
+> **ERLEDIGT 2026-11-07 (`9a54155`).** Die neun sind erfasst, `bosses` führt 20 von 20,
+> `validateScenarioData` meldet 0 Probleme. Der Befund bleibt stehen, weil er die
+> Entscheidung begründet; gebaut wird daraus **nichts** (`CU` entfällt).
+
 Nicht im Auftrag, entscheidend für „lang". Die Kurzpartie nennt **drei Bösewichte beim
 Namen**, die langen vier kämen aus `draw_assets pool "Bösewichte"` — dem ganzen Pool
 von **20**. `scenario_data.bosses` hat Einträge für **11**: die drei ersten und die
@@ -341,12 +345,13 @@ liest das Tableau-Token) wieder beantworten müsste (M22).
 Verhaltenswechsel des heutigen Aufbaus (Standard-Wahl = heutiges Verhalten, das ist die
 Zusage an Lesezeichen und Spielstände), und erst mit allen 20 Einträgen sinnvoll.
 
-**6. OFFEN — woraus zieht „lang" ihre vier Bösewichte?** Empfehlung **B**:
-`draw_assets { needsScenario: true }`, nur Bösewichte mit Szenariodaten (siehe Spec,
-„Offene Frage"). Kosten B: ein Feld, wenige Zeilen, ein Test; wird von selbst zum
-No-op, sobald alle 20 erfasst sind. `CU` baut B; **wird A (nichts tun) gewählt, entfällt
-`CU` und `CY` trägt keinen Filter**, sonst ändert sich nichts. Weg C (die neun
-erfassen) ist ein eigener Auftrag.
+**6. ENTSCHIEDEN (2026-11-07): Weg C — die neun sind erfasst.** Der Auftraggeber hat
+nicht den Filter gewählt, sondern die Ursache beseitigen lassen. `scenario_data.bosses`
+führt jetzt **20 von 20** (`9a54155`, `docs/szenariodaten-grundspiel.md`),
+`validateScenarioData` meldet 0 Probleme. Folgen für diese Liste:
+**`CU` entfällt** — `needsScenario` wäre ein Filter, der nichts mehr aussiebt; **`CY`
+trägt keinen Filter**; `draw_assets pool "Bösewichte" count 4` zieht aus allen zwanzig.
+Befund (5) ist damit erledigt.
 
 **7. Der Name des Aufbaus.** „TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)" stimmt
 nach der Wahl „lang" nicht mehr. Vorschlag „TFT Solo (3 Dörfler)"; Umbenennen ist
@@ -504,7 +509,12 @@ fail-open) und `onlyChoice` (fail-loud) beantwortet. Rückgabe der Funktion um
 **Fertig, wenn** alle Tests grün sind, `sequence-only-final.test.js` **unverändert** ist
 und `git diff` an `applyStep` nur die eine Bindungszeile zeigt.
 
-## CU — `draw_assets { needsScenario }` (M27.2, Weg B — entfällt bei Weg A)
+## CU — ENTFÄLLT: `draw_assets { needsScenario }` (M27.2)
+
+> **Nicht bauen.** Weg C ist gegangen (Entscheidung 6): alle 20 Bösewichte haben
+> Szenariodaten, der Filter wäre wirkungslos. Die Aufgabe bleibt als Begründung stehen.
+>
+> <details><summary>ursprünglicher Text</summary>
 
 **Befund.** Spec, „Offene Frage". `draw_assets` filtert den Pool heute nur über die
 Kategorie.
@@ -525,6 +535,8 @@ Kategorie.
 
 **Fertig, wenn** die Tests grün sind. Die Zahlen 6,8 % und 93 % (Wo die Spec nicht
 stimmt, 5) stehen als Kommentar im Test, damit sie nachgerechnet werden können.
+
+</details>
 
 ## CV — Der Editor zeichnet und prüft das Gate (M27.2)
 
@@ -686,8 +698,53 @@ Prüfsummen von `zone_data`, `action_data`, `grid_data`, `state_data` **und alle
   „Aufbau-Optionen (M27)" mit Verweis hierher. Spec: ein „— gebaut"-Abschnitt wie bei
   M26, mit den Berichtigungen, die die Umsetzung findet.
 - **Offen lassen** (nicht entscheiden): Umbenennen des Aufbaus (Entscheidung 7),
-  Löschen oder Behalten des Grundaufbaus, die neun Bösewichte (Weg C).
+  Löschen oder Behalten des Grundaufbaus, und die Befunde an den **elf vorhandenen**
+  Szenarien (`docs/szenariodaten-grundspiel.md` §11: Plättchen daneben, drei fehlende,
+  fünf falsche Drehungen) — eigener Auftrag, M27 rührt sie nicht an.
 
 **Stand nachher** (wie `docs/tasks-doerfler.md`): Testzahl vorher → nachher, welche
 Daten geschrieben wurden, was der Rauchtest und die Sichtprüfung fanden, was offen
 blieb.
+
+---
+
+## DA — `place_card { category }`, damit dem Sheriff die Karte nicht fehlt (M27.5)
+
+Vor `CZ`, unabhängig von `CO`–`CY` — betrifft nur `place_card`.
+
+**Warum.** `TRILLERPFEIFE` liegt zweimal in der Bibliothek, mit verschiedenen Bildern
+und in verschiedenen Kategorien (`Einzigartige Ausrüstung` und `Toller Trödel:
+Nachschub (gesperrt, Nr. 31-162)`). *Kampf beginnen* Schritt 17 (`place_card
+"$SHERIFF"`, `onlyFinal: true`) meldet im **Endkampf gegen Handsy** `failed` und legt
+nichts. `executeSequence` wirft nie — am Tisch fehlt die Karte stumm. Sichtbar wird es
+erst in der langen Partie, weil Handsy in der Kurzpartie nicht vorkommt.
+
+**Reihenfolge, test-first.**
+
+1. **Test, der das heutige Verhalten festhält:** `place_card` **ohne** `category`
+   verhält sich unverändert (inklusive „mehrdeutig" bei zwei Bildern und „hat N
+   Exemplare, nahm das erste" bei gleichem Bild). Dieser Test darf sich nicht ändern.
+2. **Test, der fehlschlägt:** zwei gleichnamige Karten in verschiedenen Kategorien,
+   `place_card { cardName, category: "<die eine>" }` → legt die richtige.
+3. `shared/sequenceExecutor.js`: in `place_card` die Kartenliste **vor**
+   `findCardByName` auf die genannten Kategorien einschränken. `category` ist Text
+   **oder Liste**, exakt verglichen mit demselben `norm` wie `place_stack`.
+   `findCardByName` **nicht** anfassen.
+4. `category` in `NAME_FIELDS` aufnehmen, damit Platzhalter darin ersetzt werden —
+   Listeneinträge je Eintrag (wie `place_stack.category`). Test dazu.
+5. Test: Name kommt nur **außerhalb** der genannten Kategorien vor → `no card named
+   "…"`, **kein** Ersatzgriff.
+6. `client/src/utils/sequenceSteps.js`: Feld `category` bei `place_card`,
+   Zusammenfassung und Validierung (`server/test/sequence-steps.test.js`).
+7. **Daten** (zusammen mit `CY`, dieselben Regeln: nur ergänzen, Prüfsummen vorher
+   und nachher): Schritt 17 von *Kampf beginnen* erhält
+   `"category": ["Einzigartige Ausrüstung", "Einzigartige Ausrüstung (Neue Nachbarn)"]`.
+   Beide Kategorien, weil die Einzigartige Ausrüstung in zwei liegt (28 + 33) und eine
+   Angabe alle zwanzig Bösewichte abdecken soll. **`action_data` wird damit geändert** —
+   das ist die einzige Stelle in M27, die das tut, und sie gehört in die Kontrollausgabe.
+8. **Rauchtest lesend** gegen die Produktion: *Kampf beginnen* im Endkampf gegen
+   **Handsy** mit leerem Protokoll, und die neunzehn übrigen Endkämpfe legen weiterhin
+   ihre Karte.
+
+**Nicht tun.** Keine der beiden Karten umbenennen, verschieben oder löschen; keinen
+Vorrang einer Kategorie einbauen.

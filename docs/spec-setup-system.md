@@ -6185,26 +6185,107 @@ Platzdaten).
 - **Eine Editor-Oberfläche für `options`.** Die Daten werden wie die Szenariodaten
   geschrieben (Skript, Trockenlauf); der Sequenz-Editor bekommt nur die Gate-Zeile.
 
-### Offene Frage an den Auftraggeber (eine, mit Empfehlung)
+### Beantwortet: Weg C ist gegangen — „lang" zieht aus allen zwanzig
 
-**Woraus zieht „lang" seine vier Bösewichte, solange neun keine Szenariodaten haben?**
+Die Frage war: **woraus zieht „lang" seine vier Bösewichte, solange neun keine
+Szenariodaten haben?** Empfohlen war **B** (ein Filter `needsScenario`), entschieden
+hat der Auftraggeber **C**: erst die neun erfassen.
 
-| Weg | Kosten | Wirkung |
+**C ist erledigt** (`9a54155`, `docs/szenariodaten-grundspiel.md`):
+`scenario_data.bosses` führt **20 von 20** Bösewichten, `validateScenarioData` meldet
+gegen die echte Assetliste und das echte Raster **0 Probleme**, und alle 20 sind mit
+dem echten Executor durchgerechnet. Die elf vorhandenen Einträge sind byteweise
+unverändert.
+
+Damit ist die Frage nicht beantwortet, sondern **ihre Ursache weg**:
+
+- `draw_assets pool "Bösewichte" count 4` zieht aus **allen zwanzig**, so wie die
+  Regel es vorsieht `[DE S.34]`. Die 6,8 % aus M27.2 sind **100 %**.
+- **`needsScenario` wird nicht gebaut.** Es wäre ein Filter ohne Wirkung — ein Feld,
+  das nichts mehr aussiebt, aber im Vokabular, im Editor und in den Tests stehen
+  müsste. Aufgabe `CU` **entfällt**; `CY` trägt **keinen** Filter.
+- Der Befund „`lang` hat Bösewichte ohne Kampffeld — 9 von 20" aus
+  `docs/tasks-auslagen.md` (5) ist damit **erledigt**, nicht umgangen.
+
+**Was bei der Erhebung über M27 hinaus aufgefallen ist** (`docs/szenariodaten-grundspiel.md`
+§9, §11) steht dort und wird hier **nicht** nachgezogen: an elf vorhandenen Einträgen
+liegen einzelne Plättchen ein Feld oder eine Zeile daneben, drei fehlen, fünf
+Drehungen sind falsch. Das ist ein eigener Auftrag — es ändert Daten, die seit M7
+gespielt werden, und die Erhebung hat ausdrücklich nichts davon angefasst.
+
+### M27.5 — `place_card` braucht die Kategorie, sonst fehlt dem Sheriff die Karte
+
+**Befund, an den echten Daten belegt.** Die Erhebung der neun hat eine Karte
+gefunden, die es in der Bibliothek **zweimal** gibt, mit **verschiedenen Bildern**
+und in **verschiedenen Kategorien**:
+
+| Karte | Kategorie | Id |
 |---|---|---|
-| **A** aus allen 20 ziehen, nichts tun | null | in 93 % der langen Partien baut `build_scenario` für mindestens einen Bösewicht nichts; das Protokoll sagt es, der Spieler baut von Hand |
-| **B** `draw_assets { needsScenario: true }` — nur Bösewichte **mit** Eintrag | ein Feld im Schritt, wenige Zeilen im Executor, ein Test | die lange Partie ist immer aufbaubar, zieht aber nur aus 11 von 20; sobald alle 20 erfasst sind, **ist der Filter ein No-op** und muss nicht entfernt werden |
-| **C** erst die neun erfassen | der Aufwand von `docs/szenariodaten-erweiterung.md` (acht Tableaus gelesen, geprüft, eingetragen), mal neun | die richtige Antwort; blockiert „lang" bis dahin |
+| `TRILLERPFEIFE` | `Einzigartige Ausrüstung` | `803a66e4…` |
+| `TRILLERPFEIFE` | `Toller Trödel: Nachschub (gesperrt, Nr. 31-162)` | `4e7f07e0…` |
 
-**Empfehlung: B jetzt, C als eigener Auftrag.** B kostet fast nichts und lügt nicht:
-es ist ein benannter Filter am Schritt, kein stilles Weglassen, und `pool` bleibt
-sichtbar. Es ist **keine Bedingung im Sinne von oben**, sondern ein Filter wie
-`pool`. A ist ehrlich, aber der Schalter „lang" wäre in 93 % der Partien halb
-kaputt; C ist richtig und groß.
+Das ist **keine Dublette und kein Tippfehler**: Toller Trödel führt eine eigene Karte
+dieses Namens. `findCardByName` entscheidet richtig — verschiedene Bilder heißen
+„mehrdeutig", und dann wird gemeldet statt gegriffen (`shared/cardSearch.js`).
+
+**Die Folge trifft genau einen Schritt.** *Kampf beginnen*, Schritt 17:
+
+```
+{ "type": "place_card", "cardName": "$SHERIFF",
+  "targetZoneLabel": "Terrain-Auslage", "onlyFinal": true }
+```
+
+Im **Endkampf gegen Handsy** meldet dieser Schritt `failed` und legt **keine** Karte.
+`executeSequence` wirft nie (§1) — am Tisch liegt die Besondere Ausrüstung des neuen
+Sheriffs also einfach nicht da, und nur das Protokoll sagt, warum. Alle anderen
+neunzehn Bösewichte sind nicht betroffen; **sichtbar wird es erst in der langen
+Partie**, weil Handsy in der Kurzpartie nicht vorkommt.
+
+**Änderung: ein Feld am Schritt, eine Einschränkung in der Suche.**
+
+`place_card` erhält ein **optionales** Feld `category` — wie bei `place_stack` eine
+Zeichenkette **oder eine Liste**, exakt verglichen (`norm`), und wie dort in
+`NAME_FIELDS`, damit Platzhalter darin ersetzt werden. Ist es gesetzt, sucht
+`place_card` nur in diesen Kategorien; ist es leer oder fehlt, sucht es wie heute in
+der ganzen Bibliothek. `findCardByName` bleibt unverändert — die Einschränkung
+geschieht **vor** dem Aufruf, an der Kartenliste.
+
+Eine Liste ist nötig, nicht Zierde: die Einzigartige Ausrüstung liegt in **zwei**
+Kategorien (`Einzigartige Ausrüstung`, 28, und `Einzigartige Ausrüstung (Neue
+Nachbarn)`, 33). Schritt 17 erhält deshalb
+
+```
+"category": ["Einzigartige Ausrüstung", "Einzigartige Ausrüstung (Neue Nachbarn)"]
+```
+
+und deckt damit **alle zwanzig** Bösewichte mit einer Angabe ab.
+
+**Was ausdrücklich nicht geschieht.** Keine der beiden Karten wird umbenannt,
+verschoben oder gelöscht: beide sind richtig, und die gesperrte gehört in ihre
+Kategorie. Es wird auch kein Vorrang gebaut („nimm die aus der Einzigartigen
+Ausrüstung") — das wäre eine Regel ohne Begründung, die beim nächsten Namensgleichstand
+in die andere Richtung falsch wäre.
+
+**Abnahme.**
+1. `place_card` ohne `category` verhält sich **genau** wie heute (ein Test, der das
+   festhält).
+2. `place_card` mit `category` findet die Karte in der genannten Kategorie, auch wenn
+   eine gleichnamige in einer anderen liegt.
+3. `place_card` mit `category` meldet `no card named "…"`, wenn der Name nur
+   **außerhalb** der genannten Kategorien vorkommt — es greift nicht ersatzweise
+   daneben.
+4. Eine Liste mit mehreren Kategorien wird je Eintrag verglichen; ein Platzhalter
+   darin wird ersetzt.
+5. Der Editor zeigt das Feld und fasst den Schritt verständlich zusammen
+   (`sequenceSteps.js`).
+6. Gegen die **echten** Produktionsdaten: *Kampf beginnen* im Endkampf gegen Handsy
+   legt `TRILLERPFEIFE` mit **leerem** Protokoll, und die neunzehn übrigen Endkämpfe
+   legen weiterhin ihre Karte.
 
 ### Abnahme (Gesamt)
 
-1. M27.1 bis M27.3 jeweils wie oben.
-2. `cd server && npm test` grün (Stand vorher: **1391**, alle grün, 2026-11-07);
+1. M27.1 bis M27.3 und M27.5 jeweils wie oben.
+2. `cd server && npm test` grün (Stand vorher: **1418**, alle grün, 2026-11-07, nach `9a54155`);
    `cd client && npx vite build` ohne neue Warnung (zwei sind vorbestehend).
 3. Ein Rauchtest **lesend** gegen die Produktionsdaten mit dem ausgelieferten
    Executor: alle vier Kombinationen laufen mit leerem Protokoll; *Partie 14* lädt;
