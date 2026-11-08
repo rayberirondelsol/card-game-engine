@@ -40,6 +40,50 @@ const TERRAIN_KEYS = ['assetName', 'cells', 'rotation', 'faceDown'];
 const text = (s) => String(s ?? '').trim();
 
 /**
+ * Die Tabelle `terrainCards` (M29): `{ "<Assetname>": "<Kartenname>" }`, von Hand geschrieben und vom
+ * Executor als dritter Versuch gelesen. **Der Tisch prüft sie nicht** (eine gelöschte Karte darf keinen
+ * Kampfaufbau abbrechen, M8.3) – diese Prüfung ist die Wache. Leere `assets`/`cards` heißen „kann ich
+ * nicht wissen“, nicht „kenne ich nicht“. Fehlt der Schlüssel (`undefined`), gibt es nichts zu prüfen.
+ */
+function terrainCardProblems(table, assets, cards) {
+  if (table === undefined) return [];
+  if (!table || typeof table !== 'object' || Array.isArray(table)) {
+    return ['terrainCards: must be an object { "<asset name>": "<card name>" }'];
+  }
+  const haveAssets = Array.isArray(assets) && assets.length > 0;
+  const haveCards = Array.isArray(cards) && cards.length > 0;
+  const problems = [];
+  const seen = new Map();
+  for (const [key, target] of Object.entries(table)) {
+    if (!text(key)) { problems.push('terrainCards: an entry has no asset name'); continue; }
+    if (key.includes('/')) {
+      problems.push(`terrainCards: "${key}" names a two-sided tile; the table only applies to one-sided names`);
+      continue;
+    }
+    if (seen.has(norm(key))) {
+      problems.push(`terrainCards: "${seen.get(norm(key))}" and "${key}" name the same asset`);
+      continue;
+    }
+    seen.set(norm(key), key);
+
+    if (haveAssets && !assets.some(a => norm(a?.name) === norm(key))) {
+      problems.push(`terrainCards: "${key}" is not an asset`);
+    }
+    // Ein Plättchen mit gleichnamiger Karte findet sie im ersten Versuch; der Eintrag käme nie zum Zug.
+    if (haveCards && cards.some(c => norm(c?.name) === norm(key))) {
+      problems.push(`terrainCards: "${key}" has a card of its own name, the entry is never used`);
+    }
+    if (typeof target !== 'string' || !text(target)) { problems.push(`terrainCards: "${key}" names no card`); continue; }
+    if (!haveCards) continue;
+    // Mehrere Zeilen gleichen Namens mit demselben Bild sind Exemplare derselben Karte (wie `findCardByName`).
+    const images = new Set(cards.filter(c => norm(c?.name) === norm(target)).map(c => c?.image_path));
+    if (images.size === 0) problems.push(`terrainCards: "${key}" → "${text(target)}": this library has no card with that name`);
+    else if (images.size > 1) problems.push(`terrainCards: "${key}" → "${text(target)}": matches ${images.size} different cards`);
+  }
+  return problems;
+}
+
+/**
  * Was an diesen Szenariodaten nicht stimmt – eine Meldung je Fehler, leer heißt
  * in Ordnung.
  *
@@ -54,10 +98,13 @@ const text = (s) => String(s ?? '').trim();
  * @param {object} [ctx]
  * @param {Array}  [ctx.assets]        – table_assets-Zeilen (Namen)
  * @param {Array}  [ctx.grids]         – Rasterobjekte, für die Feldprüfung
+ * @param {Array}  [ctx.cards]         – Kartenzeilen, für `terrainCards` (M29.5)
  * @returns {string[]}
  */
-export function validateScenarioData(scenarioData, { assets = [], grids = [] } = {}) {
-  const problems = [];
+export function validateScenarioData(scenarioData, { assets = [], grids = [], cards = [] } = {}) {
+  // Die Tabelle `terrainCards` zuerst und **vor** der frühen Rückkehr: sie gehört dem Aufbau,
+  // nicht einem Bösewicht, und ein Aufbau ohne Einträge kann trotzdem eine haben.
+  const problems = terrainCardProblems(scenarioData?.terrainCards, assets, cards);
   const bosses = scenarioData?.bosses;
   const entries = bosses && typeof bosses === 'object' ? Object.entries(bosses) : [];
   // Keine Einträge, nichts zu prüfen – ein Setup ohne Szenarien ist kein Fehler,
