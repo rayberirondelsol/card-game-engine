@@ -44,6 +44,19 @@ services:
     networks:
       - app-network
 
+  # Cloudflare-Tunnel fuer gaming.benjathi.de. Lief bis 2026-11-08 als Waise mit
+  # dem Projekt-Label, aber ohne Eintrag hier -- `down --remove-orphans` im
+  # CI-Deploy haette ihn entfernt. Token aus .env (nicht im Repo).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: card-game-engine-cloudflared
+    restart: unless-stopped
+    # host, damit der Tunnel die auf 80/3001 veroeffentlichten Ports erreicht
+    network_mode: host
+    command: tunnel --edge-ip-version 4 --metrics 127.0.0.1:2000 run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:?CF_TUNNEL_TOKEN fehlt in /opt/card-game-engine/.env}
+
 volumes:
   db-data:
     driver: local

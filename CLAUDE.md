@@ -61,14 +61,65 @@ Request-Body.
 
 ## Deployment
 
-Läuft auf Proxmox VM 101 in `/opt/card-game-engine`, zwei Container
-(Backend + nginx-Frontend). **Deployt wird von Hand** — `.github/workflows/deploy.yml` löst zwar bei jedem Push auf `master` aus,
-aber es ist kein self-hosted Runner registriert (`gh api repos/rayberirondelsol/card-game-engine/actions/runners` → `total_count: 0`, gemessen 2026-11-08); die Läufe bleiben in `queued`.
-Rebuild:
+Läuft auf Proxmox VM 101 in `/opt/card-game-engine`, drei Container (Backend,
+nginx-Frontend, cloudflared-Tunnel für `gaming.benjathi.de`). **Deployt wird per
+CI** — `.github/workflows/deploy.yml` läuft bei jedem Push auf `master` auf dem
+self-hosted Runner `card-game-vm` auf derselben VM (Labels `self-hosted, linux,
+proxmox`). Von Hand, wenn CI nicht kann:
 
 ```
 cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build
 ```
+
+### CI-Deploys fallen still aus, wenn der Runner fehlt
+
+Ohne registrierten Runner **schlägt kein Lauf fehl**. Er bleibt in `queued`
+stehen, GitHub bricht ihn erst nach 24 Stunden ab, und es gibt keine Mail und
+keinen roten Haken — der letzte grüne Haken bleibt einfach stehen, während der
+Checkout auf der VM still veraltet (so bis 2026-11-08 acht Commits weit, mit
+sechs Läufen in `queued` und einem Dutzend abgebrochener vom Tag davor). Woran
+man es sieht:
+
+```
+gh run list --limit 10   # Läufe in `queued` statt `completed`; `cancelled` nach genau 24 h
+```
+
+```
+gh api repos/rayberirondelsol/card-game-engine/actions/runners   # erwartet: total_count 1, status online
+```
+
+Auf der VM: `systemctl status actions.runner.rayberirondelsol-card-game-engine.card-game-vm`.
+Der Dienst ist `enabled`, aber wenn die Registrierung verfallen ist, stirbt er
+nach vier Sekunden mit **Exit 0** („Failed to create a session. The runner
+registration has been deleted from the server") — deshalb sieht `systemd` keinen
+Fehler und `systemctl is-failed` meldet nichts. GitHub meldet einen Runner nach
+**30 Tagen ohne Verbindung** automatisch ab; nach jedem längeren Stillstand der
+VM also nachsehen. Neu anmelden (Token aus `gh api -X POST
+repos/rayberirondelsol/card-game-engine/actions/runners/registration-token
+--jq .token`, nie ins Repo schreiben), in `/opt/github-runner`:
+
+```
+RUNNER_ALLOW_RUNASROOT=1 ./config.sh \
+  --url https://github.com/rayberirondelsol/card-game-engine --token "$TOKEN" \
+  --name card-game-vm --labels self-hosted,linux,proxmox --work _work --unattended --replace
+./svc.sh install && ./svc.sh start
+```
+
+Erst die wartenden Läufe abbrechen (`gh run cancel <id>`), dann anmelden —
+sonst laufen beim Anmelden alle Deploys der Warteschlange hintereinander los,
+mit Commits unterschiedlichen Alters.
+
+### Was auf der VM lebt und nicht im Repo steht
+
+`/opt/card-game-engine/.env` hält `CF_TUNNEL_TOKEN` und ist gitignoriert; das
+`rsync -a --delete` im Workflow nimmt sie darum aus (`--exclude='.env'`). Ohne
+diese Zeile löscht der erste CI-Deploy das Tunnel-Token. Der Tunnel selbst steht
+seit 2026-11-08 in `docker-compose.yml` — vorher lief sein Container als Waise
+mit dem Projekt-Label, und `docker compose down --remove-orphans` aus dem
+Deploy-Schritt hätte ihn entfernt, ohne ihn wieder zu starten. Die Hilfsskripte,
+die per `docker cp` in `/app` liegen (siehe `docs/datenzugriff.md`), überleben
+keinen Deploy, weil der Container neu gebaut wird; sie sind jedes Mal neu
+hineinzukopieren.
 
 Das Dockerfile macht `COPY src/ ./src/` — Quelländerungen brauchen also einen
 Rebuild, kein Neustart. Uploads und Datenbank liegen in Named Volumes und
