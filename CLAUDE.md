@@ -121,6 +121,13 @@ die per `docker cp` in `/app` liegen (siehe `docs/datenzugriff.md`), überleben
 keinen Deploy, weil der Container neu gebaut wird; sie sind jedes Mal neu
 hineinzukopieren.
 
+Und `rsync` nimmt `.git` aus, also sagt `git rev-parse HEAD` in
+`/opt/card-game-engine` nach einem CI-Deploy **nicht**, was dort läuft — die
+Dateien sind neuer als die Metadaten (nach dem ersten CI-Deploy stand dort
+`8e09dca`, obwohl `80c45ff` lief). Was deployt ist, sagt
+`gh run list --workflow=deploy.yml --limit 1 --json headSha`; der Befehl von Hand
+(`git reset --hard origin/master`) zieht die Metadaten wieder nach.
+
 Das Dockerfile macht `COPY src/ ./src/` — Quelländerungen brauchen also einen
 Rebuild, kein Neustart. Uploads und Datenbank liegen in Named Volumes und
 überleben ihn.
