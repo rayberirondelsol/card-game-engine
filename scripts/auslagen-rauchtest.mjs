@@ -53,6 +53,12 @@ export function bekannt(boss, e) {
   return false;
 }
 
+/** Die Plättchen ohne Geländekarte, die ein bekannter `note` nennt - sichtbar, nicht nur gezählt (M28.4: Virginia Fitz). */
+const plaettchen = (notes) => {
+  const namen = notes.flatMap(e => [...(e.reason ?? '').split('): ').slice(1).join('): ').matchAll(/"([^"]+)"/g)].map(m => m[1]));
+  return namen.length ? `: ${namen.join(', ')}` : '';
+};
+
 /** Ein Lauf einer Aktion mit den Daten des Aufbaus - ohne Wahl, wie am Tisch. */
 function aktion(env, id, state, seed = 7) {
   const a = env.actions.find(x => x.id === id);
@@ -129,8 +135,12 @@ export function rauchtest(db) {
     if (rollen && !same(ohneIds(stack(s, 'Rollen')), ohneIds(rollen))) bad(`${key}: der Rollenstapel hat sich durch die Aktionen verändert`);
     // Zweiter Kampf auf demselben Tisch: die Kette trägt (Etikett, Stapel, Leiste).
     const k2 = aktion(env, 'kampf-beginnen', s);
-    if (schlecht(k2.log).length) for (const e of schlecht(k2.log)) bad(`${key} zweiter Kampf: ${zeile(e)}`);
-    else say(`             zweiter Kampf beginnen: ${k2.log.length} Zeilen/0 ohne ok`);
+    // Welcher Bösewicht an der Reihe ist, entscheidet der Mischer; der bekannte Hinweis zu Plättchen ohne Geländekarte
+    // gilt für jeden (Virginia Fitz, Red, Barry … - `bekannt`), er wird genannt, nicht verschwiegen.
+    const k2s = schlecht(k2.log);
+    const k2u = k2s.filter(e => !bekannt('', e));
+    for (const e of k2u) bad(`${key} zweiter Kampf: ${zeile(e)}`);
+    if (!k2u.length) say(`             zweiter Kampf beginnen: ${k2.log.length} Zeilen/${k2s.length} ohne ok${k2s.length ? ` (bekannte Hinweise${plaettchen(k2s)})` : ''}`);
   }
 
   // ── 2. Alle zwanzig Bösewichte, Vor- und Endkampf ──
@@ -164,7 +174,7 @@ export function rauchtest(db) {
       else bad(`${boss} ${endkampf ? 'Endkampf' : 'Vorkampf'}: nach Dorfphase beginnen ${rest.length ? `liegt noch: ${rest.join(', ')}` : schlecht(d.log).map(zeile).join('; ')}`);
       const unerwartet = sl.filter(e => !bekannt(boss, e));
       const hinweise = sl.length - unerwartet.length;
-      say(`  ${tag}: ${a.log.length} Zeilen, ohne ok: ${sl.length}${hinweise ? ` (davon ${hinweise} bekannte Hinweise)` : ''}${endkampf && sheriff ? `; Karte ${karte ? `„${karte.name}" (${karte.category})` : 'FEHLT'}` : ''}`);
+      say(`  ${tag}: ${a.log.length} Zeilen, ohne ok: ${sl.length}${hinweise ? ` (davon ${hinweise} bekannte Hinweise${plaettchen(sl.filter(e => bekannt(boss, e)))})` : ''}${endkampf && sheriff ? `; Karte ${karte ? `„${karte.name}" (${karte.category})` : 'FEHLT'}` : ''}`);
       for (const e of unerwartet) bad(`${tag}: ${zeile(e)}`);
       if (endkampf && !sheriff) ohneKarte.push(boss);
       else if (endkampf) {
