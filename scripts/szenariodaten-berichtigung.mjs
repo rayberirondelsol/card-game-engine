@@ -24,10 +24,11 @@
 // Dieser Teil ist **rein** — kein `better-sqlite3`, kein Dateizugriff.
 
 import crypto from 'node:crypto';
+import path from 'node:path';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
 import { checkScenarioAspect } from '../shared/scenarioGeometry.js';
-import { durchrechnen, erwartetAufRaster } from './szenariodaten-grundspiel.mjs';
+import { durchrechnen, erwartetAufRaster, pngSize } from './szenariodaten-grundspiel.mjs';
 
 export const GAME_ID = '072123c0-cd97-4ffb-a330-369630fab93f';
 export const SETUP_ID = 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b';
@@ -209,6 +210,39 @@ function diagnose(name, eintrag, ohne) {
 // ── Die Berichtigung ─────────────────────────────────────────────────────────
 
 /**
+ * Jeden der sieben Einträge einordnen: **zu berichtigen** (genau der erwartete alte Text),
+ * **schon berichtigt** (schon das Ergebnis) oder **abweichend** (alles andere — mit dem Grund,
+ * beim Pfad genannt). `next` trägt die Berichtigung der ersten Art; was abweicht, bleibt, wie es ist.
+ *
+ * @returns {{ next: object, berichtigt: string[], schonNeu: string[], abweichend: Array<{ name: string, grund: string }> }}
+ */
+export function plane(scenario, { ohne = [] } = {}) {
+  const bosses = scenario?.bosses;
+  if (!bosses || typeof bosses !== 'object' || Array.isArray(bosses)) throw new Error('scenario_data hat kein „bosses“');
+  const berichtigt = [], schonNeu = [], abweichend = [];
+  const neueEintraege = {};
+  for (const name of Object.keys(EINTRAEGE)) {
+    const eintrag = bosses[name];
+    if (eintrag === undefined) { abweichend.push({ name, grund: 'fehlt in scenario_data' }); continue; }
+    const h = sha(JSON.stringify(eintrag));
+    const alt = EINTRAEGE[name].altSha, neu = neuShaVon(name, ohne);
+    if (h === neu) { schonNeu.push(name); continue; }
+    if (h !== alt) {
+      abweichend.push({ name, grund: `sha ${h}, erwartet ${alt} oder schon ${neu}: ${diagnose(name, eintrag, ohne).join('; ')}` });
+      continue;
+    }
+    const next = wende(name, eintrag, ohne);
+    const hn = sha(JSON.stringify(next));
+    if (hn !== neu) { abweichend.push({ name, grund: `das Ergebnis hat sha ${hn}, erwartet ${neu} — Fehler im Baustein, nicht im Eintrag` }); continue; }
+    neueEintraege[name] = next;
+    berichtigt.push(name);
+  }
+  // Die Einträge **an ihrer Stelle** ersetzen: Reihenfolge und alle Schlüssel bleiben.
+  const nextBosses = Object.fromEntries(Object.entries(bosses).map(([k, v]) => [k, k in neueEintraege ? neueEintraege[k] : v]));
+  return { next: { ...scenario, bosses: nextBosses }, berichtigt, schonNeu, abweichend };
+}
+
+/**
  * `scenario_data` → `scenario_data` mit den sieben berichtigten Einträgen. **Wirft**, wenn einer
  * der sieben weder der erwartete alte Text noch das Ergebnis ist; die Meldung nennt Eintrag und
  * Pfad. Es gibt keinen Schalter, der das umgeht.
@@ -217,31 +251,12 @@ function diagnose(name, eintrag, ohne) {
  * @param {{ ohne?: string[] }} [opts] `ohne: ['Z1']` wählt die Wäscheleine ab (Entscheidung 4)
  * @returns {{ next: object, berichtigt: string[], schonNeu: string[] }}
  */
-export function berichtige(scenario, { ohne = [] } = {}) {
-  const bosses = scenario?.bosses;
-  if (!bosses || typeof bosses !== 'object' || Array.isArray(bosses)) throw new Error('scenario_data hat kein „bosses“');
-  const berichtigt = [], schonNeu = [], fehler = [];
-  const neueEintraege = {};
-  for (const name of Object.keys(EINTRAEGE)) {
-    const eintrag = bosses[name];
-    if (eintrag === undefined) { fehler.push(`„${name}“ fehlt in scenario_data`); continue; }
-    const h = sha(JSON.stringify(eintrag));
-    const alt = EINTRAEGE[name].altSha, neu = neuShaVon(name, ohne);
-    if (h === neu) { schonNeu.push(name); continue; }
-    if (h !== alt) {
-      fehler.push(`„${name}“ weicht ab (sha ${h}, erwartet ${alt} oder schon ${neu}): ${diagnose(name, eintrag, ohne).join('; ')}`);
-      continue;
-    }
-    const next = wende(name, eintrag, ohne);
-    const hn = sha(JSON.stringify(next));
-    if (hn !== neu) { fehler.push(`„${name}“: das Ergebnis hat sha ${hn}, erwartet ${neu} — Fehler im Baustein, nicht im Eintrag`); continue; }
-    neueEintraege[name] = next;
-    berichtigt.push(name);
+export function berichtige(scenario, opts) {
+  const { next, berichtigt, schonNeu, abweichend } = plane(scenario, opts);
+  if (abweichend.length) {
+    throw new Error(`Berichtigung abgebrochen, nichts geändert: ${abweichend.map(a => `„${a.name}“ weicht ab (${a.grund})`).join(' | ')}`);
   }
-  if (fehler.length) throw new Error(`Berichtigung abgebrochen, nichts geändert: ${fehler.join(' | ')}`);
-  // Die Einträge **an ihrer Stelle** ersetzen: Reihenfolge und alle Schlüssel bleiben.
-  const nextBosses = Object.fromEntries(Object.entries(bosses).map(([k, v]) => [k, k in neueEintraege ? neueEintraege[k] : v]));
-  return { next: { ...scenario, bosses: nextBosses }, berichtigt, schonNeu };
+  return { next, berichtigt, schonNeu };
 }
 
 // ── Der Rückwärtsbeweis (statt des Präfixbeweises) ───────────────────────────
@@ -325,4 +340,136 @@ export function pruefeZiel(next, { assets, cards, grids, imageSizes = {} }) {
     }
   }
   return { probleme, aspekt, laeufe, beanstandungen };
+}
+
+// ── CLI ──────────────────────────────────────────────────────────────────────
+//
+// Aufruf (im Backend-Container, wo `better-sqlite3` liegt; die Datei liegt dort als
+// `/app/szenariodaten-berichtigung.mjs` neben `/app/szenariodaten-grundspiel.mjs`, `../shared`
+// ist dann `/shared`; `docs/datenzugriff.md`):
+//
+//   node szenariodaten-berichtigung.mjs --json                 # die Änderungsliste, ohne Datenbank
+//   node szenariodaten-berichtigung.mjs --check <db>           # Trockenlauf, schreibgeschützt
+
+const USAGE = 'usage: szenariodaten-berichtigung.mjs --json | --check <db> [--ohne-z1]';
+
+const zeigeKurz = (v) => (v === undefined ? '(fehlt)' : JSON.stringify(v));
+
+function argumente(argv) {
+  const ohne = [];
+  const pos = [];
+  for (const a of argv) {
+    if (a === '--ohne-z1') ohne.push('Z1');
+    else pos.push(a);
+  }
+  return { ohne, pos };
+}
+
+/** Der Plan als JSON — `alt` fehlt, wo der Schlüssel heute fehlt, und sagt es mit `altFehlt`. */
+function planAlsJson() {
+  return {
+    eintraege: EINTRAEGE,
+    aenderungen: AENDERUNGEN.map(({ alt, ...a }) => ({ ...a, ...(alt === undefined ? { altFehlt: true } : { alt }) })),
+  };
+}
+
+/**
+ * `deps.Database` ist der SQLite-Treiber (auf dem Server liegt `better-sqlite3` neben der Datei, im
+ * Repo unter `server/` — der Test reicht ihn herein). `deps.uploadsDir`: wo die Bilddateien liegen
+ * (Vorgabe `CGE_UPLOADS_DIR`, sonst `/app/uploads`).
+ */
+export async function main(argv, deps = {}) {
+  const { ohne, pos } = argumente(argv);
+  const [mode, dbPath] = pos;
+
+  if (mode === '--json') {
+    console.log(JSON.stringify(planAlsJson(), null, 1));
+    return 0;
+  }
+  if (mode !== '--check' || !dbPath) {
+    console.error(USAGE);
+    return 2;
+  }
+
+  const Database = deps.Database ?? (await import('better-sqlite3')).default;
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
+  try {
+    return await pruefen(db, { ohne, uploadsDir: deps.uploadsDir });
+  } finally {
+    db.close();
+  }
+}
+
+/** Lesen, planen, prüfen, ausgeben — ohne zu schreiben. */
+async function pruefen(db, { ohne, uploadsDir }) {
+  const complaints = [];
+
+  // ── lesen: nur diese eine Spalte (und das game_id des Aufbaus), als Text ──
+  const row = db.prepare('select game_id, scenario_data, grid_data from setups where id = ?').get(SETUP_ID);
+  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return 1; }
+  if (row.game_id !== GAME_ID) complaints.push(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`);
+  const raw = row.scenario_data;
+  const before = JSON.parse(raw);
+  // Der Rückwärtsbeweis ist ein Vergleich von Text und braucht das kompakte JSON.stringify-Format.
+  if (JSON.stringify(before) !== raw) complaints.push('der gespeicherte Text ist nicht kompaktes JSON.stringify — byteweiser Vergleich nicht möglich');
+  console.log(`gelesen: scenario_data ${raw.length} Zeichen (sha ${sha(raw)}), ${Object.keys(before.bosses ?? {}).length} Einträge, Schlüssel ${Object.keys(before).join(', ')}`);
+
+  // ── Plan ──
+  const { next, berichtigt, schonNeu, abweichend } = plane(before, { ohne });
+  console.log(`${berichtigt.length} zu berichtigen, ${schonNeu.length} schon berichtigt, ${abweichend.length} abweichend${ohne.length ? ` (ohne ${ohne.join(', ')})` : ''}`);
+  for (const name of Object.keys(EINTRAEGE)) {
+    const art = berichtigt.includes(name) ? 'zu berichtigen' : schonNeu.includes(name) ? 'schon berichtigt' : 'ABWEICHEND';
+    console.log(`  ${name}: ${art}${berichtigt.includes(name) ? ` (sha ${EINTRAEGE[name].altSha} → ${neuShaVon(name, ohne)})` : ''}`);
+    if (!berichtigt.includes(name)) continue;
+    for (const a of aenderungenVon(name, { ohne })) {
+      const pfad = a.art === 'einfuegen' ? `${a.pfad} (einfügen)` : a.pfad;
+      console.log(`      ${pfad.padEnd(34)} ${zeigeKurz(a.alt)} → ${zeigeKurz(a.neu)}   [Zeile ${a.beleg}]`);
+    }
+  }
+  for (const a of abweichend) complaints.push(`„${a.name}“ weicht ab: ${a.grund} — es wird nichts überschrieben`);
+  if (abweichend.length) {
+    console.log(`Trockenlauf: ${complaints.length} Beanstandungen`);
+    for (const c of complaints) console.log('  - ' + c);
+    return 1;
+  }
+
+  // ── Rückwärtsbeweis ──
+  const beweis = rueckwaertsbeweis(before, next, berichtigt);
+  console.log(`Rückwärtsbeweis: ${beweis.length ? 'NEIN' : 'ja'} (${berichtigt.length} berichtigte Einträge durch ihren alten Text ersetzt = der gelesene Text, Zeichen für Zeichen)`);
+  for (const c of beweis) complaints.push(`Rückwärtsbeweis: ${c}`);
+
+  // ── gegen die echte Assetliste, das echte Raster, die echte Bibliothek ──
+  const assets = db.prepare('select id, name, type, image_path, back_image_path, width, height from table_assets where game_id = ?').all(row.game_id);
+  const cards = db.prepare('select c.id, c.name, c.image_path, k.name as category from cards c left join categories k on k.id = c.category_id where c.game_id = ?').all(row.game_id);
+  const grids = JSON.parse(row.grid_data);
+  const uploads = uploadsDir || process.env.CGE_UPLOADS_DIR || '/app/uploads';
+  const imageSizes = {};
+  for (const a of assets) {
+    const s = pngSize(path.join(uploads, String(a.image_path ?? '').replace(/^\/uploads\//, '')));
+    if (s) imageSizes[a.name] = s;
+  }
+  const p = pruefeZiel(next, { assets, cards, grids, imageSizes });
+  console.log(`validateScenarioData: ${p.probleme.length} Probleme (${assets.length} Assets, ${cards.length} Karten, Raster „${grids[0]?.label}“)`);
+  console.log(`checkScenarioAspect: ${p.aspekt.length} Meldung${p.aspekt.length === 1 ? '' : 'en'} (${Object.keys(imageSizes).length} Bildmaße gelesen)${p.aspekt.length ? ':' : ''}`);
+  for (const m of p.aspekt) console.log(`    ${BEKANNTE_ASPEKTMELDUNGEN.includes(m.assetName) ? 'bekannt (Z5)' : 'NEU'}: ${m.message}`);
+  console.log('durchgerechnet (Bösewicht aufdecken, build_scenario, Dörfler, $SHERIFF), elf Bösewichte × Kampf und Endkampf:');
+  for (const l of p.laeufe) {
+    const build = l.log.find(e => e.type === 'build_scenario');
+    console.log(`  ${l.boss.padEnd(18)} ${l.final ? 'Endkampf' : 'Kampf   '}: build_scenario ${build?.status}; Raster ${l.tokens}/${l.erwartet}; Karten ${l.karten.length}${build?.status === 'note' ? ` — ${build.reason}` : ''}`);
+  }
+  console.log(p.beanstandungen.length ? `${p.laeufe.length} Läufe, ${p.beanstandungen.length} Beanstandungen` : `${p.laeufe.length} Läufe sauber`);
+  complaints.push(...p.beanstandungen);
+
+  console.log(`Zielstand: scenario_data ${JSON.stringify(next).length} Zeichen, sha ${sha(JSON.stringify(next))}`);
+  console.log(`Trockenlauf: ${complaints.length} Beanstandungen`);
+  for (const c of complaints) console.log('  - ' + c);
+  if (complaints.length) return 1;
+  if (!berichtigt.length) { console.log('nichts zu schreiben (alle sieben schon berichtigt)'); return 0; }
+  console.log(`würde schreiben: ${berichtigt.length} Einträge, scenario_data ${raw.length} → ${JSON.stringify(next).length} Zeichen (nichts geschrieben)`);
+  return 0;
+}
+
+if (process.argv[1] && process.argv[1].endsWith('szenariodaten-berichtigung.mjs')) {
+  main(process.argv.slice(2)).then(code => { process.exitCode = code; }, err => { console.error(err); process.exitCode = 1; });
 }
