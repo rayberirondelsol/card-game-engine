@@ -16,16 +16,17 @@
 // Die Zuordnung steht **einmal** hier (`ZUORDNUNG`); Prüfer, Skript, Rauchtest und Tests lesen dieselbe (M6).
 // Dieser Teil ist **rein** — kein `better-sqlite3`, kein Dateizugriff.
 
+import fs from 'node:fs';
 import crypto from 'node:crypto';
+import path from 'node:path';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
 import { checkScenarioAspect } from '../shared/scenarioGeometry.js';
-import { durchrechnen, erwartetAufRaster } from './szenariodaten-grundspiel.mjs';
-import { GAME_ID, SETUP_ID, saveStateHashes, bekannteMeldung } from './szenariodaten-berichtigung.mjs';
+import { durchrechnen, erwartetAufRaster, pngSize } from './szenariodaten-grundspiel.mjs';
+import { GAME_ID, SETUP_ID, sha, saveStateHashes, bekannteMeldung, tausche, fingerabdruckZeilen } from './szenariodaten-berichtigung.mjs';
 
 export { GAME_ID, SETUP_ID, saveStateHashes };
 
-const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
 const copy = (x) => JSON.parse(JSON.stringify(x));
 const text = (x) => JSON.stringify(x);
 
@@ -194,6 +195,13 @@ export function pruefeZiel(ziel, { assets, cards, grids, imageSizes = {} }) {
   return { probleme, aspekt, laeufe: l, beanstandungen };
 }
 
+/** `kurz` kommt in `lang` vor, in gleicher Reihenfolge (nicht unbedingt nebeneinander). */
+const teilfolge = (kurz, lang) => {
+  let i = 0;
+  for (const k of lang) if (k === kurz[i]) i++;
+  return i === kurz.length;
+};
+
 /**
  * Die Umfangstabelle (M29.1): dieselben 40 Läufe für `ausgang` und `ziel`, Zeile für Zeile — Namen ohne
  * Karte, `build_scenario`-Status, Karten, Objekte auf dem Raster, die übrigen Protokollzeilen.
@@ -212,6 +220,8 @@ export function vergleiche(ausgang, ziel, env) {
       vorher: { status: bauA?.status, namen: namenIn(bauA), karten: a.karten, tokens: a.tokens },
       nachher: { status: bauB?.status, namen: namenIn(bauB), karten: b.karten, tokens: b.tokens },
       unveraendert: text(a.log) === text(b.log) && text(a.karten) === text(b.karten),
+      // Jede Karte, die vorher lag, liegt nachher, in gleicher Reihenfolge untereinander (Teilfolge).
+      monoton: teilfolge(a.karten, b.karten),
       restGleich: rest(a) === rest(b),
     };
   });
@@ -228,4 +238,273 @@ export function vergleiche(ausgang, ziel, env) {
       verschwunden,
     },
   };
+}
+
+// ── CLI ──────────────────────────────────────────────────────────────────────
+//
+// Aufruf (im Backend-Container, wo `better-sqlite3` liegt; die Datei liegt dort als `/app/gelaendekarten-zuordnung.mjs`
+// neben `/app/szenariodaten-berichtigung.mjs` und `/app/szenariodaten-grundspiel.mjs`, `../shared` ist dann `/shared`;
+// `docs/datenzugriff.md`):
+//
+//   node gelaendekarten-zuordnung.mjs --json                                    # die Tabelle samt Ausgang/Ziel, ohne Datenbank
+//   node gelaendekarten-zuordnung.mjs --check <db>                              # Trockenlauf, schreibgeschützt
+//   node gelaendekarten-zuordnung.mjs --write <db> --sicherung-sha <hex>        # eine IMMEDIATE-Transaktion
+//   node gelaendekarten-zuordnung.mjs --zurueck <sicherungsdatei> <db>          # der Weg zurück
+//
+// **Es gibt kein `--force`** (M28 hat das entschieden, es gilt weiter): ein Stand, der nicht der Ausgangsstand ist, bricht ab.
+//
+// **Die Absicherung beim Schreiben, in der Reihenfolge, in der sie läuft** (M29.7):
+//
+//   1. Die Sicherung legt dieses Skript **nicht** an. `--write` verlangt den **Hash** der Sicherung und schreibt nur,
+//      wenn er zum **gelesenen** Text passt: ohne Sicherung kein Schreiben. (Die von M28 ist der Stand *vor* M28 und passt nicht.)
+//   2. Einordnung: Ausgangsstand (Länge und Hash der Spalte, `bosses` und jeder der 20 Einträge) → zu schreiben; die Tabelle
+//      schon da und gleich → schon geschrieben; alles andere → Abbruch mit Länge, Hash und Text. Eine vorhandene Tabelle
+//      wird nie überschrieben.
+//   3. Präfix- und Rückwärtsbeweis, `validateScenarioData` (mit der Bibliothek), 40 Läufe: vor dem Schreiben, auf dem Zielstand,
+//      der selbst Länge und Hash aus M29.6 haben muss.
+//   4. Eine `IMMEDIATE`-Transaktion (die Schreibsperre ist da, **bevor** gehasht wird), darin Fingerabdruck vorher und nachher —
+//      je Tabelle und je Zeile von `save_states` — und `UPDATE … WHERE id = ? AND scenario_data = <exakt der gelesene Text>`.
+//      Trifft er keine Zeile, hat jemand die Spalte zwischen Lesen und Schreiben geändert: Abbruch. **Nur diese Spalte.**
+//      (`tausche` und `fingerabdruckZeilen` kommen aus dem M28-Skript — kopiert wird nichts.)
+//   5. Kontrollausgabe, **neu gelesen**, nicht aus dem Plan.
+//
+// Der Weg zurück ist derselbe Vergleich-und-Tausch in die andere Richtung: der aktuelle Text muss **genau der Zielstand** sein.
+// **Beide zurück: zuerst M29, dann M28** — M28s `--zurueck` verlangt *seinen* Zielstand und weigert sich, solange die Tabelle dasteht.
+
+const USAGE = 'usage: gelaendekarten-zuordnung.mjs --json | --check <db> | --write <db> --sicherung-sha <hex> | --zurueck <sicherungsdatei> <db>';
+const MODI = ['--json', '--check', '--write', '--zurueck'];
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const gleich = (a, b) => (text(a) === text(b) ? 'gleich' : 'GEÄNDERT');
+
+function argumente(argv) {
+  const pos = [], unbekannt = [];
+  let sicherungSha;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--sicherung-sha') sicherungSha = argv[++i] ?? '';
+    // Der erste Parameter ist der Modus; jede weitere Option, die das Skript nicht kennt (auch `--force`), ist ein Benutzungsfehler.
+    else if (a.startsWith('--') && (pos.length || !MODI.includes(a))) unbekannt.push(a);
+    else pos.push(a);
+  }
+  return { pos, sicherungSha, unbekannt };
+}
+
+/**
+ * `deps.Database` ist der SQLite-Treiber (auf dem Server liegt `better-sqlite3` neben der Datei, im Repo unter `server/` — der
+ * Test reicht ihn herein). `deps.uploadsDir`: wo die Bilddateien liegen (Vorgabe `CGE_UPLOADS_DIR`, sonst `/app/uploads`).
+ * `deps.haken(stelle, db)`: **die eine** Stelle, an der ein Test einhängen kann — `'nach-lesen'` (zwischen Lesen und Schreiben,
+ * außerhalb der Transaktion) und `'in-transaktion'` (nach dem Fingerabdruck vorher, vor dem UPDATE).
+ *
+ * `deps.ausgang`/`deps.ziel` (`{ laenge, sha }`): **die eine Naht für Tests.** Die Vorbedingung nennt die Produktionswerte
+ * (`AUSGANG`, `ZIEL`), die Fixture hat `options` nicht und kann sie nicht erreichen; ein Test reicht hier die Werte seiner
+ * Spalte herein. Die Einträge (`bosses`, 20 Hashes) prüft `plane` ohne Naht.
+ */
+export async function main(argv, deps = {}) {
+  const { pos, sicherungSha, unbekannt } = argumente(argv);
+  const [mode, a1, a2] = pos;
+
+  if (unbekannt.length || !MODI.includes(mode)) { console.error(USAGE); return 2; }
+  if (mode === '--json') {
+    console.log(JSON.stringify({ terrainCards: ZUORDNUNG, ausgang: AUSGANG, ziel: ZIEL }, null, 1));
+    return 0;
+  }
+  const dbPath = mode === '--zurueck' ? a2 : a1;
+  if (!dbPath || (mode === '--zurueck' && !a1)) { console.error(USAGE); return 2; }
+
+  const Database = deps.Database ?? (await import('better-sqlite3')).default;
+  const db = new Database(dbPath, { readonly: mode === '--check', fileMustExist: true });
+  // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
+  try {
+    const opts = {
+      uploadsDir: deps.uploadsDir, haken: deps.haken, sicherungSha,
+      ausgang: deps.ausgang ?? AUSGANG, ziel: deps.ziel ?? ZIEL,
+    };
+    if (mode === '--check') return trockenlauf(db, opts);
+    if (mode === '--write') return schreiben(db, opts);
+    return zurueck(db, a1, opts);
+  } catch (e) {
+    console.error(`Abbruch: ${e.message}`);
+    return 1;
+  } finally {
+    db.close();
+  }
+}
+
+/** Länge und Hash eines Textes, so wie die Meldungen sie nennen. */
+const kennzeichen = (t) => `${t.length} Zeichen (sha ${sha(t)})`;
+
+/**
+ * Lesen, einordnen, prüfen, ausgeben — ohne zu schreiben. `null` heißt: beanstandet (schon ausgegeben).
+ * Sonst `{ art, raw, before, next, … }`; bei `schon-da` ist nichts weiter zu tun.
+ */
+function vorpruefung(db, { uploadsDir, ausgang, ziel, titel }) {
+  const complaints = [];
+
+  // ── lesen: nur diese eine Spalte (und das game_id des Aufbaus), als Text ──
+  const row = db.prepare('select game_id, scenario_data, grid_data from setups where id = ?').get(SETUP_ID);
+  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return null; }
+  if (row.game_id !== GAME_ID) complaints.push(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`);
+  const raw = row.scenario_data;
+  const before = JSON.parse(raw);
+  // Beweise und Vergleich sind Vergleiche von Text und brauchen das kompakte JSON.stringify-Format.
+  if (text(before) !== raw) complaints.push('der gespeicherte Text ist nicht kompaktes JSON.stringify — byteweiser Vergleich nicht möglich');
+  console.log(`gelesen: scenario_data ${kennzeichen(raw)}, ${Object.keys(before.bosses ?? {}).length} Einträge, Schlüssel ${Object.keys(before).join(', ')}`);
+
+  const aus = () => {
+    console.log(`${titel}: ${complaints.length} Beanstandungen`);
+    for (const c of complaints) console.log('  - ' + c);
+    return null;
+  };
+
+  // ── Einordnung ──
+  const p = plane(before);
+  console.log(`Einordnung: ${p.art === 'zu-schreiben' ? 'zu schreiben' : p.art === 'schon-da' ? 'schon geschrieben' : 'ABWEICHEND'}`);
+  if (p.art === 'abweichend') complaints.push(`${p.meldung} — es wird nichts überschrieben`);
+  if (p.art === 'zu-schreiben' && (raw.length !== ausgang.laenge || sha(raw) !== ausgang.sha)) {
+    complaints.push(`scenario_data hat ${kennzeichen(raw)}, erwartet ${ausgang.laenge} Zeichen (sha ${ausgang.sha}) — ein anderer Stand als der Ausgangsstand von M29.6; es wird nichts überschrieben`);
+  }
+  if (complaints.length) return aus();
+  if (p.art === 'schon-da') {
+    console.log(`schon geschrieben: terrainCards ${kennzeichen(text(before.terrainCards))}, nichts zu schreiben`);
+    return { art: 'schon-da', raw, before, titel };
+  }
+  const next = p.next;
+  const neuRaw = text(next);
+
+  // ── Plan als Diff ──
+  console.log(`  + ,"terrainCards":${text(ZUORDNUNG)}   (${FRAGMENT.length} Zeichen, hinten angehängt)`);
+  for (const [von, nach] of Object.entries(ZUORDNUNG)) console.log(`      ${von.padEnd(16)} → ${nach}`);
+
+  // ── Beweise ──
+  const b = beweise(before, next);
+  console.log(`Präfixbeweis: ${b.some(m => /^Präfix/.test(m)) ? 'NEIN' : 'ja'} (der neue Text ist der alte ohne die letzte „}“ plus das Fragment)`);
+  console.log(`Rückwärtsbeweis: ${b.some(m => /^Rückwärts/.test(m)) ? 'NEIN' : 'ja'} (das Fragment entfernt = der gelesene Text, Zeichen für Zeichen)`);
+  complaints.push(...b);
+
+  // ── gegen die echte Assetliste, das echte Raster, die echte Bibliothek ──
+  const assets = db.prepare('select id, name, type, image_path, back_image_path, width, height from table_assets where game_id = ?').all(row.game_id);
+  const cards = db.prepare('select c.id, c.name, c.image_path, k.name as category from cards c left join categories k on k.id = c.category_id where c.game_id = ?').all(row.game_id);
+  const grids = JSON.parse(row.grid_data);
+  const uploads = uploadsDir || process.env.CGE_UPLOADS_DIR || '/app/uploads';
+  const imageSizes = {};
+  for (const a of assets) {
+    const s = pngSize(path.join(uploads, String(a.image_path ?? '').replace(/^\/uploads\//, '')));
+    if (s) imageSizes[a.name] = s;
+  }
+  const pr = pruefeZiel(next, { assets, cards, grids, imageSizes });
+  console.log(`validateScenarioData: ${pr.probleme.length} Probleme (${assets.length} Assets, ${cards.length} Karten, Raster „${grids[0]?.label}“)`);
+  console.log(`checkScenarioAspect: ${pr.aspekt.length} Meldung${pr.aspekt.length === 1 ? '' : 'en'} (${Object.keys(imageSizes).length} Bildmaße gelesen)${pr.aspekt.length ? ':' : ''}`);
+  for (const m of pr.aspekt) console.log(`    ${bekannteMeldung(m) ? 'bekannt' : 'NEU'}: ${m.message}`);
+  console.log(pr.beanstandungen.length ? `${pr.laeufe.length} Läufe, ${pr.beanstandungen.length} Beanstandungen` : `${pr.laeufe.length} Läufe sauber`);
+  complaints.push(...pr.beanstandungen);
+
+  // ── Umfang (M29.1): dieselben 40 Läufe vor und nach der Tabelle ──
+  const v = vergleiche(before, next, { assets, cards, grids });
+  console.log('Umfang, vorher → nachher (Namen ohne Karte in der Meldung von build_scenario):');
+  for (const z of v.zeilen) {
+    if (z.unveraendert) continue;
+    const namen = (n) => (n.length ? n.map(x => `"${x}"`).join(', ') : '—');
+    console.log(`  ${z.boss.padEnd(18)} ${z.final ? 'Endkampf' : 'Kampf   '}  ${z.vorher.status} → ${z.nachher.status}; Karten ${z.vorher.karten.length} → ${z.nachher.karten.length}; ${namen(z.vorher.namen)} → ${namen(z.nachher.namen)}`);
+  }
+  const s = v.summe;
+  console.log(`  ${v.zeilen.filter(z => z.unveraendert).length} von ${v.zeilen.length} Läufen Zeichen für Zeichen dieselben`);
+  console.log(`  ok ${s.ok.vorher} → ${s.ok.nachher}, note ${s.note.vorher} → ${s.note.nachher}, Vorkämpfe mit note ${s.vorkampfNote.vorher} → ${s.vorkampfNote.nachher}, Namensnennungen ${s.namen.vorher} → ${s.namen.nachher}`);
+  for (const z of v.zeilen) {
+    const wo = `${z.boss} (${z.final ? 'Endkampf' : 'Kampf'})`;
+    if (!z.monoton) complaints.push(`${wo}: eine Karte, die vorher lag, liegt nachher nicht mehr (oder in anderer Reihenfolge)`);
+    if (z.nachher.tokens !== z.vorher.tokens) complaints.push(`${wo}: Objekte auf dem Raster ${z.vorher.tokens} → ${z.nachher.tokens}`);
+    if (!z.restGleich) complaints.push(`${wo}: die übrigen Protokollzeilen haben sich geändert`);
+  }
+
+  // ── Zielstand ──
+  console.log(`Zielstand: scenario_data ${kennzeichen(neuRaw)}`);
+  if (neuRaw.length !== ziel.laenge || sha(neuRaw) !== ziel.sha) {
+    complaints.push(`der Zielstand hat ${kennzeichen(neuRaw)}, M29.6 verspricht ${ziel.laenge} Zeichen (sha ${ziel.sha}) — das Skript rechnet nicht, was es verspricht`);
+  }
+  if (complaints.length) return aus();
+  console.log(`${titel}: 0 Beanstandungen`);
+  return { art: 'zu-schreiben', raw, before, next, neuRaw, assets, cards, grids, titel };
+}
+
+function trockenlauf(db, opts) {
+  const v = vorpruefung(db, { ...opts, titel: 'Trockenlauf' });
+  if (!v) return 1;
+  if (v.art === 'schon-da') return 0;
+  console.log(`würde schreiben: scenario_data ${v.raw.length} → ${v.neuRaw.length} Zeichen (nichts geschrieben)`);
+  return 0;
+}
+
+function schreiben(db, { sicherungSha, haken, ...opts }) {
+  const v = vorpruefung(db, { ...opts, titel: 'Vorprüfung' });
+  if (!v) return 1;
+  if (v.art === 'schon-da') { console.log('nichts zu schreiben'); return 0; }
+  const { raw, before, next, neuRaw, assets, cards, grids } = v;
+
+  // ── Die Sicherung: ohne sie kein Schreiben ──
+  if (!sicherungSha) { console.error('ohne Sicherung kein Schreiben: --sicherung-sha <Hash der gesicherten Spalte> fehlt'); return 1; }
+  if (!/^[0-9a-f]{12,64}$/i.test(sicherungSha)) { console.error('--sicherung-sha braucht mindestens 12 Hex-Stellen'); return 1; }
+  if (!sha256(raw).startsWith(sicherungSha.toLowerCase())) {
+    console.error(`der Hash der Sicherung (${sicherungSha}) passt nicht zum gelesenen Text (sha256 beginnt mit ${sha256(raw).slice(0, 12)}) — die Sicherung ist nicht der Stand, der überschrieben würde`);
+    return 1;
+  }
+
+  haken?.('nach-lesen', db);
+  const t = tausche(db, { von: raw, nach: neuRaw, haken });
+
+  // ── Kontrollausgabe: neu gelesen, nicht aus dem Plan ──
+  const gelesen = db.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data;
+  const after = JSON.parse(gelesen);
+  console.log(`geschrieben: scenario_data ${raw.length} → ${gelesen.length} Zeichen, sha ${sha(raw)} → ${sha(gelesen)}${gelesen === neuRaw ? '' : ' — WEICHT VOM ZIELSTAND AB'}`);
+  console.log(`  Einträge jetzt: ${Object.keys(after.bosses).length}`);
+  for (const k of Object.keys(before.bosses)) {
+    console.log(`  ${k.padEnd(18)} sha ${sha(text(before.bosses[k]))} → ${sha(text(after.bosses[k]))} ${gleich(before.bosses[k], after.bosses[k])}`);
+  }
+  for (const k of Object.keys(after).filter(x => x !== 'bosses')) {
+    const alt = before[k] === undefined ? '(fehlt)' : sha(text(before[k]));
+    console.log(`  Schlüssel ${k.padEnd(14)} sha ${alt} → ${sha(text(after[k]))} ${before[k] === undefined ? 'neu' : gleich(before[k], after[k])}`);
+  }
+  console.log(`  Präfixbeweis auf der gelesenen Spalte: ${beweise(before, after).some(m => /^Präfix/.test(m)) ? 'NEIN' : 'ja'}`);
+  console.log(`  Rückwärtsbeweis auf der gelesenen Spalte: ${beweise(before, after).some(m => /^Rückwärts/.test(m)) ? 'NEIN' : 'ja'}`);
+  console.log(`  validateScenarioData auf der gelesenen Spalte: ${validateScenarioData(after, { assets, grids, cards }).length} Probleme`);
+  fingerabdruckZeilen(db, t);
+  return gelesen === neuRaw ? 0 : 1;
+}
+
+/** Der Weg zurück: der aktuelle Text muss **genau der Zielstand** sein, dann kommt der gesicherte Text wieder. */
+function zurueck(db, sicherungsdatei, { haken, ausgang }) {
+  // ── die Sicherung prüfen: Hash zum Text, kompakt, und der Text ist der Ausgangsstand von M29 ──
+  const s = JSON.parse(fs.readFileSync(sicherungsdatei, 'utf8'));
+  if (typeof s.scenario_data !== 'string' || typeof s.sha256 !== 'string') throw new Error('die Sicherung hat nicht die Form { scenario_data, sha256, updated_at }');
+  if (sha256(s.scenario_data) !== s.sha256) { console.error(`Hash der Sicherung passt nicht zu ihrem Text (${sha256(s.scenario_data).slice(0, 12)} gegen ${s.sha256.slice(0, 12)}) — die Datei ist beschädigt`); return 1; }
+  const alt = JSON.parse(s.scenario_data);
+  if (text(alt) !== s.scenario_data) { console.error('der gesicherte Text ist nicht kompaktes JSON.stringify'); return 1; }
+  const plan = plane(alt);
+  if (plan.art !== 'zu-schreiben' || s.scenario_data.length !== ausgang.laenge || sha(s.scenario_data) !== ausgang.sha) {
+    console.error(`die Sicherung ist nicht der Ausgangsstand von M29 (${kennzeichen(s.scenario_data)}, erwartet ${ausgang.laenge} Zeichen, sha ${ausgang.sha}${plan.meldung ? `; ${plan.meldung}` : ''}) — dorthin gibt es keinen Weg zurück`);
+    return 1;
+  }
+  const ziel = text(plan.next);
+
+  const row = db.prepare('select game_id, scenario_data from setups where id = ?').get(SETUP_ID);
+  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return 1; }
+  if (row.game_id !== GAME_ID) { console.error(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`); return 1; }
+  const raw = row.scenario_data;
+  console.log(`gelesen: scenario_data ${kennzeichen(raw)}; Sicherung ${kennzeichen(s.scenario_data)}; Zielstand von M29 ${kennzeichen(ziel)}`);
+  if (raw === s.scenario_data) { console.log('schon der Ausgangsstand — nichts zu tun'); return 0; }
+  if (raw !== ziel) {
+    console.error('der gelesene Text ist nicht der Zielstand von M29 und nicht der Ausgangsstand — jemand hat nach M29 weitergearbeitet; es wird nichts überschrieben');
+    return 1;
+  }
+
+  haken?.('nach-lesen', db);
+  const t = tausche(db, { von: raw, nach: s.scenario_data, haken });
+
+  const gelesen = db.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data;
+  console.log(`zurückgeschrieben: scenario_data ${raw.length} → ${gelesen.length} Zeichen, sha ${sha(raw)} → ${sha(gelesen)}${gelesen === s.scenario_data ? ' (= die Sicherung, Zeichen für Zeichen)' : ' — WEICHT VON DER SICHERUNG AB'}`);
+  fingerabdruckZeilen(db, t);
+  return gelesen === s.scenario_data ? 0 : 1;
+}
+
+if (process.argv[1] && process.argv[1].endsWith('gelaendekarten-zuordnung.mjs')) {
+  main(process.argv.slice(2)).then(code => { process.exitCode = code; }, err => { console.error(err); process.exitCode = 1; });
 }

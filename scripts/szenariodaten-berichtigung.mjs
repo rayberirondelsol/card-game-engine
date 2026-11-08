@@ -35,7 +35,7 @@ export const GAME_ID = '072123c0-cd97-4ffb-a330-369630fab93f';
 export const SETUP_ID = 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b';
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
+export const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
 const copy = (x) => JSON.parse(JSON.stringify(x));
 
 // ── Die Hashes je Eintrag (M28.2) ────────────────────────────────────────────
@@ -551,7 +551,7 @@ async function trockenlauf(db, { ohne, uploadsDir }) {
  * Die Transaktion: Sperre, Fingerabdruck vorher, (Haken), Vergleich-und-Tausch, Fingerabdruck nachher.
  * Wirft bei jeder Abweichung — und `better-sqlite3` rollt zurück.
  */
-function tausche(db, { von, nach, haken }) {
+export function tausche(db, { von, nach, haken }) {
   const tx = db.transaction(() => {
     const vorher = fingerprint(db);
     const saves = saveStateHashes(db);
@@ -575,7 +575,7 @@ function tausche(db, { von, nach, haken }) {
 }
 
 /** Die Kontrollausgabe zum Fingerabdruck — gelesen nach dem Schreiben. */
-function fingerabdruckZeilen(db, t) {
+export function fingerabdruckZeilen(db, t) {
   // In der Transaktion exakt: wäre etwas abgewichen, hätte `tausche` geworfen und zurückgerollt.
   console.log('  Fingerabdruck aller Tabellen (setups ohne scenario_data, save_states, zone_data, grid_data, state_data …), in der Transaktion vorher/nachher, unverändert: true');
   console.log(`  Fingerabdruck nach dem Commit neu gelesen: ${same(t.vorher, fingerprint(db)) ? 'gleich' : 'ABWEICHEND (ein offener Tisch kann die Zeile Auto Save schreiben — docs/datenzugriff.md)'}`);
