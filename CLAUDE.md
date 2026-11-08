@@ -62,7 +62,9 @@ Request-Body.
 ## Deployment
 
 Läuft auf Proxmox VM 101 in `/opt/card-game-engine`, zwei Container
-(Backend + nginx-Frontend). Rebuild:
+(Backend + nginx-Frontend). **Deployt wird von Hand** — `.github/workflows/deploy.yml` löst zwar bei jedem Push auf `master` aus,
+aber es ist kein self-hosted Runner registriert (`gh api repos/rayberirondelsol/card-game-engine/actions/runners` → `total_count: 0`, gemessen 2026-11-08); die Läufe bleiben in `queued`.
+Rebuild:
 
 ```
 cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build
@@ -150,8 +152,11 @@ liest (nur Namen ohne Schrägstrich, ersetzt nie einen Treffer; **kein Ähnlichk
 **Frontend-Bundle**, beide Images ändern sich; **erst deployen, dann schreiben** (beides ist einzeln unschädlich, gemessen), das Schreiben ist der eine Schalter.
 `scripts/gelaendekarten-zuordnung.mjs` (`--check`, `--write … --sicherung-sha`, `--zurueck`, kein `--force`; nur ergänzen: `scenario_data` 18 982 → 19 106 Zeichen,
 `5eec10582ec8` → `914461d63f77`, die 20 Einträge und M28s Hashes bleiben gleich). **Rückweg umgekehrt: zuerst M29, dann M28.** Nicht Teil davon: 14 Plättchenarten
-**ohne** Karte (Grabhügel, Bundo-Königin, Bürger/Milchkanne, Ritualzeichen, Verschlingende Welle, Pile of Locals). **Stand (2026-11-08): nur Spec und Aufgaben, nichts gebaut,
-nichts geschrieben.** Ein offener Setup-Editor kann M28 und M29 still zurücknehmen (`docs/datenzugriff.md`, „Fallen“).
+**ohne** Karte (Grabhügel, Bundo-Königin, Bürger/Milchkanne, Ritualzeichen, Verschlingende Welle, Pile of Locals). **Stand (2026-11-08): gebaut, deployt, geschrieben.** Tests 1 595 → 1 686. Deploy beider Images von Hand um 14:27 UTC (der VM-Checkout stand auf `1fc6f39`, jetzt `8e09dca`),
+Schreiben um 14:31 UTC in einer `IMMEDIATE`-Transaktion: `scenario_data` 18 982 → **19 106** Zeichen, sha `5eec10582ec8` → **`914461d63f77`**, `terrainCards` 108 Zeichen / `aad39d745984` hinten
+angehängt, die fünf alten Schlüssel und alle 20 Einträge byteweise gleich, `save_states` (17 Zeilen) gleich; zweiter Lauf „schon geschrieben“. Gemessen an der Produktion (40 Läufe, ausgelieferter Executor): `ok` 19 → **32**,
+`note` 21 → **8**, Vorkämpfe mit `note` 8 → **0**, Namensnennungen 50 → **18**. **Offen: `DT`** (Sichtprüfung am Tisch, Auftraggeber) — und der Tisch muss **neu geladen** werden (ein offener Tisch hält die alten
+Szenariodaten). Ein offener Setup-Editor kann M28 und M29 still zurücknehmen (`docs/datenzugriff.md`, „Fallen“); `--check` beider Skripte am Ende des Tages.
 
 ## Produktionsdaten
 

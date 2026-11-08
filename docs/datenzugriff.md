@@ -95,6 +95,14 @@ $SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin
   && docker exec -w /app card-game-engine-backend node /app/auslagen-daten.mjs --check /app/data/card-game-engine.db"
 ```
 
+> ⚠️ **Der Dateiname zählt.** Jedes dieser Skripte startet nur, wenn `process.argv[1]` auf seinen **eigenen Namen** endet
+> (`…auslagen-rauchtest.mjs`, `…gelaendekarten-zuordnung.mjs`). Eine Kopie unter anderem Namen (`alt-rauchtest.mjs`) läuft
+> **still durch: Exit 0, leere Ausgabe**. Wer zwei Fassungen vergleichen will, spielt sie nacheinander unter dem richtigen Namen ein.
+
+**Für M29 (`gelaendekarten-zuordnung.mjs`, und der Rauchtest seit M29)** gehören **vier** Dateien nach `/app/`, nicht nur eine: `gelaendekarten-zuordnung.mjs`,
+`szenariodaten-berichtigung.mjs`, `szenariodaten-grundspiel.mjs` und `auslagen-rauchtest.mjs` (der Rauchtest liest `ZUORDNUNG` aus dem ersten, der importiert die beiden anderen);
+`auslagen-daten.mjs`, `doerfler-daten.mjs`, `equipment-zones.mjs` bleiben für `auslagen-daten.mjs` und den Rauchtest nötig. Der **alte** Rauchtest (vor M29) kommt mit den drei M27-Dateien aus.
+
 `--check` öffnet die Datei schreibgeschützt; `--write` ist **eine** `IMMEDIATE`-Transaktion. Der Rauchtest
 (`auslagen-rauchtest.mjs <db>`) schreibt nie. `doerfler-daten.mjs` und `equipment-zones.mjs` brauchen die
 beiden anderen, weil `auslagen-daten.mjs` `VILLAGERS` daraus liest. Eine **Sicherung** der betroffenen Spalten
@@ -146,6 +154,11 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
   (Roster **und** Platzdaten `barZone`, `seats[].tableau/counters`). Wer einen Startwert ändert, ändert ihn im
   Roster; einen Schritt anfassen muss er nicht. `doerfler-daten.mjs --write` schreibt nur noch Zonen,
   Aktionen und `villagers` (Zeichen für Zeichen die Konstante) — kein Schritt der Folge. (M27.1)
+- **Der Executor läuft auch im Frontend-Bundle** (`GameTable.jsx` importiert `shared/sequenceExecutor.js`; `client/Dockerfile` legt `shared/` daneben). Wer ihn ändert, deployt
+  **beide** Images; wer nur das Backend prüft (Hash von `/shared/sequenceExecutor.js`, Rauchtest), hat den Tisch nicht geprüft — im Bundle sucht man `terrainCards`
+  (`grep -o '[A-Za-z_.?]*terrainCards[^;]\{0,100\}' /usr/share/nginx/html/assets/index-*.js`; die reine Zählung `grep -c` trifft auch den Prüfer in `scenarioData.js`). Ein **neu angelegter Container** hat die
+  Skripte aus `/app` **nicht mehr** (nur, was im Image steht; auch `/app/scripts/` ist weg) — und der **nginx-Log** des alten Frontend-Containers ebenso: Belege wie „`mode=setup` kommt im Log nie vor“
+  lassen sich nach einem Deploy nur noch ab dessen Zeitpunkt führen. (M29)
 - **Der Setup-Editor schreibt `scenario_data` zurück.** `saveSetup` (`GameTable.jsx`) schickt die Spalte **aus dem Zustand, den der
   Editor beim Öffnen geladen hat**. Eine Editor-Sitzung (`?mode=setup`), die **vor** einer Datenänderung geöffnet wurde und danach
   speichert, stellt den alten Text wieder her — still, ohne Fehler; Vergleich-und-Tausch hilft nicht, weil der Editor selbst schreibt.
