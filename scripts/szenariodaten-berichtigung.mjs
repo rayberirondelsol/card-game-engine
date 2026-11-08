@@ -24,11 +24,12 @@
 // Dieser Teil ist **rein** — kein `better-sqlite3`, kein Dateizugriff.
 
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
 import { checkScenarioAspect } from '../shared/scenarioGeometry.js';
-import { durchrechnen, erwartetAufRaster, pngSize } from './szenariodaten-grundspiel.mjs';
+import { durchrechnen, erwartetAufRaster, fingerprint, pngSize } from './szenariodaten-grundspiel.mjs';
 
 export const GAME_ID = '072123c0-cd97-4ffb-a330-369630fab93f';
 export const SETUP_ID = 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b';
@@ -342,27 +343,75 @@ export function pruefeZiel(next, { assets, cards, grids, imageSizes = {} }) {
   return { probleme, aspekt, laeufe, beanstandungen };
 }
 
+// ── Fingerabdruck der Datenbank ──────────────────────────────────────────────
+
+/**
+ * Ein Hash je Zeile von `save_states` — Name und Stand dabei, damit eine Abweichung beim Namen
+ * genannt werden kann. (Der Hash je **Tabelle** liefert `fingerprint` aus `szenariodaten-grundspiel.mjs`:
+ * alle Tabellen, bei `setups` alle Spalten außer `scenario_data`.)
+ */
+export function saveStateHashes(db) {
+  return Object.fromEntries(db.prepare('select * from save_states order by rowid').all().map(r => [
+    r.id, { name: r.name, updated_at: r.updated_at, sha: sha(JSON.stringify(r)) },
+  ]));
+}
+
+/** Ein Hash je Spalte der Zeile des Aufbaus, **ohne** `scenario_data` — `updated_at` gehört dazu. */
+function spaltenHashes(db) {
+  const row = db.prepare('select * from setups where id = ?').get(SETUP_ID);
+  return Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'scenario_data').map(([k, v]) => [k, sha(String(v))]));
+}
+
+const gleich = (a, b) => (JSON.stringify(a) === JSON.stringify(b) ? 'gleich' : 'GEÄNDERT');
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
 //
 // Aufruf (im Backend-Container, wo `better-sqlite3` liegt; die Datei liegt dort als
 // `/app/szenariodaten-berichtigung.mjs` neben `/app/szenariodaten-grundspiel.mjs`, `../shared`
 // ist dann `/shared`; `docs/datenzugriff.md`):
 //
-//   node szenariodaten-berichtigung.mjs --json                 # die Änderungsliste, ohne Datenbank
-//   node szenariodaten-berichtigung.mjs --check <db>           # Trockenlauf, schreibgeschützt
+//   node szenariodaten-berichtigung.mjs --json                                    # die Änderungsliste, ohne Datenbank
+//   node szenariodaten-berichtigung.mjs --check <db>                              # Trockenlauf, schreibgeschützt
+//   node szenariodaten-berichtigung.mjs --write <db> --sicherung-sha <hex>        # eine IMMEDIATE-Transaktion
+//   node szenariodaten-berichtigung.mjs --zurueck <sicherungsdatei> <db>          # der Weg zurück
+//
+// `--ohne-z1` wählt die Wäscheleine bei Ms. Falls ab (Entscheidung 4).
+//
+// **Die Absicherung beim Schreiben, in der Reihenfolge, in der sie läuft** (M28.6):
+//
+//   1. Die Sicherung legt dieses Skript **nicht** an (es schreibt nichts außer der einen Spalte).
+//      `--write` verlangt den **Hash** der Sicherung und schreibt nur, wenn er zum **gelesenen**
+//      Text passt: ohne Sicherung kein Schreiben.
+//   2. Jeder der sieben Einträge muss genau der erwartete Text sein (oder schon das Ergebnis) —
+//      sonst Abbruch, mit Eintrag und Pfad. Einen Schalter, der das umgeht, gibt es nicht.
+//   3. Rückwärtsbeweis, `validateScenarioData`, 22 Läufe: vor dem Schreiben, auf dem Zielstand.
+//   4. Eine `IMMEDIATE`-Transaktion (die Schreibsperre ist da, **bevor** gehasht wird), darin
+//      ein Fingerabdruck vorher und nachher — je Tabelle und je Zeile von `save_states` — und
+//      `UPDATE … WHERE id = ? AND scenario_data = <exakt der gelesene Text>`. Trifft er keine Zeile,
+//      hat jemand die Spalte zwischen Lesen und Schreiben geändert: Abbruch. Jede Abweichung des
+//      Fingerabdrucks: Rollback. **Nur diese Spalte**; `updated_at` bleibt.
+//   5. Kontrollausgabe, **neu gelesen**, nicht aus dem Plan.
+//
+// Der Weg zurück ist derselbe Vergleich-und-Tausch in die andere Richtung: der aktuelle Text muss
+// **genau der Zielstand** sein, sonst hat jemand nach M28 weitergearbeitet, und nichts wird überschrieben.
 
-const USAGE = 'usage: szenariodaten-berichtigung.mjs --json | --check <db> [--ohne-z1]';
+const USAGE = 'usage: szenariodaten-berichtigung.mjs --json | --check <db> | --write <db> --sicherung-sha <hex> | --zurueck <sicherungsdatei> <db>   [--ohne-z1]';
+const MODI = ['--json', '--check', '--write', '--zurueck'];
 
 const zeigeKurz = (v) => (v === undefined ? '(fehlt)' : JSON.stringify(v));
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 function argumente(argv) {
-  const ohne = [];
-  const pos = [];
-  for (const a of argv) {
+  const ohne = [], pos = [], unbekannt = [];
+  let sicherungSha;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
     if (a === '--ohne-z1') ohne.push('Z1');
+    else if (a === '--sicherung-sha') sicherungSha = argv[++i] ?? '';
+    else if (a.startsWith('--') && pos.length) unbekannt.push(a);
     else pos.push(a);
   }
-  return { ohne, pos };
+  return { ohne, pos, sicherungSha, unbekannt };
 }
 
 /** Der Plan als JSON — `alt` fehlt, wo der Schlüssel heute fehlt, und sagt es mit `altFehlt`. */
@@ -376,38 +425,45 @@ function planAlsJson() {
 /**
  * `deps.Database` ist der SQLite-Treiber (auf dem Server liegt `better-sqlite3` neben der Datei, im
  * Repo unter `server/` — der Test reicht ihn herein). `deps.uploadsDir`: wo die Bilddateien liegen
- * (Vorgabe `CGE_UPLOADS_DIR`, sonst `/app/uploads`).
+ * (Vorgabe `CGE_UPLOADS_DIR`, sonst `/app/uploads`). `deps.haken(stelle, db)`: **die eine** Stelle,
+ * an der ein Test einhängen kann — `'nach-lesen'` (zwischen Lesen und Schreiben, außerhalb der
+ * Transaktion) und `'in-transaktion'` (nach dem Fingerabdruck vorher, vor dem UPDATE).
  */
 export async function main(argv, deps = {}) {
-  const { ohne, pos } = argumente(argv);
-  const [mode, dbPath] = pos;
+  const { ohne, pos, sicherungSha, unbekannt } = argumente(argv);
+  const [mode, a1, a2] = pos;
 
+  if (unbekannt.length || !MODI.includes(mode)) { console.error(USAGE); return 2; }
   if (mode === '--json') {
     console.log(JSON.stringify(planAlsJson(), null, 1));
     return 0;
   }
-  if (mode !== '--check' || !dbPath) {
-    console.error(USAGE);
-    return 2;
-  }
+  const dbPath = mode === '--zurueck' ? a2 : a1;
+  if (!dbPath || (mode === '--zurueck' && !a1)) { console.error(USAGE); return 2; }
 
   const Database = deps.Database ?? (await import('better-sqlite3')).default;
-  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  const db = new Database(dbPath, { readonly: mode === '--check', fileMustExist: true });
   // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
   try {
-    return await pruefen(db, { ohne, uploadsDir: deps.uploadsDir });
+    const opts = { ohne, uploadsDir: deps.uploadsDir, haken: deps.haken, sicherungSha };
+    if (mode === '--check') return await trockenlauf(db, opts);
+    if (mode === '--write') return await schreiben(db, opts);
+    return await zurueck(db, a1, opts);
+  } catch (e) {
+    console.error(`Abbruch: ${e.message}`);
+    return 1;
   } finally {
     db.close();
   }
 }
 
-/** Lesen, planen, prüfen, ausgeben — ohne zu schreiben. */
-async function pruefen(db, { ohne, uploadsDir }) {
+/** Lesen, planen, prüfen, ausgeben — ohne zu schreiben. `null` heißt: beanstandet (schon ausgegeben). */
+function vorpruefung(db, { ohne, uploadsDir, titel }) {
   const complaints = [];
 
   // ── lesen: nur diese eine Spalte (und das game_id des Aufbaus), als Text ──
   const row = db.prepare('select game_id, scenario_data, grid_data from setups where id = ?').get(SETUP_ID);
-  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return 1; }
+  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return null; }
   if (row.game_id !== GAME_ID) complaints.push(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`);
   const raw = row.scenario_data;
   const before = JSON.parse(raw);
@@ -428,11 +484,12 @@ async function pruefen(db, { ohne, uploadsDir }) {
     }
   }
   for (const a of abweichend) complaints.push(`„${a.name}“ weicht ab: ${a.grund} — es wird nichts überschrieben`);
-  if (abweichend.length) {
-    console.log(`Trockenlauf: ${complaints.length} Beanstandungen`);
+  const aus = () => {
+    console.log(`${titel}: ${complaints.length} Beanstandungen`);
     for (const c of complaints) console.log('  - ' + c);
-    return 1;
-  }
+    return null;
+  };
+  if (abweichend.length) return aus();
 
   // ── Rückwärtsbeweis ──
   const beweis = rueckwaertsbeweis(before, next, berichtigt);
@@ -462,12 +519,132 @@ async function pruefen(db, { ohne, uploadsDir }) {
   complaints.push(...p.beanstandungen);
 
   console.log(`Zielstand: scenario_data ${JSON.stringify(next).length} Zeichen, sha ${sha(JSON.stringify(next))}`);
-  console.log(`Trockenlauf: ${complaints.length} Beanstandungen`);
-  for (const c of complaints) console.log('  - ' + c);
-  if (complaints.length) return 1;
-  if (!berichtigt.length) { console.log('nichts zu schreiben (alle sieben schon berichtigt)'); return 0; }
-  console.log(`würde schreiben: ${berichtigt.length} Einträge, scenario_data ${raw.length} → ${JSON.stringify(next).length} Zeichen (nichts geschrieben)`);
+  if (complaints.length) return aus();
+  console.log(`${titel}: 0 Beanstandungen`);
+  return { raw, before, next, berichtigt, schonNeu, assets, grids };
+}
+
+async function trockenlauf(db, { ohne, uploadsDir }) {
+  const v = vorpruefung(db, { ohne, uploadsDir, titel: 'Trockenlauf' });
+  if (!v) return 1;
+  if (!v.berichtigt.length) { console.log('nichts zu schreiben (alle sieben schon berichtigt)'); return 0; }
+  console.log(`würde schreiben: ${v.berichtigt.length} Einträge, scenario_data ${v.raw.length} → ${JSON.stringify(v.next).length} Zeichen (nichts geschrieben)`);
   return 0;
+}
+
+/**
+ * Die Transaktion: Sperre, Fingerabdruck vorher, (Haken), Vergleich-und-Tausch, Fingerabdruck nachher.
+ * Wirft bei jeder Abweichung — und `better-sqlite3` rollt zurück.
+ */
+function tausche(db, { von, nach, haken }) {
+  const tx = db.transaction(() => {
+    const vorher = fingerprint(db);
+    const saves = saveStateHashes(db);
+    const spalten = spaltenHashes(db);
+    haken?.('in-transaktion', db);
+    // Nur diese Spalte, nur auf dem exakt gelesenen Text.
+    const r = db.prepare('update setups set scenario_data = ? where id = ? and scenario_data = ?').run(nach, SETUP_ID, von);
+    if (r.changes !== 1) throw new Error('scenario_data hat sich seit dem Lesen geändert — nichts geschrieben');
+    const nachher = fingerprint(db);
+    const savesNachher = saveStateHashes(db);
+    const zeilen = Object.keys({ ...saves, ...savesNachher }).filter(id => saves[id]?.sha !== savesNachher[id]?.sha)
+      .map(id => `save_states-Zeile „${(saves[id] ?? savesNachher[id]).name}“ (updated_at ${saves[id]?.updated_at} → ${savesNachher[id]?.updated_at})`);
+    const tabellen = Object.keys({ ...vorher, ...nachher }).filter(t => vorher[t] !== nachher[t]);
+    if (zeilen.length || tabellen.length) {
+      throw new Error(`unerwartet geändert: ${[...zeilen, ...tabellen].join(', ')} — Rollback`);
+    }
+    return { vorher, saves, spalten, spaltenNachher: spaltenHashes(db) };
+  });
+  // IMMEDIATE: die Schreibsperre wird genommen, bevor der erste Hash berechnet wird.
+  return tx.immediate();
+}
+
+/** Die Kontrollausgabe zum Fingerabdruck — gelesen nach dem Schreiben. */
+function fingerabdruckZeilen(db, t) {
+  // In der Transaktion exakt: wäre etwas abgewichen, hätte `tausche` geworfen und zurückgerollt.
+  console.log('  Fingerabdruck aller Tabellen (setups ohne scenario_data, save_states, zone_data, grid_data, state_data …), in der Transaktion vorher/nachher, unverändert: true');
+  console.log(`  Fingerabdruck nach dem Commit neu gelesen: ${same(t.vorher, fingerprint(db)) ? 'gleich' : 'ABWEICHEND (ein offener Tisch kann die Zeile Auto Save schreiben — docs/datenzugriff.md)'}`);
+  console.log(`  Spalten der Zeile, die nicht geschrieben wurden: ${Object.keys(t.spalten).map(k => `${k} ${t.spalten[k]}${t.spalten[k] === t.spaltenNachher[k] ? '' : ` → ${t.spaltenNachher[k]} GEÄNDERT`}`).join(', ')}`);
+  const jetzt = saveStateHashes(db);
+  for (const [id, s] of Object.entries(t.saves)) {
+    console.log(`  save_states ${s.name}: sha ${s.sha} → ${jetzt[id]?.sha ?? 'GELÖSCHT'} ${s.sha === jetzt[id]?.sha ? 'gleich' : 'ABWEICHEND (nach dem Commit geschrieben, z. B. Auto Save)'}`);
+  }
+  console.log(`  save_states: ${Object.keys(jetzt).length} Zeilen (in der Transaktion ${Object.keys(t.saves).length})`);
+}
+
+async function schreiben(db, { ohne, uploadsDir, sicherungSha, haken }) {
+  const v = vorpruefung(db, { ohne, uploadsDir, titel: 'Vorprüfung' });
+  if (!v) return 1;
+  const { raw, before, next, berichtigt, schonNeu, assets, grids } = v;
+  if (!berichtigt.length) {
+    console.log(`schon berichtigt: ${schonNeu.length}`);
+    console.log('nichts zu schreiben (alle sieben schon berichtigt)');
+    return 0;
+  }
+
+  // ── Die Sicherung: ohne sie kein Schreiben ──
+  if (!sicherungSha) { console.error('ohne Sicherung kein Schreiben: --sicherung-sha <Hash der gesicherten Spalte> fehlt'); return 1; }
+  if (!/^[0-9a-f]{12,64}$/i.test(sicherungSha)) { console.error('--sicherung-sha braucht mindestens 12 Hex-Stellen'); return 1; }
+  if (!sha256(raw).startsWith(sicherungSha.toLowerCase())) {
+    console.error(`der Hash der Sicherung (${sicherungSha}) passt nicht zum gelesenen Text (sha256 beginnt mit ${sha256(raw).slice(0, 12)}) — die Sicherung ist nicht der Stand, der überschrieben würde`);
+    return 1;
+  }
+
+  haken?.('nach-lesen', db);
+
+  const neuRaw = JSON.stringify(next);
+  const t = tausche(db, { von: raw, nach: neuRaw, haken });
+
+  // ── Kontrollausgabe: neu gelesen, nicht aus dem Plan ──
+  const gelesen = db.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data;
+  const after = JSON.parse(gelesen);
+  console.log(`geschrieben: scenario_data ${raw.length} → ${gelesen.length} Zeichen, sha ${sha(raw)} → ${sha(gelesen)}${gelesen === neuRaw ? '' : ' — WEICHT VOM ZIELSTAND AB'}`);
+  console.log(`  Einträge jetzt: ${Object.keys(after.bosses).length}`);
+  for (const k of Object.keys(before.bosses)) {
+    console.log(`  ${k.padEnd(18)} sha ${sha(JSON.stringify(before.bosses[k]))} → ${sha(JSON.stringify(after.bosses[k]))} ${berichtigt.includes(k) ? 'berichtigt' : gleich(before.bosses[k], after.bosses[k])}`);
+  }
+  for (const k of Object.keys(before).filter(x => x !== 'bosses')) {
+    console.log(`  Schlüssel ${k.padEnd(14)} sha ${sha(JSON.stringify(before[k]))} → ${sha(JSON.stringify(after[k]))} ${gleich(before[k], after[k])}`);
+  }
+  console.log(`  Rückwärtsbeweis auf der gelesenen Spalte: ${rueckwaertsbeweis(before, after, berichtigt).length ? 'NEIN' : 'ja'}`);
+  console.log(`  validateScenarioData auf der gelesenen Spalte: ${validateScenarioData(after, { assets, grids }).length} Probleme`);
+  fingerabdruckZeilen(db, t);
+  return gelesen === neuRaw ? 0 : 1;
+}
+
+/** Der Weg zurück: der aktuelle Text muss **genau der Zielstand** sein, dann kommt der gesicherte Text wieder. */
+async function zurueck(db, sicherungsdatei, { ohne, haken }) {
+  // ── die Sicherung prüfen: Hash zum Text, und der Text ist der Ausgangsstand von M28.2 ──
+  const s = JSON.parse(fs.readFileSync(sicherungsdatei, 'utf8'));
+  if (typeof s.scenario_data !== 'string' || typeof s.sha256 !== 'string') throw new Error('die Sicherung hat nicht die Form { scenario_data, sha256, updated_at }');
+  if (sha256(s.scenario_data) !== s.sha256) { console.error(`Hash der Sicherung passt nicht zu ihrem Text (${sha256(s.scenario_data).slice(0, 12)} gegen ${s.sha256.slice(0, 12)}) — die Datei ist beschädigt`); return 1; }
+  const alt = JSON.parse(s.scenario_data);
+  if (JSON.stringify(alt) !== s.scenario_data) { console.error('der gesicherte Text ist nicht kompaktes JSON.stringify'); return 1; }
+  const plan = plane(alt, { ohne });
+  if (plan.abweichend.length || plan.berichtigt.length !== Object.keys(EINTRAEGE).length) {
+    console.error('die Sicherung ist nicht der Ausgangsstand von M28.2 (nicht alle sieben Einträge sind der erwartete alte Text) — dorthin gibt es keinen Weg zurück');
+    return 1;
+  }
+  const ziel = JSON.stringify(plan.next);
+
+  const row = db.prepare('select game_id, scenario_data from setups where id = ?').get(SETUP_ID);
+  if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return 1; }
+  if (row.game_id !== GAME_ID) { console.error(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`); return 1; }
+  const raw = row.scenario_data;
+  console.log(`gelesen: scenario_data ${raw.length} Zeichen (sha ${sha(raw)}); Sicherung ${s.scenario_data.length} Zeichen (sha ${sha(s.scenario_data)}); Zielstand von M28 ${ziel.length} Zeichen (sha ${sha(ziel)})`);
+  if (raw === s.scenario_data) { console.log('schon der Ausgangsstand — nichts zu tun'); return 0; }
+  if (raw !== ziel) {
+    console.error('der gelesene Text ist nicht der Zielstand von M28 und nicht der Ausgangsstand — jemand hat nach M28 weitergearbeitet; es wird nichts überschrieben');
+    return 1;
+  }
+
+  haken?.('nach-lesen', db);
+  const t = tausche(db, { von: raw, nach: s.scenario_data, haken });
+
+  const gelesen = db.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data;
+  console.log(`zurückgeschrieben: scenario_data ${raw.length} → ${gelesen.length} Zeichen, sha ${sha(raw)} → ${sha(gelesen)}${gelesen === s.scenario_data ? ' (= die Sicherung, Zeichen für Zeichen)' : ' — WEICHT VON DER SICHERUNG AB'}`);
+  fingerabdruckZeilen(db, t);
+  return gelesen === s.scenario_data ? 0 : 1;
 }
 
 if (process.argv[1] && process.argv[1].endsWith('szenariodaten-berichtigung.mjs')) {

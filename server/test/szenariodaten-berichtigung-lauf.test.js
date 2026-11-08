@@ -196,14 +196,305 @@ test('DC: `--json` druckt den Plan, ohne Datenbank', async () => {
   assert.ok(plan.aenderungen.find(a => a.pfad === 'terrain[3].rotation' && a.eintrag === 'The Door Knockers').altFehlt);
 });
 
-test('DC: `--write` gibt es hier noch nicht – die Benutzungszeile', async () => {
+test('DC: ein Schalter, den es nicht gibt – `--force` – ist ein Benutzungsfehler, und nichts wird geschrieben', async () => {
   const { tmp, file, uploads } = frischeDatenbank();
   try {
     const vorher = spalten(file);
-    const r = await lauf(['--write', file], { uploads });
+    const r = await lauf(['--write', file, '--force', '--sicherung-sha', 'abcdef123456'], { uploads });
     assert.equal(r.code, 2, r.out);
     assert.match(r.out, /usage: szenariodaten-berichtigung\.mjs/);
     assert.deepEqual(spalten(file), vorher);
-    void ohneScenario; void sha;
   } finally { weg(tmp); }
+});
+
+// ── DD: Schreiben, Fingerabdruck, Weg zurück ────────────────────────────────
+
+const ausgang = JSON.stringify(fx.scenarioBefore);
+const zielText = JSON.stringify(berichtige(fx.scenarioBefore).next);
+const sichSha = sha(ausgang);
+
+/** Was `DE` an der Produktion ablegt: der rohe Text, seine sha256, `updated_at`, die Hashes je Spielstand. */
+function sicherungsdatei(tmp, text = ausgang) {
+  const f = path.join(tmp, 'scenario_data.sicherung.json');
+  fs.writeFileSync(f, JSON.stringify({
+    scenario_data: text,
+    sha256: crypto.createHash('sha256').update(text).digest('hex'),
+    updated_at: '2026-11-08 00:00:00',
+  }));
+  return f;
+}
+
+const schreiben = (file, extra = []) => ['--write', file, '--sicherung-sha', sichSha, ...extra];
+
+test('DD: `--write` am Ausgangsstand schreibt genau den Zielstand und nur `scenario_data`; die Kontrollausgabe ist neu gelesen', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const vorher = spalten(file);
+    const r = await lauf(schreiben(file), { uploads });
+    assert.equal(r.code, 0, r.out);
+    const nachher = spalten(file);
+    // Die Spalte ist genau der Zielstand: `bosses` 15 263 → 15 567 Zeichen, die Spalte um 304 Zeichen mehr.
+    assert.equal(nachher.r.scenario_data, zielText);
+    assert.equal(JSON.stringify(JSON.parse(nachher.r.scenario_data).bosses).length, 15567);
+    assert.equal(nachher.r.scenario_data.length - vorher.r.scenario_data.length, 304);
+    assert.equal(sha(JSON.stringify(JSON.parse(nachher.r.scenario_data).bosses)), 'f6c1d5f585c0');
+    // Nur diese Spalte: jede andere der Zeile (zone_data, action_data, grid_data, sequence_data,
+    // state_data, **updated_at**), jede andere Zeile und jeder Spielstand sind gleich.
+    assert.deepEqual(ohneScenario(nachher), ohneScenario(vorher));
+    assert.equal(nachher.r.updated_at, vorher.r.updated_at, 'updated_at bleibt');
+    // Kontrollausgabe, gelesen und nicht aus dem Plan.
+    assert.match(r.out, /geschrieben: scenario_data \d+ → \d+ Zeichen, sha [0-9a-f]{12} → [0-9a-f]{12}/);
+    assert.match(r.out, /Ernie Offal\s+sha f70452263c32 → 26f455032580/);
+    assert.match(r.out, /Patches\s+sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
+    assert.equal((r.out.match(/ gleich$/gm) || []).filter(l => l).length >= 13, true);
+    assert.match(r.out, /Schlüssel gridLabel\s+sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
+    assert.match(r.out, /Schlüssel villagers\s+sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
+    assert.match(r.out, /Rückwärtsbeweis auf der gelesenen Spalte: ja/);
+    assert.match(r.out, /validateScenarioData auf der gelesenen Spalte: 0 Probleme/);
+    assert.match(r.out, /Fingerabdruck aller Tabellen .* unverändert: true/);
+    assert.match(r.out, /save_states Partie 14 – Sieg gegen Virginia Fitz: sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
+    assert.match(r.out, /save_states: 3 Zeilen/);
+  } finally { weg(tmp); }
+});
+
+test('DD: ein zweiter Lauf schreibt nichts – „schon berichtigt: 7“, die Spalte ist byteweise gleich', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    assert.equal((await lauf(schreiben(file), { uploads })).code, 0);
+    const nach1 = spalten(file);
+    // Mit der (nun überholten) Sicherung und ohne sie: beides ändert nichts.
+    for (const args of [schreiben(file), ['--write', file]]) {
+      const r = await lauf(args, { uploads });
+      assert.equal(r.code, 0, r.out);
+      assert.match(r.out, /schon berichtigt: 7/);
+      assert.match(r.out, /nichts zu schreiben/);
+      assert.deepEqual(spalten(file), nach1, 'der zweite Lauf hat nichts überschrieben');
+    }
+  } finally { weg(tmp); }
+});
+
+test('DD: ein abweichender Eintrag bricht den Lauf ab, **bevor** geschrieben wird – die Spalte bleibt, wie sie war', async () => {
+  const sc = copy(fx.scenarioBefore);
+  sc.bosses['Ernie Offal'].fields.B = 'J5:K5';
+  const { tmp, file, uploads } = frischeDatenbank({ scenario: sc });
+  try {
+    const vorher = spalten(file);
+    const r = await lauf(['--write', file, '--sicherung-sha', sha(JSON.stringify(sc))], { uploads });
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Ernie Offal/);
+    assert.match(r.out, /fields\.B/);
+    assert.doesNotMatch(r.out, /geschrieben:/);
+    assert.deepEqual(spalten(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('DD: die Spalte ändert sich zwischen Lesen und Schreiben – der Vergleich-und-Tausch trifft keine Zeile, die Transaktion bricht ab', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const fremd = copy(fx.scenarioBefore);
+    fremd.bosses.Patches.scenario += ' (fremde Arbeit)';
+    const fremdText = JSON.stringify(fremd);
+    const vorher = spalten(file);
+    const r = await lauf(schreiben(file), {
+      uploads,
+      haken: (stelle, db) => {
+        if (stelle !== 'nach-lesen') return;
+        // Eine zweite Verbindung — ein Setup-Editor, der zwischen Lesen und Schreiben speichert.
+        const zweite = new Database(file);
+        zweite.prepare('update setups set scenario_data = ? where id = ?').run(fremdText, SETUP_ID);
+        zweite.close();
+      },
+    });
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /seit dem Lesen geändert/);
+    assert.match(r.out, /nichts geschrieben/);
+    // Es steht nichts Halbes da: die fremde Spalte, unberührt.
+    const nachher = spalten(file);
+    assert.equal(nachher.r.scenario_data, fremdText);
+    assert.deepEqual(ohneScenario(nachher), ohneScenario(vorher));
+  } finally { weg(tmp); }
+});
+
+test('DD: die Schreibsperre ist da, bevor der Fingerabdruck genommen wird (`IMMEDIATE`)', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    let busy = null;
+    const r = await lauf(schreiben(file), {
+      uploads,
+      haken: (stelle) => {
+        if (stelle !== 'in-transaktion') return;
+        // Eine zweite Verbindung darf in der Transaktion nicht schreiben: das Skript hält die Sperre schon.
+        const zweite = new Database(file, { timeout: 0 });
+        try { zweite.prepare("update save_states set name = name where name = 'Auto Save'").run(); }
+        catch (e) { busy = e.code; }
+        finally { zweite.close(); }
+      },
+    });
+    assert.equal(r.code, 0, r.out);
+    assert.match(busy ?? '', /SQLITE_BUSY|SQLITE_LOCKED/);
+  } finally { weg(tmp); }
+});
+
+test('DD: ändert sich in der Transaktion eine Zeile von `save_states`, weicht der Fingerabdruck ab – Rollback, die Meldung nennt die Zeile beim Namen', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const vorher = spalten(file);
+    const r = await lauf(schreiben(file), {
+      uploads,
+      haken: (stelle, db) => {
+        if (stelle === 'in-transaktion') db.prepare("update save_states set state_data = '{\"a\":99}' where name like 'Partie 14%'").run();
+      },
+    });
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Partie 14 – Sieg gegen Virginia Fitz/);
+    assert.match(r.out, /Rollback/);
+    // Alles zurück, auch die Änderung des Hakens: die Transaktion war eine.
+    assert.deepEqual(spalten(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('DD: der Fingerabdruck umfasst alle Tabellen – `setups` (alle Spalten außer `scenario_data`) und jede andere', async () => {
+  for (const [sql, tabelle] of [
+    ["update setups set zone_data = '[]' where id = 'SETUP'", 'setups'],
+    ["update cards set name = name || 'x' where rowid = 1", 'cards'],
+  ]) {
+    const { tmp, file, uploads } = frischeDatenbank();
+    try {
+      const vorher = spalten(file);
+      const r = await lauf(schreiben(file), {
+        uploads,
+        haken: (stelle, db) => { if (stelle === 'in-transaktion') db.prepare(sql.replace('SETUP', SETUP_ID)).run(); },
+      });
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, new RegExp(`unerwartet geändert: .*${tabelle}`));
+      assert.deepEqual(spalten(file), vorher);
+    } finally { weg(tmp); }
+  }
+});
+
+test('DD: eine Änderung an `save_states` **vor** der Transaktion ist kein Fehler – es ist die Zeile „Auto Save“, die der Browser schreibt', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const r = await lauf(schreiben(file), {
+      uploads,
+      haken: (stelle) => {
+        if (stelle !== 'nach-lesen') return;
+        // Zwischen Lesen und Schreiben schreibt ein offener Tisch seinen Auto Save.
+        const zweite = new Database(file);
+        zweite.prepare("update save_states set state_data = '{\"a\":42}', updated_at = '2099-01-01' where name = 'Auto Save'").run();
+        zweite.close();
+      },
+    });
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /Fingerabdruck aller Tabellen .* unverändert: true/);
+    assert.equal(spalten(file).r.scenario_data, zielText);
+    assert.equal(spalten(file).saves.find(s => s.name === 'Auto Save').state_data, '{"a":42}', 'der Auto Save bleibt, wie der Browser ihn geschrieben hat');
+  } finally { weg(tmp); }
+});
+
+test('DD: ohne `--sicherung-sha`, mit einem falschen und mit einem zu kurzen schreibt `--write` nicht – und sagt warum', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const vorher = spalten(file);
+    const fehlt = await lauf(['--write', file], { uploads });
+    assert.equal(fehlt.code, 1, fehlt.out);
+    assert.match(fehlt.out, /ohne Sicherung kein Schreiben/);
+    const falsch = await lauf(['--write', file, '--sicherung-sha', sha('etwas anderes')], { uploads });
+    assert.equal(falsch.code, 1, falsch.out);
+    assert.match(falsch.out, /passt nicht zum gelesenen Text/);
+    const kurz = await lauf(['--write', file, '--sicherung-sha', sichSha.slice(0, 8)], { uploads });
+    assert.equal(kurz.code, 1, kurz.out);
+    assert.match(kurz.out, /mindestens 12/);
+    assert.deepEqual(spalten(file), vorher);
+    // Richtig: schreibt (dieselbe Datenbank).
+    const richtig = await lauf(schreiben(file), { uploads });
+    assert.equal(richtig.code, 0, richtig.out);
+    assert.equal(spalten(file).r.scenario_data, zielText);
+  } finally { weg(tmp); }
+});
+
+test('DD: `--write --ohne-z1` schreibt den Zielstand ohne die Wäscheleine (Entscheidung 4)', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const r = await lauf(schreiben(file, ['--ohne-z1']), { uploads });
+    assert.equal(r.code, 0, r.out);
+    const neu = JSON.parse(spalten(file).r.scenario_data);
+    assert.equal(neu.bosses['Ms. Falls & Co.'].terrain[2].rotation, 90);
+    assert.equal(sha(JSON.stringify(neu.bosses['Ms. Falls & Co.'])), '78204866a9de');
+    assert.equal(spalten(file).r.scenario_data.length - ausgang.length, 303);
+  } finally { weg(tmp); }
+});
+
+test('DD: `--zurueck` stellt am Zielstand den gesicherten Text wieder her – Hash gleich dem Ausgang, sonst nichts angefasst', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const vorher = spalten(file);
+    const sicherung = sicherungsdatei(tmp);
+    assert.equal((await lauf(schreiben(file), { uploads })).code, 0);
+    assert.notEqual(spalten(file).r.scenario_data, ausgang);
+    const r = await lauf(['--zurueck', sicherung, file], { uploads });
+    assert.equal(r.code, 0, r.out);
+    assert.equal(sha(spalten(file).r.scenario_data), sha(ausgang));
+    assert.deepEqual(spalten(file), vorher, 'wie vor dem Schreiben - Zeile für Zeile');
+    assert.match(r.out, /zurückgeschrieben/);
+    assert.match(r.out, /Fingerabdruck aller Tabellen .* unverändert: true/);
+    // Danach meldet es: schon der Ausgangsstand.
+    const noch = await lauf(['--zurueck', sicherung, file], { uploads });
+    assert.equal(noch.code, 0, noch.out);
+    assert.match(noch.out, /schon der Ausgangsstand/);
+    assert.deepEqual(spalten(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('DD: `--zurueck` weigert sich, wenn der Stand **nicht** der Zielstand ist – jemand hat nach M28 weitergearbeitet', async () => {
+  const { tmp, file, uploads } = frischeDatenbank();
+  try {
+    const sicherung = sicherungsdatei(tmp);
+    assert.equal((await lauf(schreiben(file), { uploads })).code, 0);
+    // Jemand arbeitet weiter: ein Eintrag der 13 wird geändert.
+    const db = new Database(file);
+    const weiter = JSON.parse(spalten(file).r.scenario_data);
+    weiter.bosses.Patches.stats.LEB += 1;
+    db.prepare('update setups set scenario_data = ? where id = ?').run(JSON.stringify(weiter), SETUP_ID);
+    db.close();
+    const vorher = spalten(file);
+    const r = await lauf(['--zurueck', sicherung, file], { uploads });
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /nicht der Zielstand/);
+    assert.deepEqual(spalten(file), vorher, 'nichts überschrieben');
+  } finally { weg(tmp); }
+});
+
+test('DD: `--zurueck` prüft die Sicherung selbst – ihr Hash muss zum Text passen, und der Text muss der Ausgangsstand von M28.2 sein', async () => {
+  const { tmp, file, uploads } = frischeDatenbank({ scenario: berichtige(fx.scenarioBefore).next });
+  try {
+    const vorher = spalten(file);
+    // Beschädigt: der Text stimmt nicht mehr zu seinem Hash.
+    const kaputt = sicherungsdatei(tmp);
+    const j = JSON.parse(fs.readFileSync(kaputt, 'utf8'));
+    j.scenario_data += ' ';
+    fs.writeFileSync(kaputt, JSON.stringify(j));
+    const a = await lauf(['--zurueck', kaputt, file], { uploads });
+    assert.equal(a.code, 1, a.out);
+    assert.match(a.out, /Hash der Sicherung passt nicht/);
+    // Eine Sicherung, die gar nicht der Ausgangsstand war (schon berichtigt): kein Weg zurück dorthin.
+    const andere = sicherungsdatei(tmp, zielText);
+    const b = await lauf(['--zurueck', andere, file], { uploads });
+    assert.equal(b.code, 1, b.out);
+    assert.match(b.out, /nicht der Ausgangsstand/);
+    assert.deepEqual(spalten(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('DD: das Skript kennt kein `--force` und schreibt nur `scenario_data` – der Quelltext sagt es', () => {
+  const quelle = fs.readFileSync(new URL('../../scripts/szenariodaten-berichtigung.mjs', import.meta.url), 'utf8');
+  // Der Schalter taucht nur im Kommentar auf, der ihn ausschließt - nirgends als verarbeitete Option.
+  assert.doesNotMatch(quelle, /a === '--force'|'--force'\s*[:,)]/);
+  // Genau ein UPDATE je Richtung, und beide setzen nur diese Spalte.
+  const updates = quelle.match(/update setups set [^'`]*/g) ?? [];
+  assert.ok(updates.length >= 1);
+  for (const u of updates) assert.match(u, /^update setups set scenario_data = \? where id = \? and scenario_data = \?$/);
+  for (const spalte of ['zone_data', 'action_data', 'grid_data', 'sequence_data', 'state_data', 'updated_at']) {
+    assert.doesNotMatch(quelle, new RegExp(`update setups set[^;\\n]*${spalte}`), spalte);
+  }
 });
