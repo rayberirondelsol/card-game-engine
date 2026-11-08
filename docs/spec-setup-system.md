@@ -2062,6 +2062,9 @@ Editor ändert, baut Vokabular für eine Oberfläche, die es nicht gibt.
 aber `Sprengstoff` und `Auslöser` sind **zwei** Plättchen. Eine Karte für zwei
 Teile passt in keine der beiden Regeln; das ist ein eigener Fall.
 
+*Nachtrag (M29, 2026-11-08):* dieser Fall ist **gelöst**, ohne dass eine der beiden Regeln geändert wird: ein dritter, letzter Versuch aus einer Tabelle
+in den Szenariodaten (`terrainCards`), siehe M29.
+
 ### M8.5 — Die Kartenbibliothek hat keine Suche
 
 **Befund aus der gespielten Partie.** 1087 Karten in 38 Kategorien, und in der
@@ -6858,3 +6861,423 @@ Wo dieser Abschnitt nicht stimmte (Nummern fortlaufend nach `docs/tasks-szenarie
 
 **Offen geblieben** (vollständig in „Offen und ungeprüft“ oben, 1–12, unverändert gültig; neu hinzu kommt): die Sichtprüfung `DI`; die Frage, ob nach dem Schreiben ein Editor-Tab zurückschreibt (`--check` am Ende
 des Tages); `setups.updated_at` ist **nicht** angefasst (bewusst, M28.6 Nr. 6) — wer das als Änderungsmerkmal liest, sieht M28 nicht.
+
+
+---
+
+## M29 — Drei Plättchenarten finden ihre Geländekarte
+
+Auftrag vom **2026-11-08**: ein Geländeplättchen auf dem Tisch findet seine Geländekarte nur, wenn der
+**Name** passt (M8.3, M7.6). Für drei Plättchenarten passt er nicht, obwohl die Karte da ist:
+`Dichter Wald 2`, `Sprengstoff` und `Auslöser`. Aufgaben `DK`–`DT` in `docs/tasks-kartenzuordnung.md`
+(nicht `tasks-gelaendekarten.md` — die Datei gibt es schon, sie gehört zu M8.3, `K1`–`K6`); dort auch
+**„Wo die Spec nicht stimmt“** und **„Entscheidungen“ — vor dem Bauen lesen**.
+
+**Ergebnis in acht Sätzen.**
+
+1. **Gemessen**, nicht vermutet (M29.1): von 40 Läufen (20 Bösewichte × Kampf und Endkampf) hat der
+   Executor heute in **21** ein Plättchen ohne Karte (`build_scenario` meldet `note`), die Zuordnung behebt das in **16**
+   (acht Bösewichte); **13** davon werden `ok`, **3** bleiben `note` mit kürzerer Liste, und kein einziger **Vorkampf** hat danach
+   noch ein Plättchen ohne Karte (8 → 0).
+2. **Entscheidung (M29.2): eine Tabelle `terrainCards` in `setups.scenario_data`**, neben `gridLabel`, `cardZoneLabel`,
+   `bosses`, `villagers`, `options` — drei Paare, 108 Zeichen. Der Vorschlag des Auftrags trägt; verworfen sind
+   ein Feld je Geländeeintrag, eine Konstante in `shared/`, das Umbenennen der Assets und ein neues Feld an `table_assets`.
+3. **Die Regel (M29.3)** ist ein **dritter und letzter Versuch** im Executor, nach dem exakten Namen und dem Teil vor/hinter dem
+   Schrägstrich: steht der Name des Plättchens in der Tabelle, gilt die Karte, die sie nennt. Nur für Namen **ohne** Schrägstrich;
+   sie ersetzt nie einen Treffer, den die ersten beiden Versuche schon haben.
+4. **Das ist kein Ähnlichkeitsrechner (M29.4)** — und der Kommentar im Code, der „zwei Versuche, kein dritter“ sagt, wird geändert,
+   sonst steht dort eine Lüge. Das Verbot richtet sich gegen Raten; eine benannte, geschlossene, geprüfte Abbildung rät nicht.
+5. **`validateScenarioData` prüft die Tabelle gegen die Bibliothek (M29.5)**, wenn man ihr die Karten gibt: ein Ziel, das es nicht
+   gibt, ist ein Datenfehler. Am Tisch wird die Bibliothek **nicht** geprüft — eine fehlende Karte bleibt ein Vermerk, wie M8.3 es will.
+6. **Der Zielstand ist als Text mit Hashes festgelegt (M29.6):** `scenario_data` 18 982 → **19 106** Zeichen, sha256
+   `5eec10582ec8` → **`914461d63f77`**. Es wird **nur ergänzt**: die fünf vorhandenen Schlüssel und alle 20 Einträge bleiben
+   byteweise gleich — darum bleiben auch die Hashes von M28 gültig, und M28s `--check` am Ende des Tages sagt weiter „7 schon berichtigt“.
+7. **Verbindliche Reihenfolge (M29.8): erst deployen, dann schreiben.** Beides ist in jeder Reihenfolge unschädlich — gemessen: alter
+   Executor mit dem neuen Schlüssel und neuer Executor ohne ihn liefern dieselbe Rauchtest-Ausgabe wie heute —, aber so ist der Deploy
+   folgenlos und das Schreiben der **eine** Schalter, `--zurueck` der eine Rückweg.
+8. **Bewusst nicht Teil davon (M29.10):** 14 Plättchenarten, für die es **keine** Karte gibt — gemessen vollständig, **mehr als
+   der Auftrag nannte** (die fünf Grabhügel bei Virginia Fitz fehlten in der Liste).
+
+### M29.1 — Befund, gemessen
+
+**Wie gemessen wurde.** Am 2026-11-08 aus der Produktion **gelesen** (SSH, `docs/datenzugriff.md`, nur lesend): die Zeile des Aufbaus
+`b1e10f4e-b8f2-4c2a-bb3e-54643944121b`, alle 212 Assets, alle 1 087 Karten. Ausgangsstand wie im Auftrag: `scenario_data`
+**18 982 Zeichen**, sha256 `5eec10582ec8`, Schlüssel `gridLabel, bosses, cardZoneLabel, villagers, options`, 20 Bösewichte,
+kompaktes `JSON.stringify`. Der Executor im Backend-Container ist der im Repo (`shared/sequenceExecutor.js` `823fa269f58f`,
+`scenarioData.js` `174b8761600b`, `cardSearch.js` `96d6d91159c6` — jeweils gleich). Die Läufe sind mit **dem Executor des Repos**
+gerechnet (`durchrechnen` aus `scripts/szenariodaten-grundspiel.mjs`; Rauchtest `scripts/auslagen-rauchtest.mjs`), gegen eine **Kopie
+der Daten im Scratchpad**; für den Zustand „nachher“ mit einer **Prototyp-Kopie** von `shared/` im Scratchpad, in der die Regel aus M29.3
+steht (acht Zeilen, nicht im Repo). **Nichts wurde in die Produktion geschrieben, nichts im Repo geändert.**
+
+**Die Bibliothek.** 33 Geländekarten — `Gelände` (20) und `Gelände (Neue Nachbarn)` (13), Namen wie im Auftrag; die älteren Texte
+(M8.3, `szenariodaten-erweiterung.md` 8.9) sagen noch `Üble Nachbarn`, das ist der alte Kategoriename. Jeder Name kommt in der **ganzen**
+Bibliothek **genau einmal** vor (keine Kollision unter 1 087 Karten), **keiner trägt einen Schrägstrich**, alle Namen sind
+Unicode-NFC und ohne Randleerzeichen. Von den 62 Geländeassets finden **28** eine Karte, **34 nicht** — drei davon sind die Namen dieses Auftrags.
+
+| Plättchen (Asset, je 1×, Kategorie `Gelände`) | Karte | Karten mit diesem Namen | Läufe, in denen es heute ohne Karte steht |
+|---|---|---|---|
+| `Dichter Wald 2` (350 × 200) | `Dichter Wald` | 1 | 12 |
+| `Sprengstoff` (47 × 48, **TNT-Kasten**) | `Sprengstoff & Auslöser` | 1 | 10 |
+| `Auslöser` (47 × 46, **Dynamitbündel**) | `Sprengstoff & Auslöser` | 1 | 10 |
+
+Die Falle mit der Vertauschung (`szenariodaten-grundspiel.md` §6.5, M28.4) ist für die Zuordnung ohne Belang: beide Namen zeigen auf
+dieselbe Karte. Sie bleibt für **die Einträge** wichtig (an `H7` steht `Auslöser`, an `Q5` `Sprengstoff`, nach dem Bild) und
+wird hier nicht angefasst.
+
+**Umfang: acht Bösewichte, 16 von 40 Läufen.** Spalte „Karten“: die **Geländekarten** der Reihe (ohne die Sheriff-Karte im Endkampf).
+`build_scenario` heißt das Protokoll des Schritts.
+
+| Bösewicht | Lauf | heute ohne Karte, **behoben** | danach noch ohne Karte | Karten | `build_scenario` |
+|---|---|---|---|---|---|
+| Virginia Fitz | Kampf | `Dichter Wald 2`, `Auslöser`, `Sprengstoff` | — | 6 → 7 | `note` → `ok` |
+| | Endkampf | dieselben drei | 5 × `Grabhügel / Grabhügel ausgehoben (…)` | 6 → 7 | `note` → `note` |
+| Red Atrocious | Kampf, Endkampf | `Dichter Wald 2`, `Sprengstoff`, `Auslöser` | — | 6 → 7 | `note` → `ok` |
+| Barry Bluff | Kampf, Endkampf | `Auslöser`, `Sprengstoff` | — | 6 → 7 | `note` → `ok` |
+| The Door Knockers | Kampf, Endkampf | `Dichter Wald 2` | — | 7 → 7 | `note` → `ok` |
+| Handsy | Kampf | `Sprengstoff`, `Dichter Wald 2`, `Auslöser` | — | 5 → 7 | `note` → `ok` |
+| | Endkampf | dieselben drei | 5 × `Versteckter Bürger (…) / Große Milchkanne` | 5 → 7 | `note` → `note` |
+| Lawman Dozy | Kampf, Endkampf | `Dichter Wald 2` | — | 6 → 7 | `note` → `ok` |
+| Qing & Kween | Kampf, Endkampf | `Dichter Wald 2` | — | 7 → 7 | `note` → `ok` |
+| Umbrello | Kampf | `Auslöser`, `Sprengstoff` | — | 6 → 7 | `note` → `ok` |
+| | Endkampf | dieselben zwei | `Verschlingende Welle` | 6 → 7 | `note` → `note` |
+
+**Die zwölf übrigen Bösewichte sind unberührt** (Deputy Waggums, The Bundits, Tilda Fields, Ernie Offal, Tartar Fishboy, Ms. Falls & Co.,
+Patches, Bort Dovis, Penny Pinchetti, Pepin Milkfrog, Samuel Strawman, Will Barlow): in **24 von 40 Läufen** ist Meldung und Kartenreihe
+Zeichen für Zeichen dieselbe. Vier der acht betroffenen Einträge sind die vom 2026-11-07 (Handsy, Lawman Dozy, Qing & Kween, Umbrello),
+vier die berichtigten (Virginia, Red, Barry, Door Knockers).
+
+**Summe über alle 40 Läufe.** `build_scenario`: **`ok` 19 → 32, `note` 21 → 8**. Die acht `note`, die bleiben, sind genau Endkämpfe
+(Deputy Waggums, Virginia Fitz, The Bundits, Tilda Fields, Handsy, Pepin Milkfrog, Samuel Strawman, Umbrello); **Vorkämpfe mit `note`: 8 → 0**.
+Namen in den Meldungen (Name × Lauf): **50 → 18**; die 32, die verschwinden, sind 12 × `Dichter Wald 2`, 10 × `Sprengstoff`, 10 × `Auslöser`.
+Objekte auf dem Raster: in allen 40 Läufen **gleich**. Die übrigen Protokollzeilen: in allen 40 **gleich**. Die größte Auslage bleibt
+**7** Geländekarten (heute schon bei Deputy Waggums); die Zone `Terrain-Auslage` hat `capacity: null`. Eine neue Karte steht **mitten in der Reihe**, an der Stelle ihres Plättchens im Eintrag; die schon vorhandenen rücken einen Platz
+weiter, ihre Reihenfolge untereinander bleibt (z. B. Virginia, Kampf: `… Werkzeugschuppen | Bärenfalle` → `… Werkzeugschuppen | Sprengstoff & Auslöser | Bärenfalle`).
+
+**Was Punkt 4 des Auftrags bestätigt — und mehr.** `Dichter Wald 2` → `Dichter Wald` fällt dort automatisch auf **eine** Karte zusammen, wo
+ein Eintrag **beide** Wälder führt: Qing & Kween und The Door Knockers (7 → 7), dazu Virginia und Red (dort kommt nur
+`Sprengstoff & Auslöser` dazu). Das ist die zweite Entdoppelung in `build_scenario` (`!found.includes(card)`) — beide Namen liefern **dieselbe
+Zeile** der Bibliothek. Dasselbe gilt für `Sprengstoff` und `Auslöser` bei Virginia, Red, Barry, Handsy und Umbrello: **eine** Karte, nicht zwei.
+Anders bei **Handsy und Lawman Dozy**: dort liegt **nur** `Dichter Wald 2`, die Waldkarte kommt neu dazu (5 → 7, 6 → 7). Das ist die eigentliche
+Änderung am Tisch.
+
+**Das tolerante Suchen hilft nicht** (und ist der Grund, die Tabelle nicht aus `findCardByName` zu füttern): `findCardByName` findet für
+`Dichter Wald 2` **nichts**, für `Sprengstoff` meldet es **zwei Treffer** — die Beute-Karte `SPRENGSTOFF-ZIGARRE` (`Nachschub`) und
+`Sprengstoff & Auslöser` — und trifft nur `Auslöser` richtig, durch Zufall.
+
+### M29.2 — Wo die Zuordnung wohnt
+
+**Entscheidung: (a) `setups.scenario_data.terrainCards`**, eine Abbildung `{ "<Assetname des Plättchens>": "<Name der Geländekarte>" }`.
+
+Gründe, gemessen oder aus dem Code gelesen:
+
+1. **Es ist Material eines Spiels, keine Regel der Engine.** `Dichter Wald 2` und `Sprengstoff` sind Townsfolk-Tussle-Namen; der Code weiß
+   nichts über Townsfolk Tussle (M7, M8.3, `cardZoneLabel`). Dort, wo das Spiel seine eigenen Namen schon ablegt (`gridLabel`, `cardZoneLabel`),
+   gehört auch dieser hin.
+2. **Es berührt keinen der 20 Einträge.** Alle Hashes aus M28.2 bleiben gültig; `scripts/szenariodaten-berichtigung.mjs --check` (die Kontrolle
+   „am Ende des Tages“ aus M28.6) sagt nach M29 weiter „0 zu berichtigen, 7 schon berichtigt“ (gemessen: `plane()` auf dem Zielstand) und wird nicht rot.
+3. **Es ist additiv.** Ein Schlüssel kommt dazu, nichts wird geändert: der Präfix- **und** der Rückwärtsbeweis gelten (M29.7), der Weg zurück ist
+   das Entfernen eines Fragments.
+4. **Der Executor liest `scenarioData` schon ganz** (`cardZoneLabel` steht dort auch), und Tisch (Browser), Raum (`rooms.js`) und die
+   Skripte übergeben den **ganzen** Text. `parseScenarioData` und `doerfler-daten.mjs` reichen unbekannte Schlüssel durch (`{...base}`).
+
+Der Preis, ehrlich: **ein zweiter Schreibvorgang** in dieselbe Spalte, die M28 gerade berichtigt hat, **und ein Deploy** (der Executor ändert sich,
+anders als bei M28; und weil der Tisch den Executor aus dem **Frontend-Bundle** ausführt, sind es **beide** Images). Dazu gilt die Falle aus
+`docs/datenzugriff.md`: ein Setup-Editor, der vor dem Schreiben geöffnet war, stellt den alten Text still wieder her — und mit ihm gäbe er auch M28 zurück.
+Und: die Tabelle gehört **dem Aufbau**, nicht dem Spiel; die anderen beiden Aufbauten des Spiels (`TFT Basis-Aufbau`, `TFT Grundaufbau (Dorfphase)`)
+haben `scenario_data = '{}'` und bauen keine Szenarien.
+
+**Verworfen:**
+
+- **(b) ein Feld `cardName` am einzelnen `terrain`-Eintrag.** Gemessen: **16 Stellen in 8 Einträgen**, dieselbe Abbildung 16-mal hingeschrieben, und
+  **vier der acht** sind berichtigte Einträge von M28 (Virginia, Red, Barry, Door Knockers): ihre `neuSha` bräche, M28s `--check` und `--zurueck`
+  würden für sie „abweichend“ melden. Dazu ist der Geländeeintrag der einzige mit **geschlossenem** Schlüsselsatz (`TERRAIN_KEYS`), also ein weiterer
+  Prüferfall. Die Flexibilität (dasselbe Asset je Szenario auf eine andere Karte) hat keinen Fall.
+- **(c) eine Tabelle in `shared/`.** Schreibt Townsfolk-Tussle-Namen in einen Motor, der auch andere Spiele aufbaut — die bequeme, aber falsche Stufe.
+- **(d) die Assets umbenennen.** `Dichter Wald 2` → `Dichter Wald` heißt zwei Assets gleichen Namens; `findAsset` nimmt das **erste** (`assets.find`), die
+  Unterscheidung der Artworks, die M28 gemessen und in sechs Einträge geschrieben hat (Virginia, Red, Door Knockers, Handsy, Dozy, Qing), ginge **still**
+  verloren. `Sprengstoff` und `Auslöser` hießen dann beide `Sprengstoff & Auslöser`, und M28.4 („nach dem Bild, nicht nach dem Namen“) wäre unbeweisbar.
+  Dazu: eine zweite Tabelle (`table_assets`) schreiben, und Spielstände tragen den Namen als `label` am Objekt.
+- **(e) ein neues Feld `card_name` an `table_assets`** (kein Vorschlag des Auftrags, aber der ehrlichste Ort im Datenmodell: die Beziehung
+  Plättchen → Karte ist eine Eigenschaft des Plättchens und gilt in jedem Aufbau). Kostet Schema-Migration (`database.js`), den Import (der TTS-Import legt
+  Assets neu an) und eine Stelle zum Eintragen — für drei Zeilen. **Umkehr, wenn** ein zweites Spiel das braucht oder mehr als etwa zehn Paare zusammenkommen.
+
+### M29.3 — Die Regel
+
+In `build_scenario`, im Zweig der Geländekarten (`cardZoneLabel`), je Plättchenart `(Name, Seite)` — die Entdoppelung nach `Name|Seite` davor
+und nach **Karte** danach bleiben, wie sie sind:
+
+1. **Exakter Name** (`norm`: trim, klein) gegen die Namen der **ganzen** Bibliothek — unverändert.
+2. **Der Teil der Seite**, bei einem Namen mit Schrägstrich (`side()`, M7.6): offen der vor, verdeckt der hinter dem Schrägstrich — unverändert.
+3. **Neu: die Tabelle** `scenarioData.terrainCards`, **nur wenn der Name keinen Schrägstrich trägt** (`side()` liefert `null`) und 1 und 2 nichts gefunden haben:
+   der Schlüssel, der dem Namen des Plättchens gleicht (`norm` auf beiden Seiten, **vor** jedem Zerlegen), nennt einen **Kartennamen**, der wiederum mit
+   `norm` gegen die Bibliothek verglichen wird.
+
+Was daraus folgt, Frage für Frage:
+
+- **Vor oder nach `side()`?** Danach — als dritter Versuch. Der Schlüssel ist der **ganze** Assetname, wie er in `terrain[].assetName` steht; er wird nie zerlegt.
+- **Darf ein Ziel einen Schrägstrich tragen?** Es wird **nie** zerlegt, sondern als Kartenname wörtlich verglichen. Weil **keine** der 1 087 Karten einen Schrägstrich
+  im Namen hat (gemessen), kann so ein Ziel nichts treffen; der Prüfer meldet es als „Karte gibt es nicht“ (M29.5).
+- **Darf ein Schlüssel einen Schrägstrich tragen?** Er wirkt **nicht** (Bedingung `side() === null`), und der Prüfer meldet ihn. Grund: die Tabelle unterscheidet
+  die Seiten nicht, ein zweiseitiges Teil mit fehlender Karte bekäme auf der Rückseite die Karte der Vorderseite — „die Regel zu einem Gelände, das gar nicht
+  daliegt“, was `sequence-terrain-cards.test.js` („die hintere Richtung findet nur, was es gibt“) ausdrücklich festhält.
+- **`faceDown`:** ohne Einfluss auf die Tabelle; die drei Namen haben keinen Schrägstrich. `Auslöser` und `Sprengstoff` haben ein Rückseitenbild; läge eines
+  davon verdeckt, gälte dieselbe Karte — es ist **ein** Geländeteil. Kein Eintrag legt sie heute verdeckt.
+- **Monoton:** die Tabelle füllt nur Lücken. Jedes Plättchen, das heute eine Karte hat, hat danach **dieselbe** (gemessen an den 40 Läufen: jede Karte, die vorher
+  lag, liegt nachher, und ihre Reihenfolge untereinander bleibt). Legt jemand später eine Karte `Dichter Wald 2` an, gewinnt sie (Versuch 1); der Prüfer meldet den
+  Eintrag dann als überholt (M29.5).
+- **Fehlt die Tabelle, ist sie kein Objekt oder trifft nichts:** der Executor verhält sich **wie heute**, Zeichen für Zeichen — auch der Wortlaut der Meldung
+  (M25.2) bleibt. Er prüft die Tabelle am Tisch **nicht** (M29.5).
+- **Reihenfolge der Karten:** wie bisher die Reihenfolge der Plättchen im Eintrag; die Karte steht dort, wo das **erste** Plättchen steht, das auf sie zeigt.
+- **`findCardByName` bleibt außen vor.** `build_scenario` benutzt es nicht, die Tabelle auch nicht (Begründung am Ende von M29.1).
+
+### M29.4 — Warum das kein Ähnlichkeitsrechner ist
+
+M8.3 verbietet einen Rechner, der `SCHROTKARRE` auf `Schrottkarre` zieht, weil er beim nächsten Deck etwas Falsches zieht. Das Verbot trifft **Raten** — eine Funktion des
+Namens (Abstand, Wortstamm, Teilstring), die über einen Namen entscheidet, den niemand angesehen hat. Die Tabelle ist das Gegenteil, in vier Punkten:
+
+1. **Sie ist geschlossen.** Was nicht drinsteht, bleibt ohne Karte, genau wie heute. Ein neues Deck bringt keine neue Zuordnung hervor.
+2. **Jedes Paar hat ein Mensch gegen das Bild geprüft** (M29.1: eine Karte `Dichter Wald`, zwei Artworks derselben Geländeart, `szenariodaten-grundspiel.md` §6.4;
+   eine Karte `Sprengstoff & Auslöser` für zwei Token, `befund-beute-und-aufstellbares.md` §3.3).
+3. **Sie wird gehalten:** `validateScenarioData` prüft jedes Ziel gegen die Bibliothek (M29.5), der Rauchtest tut es an der Produktion (M29.9), ein Test hält fest, dass die
+   drei Paare dieselben sind, die `terrainName()` aus `scripts/szenariodaten-grundspiel.mjs` kennt (M29.7).
+4. **Sie ersetzt nie einen Treffer** (M29.3, „monoton“).
+
+Dem Code fehlt dadurch nichts: er bekommt die Tabelle von außen, wie `cardZoneLabel`. **Der Kommentar muss mit.** Heute steht an dieser Stelle in `sequenceExecutor.js`
+„Kein Aehnlichkeitsrechner … zwei Versuche, kein dritter und kein Aehnlichkeitsrechner“ — nach M29 sind es drei Versuche. Der neue Wortlaut steht in `DK` und sagt dasselbe
+wie dieser Abschnitt, in drei Sätzen: **drei Versuche, alle benannt; der dritte ist eine Tabelle aus den Daten, keine Rechnung; sie rät nicht und ersetzt nichts**. Wer den
+Kommentar stehen ließe, hinterließe einen Satz, der dem Code widerspricht — und der nächste, der eine vierte Regel „kein dritter“ zuliebe verweigert, wäre auf die Lüge hereingefallen.
+
+### M29.5 — Prüfen
+
+**Was heute gilt.** `validateScenarioData` liest `gridLabel` und `bosses` und **sonst nichts**; ein weiterer Schlüssel in `scenario_data` scheitert dort nicht, und
+`build_scenario` reicht ihr ohnehin nur `{ gridLabel, bosses: { [key]: entry } }`. „Annehmen, ohne zu scheitern“ ist also schon erfüllt; **zu ergänzen** ist das Prüfen.
+
+**Neu.** `validateScenarioData(scenarioData, { assets, grids, cards })` bekommt den Parameter `cards` und prüft, **unabhängig davon, ob es Bösewichte gibt**
+(also vor der frühen Rückkehr bei leeren `bosses`), `scenarioData.terrainCards`, wenn der Schlüssel da ist. Fehlt er, passiert nichts. Eine leere Liste von Assets oder Karten heißt
+wie überall „kann ich nicht wissen“, nicht „kenne ich nicht“. Jede Meldung nennt den Schlüssel:
+
+| Fall | Meldung (Sinn) |
+|---|---|
+| Wert ist kein Objekt (Liste, Text, Zahl, `null`) | `terrainCards: must be an object { "<asset name>": "<card name>" }` |
+| Schlüssel leer | `terrainCards: an entry has no asset name` |
+| Schlüssel enthält `/` | `terrainCards: "<key>" names a two-sided tile; the table only applies to one-sided names` |
+| zwei Schlüssel gleich unter `norm` | `terrainCards: "<a>" and "<b>" name the same asset` |
+| Assets bekannt, Schlüssel ist keiner | `terrainCards: "<key>" is not an asset` |
+| Karten bekannt, es gibt eine Karte mit genau diesem Namen | `terrainCards: "<key>" has a card of its own name, the entry is never used` |
+| Ziel kein nichtleerer Text | `terrainCards: "<key>" names no card` |
+| Karten bekannt, **keine** Karte dieses Namens (`norm`) | `terrainCards: "<key>" → "<card>": this library has no card with that name` |
+| Karten bekannt, mehrere Karten dieses Namens mit **verschiedenem** `image_path` | `terrainCards: "<key>" → "<card>": matches <n> different cards` |
+
+(Mehrere Karten gleichen Namens **mit demselben** `image_path` sind Exemplare derselben Karte und kein Fehler — wie bei `findCardByName`.)
+
+**Wo es läuft:** im Baustein (`--check`, vor dem Schreiben auf dem Zielstand und danach auf der gelesenen Spalte), im Rauchtest (M29.9) und in Tests gegen die Fixture.
+**Wo nicht: am Tisch.** `build_scenario` ruft `validateScenarioData` weiter **ohne** `terrainCards` und **ohne** `cards` auf. Grund: M8.3 sagt „eine fehlende Karte ist ein
+bekannter Normalfall, ein Abbruch dafür ließe das ganze Kampffeld leer“. Würde der Tisch das Ziel prüfen, ließe das **Löschen einer einzigen Karte** in der Bibliothek jeden
+Kampfaufbau scheitern. So bleibt es, wo es heute ist: ein Plättchen ohne Karte steht im Vermerk (M25.2). Ein Ziel, das ins Leere zeigt, ist dort **nicht unterscheidbar** von einer
+fehlenden Karte — das Gegenmittel ist der Prüfer, nicht eine zweite Meldung (Entscheidung 12 in `tasks-kartenzuordnung.md`).
+
+### M29.6 — Zielstand
+
+**Ausgangsstand** (gelesen 2026-11-08, Produktion): `scenario_data` **18 982 Zeichen**, sha256 `5eec10582ec8e60882786b45860d29763a3d0f8b15d6f7e451289cb1fa40e038`
+(Präfix `5eec10582ec8`), kompaktes `JSON.stringify` (gespeicherter Text = neu serialisierter), NFC.
+
+**Zielstand:** `scenario_data` **19 106 Zeichen** (+124), sha256 `914461d63f772cb44c53e2d968dbfe0f9d99c958df038f7253a9a328035caa5e` (Präfix **`914461d63f77`**),
+Schlüsselreihenfolge `gridLabel, bosses, cardZoneLabel, villagers, options, terrainCards` — der neue Schlüssel steht **hinten**, wie `options` bei M27.
+Aus einer Kopie des Ausgangsstandes erzeugt (nichts geschrieben); **maßgeblich ist der folgende Text**, und seine Zeichenzahl und sein Hash sind die Abnahme:
+
+```json
+{"Dichter Wald 2":"Dichter Wald","Sprengstoff":"Sprengstoff & Auslöser","Auslöser":"Sprengstoff & Auslöser"}
+```
+
+**108 Zeichen**, sha256-Präfix **`aad39d745984`**, Schlüsselreihenfolge wie gezeigt (eine andere Reihenfolge ergäbe einen anderen Hash); `ü`/`ö` sind **vorzusammengesetzt** (U+00FC, U+00F6),
+nicht `u`/`o` plus Trema — ein Test hält `text.normalize('NFC') === text` fest, weil `norm` nicht normalisiert und der Vergleich sonst still scheitert. Eingefügt wird das Fragment
+`,"terrainCards":<Text>` (124 Zeichen) vor der letzten `}`.
+
+| Schlüssel | Zeichen | sha256-Präfix | Zustand |
+|---|---|---|---|
+| `gridLabel` | 22 | `29499d91a16c` | gleich |
+| `bosses` | 15 567 | `f6c1d5f585c0` | gleich |
+| `cardZoneLabel` | 17 | `f04e85a28054` | gleich |
+| `villagers` | 2 895 | `9d58cc5bb60a` | gleich |
+| `options` | 416 | `0c567cede3be` | gleich |
+| **`terrainCards`** | **108** | **`aad39d745984`** | **neu** |
+
+Die 20 Einträge in `bosses` (sha256 des kompakten Textes, 12 Stellen) — **alle gleich**, kein einziger ändert sich:
+
+| Eintrag | Zeichen | Hash | Eintrag | Zeichen | Hash |
+|---|---|---|---|---|---|
+| Deputy Waggums | 870 | `1fb204d54257` | Bort Dovis | 638 | `5ef877d75e05` |
+| Virginia Fitz | 1 109 | `0e8f97427d33` | Handsy | 1 161 | `4fc6177a6bf6` |
+| The Bundits | 771 | `909beab802e5` | Lawman Dozy | 664 | `355edd78fc78` |
+| Red Atrocious | 684 | `dfc3c087210f` | Penny Pinchetti | 637 | `415789baf76e` |
+| Tilda Fields | 709 | `e5a9e2eeaa7f` | Pepin Milkfrog | 1 037 | `cd7a7c5dcde8` |
+| Ernie Offal | 635 | `26f455032580` | Qing & Kween | 694 | `cc8f1f845834` |
+| Barry Bluff | 765 | `ebeedd302fda` | Samuel Strawman | 1 002 | `1d15be2b81e4` |
+| Tartar Fishboy | 570 | `93902e65bcb8` | Umbrello | 700 | `c18f8eb1bc25` |
+| Ms. Falls & Co. | 657 | `80a78f3a8e4d` | Will Barlow | 634 | `df21cf20aa52` |
+| Patches | 598 | `931d0547a617` | The Door Knockers | 711 | `e7ea86b2cdb1` |
+
+Die sieben M28-Hashes (Ernie … Door Knockers) sind dieselben wie in M28.2 — das ist der Beweis zu Grund 2 aus M29.2, und es ist **gemessen** (M28s `plane()` auf dem Zielstand:
+0 zu berichtigen, 7 schon berichtigt, 0 abweichend). Die Fixture `server/test/fixtures/auslagen-kurzpartie.json` hat weder `options` noch die Tabelle und bleibt, wie sie ist
+(M28 hat ihren Hash festgeschrieben); Tests holen sich den Zielstand aus `berichtige(fx.scenarioBefore).next` plus `ergaenze`, und die Hashes **der ganzen Spalte** sind Produktionswerte.
+
+### M29.7 — Schreiben, ohne fremde Arbeit zu zerstören
+
+Diesmal wird **ergänzt**, nicht geändert (`docs/datenzugriff.md`, „Regeln fürs Schreiben“, Nr. 5 gilt daher nur zum Teil) — und trotzdem gelten die Sicherung, der Vergleich-und-Tausch und
+der Weg zurück unverändert; der Auftraggeber hat das für M28 entschieden, und es gilt weiter. **`--force` gibt es nicht und kommt nicht dazu.** Vorlage: `scripts/szenariodaten-berichtigung.mjs`.
+Neues Skript **`scripts/gelaendekarten-zuordnung.mjs`**: der Baustein ist **rein** (kein `better-sqlite3`, kein Dateizugriff); er **benutzt** `GAME_ID`, `SETUP_ID`, `saveStateHashes`
+und — dafür bekommen sie ein `export` — `tausche` und `fingerabdruckZeilen` aus dem M28-Skript, und `fingerprint`, `durchrechnen`, `erwartetAufRaster`, `pngSize` aus
+`szenariodaten-grundspiel.mjs`. Kopiert wird nichts (M6).
+
+**Einordnung der gelesenen Spalte** (statt „Eintrag je Hash“ bei M28 — hier ist es **eine** Frage mit drei Antworten):
+
+- **Ausgangsstand** (sha256-Präfix `5eec10582ec8`, **kein** Schlüssel `terrainCards`) → zu schreiben.
+- **Tabelle schon da und gleich** (`JSON.stringify(terrainCards)` ist der Text oben, gleich welcher Rest) → „schon geschrieben“, nichts tun. (Der Rest darf sich ändern: wer nach M29
+  weiterarbeitet, ist kein Fehler.)
+- **Alles andere** — ein anderer Stand ohne die Tabelle, oder eine Tabelle, die anders lautet — bricht den ganzen Lauf ab, **nichts wird geschrieben**, die Meldung nennt, was abweicht
+  (die Zeichenzahl und den Hash; bei einer abweichenden Tabelle beide Texte). Eine vorhandene Tabelle wird **nie überschrieben**.
+
+**Die Absicherung, in der Reihenfolge, in der sie läuft:**
+
+1. **Sicherung ins Scratchpad, nicht ins Repo**, *vor* dem Trockenlauf: der rohe Text (18 982 Zeichen), seine sha256, `updated_at` der Zeile, ein Hash je Zeile von `save_states`
+   (Form `{ scenario_data, sha256, updated_at }` wie bei M28). **Nicht die von M28 wiederverwenden** — `scenario_data.2026-11-08.json` ist der Stand **vor** M28 (18 678 Zeichen,
+   `2f9cf558a0f7`) und würde von `--write` und `--zurueck` abgelehnt. `--write` verlangt `--sicherung-sha <Hash>` und prüft ihn gegen den **gelesenen** Text.
+2. **Beweise vor dem Schreiben**, auf dem Zielstand: **Präfixbeweis** (der neue Text ist der alte ohne die letzte `}`, plus `,"terrainCards":…}`), **Rückwärtsbeweis** (das Fragment aus dem
+   neuen Text entfernen ergibt den gelesenen Text Zeichen für Zeichen — beides ist an der Produktion gerechnet und stimmt), jeder andere Schlüssel und jeder der 20 Einträge byteweise gleich.
+3. **`validateScenarioData(ziel, { assets, grids, cards })` = 0 Probleme**; `checkScenarioAspect` meldet nur die vier bekannten Meldungen (`BEKANNTE_ASPEKTMELDUNGEN`), nie eine neue;
+   **40 Läufe** (alle 20 Bösewichte, Kampf und Endkampf) mit `durchrechnen` gegen Zielstand **und** Ausgangsstand, verglichen nach M29.1: `ok`/`note` je Lauf, Namen, Kartenzahl, Objekte auf dem
+   Raster gleich dem Ausgang, **monoton** (jede vorher gelegte Karte liegt nachher), nie `failed`/`skipped` außer Tildas `$SHERIFF is not bound`.
+4. **Trockenlauf zuerst** (`--check`, schreibgeschützt): Plan, Beweise, Vergleichstabelle; die Ausgabe wird **gegen M29.1 und M29.6 gelesen**, bevor `--write` läuft.
+5. **Schreiben in einer `IMMEDIATE`-Transaktion:** `UPDATE setups SET scenario_data = ? WHERE id = ? AND scenario_data = <exakt der gelesene Text>`; trifft er keine Zeile, hat jemand die Spalte zwischen Lesen
+   und Schreiben geändert, die Transaktion bricht ab. **Nur diese Spalte** (auch nicht `updated_at`, wie bei M28). Fingerabdruck vorher/nachher je Tabelle und je Zeile von `save_states`, Rollback bei Abweichung.
+6. **Der Weg zurück**, `--zurueck <Sicherung> <db>`: der aktuelle Text muss **genau der Zielstand** sein (sonst hat jemand nach M29 weitergearbeitet, und nichts wird überschrieben), dann kommt der gesicherte
+   Text zurück. Er wird auf einer Wegwerf-Datenbank **getestet**, bevor er gebraucht wird. **Umgekehrte Reihenfolge, wenn beide zurückmüssen:** zuerst M29, dann M28 — M28s `--zurueck` verlangt *seinen* Zielstand
+   und weigert sich, solange `terrainCards` in der Spalte steht (aus dem Code gelesen, nicht ausgeführt).
+7. **Kontrollausgabe, neu gelesen:** Länge und Hash vorher/nachher; je Schlüssel Hash alt → neu („gleich“ für fünf, „neu“ für `terrainCards`); je Eintrag „gleich“ (20); Beweise; `validateScenarioData` auf der
+   gelesenen Spalte; Fingerabdruck. **Zweiter Lauf: „schon geschrieben“, schreibt nichts.** Am Ende des Tages `--check` (dieses Skript **und** M28s) — meldet eines, dass etwas fehlt, hat ein Editor zurückgeschrieben.
+
+**Zwei Tests, die nur hier stehen:** (1) `terrainName()` aus `szenariodaten-grundspiel.mjs` kennt dieselben drei Paare (`terrainName('Dichter Wald 2') === 'Dichter Wald'` usw.) — **es gibt schon eine zweite
+Abbildung im Repo** (eine Regex, zum Auszählen der sieben Terrains je Szenario, auch für `Holzzaun 2`), und die beiden dürfen nicht auseinanderlaufen; (2) `ZUORDNUNG` ist NFC.
+
+### M29.8 — Reihenfolge von Daten und Deploy (verbindlich)
+
+**Gemessen:** (i) alter Executor **mit** dem neuen Schlüssel liefert die Rauchtest-Ausgabe (Abschnitt 1 und 2, vier Kombinationen und 40 Kämpfe) **Byte für Byte** wie heute; (ii) der neue
+Executor **ohne** den Schlüssel ebenso. Der alte Executor liest `terrainCards` nirgends — er bekommt `scenarioData` als Ganzes, und nichts darin zählt Schlüssel oder meldet unbekannte. Beide Reihenfolgen sind
+daher unschädlich. Verbindlich ist die folgende, weil sie den Deploy **folgenlos** und das Schreiben zum **einen** Schalter macht (`--zurueck` ist der Rückweg), und weil die Zeit zwischen dem Schreiben und
+dem Gegenprüfen (offener Editor!) kurz bleibt:
+
+1. **Bauen, ohne die Produktion zu berühren** (`DK`–`DO`): Tests grün, **nichts** in der Spalte; dann `origin/master`.
+2. **Den Rauchtest `vorher` aufnehmen** an der Produktion, mit der Fassung von `auslagen-rauchtest.mjs`, die dort jetzt liegt (M28), Ausgabe ins Scratchpad; die Datei als Kopie aufheben.
+3. **Deploy beider Images** (`cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build`; der Checkout steht auf `1fc6f39`, M27, und zieht dabei die acht Commits seither nach).
+   Danach: die Skripte **neu in den Container** (ein neu angelegter Container hat nur, was das Image hat; `/app/*.mjs` kamen mit `docker cp` — `docs/datenzugriff.md`); `/shared/sequenceExecutor.js` im Backend-Container
+   gleich dem Repo; das **Frontend-Bundle** enthält `terrainCards` (der Tisch führt den Executor aus dem Bundle aus, nicht aus dem Backend); **derselbe alte Rauchtest wie in Schritt 2 → Ausgabe gleich** (`diff` leer).
+   Nur wenn das stimmt, weiter.
+4. **Frage an den Auftraggeber: ist ein Setup-Editor offen?** (`docs/datenzugriff.md`; der Server sieht es nicht.) Dann Sicherung (M29.7 Nr. 1), `--check`, `--write … --sicherung-sha`, Kontrollausgabe.
+5. **Den neuen Rauchtest** (M29.9) laufen lassen; sein Unterschied zu Schritt 2 ist die Tabelle in M29.9 — nicht mehr, nicht weniger.
+6. **Browser neu laden** (ein Tisch, der vor dem Schreiben geöffnet war, hält die alten Szenariodaten im Zustand), Sichtprüfung (`DT`), am Ende des Tages `--check`.
+
+Wenn Schritt 3 oder 5 nicht stimmt: bei 3 den Deploy zurück (`git revert`, Rebuild) — die Spalte ist noch unberührt; bei 5 `--zurueck` — der Deploy bleibt. Ein Deploy ist ein kurzer Ausfall des Tisches (Container werden neu angelegt; Datenbank und
+Uploads liegen in Named Volumes): **fragen, ob gerade gespielt wird.**
+
+### M29.9 — Der Rauchtest
+
+`scripts/auslagen-rauchtest.mjs` trägt die heutigen `note` als „bekannt“ — und zwar **nicht als Liste von Namen**: `bekannt()` ist ein regulärer Ausdruck auf den **allgemeinen** Wortlaut
+(`no terrain card(s) in this library (nothing to do)`), die Namen kommen erst in `plaettchen()` zur Ausgabe. Gemessen heißt das:
+
+- **`bekannt()` muss nicht mitgezogen werden.** Der Wortlaut ändert sich nicht (M29.3), und wo ein Name verschwindet, bleibt entweder die kürzere Meldung (Treffer des Ausdrucks) oder gar keine.
+- **Der Rauchtest beanstandet die kürzere Meldung nicht** und meldet auch nicht „alles gut“ für etwas, das nicht mehr vorkommt: vorher und nachher **0 Beanstandungen**.
+- **Die Gefahr liegt umgekehrt:** `bekannt()` lässt **jedes** Plättchen ohne Karte als bekannt durch. Fiele die Tabelle aus (Daten zurückgeschrieben, Karte gelöscht, Deploy zurückgenommen), bliebe der Rauchtest grün —
+  die drei Namen stünden wieder in den Meldungen, als wäre nichts. Das ist die Lücke, die zu schließen ist.
+
+**Gemessen, was sich in der Ausgabe ändert** (Abschnitte 1 und 2 des Rauchtests; Prototyp-Executor und Prototyp-Daten gegen die Produktionsdaten vom 2026-11-08; Abschnitt 3 „Spielstände“ ist **nicht** nachgerechnet,
+siehe „Offen“):
+
+- **Abschnitt 1, „zweiter Kampf beginnen“** (bei `kurz/mit` und `kurz/ohne` zieht der Mischer mit festem Startwert Virginia Fitz): `17 Zeilen/1 ohne ok (bekannte Hinweise: Dichter Wald 2, Auslöser, Sprengstoff)` →
+  `17 Zeilen/0 ohne ok`. `lang/mit` und `lang/ohne`: unverändert.
+- **Abschnitt 2** (20 Bösewichte × Vor-/Endkampf), 16 Zeilen ändern sich, 24 nicht:
+
+  | Zeile | „ohne ok“ vorher → nachher | genannte Plättchen nachher |
+  |---|---|---|
+  | Virginia Fitz Vorkampf | 1 → 0 | — |
+  | Virginia Fitz Endkampf | 1 → 1 | 5 Grabhügel (vorher zusätzlich `Dichter Wald 2`, `Auslöser`, `Sprengstoff`) |
+  | Red Atrocious Vor-, Endkampf | 1 → 0, 1 → 0 | — |
+  | Barry Bluff Vor-, Endkampf | 5 → 4, 5 → 4 | keine Namen mehr (die vier übrigen sind die **bekannten** `Equal to …`-Schritte, die Formel auf dem Tableau) |
+  | The Door Knockers Vor-, Endkampf | 1 → 0, 1 → 0 | — |
+  | Handsy Vorkampf | 1 → 0 | — |
+  | Handsy Endkampf | 1 → 1 | 5 × `Versteckter Bürger (…) / Große Milchkanne` (vorher zusätzlich drei Namen) |
+  | Lawman Dozy Vor-, Endkampf | 1 → 0, 1 → 0 | — |
+  | Qing & Kween Vor-, Endkampf | 1 → 0, 1 → 0 | — |
+  | Umbrello Vorkampf | 1 → 0 | — |
+  | Umbrello Endkampf | 1 → 1 | `Verschlingende Welle` (vorher zusätzlich `Auslöser`, `Sprengstoff`) |
+
+  Unverändert bleiben die Zeilen der zwölf übrigen Bösewichte, `Endkämpfe, in denen die Sheriff-Karte liegt: 19 von 20`, `Dorfphase beginnen nach jedem dieser Kämpfe: … 40 von 40` und die Handsy-Zeile
+  (`ohne ok und unbekannt: 0, bekannte Hinweise: 1`) — ein bestehender Test (`auslagen-daten.test.js`, `CZ`) fordert genau diese Handsy-Zeile mit mindestens einem bekannten Hinweis, und sie bleibt wahr.
+
+**Zu ändern (`DO`):** (1) **Abschnitt 0:** die Tabelle ist da (genau die drei Schlüssel) und `validateScenarioData(env.scenarioData, { assets, grids, cards })` meldet **0 Probleme**. (2) **Sperre:** `bekannt()` nimmt
+einen Hinweis, der eines der drei Plättchen **namentlich** nennt, **nicht** mehr als bekannt an — er wird zur Beanstandung („Plättchen … steht wieder ohne Karte da, obwohl die Zuordnung es abdeckt“). (3) **Der bestehende Test**
+`CZ: der Rauchtest findet nach dem Schreiben nichts` (`server/test/auslagen-daten.test.js`) läuft auf einer Wegwerf-Datenbank **ohne** Tabelle und würde mit (1) rot; er schreibt die Tabelle mit (`ergaenze`), und ein neuer
+Test hält fest, dass der Rauchtest **ohne** sie anschlägt — wie `CZ`, zweiter Test, es für alte Daten tut.
+
+### M29.10 — Bewusst nicht Teil davon
+
+**Echt fehlende Karten — kein Kartenbild, das man zuordnen könnte; sie anzulegen ist ein eigener Auftrag mit eigener Entscheidung** (`szenariodaten-grundspiel.md` §9.10, M20.2). Nachgemessen, ob die Liste des Auftrags vollständig ist:
+**sie ist es nicht.** Nach der Zuordnung bleiben **14 Plättchenarten**, die in Szenariodaten vorkommen und keine Karte haben — in **acht** Endkämpfen, in **keinem** Vorkampf:
+
+| Plättchen ohne Karte | Treffer in der Bibliothek (1 087 Karten, ohne Rücksicht auf Leerzeichen gesucht) | Endkampf bei |
+|---|---|---|
+| `Die Bundo-Königin / Beruhigungs-Leckerli` | **0** (`bundo`, `leckerli`, `beruhig`, `königin`) | The Bundits **und Deputy Waggums** |
+| `Pile of Locals` | **0** (`pile`, `locals`) | Tilda Fields |
+| `Grabhügel / Grabhügel ausgehoben (0)`, `(6)`, `(10)`, `(14)`, `(30)` | **0** (`grab`: nur `Matschiger Graben` u. a., kein Grabhügel; `hügel`, `huegel`) | Virginia Fitz — **fehlte in der Liste des Auftrags** |
+| `Versteckter Bürger (Katze / Dörflerin / Soßenflasche / Dörfler / blond) / Große Milchkanne` | **0** (`bürger`, `versteckt`, `milchkan`, `kanne`) | Handsy (fünf, offen), Pepin Milkfrog (drei, verdeckt) |
+| `Ritualzeichen / Weizenfeld` | **0** (`ritual`: nur `RITUAL-SET`, Ausrüstung; `weizen`) | Samuel Strawman (verdeckt) |
+| `Verschlingende Welle` | **0** (`welle`, `verschling`) | Umbrello |
+
+Das sind 18 Namensnennungen in den acht Läufen; die Rechnung stimmt mit der in M29.1 überein (50 − 32 = 18). **Wer eine dieser Karten anlegt, tut es mit Bild und Regeltext aus dem gedruckten Spiel** — nichts davon ist Aufgabe von M29.
+
+Außerdem **nicht Teil davon:**
+
+- **`Holzzaun 2` → `Holzzaun` und `Flut (hochkant)` → `Flut`.** Gleiche Klasse wie `Dichter Wald 2` (`szenariodaten-erweiterung.md` 8.7 nennt sie als dritte und vierte Variante; `terrainName()` kennt `Holzzaun 2`), aber **kein
+  einziger der 20 Einträge benutzt sie** (gemessen: 0 Stellen) — und ob es dieselbe Geländeart in anderer Ausrichtung ist, ist nicht gemessen. Wird einer der beiden Namen zum ersten Mal in einem Eintrag gebraucht, ist das **eine Zeile**
+  in der Tabelle, mit eigenem Hash und eigenem Nachweis; bis dahin wäre es Vorrat.
+- **Zwei Karten statt einer** (für `Dichter Wald 2` und für `Sprengstoff` + `Auslöser`) — das wäre eine Karte erfinden, die es im gedruckten Spiel nicht gibt, bzw. eine zu viel auslegen.
+- **Die 17 Geländeassets ohne Karte, die kein Eintrag benutzt** (`Bundo 1`–`6`, `Krankheit: …` ×4, `Unbekannt 1/2` ×2, `Fetid Furball` ×2, `Die Gesellschaft`, `Holzzaun 2`, `Flut (hochkant)`).
+- **Neue Wortlaute der Meldung** (kein eigener Satz für „Ziel zeigt ins Leere“): der Prüfer ist die Wache, nicht der Tisch (M29.5).
+- **Eine Oberfläche, das Schrittvokabular, `client/`:** die Szenariodaten haben keine Oberfläche (M7.6); wer hier etwas am Editor ändert, baut Vokabular für etwas, das es nicht gibt.
+- **Die gespeicherten Partien** (ein Spielstand trägt seine Karten, M28.3; ein offen liegender Tisch behält die Reihe, die er hat), **Aktionen, Zonen, Raster, Folge** — keine dieser Spalten wird geschrieben.
+
+### Abnahme
+
+1. **Zielstand:** `scenario_data` hat **19 106 Zeichen**, sha256 beginnt mit **`914461d63f77`**; `terrainCards` hat **108 Zeichen** und `aad39d745984`, steht **hinter** `options`; die fünf alten Schlüssel
+   und alle 20 Einträge haben **dieselben Hashes** wie in M29.6; Präfix- und Rückwärtsbeweis gelten.
+2. **`validateScenarioData(…, { assets, grids, cards })` auf der gelesenen Spalte: 0 Probleme.** `checkScenarioAspect`: nur die vier bekannten Meldungen.
+3. **40 Läufe** mit dem **ausgelieferten** Executor und den **Produktionsdaten**: `ok` **32**, `note` **8** (genau die acht Endkämpfe aus M29.1), **Vorkämpfe mit `note`: 0**; Namensnennungen in den `note`: **genau 18**, genau die
+   Namen der Tabelle in M29.10; Geländekarten je Lauf wie in M29.1; Objekte auf dem Raster und übrige Protokollzeilen: gleich; **jede Karte, die vorher lag, liegt nachher**, in gleicher Reihenfolge untereinander.
+4. **Beide Zustände einzeln sind unschädlich:** neuer Executor ohne Tabelle und alter Executor mit Tabelle liefern dieselbe Rauchtest-Ausgabe wie heute (Test und Messung in Schritt 3 von M29.8).
+5. **Qing & Kween und The Door Knockers legen genau eine Waldkarte** (nicht zwei); **Handsy und Lawman Dozy legen sie neu** (5 → 7, 6 → 7); **Virginia, Red, Barry, Handsy, Umbrello legen `Sprengstoff & Auslöser` genau einmal.**
+6. **Fingerabdruck:** alle Tabellen außer `setups.scenario_data` vor und nach dem Schreiben gleich, **jede Zeile von `save_states`** einzeln.
+7. **Zweiter Lauf schreibt nichts** („schon geschrieben“). Eine **abweichende** Tabelle in der Spalte bricht ab und schreibt nichts; ein **anderer** Stand ohne Tabelle ebenso; `--zurueck` stellt `5eec10582ec8` / 18 982 Zeichen wieder her, und ein Lauf danach meldet „Ausgangsstand“. Es gibt kein `--force` (der Quelltext sagt es).
+8. **Rauchtest** (`scripts/auslagen-rauchtest.mjs <db>`): **0 Beanstandungen**, Abschnitt 0 (Tabelle da, Prüfer 0 Probleme); die Sperre schlägt an, wenn man die Tabelle aus der Wegwerf-Datenbank nimmt; die Ausgabe unterscheidet sich von der aus Schritt 2 genau nach der Tabelle in M29.9.
+9. **Der Kommentar:** `grep -n "kein dritter" shared/sequenceExecutor.js` findet nichts; an der Stelle stehen drei Versuche und der Satz, dass die Tabelle nichts rät.
+10. **Deploy-Beleg:** `/shared/sequenceExecutor.js` im Backend-Container hat den Hash des Repos; das Frontend-Bundle enthält `terrainCards`.
+11. **`terrainName()`-Test:** die drei Paare der Tabelle sind die von `terrainName()`; `ZUORDNUNG` ist NFC.
+12. **Tests:** `cd server && npm test` grün (Stand vorher, gemessen am 2026-11-08: **1 595**; es kommen die Tests aus `DK`–`DO` dazu).
+13. **Am Tisch (Auftraggeber, `DT`):** Tisch **neu laden**; einen Kampf gegen Handsy, Lawman Dozy und Qing & Kween aufbauen: Geländekarten-Reihe mit `Dichter Wald` (bei Qing nur **eine**) und, wo Dynamit und Kasten liegen, **einer** Karte `Sprengstoff & Auslöser`; im Protokoll kein Hinweis auf die drei Namen.
+
+### Offen und ungeprüft
+
+Vollständig; es ist mehr als die bestätigten Befunde wert.
+
+1. **Die Aussage „im gedruckten Spiel gibt es eine Karte dafür“** (Auftrag) ist **nicht geprüft.** Belegt ist: die Bibliothek führt **eine** Karte `Dichter Wald` und **eine** `Sprengstoff & Auslöser`, `szenariodaten-grundspiel.md` §6.4 trennt die zwei
+   Wald-Artworks (0,4–0,7 gegen ≈ 0), `befund-beute-und-aufstellbares.md` §3.3 nennt die zwei Token. Ob das gedruckte Spiel genau **eine** Waldkarte kennt, steht in keinem Dokument, das ich geprüft habe.
+2. **Alle Zahlen für „nachher“ stammen aus einem Prototyp** (eine Kopie von `shared/` im Scratchpad mit acht Zeilen Änderung, Daten als Kopie der Produktion) und aus Node, **nicht** aus dem gebauten Code, **nicht** aus dem Browser und **nicht** vom
+   ausgelieferten Image. `DK` bis `DO` müssen sie am echten Code wiederholen; Abnahme 3, 4 und 8 tun es.
+3. **Rauchtest Abschnitt 3 (Spielstände)** habe ich nicht nachgerechnet (die Zeilen von `save_states` sind nicht gezogen). Dass er schweigt, folgt nur daraus, dass `note` verschwinden und nicht entstehen können.
+4. **Ob ein Setup-Editor offen ist,** sieht der Server nicht (`docs/datenzugriff.md`). Er kann M29 — und M28 — still zurücknehmen; gegengeprüft wird mit `--check` nach dem Schreiben und am Ende des Tages.
+5. **Offene Tische:** `GameTable.jsx` setzt `scenarioData` beim Laden; ein Tisch, der vor dem Schreiben geöffnet war, kennt die Tabelle nicht, bis er neu geladen wird. Aus dem Code gelesen, am Browser nicht ausprobiert (der Browser-Bereich ist nicht angemeldet).
+6. **Der Deploy** — wie lange der Tisch weg ist, ob gerade gespielt wird, ob der Rebuild die Skripte aus `/app` wirklich entfernt: **nicht gemessen** (Standardverhalten von `docker compose up -d --build`). Der Checkout auf der VM steht auf `1fc6f39` und wurde nicht angefasst.
+7. **`Auslöser` und `Sprengstoff` haben ein Rückseitenbild** (`back_image_path` gesetzt); was darauf zu sehen ist, habe ich nicht angesehen. Kein Eintrag legt sie verdeckt.
+8. **Die Reihenfolge der Karten** („die ältere Reihenfolge bleibt“) ist an den 40 Läufen der heutigen Daten geprüft, nicht als Regel bewiesen: die Karte steht dort, wo das erste Plättchen steht, das auf sie zeigt, und das kann eine Karte, die schon lag, verschieben, wenn
+   künftige Daten das so legen.
+9. **`Holzzaun 2` / `Flut (hochkant)`** (siehe oben): nicht gemessen, ob dieselbe Geländeart; die zweite Abbildung `terrainName()` nimmt es für `Holzzaun 2` an.
+10. **Der Raumstart** (`POST /api/rooms/:code/start`) liest `scenario_data` je Anfrage aus der Zeile (`rooms.js`); es wurde kein Raum gestartet.
+11. **Dass die Karte `Sprengstoff & Auslöser` beide Token meint,** folgt `befund-beute-und-aufstellbares.md` §3.3 („ein Geländeteil mit zwei Token“); ich habe das Kartenbild nicht angesehen.

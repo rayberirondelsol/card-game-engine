@@ -141,6 +141,18 @@ Rückwärtsbeweis, Vergleich-und-Tausch) hat die sieben Einträge in einer Trans
 ein zweiter Lauf schreibt nichts. Die Sichtprüfung am Tisch (`DI`: Ernie Offal und Virginia Fitz zuerst) steht aus. Ein offener Setup-Editor kann die Berichtigung still zurücknehmen
 (`docs/datenzugriff.md`, „Fallen"); dann `--check` meldet `ALT_SHA`, und `DG` wird wiederholt. Szenariodaten **ändern** (nicht ergänzen): `docs/datenzugriff.md`, „Regeln fürs Schreiben" Nr. 5.
 
+**Gelände-Zuordnung (M29):** `docs/tasks-kartenzuordnung.md` (Aufgaben `DK`–`DT`, mit „Wo die Spec nicht stimmt“ und „Entscheidungen“; die Datei
+`tasks-gelaendekarten.md` ist M8.3 und eine andere). Ein Geländeplättchen findet seine Karte nur über den Namen (M8.3, M7.6); für `Dichter Wald 2`,
+`Sprengstoff` und `Auslöser` trifft er nicht, obwohl die Karten da sind (`Dichter Wald`, `Sprengstoff & Auslöser`) — gemessen: 8 Bösewichte, 16 von 40 Läufen.
+Entschieden ist eine **Tabelle `terrainCards` in `setups.scenario_data`** (drei Paare, 108 Zeichen), die `build_scenario` als **dritten, letzten Versuch**
+liest (nur Namen ohne Schrägstrich, ersetzt nie einen Treffer; **kein Ähnlichkeitsrechner**, der Kommentar im Executor wird mitgeändert).
+`validateScenarioData(…, { assets, grids, cards })` prüft die Tabelle gegen die Bibliothek, der Tisch nicht. **Daten und Deploy:** der Executor läuft auch im
+**Frontend-Bundle**, beide Images ändern sich; **erst deployen, dann schreiben** (beides ist einzeln unschädlich, gemessen), das Schreiben ist der eine Schalter.
+`scripts/gelaendekarten-zuordnung.mjs` (`--check`, `--write … --sicherung-sha`, `--zurueck`, kein `--force`; nur ergänzen: `scenario_data` 18 982 → 19 106 Zeichen,
+`5eec10582ec8` → `914461d63f77`, die 20 Einträge und M28s Hashes bleiben gleich). **Rückweg umgekehrt: zuerst M29, dann M28.** Nicht Teil davon: 14 Plättchenarten
+**ohne** Karte (Grabhügel, Bundo-Königin, Bürger/Milchkanne, Ritualzeichen, Verschlingende Welle, Pile of Locals). **Stand (2026-11-08): nur Spec und Aufgaben, nichts gebaut,
+nichts geschrieben.** Ein offener Setup-Editor kann M28 und M29 still zurücknehmen (`docs/datenzugriff.md`, „Fallen“).
+
 ## Produktionsdaten
 
 Wer an den echten Spieldaten arbeitet: **`docs/datenzugriff.md`** — zwei geprüfte
