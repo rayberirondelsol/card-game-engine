@@ -353,3 +353,25 @@ keine) — die Selbstprobe läuft von Hand.
 
 *Wird von `DG` und `DH` gefüllt, wie in `docs/tasks-auslagen.md`:* Testzahl vorher (1555) → nachher; die Länge und die Hashes aus der Kontrollausgabe von `DG`; der Pfad der Sicherung; was der Rauchtest und
 `DI` fanden; welche der Entscheidungen 3–7 der Auftraggeber geändert hat; welche Stellen M28 selbst nicht traf („Wo die Spec nicht stimmt“ der Umsetzung).
+
+### Zwischenstand 2026-11-08: `DB`–`DF` und `DJ` gebaut, **`DG` nicht**
+
+*Das Schreiben (`DG`) wartet auf die Antwort zu `DE` Punkt 4 (Setup-Editor offen?). Bis dahin ist an der Produktion **nichts** geschrieben.*
+
+- **Tests:** 1555 → **1595**, alle grün. Neue Dateien: `server/test/szenariodaten-berichtigung.test.js` (19, der reine Baustein) und
+  `server/test/szenariodaten-berichtigung-lauf.test.js` (21, `main` gegen eine Wegwerf-Datenbank mit dem echten Schema). Kein Laufzeitcode
+  angefasst (`shared/`, `server/src/`, `client/src/`: kein Diff gegen `1fc6f39`, den Stand auf der VM).
+- **Der Baustein** `scripts/szenariodaten-berichtigung.mjs`: `AENDERUNGEN` (die Liste `{ eintrag, pfad, alt, neu, beleg }`, 31 Zeilen, neun Drehungen) ist die
+  einzige Stelle; der Zielstand wird daraus **gerechnet** und trifft alle sieben `NEU_SHA` aus M28.2 und `5eec10582ec8` für die ganze Spalte. `--json`,
+  `--check <db>`, `--write <db> --sicherung-sha <hex>`, `--zurueck <sicherung> <db>`, `--ohne-z1`; **kein `--force`**.
+- **Ausgangsstand an der Produktion (gelesen, 2026-11-08):** `scenario_data` **18 678 Zeichen**, sha256 beginnt mit `2f9cf558a0f7`, kompaktes `JSON.stringify`,
+  Schlüssel `gridLabel, bosses, cardZoneLabel, villagers, options`, **20** Einträge, die sieben `ALT_SHA` und die 13 übrigen wie in M28.2, die vier Schlüssel-Hashes
+  (`29499d91a16c`, `f04e85a28054`, `9d58cc5bb60a`, `0c567cede3be`) wie in `DG`. **Die Spec stimmt.**
+- **Executor:** `/shared/*.js` im Container = `/opt/card-game-engine/shared/*.js` auf der VM = Repo (neun Dateien, sha256 gleich; VM auf `1fc6f39`).
+- **Trockenlauf an der Produktion:** 7 zu berichtigen, 0 abweichend; je Eintrag das Diff wie in M28.2; Rückwärtsbeweis ja; `validateScenarioData` 0 (212 Assets, 1 087 Karten);
+  22 Läufe sauber (Virginia 13/18, Bundits 12/13, Ernie 12/12); Zielstand 18 982 Zeichen, `5eec10582ec8`.
+- **Wo M28 selbst nicht traf:** M28.5 sagt, `checkScenarioAspect` melde heute 2 Treffer und nach M28 einen. Mit den echten Bildmaßen aller 211 Assets sind es **5 vor und 4 nach**:
+  zusätzlich die drei 6-%-Treffer an den Milchkannen-Plättchen (Handsy-Endkampf M9, M12; Pepin-Endkampf S9), die in `szenariodaten-grundspiel.md` §9.16 stehen und zu den neun vom
+  2026-11-07 gehören. Sie sind jetzt als bekannt geführt (je Eintrag, Seite, Asset und Feld); dasselbe Asset an anderer Stelle bleibt eine Beanstandung.
+- **`DJ`:** `scripts/tableau-messung/` (Python/OpenCV, Selbstprobe an Ms. Falls & Co.; reproduziert die Zahlen aus M28.1, z. B. Foodtruck 0,40 gegen 0,07, Falls-Farmhaus 180 = 0,28 / Vorlage 0,79,
+  Ernie `B` bei K5:L6, Virginia `EG5` bei R14). Nicht Teil von `npm test`.

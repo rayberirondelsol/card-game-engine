@@ -21,3 +21,7 @@ kill-all.js
 test-tts-save.json
 test-sharp-*.mjs
 create-tts-test.js
+
+# Tableau-Messung (scripts/tableau-messung): Zwischenergebnisse und Bilder, nie einchecken
+tableau-messung-arbeit/
+__pycache__/
