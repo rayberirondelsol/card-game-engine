@@ -98,7 +98,14 @@ M29.1 braucht keine Berichtigung. Was nicht hielt:
     (Zweig entfernen, Bedingung `part === null` weglassen, `Array.isArray` weglassen … — jeweils rot, der Rest siehe Bericht). Dasselbe gilt für die M29.1-Tests in `DM` (Zahlen, Monotonie): sie waren grün, sobald `DK` stand, und werden durch dieselbe Mutation (dritten Versuch entfernen) rot.
 28. **Pepins drei verdeckte Bürger** (M29.10 sagt „drei“, nennt sie nicht): `Katze`, `Dörflerin`, `Soßenflasche` — eine Teilmenge der fünf von Handsy; die vierzehn Plättchenarten stimmen.
 
-**Stand nach `DK`–`DO` (gebaut, nichts deployt, nichts an der Produktion gelesen oder geschrieben):** `DK` `8dc9bd8`, `DL` `615fd33`, `DM` `69884d6`, `DN` `423ae6a` + `d76811d` (Naht gestrichen), `DO` `53e09be`; Spec und Aufgabenliste als `d980c1f`. Tests **1 595 → 1 686**, alle grün. `DP`–`DT` offen.
+**Stand nach `DK`–`DO` (gebaut, nichts deployt, nichts an der Produktion gelesen oder geschrieben):** `DK` `8dc9bd8`, `DL` `615fd33`, `DM` `69884d6`, `DN` `423ae6a` + `d76811d` (Naht gestrichen), `DO` `53e09be`; Spec und Aufgabenliste als `d980c1f`. Tests **1 595 → 1 686**, alle grün. `DP`–`DT` offen (siehe unten).
+
+**Stand nach `DP`–`DS` (2026-11-08, deployt und geschrieben; die Befunde Nr. 29–37 stehen in `docs/spec-setup-system.md`, „M29 — gebaut, und was die Spec dabei berichtigt“).** `DP`: Deploy beider Images von Hand 14:27 UTC (Checkout `1fc6f39` → `8e09dca`), `/shared/sequenceExecutor.js` im Backend gleich dem Repo (`3b3b4de76ce2…`),
+`terrainCards` im Frontend-Bundle (dritter Versuch eingeschlossen), alter Rauchtest vor/nach dem Deploy `diff` leer. `DQ`: gelesen = M29.6 (18 982 Zeichen, `5eec10582ec8`, 5 Schlüssel, 20 Einträge Hash für Hash), Sicherung `scenario_data.M29-vorher.json`, `--check` = M29.1
+(40 Läufe, `ok` 32 / `note` 8, 18 Nennungen, 19 106 / `914461d63f77`); Editor-Frage: „Weiß ich nicht“ → Absicherung durch erneuten `--check`. `DR`: `--write` 14:31:15 UTC, **19 106 Zeichen, `914461d63f77`**, `terrainCards` `aad39d745984`, alle Gleichheiten, `save_states` gleich, zweiter Lauf „schon geschrieben“,
+neuer Rauchtest 0 Beanstandungen (3 neue + 18 geänderte Zeilen, sonst gleich), 40 Läufe an der Produktion wie M29.1, M28 `--check` „7 schon berichtigt“, erneuter `--check` 14:34:50 UTC sauber. `DS`: `CLAUDE.md`, `datenzugriff.md`, Spec, diese Datei; Nachträge „behoben mit M29“ in `szenariodaten-grundspiel.md` und `-erweiterung.md`.
+**`DT` ist offen** (Auftraggeber), dazu der dritte `--check` beider Skripte am Ende des Tages.
+
 
 **Was der Auftrag richtig hatte** (damit niemand es nachprüft, als wäre es unsicher): die 33 Geländekarten mit ihren Namen und Kategorien; die drei Plättchennamen und ihre Karten; die Falle mit der Vertauschung (an `H7` steht `Auslöser`, an `Q5` `Sprengstoff`);
 `norm` im Executor ist **nicht** `findCardByName`; die Entdoppelung nach Karte (`!found.includes(card)`) fängt `Dichter Wald 2` bei zwei Wäldern ab; der alte Executor läuft mit dem neuen Schlüssel **unbeschädigt** (Rauchtest-Ausgabe Byte für

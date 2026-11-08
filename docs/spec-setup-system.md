@@ -7281,3 +7281,51 @@ Vollständig; es ist mehr als die bestätigten Befunde wert.
 9. **`Holzzaun 2` / `Flut (hochkant)`** (siehe oben): nicht gemessen, ob dieselbe Geländeart; die zweite Abbildung `terrainName()` nimmt es für `Holzzaun 2` an.
 10. **Der Raumstart** (`POST /api/rooms/:code/start`) liest `scenario_data` je Anfrage aus der Zeile (`rooms.js`); es wurde kein Raum gestartet.
 11. **Dass die Karte `Sprengstoff & Auslöser` beide Token meint,** folgt `befund-beute-und-aufstellbares.md` §3.3 („ein Geländeteil mit zwei Token“); ich habe das Kartenbild nicht angesehen.
+
+
+---
+
+### M29 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `DK`–`DS` in `docs/tasks-kartenzuordnung.md`, dort „Stand nachher“ mit Zahlen. **`DT` (Sichtprüfung am Tisch) ist offen** und gehört dem Auftraggeber.
+**Gebaut** (`DK`–`DO`, 2026-11-08, `8dc9bd8` … `53e09be`): der dritte Versuch im Executor (`shared/sequenceExecutor.js`, +31/−11), der Prüfer (`shared/scenarioData.js`, +51/−2), `scripts/gelaendekarten-zuordnung.mjs`
+(`--check`, `--write … --sicherung-sha`, `--zurueck`, kein `--force`), der Rauchtest mit Abschnitt 0 und der Sperre. Tests 1 595 → **1 686**. **Deployt und geschrieben** (`DP`–`DR`) am 2026-11-08: Deploy von Hand 14:27 UTC,
+Schreiben 14:31:15 UTC; Laufzeitänderung genau die zwei Dateien in `shared/`.
+
+**Deploy (gemessen).** VM-Checkout `1fc6f39` → `8e09dca` (`git fetch` + `reset --hard`, acht Commits nachgezogen, keiner berührt eine Laufzeitdatei), `docker compose up -d --build`, **beide Images neu**, beide Container neu angelegt, beide
+`healthy` nach 20 s; `/api/health` über `gaming.benjathi.de` 200. Belege: (a) `/shared/sequenceExecutor.js` im Backend `3b3b4de76ce2…` und `scenarioData.js` `a7ae87a6f525…` = die Dateien im Repo (vorher `823fa269f58f` / `174b8761600b`);
+(b) das Frontend-Bundle `index-DOOQHNpq.js` enthält `terrainCards` — **auch den dritten Versuch** (`x.terrainCards,G=se=>{if(!_||typeof _!="object"||Array.isArray(_))return null…`), nicht nur den Prüfer; (c) **derselbe alte Rauchtest** (die Fassung von `3fc4fa8`,
+`e64a118867c1…`) vor und nach dem Deploy: 71 Zeilen, `diff` **leer**, 0 Beanstandungen; zweimal hintereinander vor dem Deploy ebenfalls Byte für Byte gleich (die Ausgabe ist deterministisch, trotz des laufenden Auto Save).
+
+**Geschrieben (gelesen, nicht aus dem Plan).** `scenario_data` **18 982 → 19 106** Zeichen, sha256 `5eec10582ec8…` → **`914461d63f77…`** (`914461d63f772cb44c53e2d968dbfe0f9d99c958df038f7253a9a328035caa5e`), kompakt, NFC, Schlüsselreihenfolge
+`gridLabel, bosses, cardZoneLabel, villagers, options, terrainCards`; `terrainCards` 108 Zeichen, `aad39d745984`; die fünf alten Schlüssel (`29499d91a16c`, `f6c1d5f585c0`, `f04e85a28054`, `9d58cc5bb60a`, `0c567cede3be`) und **alle 20 Einträge** gleich
+(Hash für Hash gegen M29.6); Präfix- und Rückwärtsbeweis ja (auch von mir **außerhalb** des Skripts, an einer zweiten Lesung, nachgerechnet); `validateScenarioData` 0 Probleme; Fingerabdruck aller Tabellen und jede der 17 Zeilen von `save_states`
+in der Transaktion gleich, `setups.updated_at` unberührt; zweiter Lauf „schon geschrieben“, schreibt nichts. Sicherung (Scratchpad, nicht im Repo): `scenario_data.M29-vorher.json`, sha256 der Spalte `5eec10582ec8e608…`.
+**40 Läufe** mit dem ausgelieferten Executor an den gelesenen Produktionsdaten: `ok` 19 → **32**, `note` 21 → **8**, Vorkämpfe mit `note` 8 → **0**, Namensnennungen 50 → **18** (14 Arten, genau die aus M29.10; keiner der drei Tabellennamen darunter), 24 von 40 Läufen Zeichen für Zeichen gleich,
+**nicht monoton: 0**, Objekte auf dem Raster ungleich: 0, übrige Protokollzeilen ungleich: 0. Qing & Kween und The Door Knockers legen **eine** Waldkarte, Handsy (5 → 7) und Lawman Dozy (6 → 7) legen sie neu, Virginia, Red, Barry, Handsy und Umbrello legen `Sprengstoff & Auslöser`
+**genau einmal**. M28s `--check` danach: „0 zu berichtigen, 7 schon berichtigt, 0 abweichend“.
+**Rauchtest nachher** (`auslagen-rauchtest.mjs` aus `53e09be`, 0 Beanstandungen) gegen den vorher: **drei neue Zeilen** (Abschnitt 0: „Tabelle terrainCards da, Prüfer ohne Probleme“) und **18 geänderte** — genau M29.9: zwei in Abschnitt 1 (`kurz/mit`, `kurz/ohne`: „17 Zeilen/1 ohne ok (bekannte Hinweise …)“ → „0 ohne ok“)
+und 16 in Abschnitt 2 (Virginia Vor-/Endkampf, Red, Barry, Door Knockers, Handsy Vor-, Endkampf, Lawman Dozy, Qing, Umbrello Vor-, Endkampf); **Abschnitt 3 (Spielstände) und alle übrigen Zeilen Byte für Byte gleich.**
+
+Wo dieser Abschnitt (und die Aufgaben) nicht trugen — Nummern fortlaufend nach `docs/tasks-kartenzuordnung.md`, „Wo die Spec nicht stimmt“ 1–28:
+
+29. **Eine Kopie des Rauchtests unter anderem Namen läuft still durch.** Der Auftrag für `DP` Schritt 2 („Fassung aus `git show 3fc4fa8:scripts/auslagen-rauchtest.mjs`“) ist richtig, aber die Datei startet nur, wenn `process.argv[1]` auf `auslagen-rauchtest.mjs` **endet** (so alle neun `scripts/*.mjs`);
+    als `alt-rauchtest.mjs` in den Container kopiert, lief sie mit **Exit 0 und leerer Ausgabe** (0 Zeilen). Ich habe es erst an der leeren Datei gemerkt. Eingespielt wird die alte Fassung unter dem **richtigen** Namen (`docs/datenzugriff.md`, neue Falle).
+30. **Die Fassung, die auf der VM lag, war schon die von `3fc4fa8`** (sha256 gleich `e64a118867c1…`); „vorher“ und „die bekannte Fassung“ sind dieselbe Datei. Ihre drei Hilfsdateien (`auslagen-daten`, `doerfler-daten`, `equipment-zones`) sind in `3fc4fa8` und `HEAD` gleich (Hash geprüft) und kamen nach dem Deploy mit `docker cp` wieder hinein.
+31. **Die Messdatei des Spec-Agenten (`m29/rauch-vorher.txt`, 63 Zeilen) kennt Abschnitt 3 nicht** — „Offen und ungeprüft“ Nr. 3 sagt es ehrlich („nicht nachgerechnet“). Gemessen an der Produktion: Abschnitt 3 hat fünf Spielstände (*Auto Save*, *M22-Probe Neuladen*, *Partie 13* ×2, *Partie 14*) und ist vor und nach der Tabelle gleich.
+    Offen Nr. 3 ist damit beantwortet.
+32. **„Karten“ in `--check` und in meiner Messung heißt: Karten in der Terrain-Auslage, die Sheriff-Karte des Endkampfs eingeschlossen.** M29.1 führt für Kampf und Endkampf **dieselbe** Zahl (z. B. Virginia „6 → 7“); `--check` druckt für den Endkampf „7 → 8“. Der **Zuwachs** ist überall der der Tabelle in M29.1 — 19 von 20 Endkämpfen
+    legen eine Sheriff-Karte mehr (Tilda keine, daher bei ihr 7 → 7); kein Fehler des Codes, eine Spalte, die in der Spec anders zählt.
+33. **Es war ein Tisch offen** — auf der Kurzpartie (`play?setupId=b1e10f4e-…`, **ohne** `mode=setup`), er speichert jede Minute (*Auto Save*, 14:28, 14:29, 14:30, 14:31 …, immer 200, auch 20 s nach dem Deploy). Der Deploy hat ihn nicht gestört; zwei getrennte Lesungen von `save_states` zeigen
+    deshalb **genau eine** abweichende Zeile (*Auto Save*, `e89011b4`, der Zeitstempel springt) — das ist die Falle aus `docs/datenzugriff.md`, nicht das Skript; **in** der Transaktion waren alle 17 Zeilen gleich. Ein Tisch, der vor dem Schreiben offen war, hat die Tabelle **nicht** (neu laden, `DT` Nr. 1).
+34. **Der Beleg „`mode=setup` kommt im Log nie vor“ (Antwort des Auftraggebers auf die Editor-Frage) ließ sich nach dem Deploy nicht erneuern:** die Container sind neu, der nginx-Log des alten ist weg. Für die Zeit **seit 14:27 UTC** gilt: 0 × `mode=setup`, 0 × `PUT`, nur Auto-Save-POSTs und Gesundheitsabfragen. Die Editor-Absicherung ist der **erneute `--check`**:
+    14:34:50 UTC — dieses Skript „schon geschrieben“ (19 106 Zeichen, `914461d63f77`), M28 „0 zu berichtigen, 7 schon berichtigt, 0 abweichend“, die Spalte Zeichen für Zeichen gleich der von 14:31 (zweite Lesung gegen dritte). Ein Editor-Tab mit leerem Tisch, der **nach** dem Schreiben speichert, ist damit nicht ausgeschlossen —
+    daher am Ende des Tages ein dritter `--check` beider Skripte.
+35. **`checkScenarioAspect` meldet in der Produktion vier Meldungen, nicht null** (in der Containerprobe des Bauagenten: 0, dort gab es keine Bilddateien: „0 Bildmaße gelesen“); an der Produktion „211 Bildmaße“ und **genau die vier bekannten** (Ms. Falls, 2 × Handsy, Pepin; alle als `bekannt` gekennzeichnet). Das ist, was Abnahme 2 sagt („nur die vier bekannten“); die Probe hatte es nicht zeigen können.
+36. **Die Zahlen aus dem Prototyp halten am ausgelieferten Code.** „Offen und ungeprüft“ Nr. 2 (alle Zahlen für „nachher“ aus einem Prototyp) ist beantwortet: `ok` 32, `note` 8, Namen 18, 24 von 40 gleich, monoton — gemessen mit dem Executor aus `/shared` im Backend-Container (Hash = Repo) gegen die **geschriebene** Spalte, nicht gegen eine Kopie.
+    Nr. 6 (der Deploy) ist gemessen: ~10 s Bauzeit (Vite, Schichten im Cache), beide Container waren nach 20 s `healthy`; eine Ausfallzeit des Tisches habe ich nicht gemessen, sie liegt unter einer Minute (der offene Tisch speicherte 20 s später wieder erfolgreich). Der Rebuild entfernt die Skripte aus `/app` **tatsächlich** (nur `data`, `node_modules`,
+    `package.json`, `src`, `uploads` blieben).
+37. **Zwei Warnungen im Build sind nicht von M29:** `Duplicate "data-testid" attribute` in `client/src/pages/GameTable.jsx:5073` (esbuild; Datei von M29 nicht berührt) und „Found orphan containers ([card-game-engine-cloudflared])“ von `docker compose` (der Container `card-game-engine-cloudflared` gehört zum Projekt, steht aber nicht in der Compose-Datei). Beide sind im Log vor dem Start sichtbar und ohne Folge.
+
+**Offen geblieben:** `DT` (Auftraggeber: Tisch neu laden, Handsy / Lawman Dozy / Qing & Kween / Virginia / ein unveränderter Kampf); der **dritte `--check`** beider Skripte am Ende des Tages; „Offen und ungeprüft“ Nr. 1 (gibt es im gedruckten Spiel genau eine Waldkarte?), 5 (offene Tische, am Browser nicht probiert), 7, 8, 9, 10, 11 — unverändert gültig. Die 14 Plättchenarten ohne Karte (M29.10) bleiben ein eigener Auftrag.
+Rückweg, falls nötig: `node /app/gelaendekarten-zuordnung.mjs --zurueck <Sicherung> /app/data/card-game-engine.db` (die Sicherung liegt im Scratchpad dieses Laufs; `--zurueck` ersetzt nur den exakten Zielstand `914461d63f77`); zuerst M29, dann M28.
