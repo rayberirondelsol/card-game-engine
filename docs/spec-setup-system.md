@@ -6326,7 +6326,7 @@ Wo dieser Abschnitt nicht stimmte (Nummern wie in `docs/tasks-auslagen.md`, 13�
 
 **Offen geblieben:** die Sichtprüfung am Tisch der Produktion (geprüft wurde in einer lokalen Probeinstanz
 ohne Bilder), das Laden eines Spielstands im Browser, „Start Game" im Raum mit zwei Spielern, das Umbenennen
-des Aufbaus, das Löschen des Grundaufbaus, die elf Szenarien aus `docs/szenariodaten-grundspiel.md` §11 (→ **M28**).
+des Aufbaus, das Löschen des Grundaufbaus, die elf Szenarien aus `docs/szenariodaten-grundspiel.md` §11 (→ **M28**, seit 2026-11-08 für sieben der elf geschrieben, „gebaut“ am Ende von M28).
 
 ---
 
@@ -6776,7 +6776,8 @@ Rest ohne ihn geschrieben wird).
    bekannten `note`.
 7. **Am Tisch (Auftraggeber, `DI`):** Ernie Offal und Virginia Fitz aufgebaut; Bösewicht und drei Dörfler
    stehen auf den Kreuzen, die auf dem Tableau gedruckt sind; Plättchen auf ihren Platten; bei Virginia sind
-   Dynamit, Kasten und Falle da. *Partie 14* laden: das alte Bild, und „Kampf beginnen“ räumt es ab.
+   Dynamit, Kasten und Falle da. *Partie 14* laden: das alte Bild, und „Dorfphase beginnen“ räumt es ab
+   (*„Kampf beginnen“* hat dort nichts aufzudecken, die Leiste ist leer; berichtigt, siehe „gebaut“ Nr. 17).
 8. **Tests:** `cd server && npm test` grün (Stand vorher: **1 555**; es kommen die Tests aus `DB`–`DD` dazu).
 
 ### Offen und ungeprüft
@@ -6821,3 +6822,39 @@ Pilzwäldchen 180°: Patches 0,29 (Deputy 0,19 unsicher). Bienenstock 180°: Til
 Rangelblume: Tilda 90° 0,29, Falls 180° 0,25. Doofster-Glocke Tilda 90° 0,21. Goob's Tavern Door Knockers 270° 0,40
 (Tilda `M1:O3` 270°: 0,12 unsicher). Gemüsebeet **0°** in fünf Tableaus (0,16–0,25). Falls Dorfteich 180° (Korrelation
 0,14, aber der Steg liegt auf dem Tableau oben rechts, im Asset unten links — nach Sicht entschieden), Lagerfeuer nicht entscheidbar.
+
+---
+
+### M28 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `DB`–`DH` und `DJ` in `docs/tasks-szenarien.md`, dort „Stand nachher“ mit Zahlen. **`DI` (Sichtprüfung am Tisch) ist offen.**
+**Gebaut:** `scripts/szenariodaten-berichtigung.mjs` (`AENDERUNGEN` als einzige Liste, `--check`, `--write … --sicherung-sha`, `--zurueck`, kein
+`--force`), `scripts/tableau-messung/` (Messwerkzeuge, Python/OpenCV, nicht Teil von `npm test`). **Geschrieben** am 2026-11-08 an der Produktion in
+**einer** `IMMEDIATE`-Transaktion; **kein Deploy**, kein Laufzeitcode geändert. 1555 → **1595** Tests (19 + 21 neue; `server/test/szenariodaten-berichtigung*.test.js`).
+
+Gelesene Zahlen (Kontrollausgabe, nicht aus dem Plan): `scenario_data` **18 678 → 18 982** Zeichen, sha256 `2f9cf558a0f7` → **`5eec10582ec8`**; die sieben
+Einträge Ernie `f70452263c32` → `26f455032580`, Virginia `3856872a71ea` → `0e8f97427d33`, Bundits `0bd09089d250` → `909beab802e5`, Red `50839293ad24` → `dfc3c087210f`,
+Barry `f2a12ec7c71b` → `ebeedd302fda`, Falls `84e18b1486e2` → `80a78f3a8e4d`, Door Knockers `163ddc7225d6` → `e7ea86b2cdb1`; die **13 übrigen** und `gridLabel`,
+`cardZoneLabel`, `villagers`, `options` je „gleich“; Rückwärtsbeweis ja; `validateScenarioData` 0 Probleme; Fingerabdruck aller Tabellen und jeder der 17 Zeilen von
+`save_states` gleich (*Partie 14* `2c211a3bc44b`); zweiter Lauf: „0 zu berichtigen, 7 schon berichtigt“, nichts geschrieben. Objekte je Kampf/Endkampf: Virginia 13/18, Bundits 12/13, Ernie 12/12.
+Sicherung (Scratchpad, nicht im Repo): `scenario_data.2026-11-08.json`, sha256 `8bd78b63b48d…`; zusätzlich eine Datenbankkopie `card-game-engine.2026-11-08.backup.db`.
+
+Wo dieser Abschnitt nicht stimmte (Nummern fortlaufend nach `docs/tasks-szenarien.md`, „Wo die Spec nicht stimmt“ 1–14):
+
+15. **Der Rauchtest war nach M28 nicht „0 Beanstandungen“, sondern 2.** Abschnitt 1 („zweiter Kampf“ nach Aufbau kurz/mit und kurz/ohne) zählte
+    Virginia Fitz' neuen `note` (drei Plättchen ohne Geländekarte: `Dichter Wald 2`, `Auslöser`, `Sprengstoff`) als Fehler, weil nur Abschnitt 2 `bekannt()` kannte.
+    Behoben (`auslagen-rauchtest.mjs`): der bekannte Hinweis wird in beiden Abschnitten **mit den Namen der Plättchen genannt**, nicht nur gezählt; Ergebnis **0 Beanstandungen**.
+16. **Die Objektzahlen („Virginia 13, Bundits 12, Ernie 12“, M28.5, Abnahme 3) stammen aus dem Baustein (`--check`, „Raster 13/13“), nicht aus dem Rauchtest.** Der Rauchtest druckt
+    Zeilenzahlen und Karten, keine Objektzahlen.
+17. **„Kampf beginnen“ räumt das Brett von *Partie 14* nicht ab** (M28.3, Abnahme 7, `DG` Nr. 4, `DI` Nr. 4). Partie 14 ist ein gewonnenes Spiel: die Bösewicht-Leiste ist leer, und
+    `kampf-beginnen` meldet `reveal_next: nothing left to reveal` (1 ohne ok, 16 Schritte übersprungen) — ein Hinweis auf den Stand, kein Fehler des Aufbaus. Abgeräumt wird das alte Virginia-Brett
+    (Tableau, `Dichter Wald` A4:G7 und M10:S13, Plumpsklo L4:M5, Grabhügel) von **`dorfphase-beginnen`**; belegt durch einen Lauf im Speicher auf Partie 14.
+18. **Der nginx-Beleg „kein Editor offen“ (`DE` Nr. 4) ist schwächer als formuliert.** Im Log stehen nur die Auto-Save-POSTs (`referrer` ohne `mode=setup`) und die Gesundheitsabfragen; die
+    proxied Zugriffe sind nicht protokolliert, und ein SPA-Wechsel in den Editor trifft nginx gar nicht. Er zeigt, *welcher* Tisch speichert, nicht, dass nirgends ein ungespeicherter Editor-Tab liegt.
+19. **Der Auftrag nennt „Partie 14 und vier andere Spielstände mit Aufbau“; es sind fünf Zeilen mit `setup_id`** (Auto Save, M22-Probe Neuladen, Partie 13 zweimal, Partie 14). Alle fünf haben denselben
+    Hash der `state_data` wie in der Sicherungskopie (auch *Auto Save*, die in der Zwischenzeit mehrfach neu geschrieben wurde, mit gleichem Inhalt).
+20. **Die Hilfsdateien `/tmp/insp.mjs` und `/tmp/fix.py` lagen nicht mehr da** (weder im Container noch auf der VM); `szenariodaten-berichtigung.mjs` und `szenariodaten-grundspiel.mjs` sind aus `/app/` entfernt.
+    `auslagen-daten.mjs`, `doerfler-daten.mjs`, `equipment-zones.mjs` und `auslagen-rauchtest.mjs` (jetzt die neue Fassung) liegen von M27 her weiter dort.
+
+**Offen geblieben** (vollständig in „Offen und ungeprüft“ oben, 1–12, unverändert gültig; neu hinzu kommt): die Sichtprüfung `DI`; die Frage, ob nach dem Schreiben ein Editor-Tab zurückschreibt (`--check` am Ende
+des Tages); `setups.updated_at` ist **nicht** angefasst (bewusst, M28.6 Nr. 6) — wer das als Änderungsmerkmal liest, sieht M28 nicht.

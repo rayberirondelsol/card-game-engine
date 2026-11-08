@@ -331,7 +331,8 @@ Keine Automatik (der Client hat keine Testinfrastruktur, der Browser-Bereich ist
 2. Dasselbe für **Virginia Fitz**: Wald oben links ist der **gelbere** (Dichter Wald 2), der rechte liegt in den Zeilen **9–12**, der Schuppen hat die Tür **rechts**; **Dynamitbündel auf H7,
    TNT-Kasten auf Q5, Falle auf E11**. Im Endkampf: die fünf Grabhügel auf den fünf FF-Kästen, der fünfte auf **R14**.
 3. **The Bundits:** Farmhaus mit dem Giebel **links**, beide Zäune eine Zeile höher, **Plumpsklo bei I11:J12**.
-4. *Partie 14 – Sieg gegen Virginia Fitz* laden: das alte Brett, unverändert; „Kampf beginnen“ danach räumt es ab.
+4. *Partie 14 – Sieg gegen Virginia Fitz* laden: das alte Brett, unverändert (Wald bei M10:S13, Plumpsklo L4:M5, Grabhügel bei Q14); **„Dorfphase beginnen“** räumt es ab.
+   („Kampf beginnen“ meldet dort, es gebe nichts aufzudecken — die Leiste ist leer; das ist der Stand des gewonnenen Spiels, kein Fehler.)
 5. **Was fehlt oder falsch aussieht, in den Bericht** — und `--zurueck` ist ein Befehl.
 
 ## DJ — Die Messwerkzeuge ins Repo (unabhängig; Entscheidung 12)
@@ -375,3 +376,24 @@ keine) — die Selbstprobe läuft von Hand.
   2026-11-07 gehören. Sie sind jetzt als bekannt geführt (je Eintrag, Seite, Asset und Feld); dasselbe Asset an anderer Stelle bleibt eine Beanstandung.
 - **`DJ`:** `scripts/tableau-messung/` (Python/OpenCV, Selbstprobe an Ms. Falls & Co.; reproduziert die Zahlen aus M28.1, z. B. Foodtruck 0,40 gegen 0,07, Falls-Farmhaus 180 = 0,28 / Vorlage 0,79,
   Ernie `B` bei K5:L6, Virginia `EG5` bei R14). Nicht Teil von `npm test`.
+
+### Stand nachher (2026-11-08): `DG` und `DH` gebaut, **`DI` offen**
+
+- **Tests:** 1555 → **1595**, alle grün (nach der Änderung am Rauchtest erneut gelaufen). Laufzeitcode nicht angefasst; geändert sind `scripts/auslagen-rauchtest.mjs` (bekannte Hinweise mit Plättchennamen,
+  auch beim „zweiten Kampf“) und Dokumente.
+- **Vor dem Schreiben:** `referrer` der Auto-Saves ohne `mode=setup`/`editSetupId`; `--check`: 7 zu berichtigen, 0 schon berichtigt, 0 abweichend. Sicherung geprüft:
+  `C:/Users/benja/AppData/Local/Temp/claude/C--Users-benja-projects/a20869d2-5038-44bc-9878-66120a69e42a/scratchpad/m28run/scenario_data.2026-11-08.json`
+  (sha256 `8bd78b63b48dd3e0b82d2d61d0b01b62ab54e7f148d1c4d3914c47c1feb26f8c`), Datenbankkopie `card-game-engine.2026-11-08.backup.db` (sha256 `599aa4fe81c3778ad3974e48677df99c711d2d0f22abd3ae23b9c5b2d144fb8d`).
+- **Geschrieben:** `--write /app/data/card-game-engine.db --sicherung-sha 2f9cf558a0f7`; `scenario_data` **18 678 → 18 982** Zeichen, sha `2f9cf558a0f7` → **`5eec10582ec8`**; die sieben Einträge
+  `26f455032580`, `0e8f97427d33`, `909beab802e5`, `dfc3c087210f`, `ebeedd302fda`, `80a78f3a8e4d`, `e7ea86b2cdb1`; die **13 übrigen** und `gridLabel` (`29499d91a16c`), `cardZoneLabel` (`f04e85a28054`), `villagers`
+  (`9d58cc5bb60a`), `options` (`0c567cede3be`) **gleich**; Rückwärtsbeweis ja; `validateScenarioData` auf der gelesenen Spalte 0; Fingerabdruck aller Tabellen und jede der 17 `save_states`-Zeilen gleich
+  (*Partie 14* `2c211a3bc44b`); nach dem Commit neu gelesen: gleich.
+- **Zweiter Lauf** und ein dritter `--check` (nach Rauchtest, vor dem Aufräumen): „0 zu berichtigen, 7 schon berichtigt, 0 abweichend“, nichts geschrieben.
+- **Rauchtest** (Container, Daten der Produktion): **0 Beanstandungen**; die bekannten Hinweise stehen mit Namen da (Virginia Fitz: `Dichter Wald 2`, `Auslöser`, `Sprengstoff`; Endkampf zusätzlich die fünf Grabhügel).
+  Objekte (Baustein): Virginia 13/18, Bundits 12/13, Ernie 12/12; 22 Läufe sauber; `checkScenarioAspect` 4 bekannte Meldungen (Falls' Matschpfütze 7 %, drei Milchkannen 6 %).
+- **Fünf Spielstände mit `setup_id`** (Auto Save, M22-Probe Neuladen, Partie 13 ×2, *Partie 14*): `state_data`-Hash je Zeile gleich dem in der Datenbankkopie; Partie 14 trägt weiter Wald `A4:G7` und `M10:S13`,
+  Plumpsklo `L4:M5`, Grabhügel `Q14`, `Tableau: Virginia Fitz`.
+- **Entscheidungen 3–7:** vom Auftraggeber nicht geändert (Z1 ist drin, `--ohne-z1` nicht benutzt).
+- **Wo M28 selbst nicht traf** (zusätzlich zu „Wo die Spec nicht stimmt“ 1–14): Rauchtest zählte den neuen Virginia-Hinweis im „zweiten Kampf“ als Fehler; die Objektzahlen kommen aus dem Baustein, nicht aus dem
+  Rauchtest; „Kampf beginnen“ räumt Partie 14 nicht ab (Dorfphase tut es); der nginx-Beleg zum Editor ist schwächer als gedacht; Details und Nummern 15–20 in M28 „gebaut“ in `docs/spec-setup-system.md`.
+- **Aufgeräumt:** `szenariodaten-berichtigung.mjs`, `szenariodaten-grundspiel.mjs` aus `/app/` des Containers entfernt; `/tmp/insp.mjs`, `/tmp/fix.py` waren nicht (mehr) da.

@@ -116,6 +116,16 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
    `action_data` und `zone_data` werden von verschiedenen Aufträgen angefasst.
 4. **Nichts löschen**, was der Auftrag nicht ausdrücklich nennt. Eine Sicherung
    der betroffenen Spalte vorher kostet nichts.
+5. **Vorhandene Werte ändern** (statt ergänzen) ist strenger als Ergänzen — Vorbild `scripts/szenariodaten-berichtigung.mjs` (M28):
+   - **Vorbedingung je Wert:** jeder Eintrag trägt den Hash des *erwarteten alten* Textes und den des Ergebnisses; ist er weder das
+     eine noch das andere, bricht der ganze Lauf ab. **Kein `--force`.** Eine Einzeländerung nennt bei Abweichung ihren Pfad.
+   - **Rückwärtsbeweis statt Präfixbeweis:** im neuen Text jeden geänderten Eintrag durch seinen alten ersetzen — das muss den
+     gelesenen Text Zeichen für Zeichen ergeben (der Präfixbeweis des Ergänzens scheitert bei jeder echten Änderung).
+   - **Sicherung vorher, ihr Hash als Argument** (`--sicherung-sha`): ohne gültige Sicherung kein Schreiben.
+   - **Vergleich-und-Tausch** (`UPDATE … WHERE scenario_data = <gelesener Text>`), `IMMEDIATE`-Transaktion, Fingerabdruck je Tabelle und je Zeile
+     von `save_states` vorher/nachher, Rollback bei Abweichung.
+   - **Weg zurück:** `--zurueck <Sicherung> <db>` ersetzt nur den **exakten Zielstand**; vorher auf einer Wegwerf-Datenbank getestet.
+   - Zweiter Lauf: „schon berichtigt", schreibt nichts.
 
 ## Fallen, die schon zugeschlagen haben
 
@@ -136,6 +146,12 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
   (Roster **und** Platzdaten `barZone`, `seats[].tableau/counters`). Wer einen Startwert ändert, ändert ihn im
   Roster; einen Schritt anfassen muss er nicht. `doerfler-daten.mjs --write` schreibt nur noch Zonen,
   Aktionen und `villagers` (Zeichen für Zeichen die Konstante) — kein Schritt der Folge. (M27.1)
+- **Der Setup-Editor schreibt `scenario_data` zurück.** `saveSetup` (`GameTable.jsx`) schickt die Spalte **aus dem Zustand, den der
+  Editor beim Öffnen geladen hat**. Eine Editor-Sitzung (`?mode=setup`), die **vor** einer Datenänderung geöffnet wurde und danach
+  speichert, stellt den alten Text wieder her — still, ohne Fehler; Vergleich-und-Tausch hilft nicht, weil der Editor selbst schreibt.
+  Vor dem Schreiben den Auftraggeber fragen, ob einer offen ist; nach dem Schreiben (und am Ende des Tages) `--check` wiederholen.
+  **Der Server kann es nicht sehen:** nginx protokolliert nur die Auto-Save-POSTs (Warnung „body buffered") mit `referrer`; ein
+  `mode=setup` darin zeigt einen Editor, dessen *Fehlen* dort beweist nichts über einen offenen, noch nicht gespeicherten Tab.
 - **Feldschlüssel in `scenario_data` binden als Variablen** (`EG` → `$EG1`…).
   Wer sie umbenennt, ohne die Schritte mitzuziehen, bekommt **keinen Fehler** —
   `executeSequence` wirft nie, die Schritte landen still als `skipped`. (M13.6)

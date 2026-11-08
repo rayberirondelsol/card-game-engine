@@ -77,6 +77,13 @@ Hütte des Dorfdoktors 3×3, Trüber Fluss 12×2, Marodes Farmhaus 5×4.
 
 ## 3. Die Tabelle
 
+> **Berichtigt in M28 (2026-11-08).** Die Tabellen unten sind der Stand vom 2026-10-14 und bleiben es. In der Produktion geändert
+> wurden danach (`docs/spec-setup-system.md`, M28.2): **Red Atrocious** (die beiden Wälder vertauscht, A7:D13 mit Drehung 270),
+> **Ernie Offal** (Bösewicht, drei Dörferfelder, Foodtruck, Fass, Kochtopf, Maisfeld ein Feld nach rechts; der Zaun in zwei
+> Einträge geteilt: G7:G10 mit 270, O7:O10 mit 90), **Barry Bluff** (Trüber Fluss 270), **Ms. Falls & Co.** (Farmhaus 180,
+> Wäscheleine 270) und **The Door Knockers** (Farmhaus 180). Unverändert blieben Tilda Fields, Tartar Fishboy und Patches
+> — und der rechte Wald der Door Knockers, den §11 in `szenariodaten-grundspiel.md` zu Unrecht anzweifelte.
+
 Raster: `Spielfeld A–S / 1–14`. Alle Geländeeinträge stehen als **Bereich**
 (auch die einfeldrigen, als `H6:H6`) — damit bestimmt die Adresse die
 Grundfläche und nicht die TTS-Skalierung des Assets (siehe Lücke 4).
@@ -271,7 +278,8 @@ Plumpsklo-Plättchen und dementsprechend nur das eine Asset
 2. **`Dichter Wald` vs. `Dichter Wald 2`.** Red Atrocious und The Door Knockers
    haben je **zwei** Waldstücke. Welches der beiden Assets (die sich im Artwork
    nur minimal unterscheiden) auf welchem Platz liegt, ist auf dem Tableaubild
-   nicht zu unterscheiden. Erfasst ist: erstes Stück = `Dichter Wald`, zweites =
+   nicht zu unterscheiden. **[Falsch, siehe M28.1: gemessen trennen die Varianten 0,50–0,84 von höchstens 0,04; Red Atrocious war
+   deshalb vertauscht, Door Knockers nur zufällig richtig.]** Erfasst ist: erstes Stück = `Dichter Wald`, zweites =
    `Dichter Wald 2`. Zwei Waldstücke liegen also richtig, ihre Reihenfolge ist
    willkürlich.
 
@@ -301,7 +309,8 @@ Plumpsklo-Plättchen und dementsprechend nur das eine Asset
    Matschiger Graben hochkant, Holzzaun hochkant, Wäscheleine hochkant, Dichter
    Wald hochkant). Die Richtung (90 statt 270) ist bei allen betroffenen Teilen
    entweder symmetrisch oder am Artwork ablesbar; geprüft wurde sie im Bild,
-   nicht am Tisch.
+   nicht am Tisch. **[Falsch, siehe M28.1: bei Barry (Fluss), Red (Wald), Ms. Falls (Wäscheleine) und den Bundits
+   (Zaun) war die Richtung weder symmetrisch noch abgelesen; neun Drehungen sind berichtigt.]**
 
 6. **Keine `decks`-Angaben.** Wie bei den Grundspiel-Einträgen.
 

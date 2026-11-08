@@ -136,7 +136,10 @@ Tableau überein (Ernie Offal: Bösewicht und drei Dörferfelder ein Feld danebe
 Drehungen …). Die Spec hat jede Behauptung aus `docs/szenariodaten-grundspiel.md` §11 **neu gemessen** (21 bestätigt,
 eine widerlegt) und die Änderung als Text mit Hashes festgelegt. **Nur Daten, kein Deploy; geschrieben wird eine Spalte, eine
 Sicherung vorher ins Scratchpad.** Gespeicherte Partien werden nicht angefasst (ein Spielstand trägt seine Objekte mit eigenem
-Feld). Stand: Spec und Aufgaben geschrieben, **nichts gebaut, nichts geschrieben**.
+Feld). **Stand (2026-11-08): geschrieben.** `scripts/szenariodaten-berichtigung.mjs` (`--check`, `--write … --sicherung-sha`, `--zurueck`, kein `--force`; Vorbedingung je Eintrag,
+Rückwärtsbeweis, Vergleich-und-Tausch) hat die sieben Einträge in einer Transaktion berichtigt: `scenario_data` 18 678 → 18 982 Zeichen, sha `2f9cf558a0f7` → `5eec10582ec8`;
+ein zweiter Lauf schreibt nichts. Die Sichtprüfung am Tisch (`DI`: Ernie Offal und Virginia Fitz zuerst) steht aus. Ein offener Setup-Editor kann die Berichtigung still zurücknehmen
+(`docs/datenzugriff.md`, „Fallen"); dann `--check` meldet `ALT_SHA`, und `DG` wird wiederholt. Szenariodaten **ändern** (nicht ergänzen): `docs/datenzugriff.md`, „Regeln fürs Schreiben" Nr. 5.
 
 ## Produktionsdaten
 

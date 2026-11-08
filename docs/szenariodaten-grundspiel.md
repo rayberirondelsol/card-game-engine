@@ -462,10 +462,12 @@ Karte heißt „Dichter Wald"). Dort fehlt die Wald-Karte in der Terrain-Auslage
 bei Eintrag mit zwei Wäldern (Qing) deckt die erste sie ab. Das ist dieselbe
 Klasse wie `docs/szenariodaten-erweiterung.md` §8.7, und auch hier nicht behoben.
 
-### 6.5 Sprengstoff / Auslöser — die Assetnamen sind gegenüber dem Artwork vertauscht
+### 6.5 Sprengstoff / Auslöser — die Assetnamen sind gegenüber der Bedeutung der Wörter vertauscht
 
 Das Asset **`Sprengstoff`** zeigt den **TNT-Kasten mit weißem Plunger**, das Asset
-**`Auslöser`** das **Dynamitbündel**. Gelegt ist, was auf dem Tableau zu *sehen* ist:
+**`Auslöser`** das **Dynamitbündel** — vertauscht ist also der *Name gegenüber der Bedeutung des Wortes*
+(Sprengstoff = Dynamit, Auslöser = Plunger-Kasten), nicht das Artwork: das Bild ist eindeutig, und die Einträge
+richten sich nach ihm (berichtigt in M28.4, Nr. 10 in `docs/tasks-szenarien.md`). Gelegt ist, was auf dem Tableau zu *sehen* ist:
 
 - Handsy: TNT-Kasten auf **N3** (= Asset `Sprengstoff`), Dynamitbündel auf **H12**
   (= `Auslöser`).
@@ -494,6 +496,12 @@ Fass: **keine Drehung erfasst**, wie in den elf. Die Tableaus drehen sie durchau
 (der Brunnen liegt in Bort, Dozy, Pepin und Qing um 180° zum Asset, bei Penny um 90°;
 auf Virginias Tableau liegt der TNT-Kasten um 90° gedreht), aber die Korrelation (0,2–0,4)
 ist bei Teilen, die das Tableau neu zeichnet, kein Beleg. Siehe §9.
+
+> **Berichtigt am 2026-11-08 (M28.1, Z4):** der *Absolutwert* trägt tatsächlich nichts, der **Abstand zur zweitbesten Drehung**
+> schon. So gelesen liegt das `Miefige Plumpsklo` in **allen fünf** Tableaus, die es führen (Virginia, Red, Barry, Patches,
+> Door Knockers), um **180°** zum Asset (0,24–0,41, zweitbeste ≤ 0,05) — das Asset ist **systematisch** gegen das Tableau
+> gedreht, die Hütte des Dorfdoktors dagegen je Szenario anders. Von 39 geprüften Plättchen sind 21 sicher gedreht (davon
+> 3 Farmhäuser). **Geändert wurde das nicht** (Entscheidung 5 in `docs/tasks-szenarien.md`); Liste: Anhang am Ende von M28.
 
 ---
 
@@ -652,7 +660,7 @@ die Zahlen sind die Kreuzkorrelation wie in §6.
 | **Red Atrocious** | Die zwei Wälder sind **vertauscht**: P4:S10 ist `Dichter Wald 2` (0,55, Drehung 90 stimmt), A7:D13 ist `Dichter Wald` mit **270** (0,31) statt 90. |
 | **Barry Bluff** | Trüber Fluss L1:M12: **270 statt 90** (0,40 gegen 0,04). |
 | **Ms. Falls & Co.** | Farmhaus G3:K6: das weiße Dach liegt oben — **180** fehlt. |
-| **The Door Knockers** | Farmhaus G5:K8: das weiße Dach liegt oben — **180** fehlt. Der rechte Wald (M1:S4) trägt `Dichter Wald 2`, ohne dass das Bild mit einer der beiden Varianten übereinstimmt (0,05) — unklar. |
+| **The Door Knockers** | Farmhaus G5:K8: das weiße Dach liegt oben — **180** fehlt. Der rechte Wald (M1:S4) trägt `Dichter Wald 2`, ohne dass das Bild mit einer der beiden Varianten übereinstimmt (0,05) — unklar. **[Widerlegt am 2026-11-08: der Wald stimmt, 0,50 gegen 0,02; siehe die Berichtigung unter der Tabelle.]** |
 | Deputy Waggums, Tilda Fields, Tartar Fishboy, Patches | **kein Befund** (Umrisse decken die Teile, Drehungen und Felder stimmen, soweit messbar). Das Farmhaus bei Patches liegt unverdreht, wie eingetragen. |
 
 Das Gelände dieser Einträge ist also an einigen Stellen nicht das, was das Tableau
@@ -669,7 +677,12 @@ Arbeit; die Zahlen oben reichen, es nachzuprüfen.
 > 270, der P-Zaun bleibt 90; Virginias `EG5` steht **zweimal** in den Daten (`final.terrain` und `final.fields.EG`); die
 > Wäscheleine bei Ms. Falls liegt 270 statt 90 (nicht in dieser Tabelle). **Gemessene Zahlen, Verfahren und die Änderung:**
 > M28.1 und M28.2 — die Zahlen in dieser Tabelle sind Kreuzkorrelationen eines anderen Verfahrens und nicht dieselben.
-> Berichtigt ist hier noch nichts (Stand 2026-11-08); der Auftrag steht in `docs/tasks-szenarien.md`.
+>
+> **Berichtigt am 2026-11-08 (Aufgabe `DG`):** die sieben Einträge Ernie Offal, Virginia Fitz, The Bundits, Red Atrocious,
+> Barry Bluff, Ms. Falls & Co. und The Door Knockers stehen in der Produktion jetzt nach dem Tableau (neun Drehungen, alle
+> Felder und Plättchen dieser Tabelle außer dem widerlegten Wald); `scenario_data` 18 678 → 18 982 Zeichen. Die
+> vier Einträge „kein Befund“ und die neun vom 2026-11-07 sind byteweise unverändert. Vorgang, Zahlen und Hashes: M28 „gebaut“
+> in `docs/spec-setup-system.md` und „Stand nachher“ in `docs/tasks-szenarien.md`.
 
 ---
 
@@ -697,8 +710,9 @@ und hat so still fremde Arbeit überschrieben):
    Zeile, und die Transaktion bricht ab.
 4. **Fingerabdruck:** vorher und nachher wird jede Tabelle gehasht (bei `setups` ohne
    `scenario_data`); sind sie nicht gleich, Abbruch und Rollback. Damit ist auch
-   `save_states` (17 benannte Spielstände, darunter *Partie 14 – Sieg gegen Virginia Fitz*)
-   belegt unangetastet.
+   `save_states` (**17 Zeilen**, davon **8 zu diesem Spiel** und 5 davon mit `setup_id`; die übrigen gehören zu zwei
+   anderen Spielen — darunter *Partie 14 – Sieg gegen Virginia Fitz*) belegt unangetastet. *(Die frühere Angabe „17 benannte
+   Spielstände“ war ungenau; berichtigt 2026-11-08, M28 Nr. 9.)*
 
 ### Kontrollausgabe
 
