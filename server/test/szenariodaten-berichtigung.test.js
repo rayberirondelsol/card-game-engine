@@ -271,6 +271,23 @@ test('DB: `checkScenarioAspect` – der Foodtruck (19 %) ist weg, übrig bleibt 
   assert.ok(p.beanstandungen.some(b => /Seitenverhältnis.*Foodtruck/.test(b)), p.beanstandungen.join('\n'));
 });
 
+test('DB: die drei 6-%-Meldungen an den Milchkannen-Plättchen (Handsy, Pepin; `szenariodaten-grundspiel.md` §9.16) sind bekannt und kein Anlass zum Abbruch', () => {
+  // Beim ersten Trockenlauf an der Produktion standen sie da: die echten Bildmaße der **211** Assets
+  // liefern sie, die 38 Geländeassets der Spec nicht. Sie gehören zu den neun vom 2026-11-07, nicht zu M28.
+  const imageSizes = {
+    'Flut / Matschpfuetze': { width: 560, height: 1000 },
+    'Versteckter Bürger (Soßenflasche) / Große Milchkanne': { width: 940, height: 1000 },
+    'Versteckter Bürger (blond) / Große Milchkanne': { width: 950, height: 1000 },
+  };
+  const p = pruefeZiel(ziel.next, { ...env, imageSizes });
+  assert.deepEqual(p.aspekt.map(m => `${m.boss}|${m.cell}`).sort(), ['Handsy|M12', 'Handsy|M9', 'Ms. Falls & Co.|H8:J12', 'Pepin Milkfrog|S9']);
+  assert.deepEqual(p.beanstandungen, []);
+  // Dasselbe Asset an einer **anderen** Stelle ist neu.
+  const x = copy(ziel.next);
+  x.bosses['Handsy'].final.terrain[2].cells = ['M9:N10'];
+  assert.ok(pruefeZiel(x, { ...env, imageSizes }).beanstandungen.some(b => /Seitenverhältnis.*Handsy/.test(b)));
+});
+
 test('DB: 22 Läufe mit der echten Maschinerie – nichts außer den bekannten `note`, Objektzahlen wie in M28.5', () => {
   const p = pruefeZiel(ziel.next, env);
   assert.deepEqual(p.beanstandungen, []);

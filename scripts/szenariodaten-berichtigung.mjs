@@ -298,8 +298,23 @@ export const EINTRAEGE_ELF = Object.fromEntries([
 
 // ── Die Prüfer, gegen die echte Assetliste und das echte Raster ──────────────
 
-/** Die eine Meldung von `checkScenarioAspect`, die nach M28 bleibt und bekannt ist (Z5). */
-export const BEKANNTE_ASPEKTMELDUNGEN = ['Flut / Matschpfuetze'];
+/**
+ * Die Meldungen von `checkScenarioAspect`, die nach M28 bleiben und **bekannt** sind — jede mit Eintrag, Seite
+ * (`main`/`final`), Asset und Feld, damit dasselbe Asset an anderer Stelle eine neue Meldung bleibt:
+ *
+ * - Z5: `Flut / Matschpfuetze` bei Ms. Falls, 7 % (der Kachelrahmen deckt den Bereich, das Asset-Foto hat einen Rand).
+ * - Drei Treffer zu 6 % an Bürger-/Milchkannen-Plättchen in den Endkämpfen von Handsy und Pepin (Bildverhältnis
+ *   0,94–0,95 gegen 1,00, Foto-Ränder; `docs/szenariodaten-grundspiel.md` §9.16) — gehören zu den neun vom
+ *   2026-11-07, nicht zu M28, und zeigen sich nur mit den echten Bildmaßen aller Assets (beim ersten Trockenlauf an der
+ *   Produktion standen sie da; die Spec hatte nur die 38 Geländeassets gemessen).
+ */
+export const BEKANNTE_ASPEKTMELDUNGEN = [
+  'Ms. Falls & Co.|main|Flut / Matschpfuetze|H8:J12',
+  'Handsy|final|Versteckter Bürger (Soßenflasche) / Große Milchkanne|M9',
+  'Handsy|final|Versteckter Bürger (blond) / Große Milchkanne|M12',
+  'Pepin Milkfrog|final|Versteckter Bürger (Soßenflasche) / Große Milchkanne|S9',
+];
+export const bekannteMeldung = (m) => BEKANNTE_ASPEKTMELDUNGEN.includes(`${m.boss}|${m.section}|${m.assetName}|${m.cell}`);
 
 /**
  * `validateScenarioData`, `checkScenarioAspect` und die 22 Läufe (elf Bösewichte × Kampf und
@@ -318,7 +333,7 @@ export function pruefeZiel(next, { assets, cards, grids, imageSizes = {} }) {
   // Eine Meldung zum Seitenverhältnis ist ein Verdacht; die eine bekannte bleibt, jede neue ist eine Beanstandung.
   const aspekt = checkScenarioAspect(next, { imageSizes, grids });
   for (const m of aspekt) {
-    if (!BEKANNTE_ASPEKTMELDUNGEN.includes(m.assetName)) beanstandungen.push(`Seitenverhältnis: ${m.message}`);
+    if (!bekannteMeldung(m)) beanstandungen.push(`Seitenverhältnis: ${m.message}`);
   }
 
   const laeufe = [];
@@ -509,7 +524,7 @@ function vorpruefung(db, { ohne, uploadsDir, titel }) {
   const p = pruefeZiel(next, { assets, cards, grids, imageSizes });
   console.log(`validateScenarioData: ${p.probleme.length} Probleme (${assets.length} Assets, ${cards.length} Karten, Raster „${grids[0]?.label}“)`);
   console.log(`checkScenarioAspect: ${p.aspekt.length} Meldung${p.aspekt.length === 1 ? '' : 'en'} (${Object.keys(imageSizes).length} Bildmaße gelesen)${p.aspekt.length ? ':' : ''}`);
-  for (const m of p.aspekt) console.log(`    ${BEKANNTE_ASPEKTMELDUNGEN.includes(m.assetName) ? 'bekannt (Z5)' : 'NEU'}: ${m.message}`);
+  for (const m of p.aspekt) console.log(`    ${bekannteMeldung(m) ? 'bekannt' : 'NEU'}: ${m.message}`);
   console.log('durchgerechnet (Bösewicht aufdecken, build_scenario, Dörfler, $SHERIFF), elf Bösewichte × Kampf und Endkampf:');
   for (const l of p.laeufe) {
     const build = l.log.find(e => e.type === 'build_scenario');
