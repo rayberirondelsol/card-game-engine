@@ -6326,4 +6326,498 @@ Wo dieser Abschnitt nicht stimmte (Nummern wie in `docs/tasks-auslagen.md`, 13�
 
 **Offen geblieben:** die Sichtprüfung am Tisch der Produktion (geprüft wurde in einer lokalen Probeinstanz
 ohne Bilder), das Laden eines Spielstands im Browser, „Start Game" im Raum mit zwei Spielern, das Umbenennen
-des Aufbaus, das Löschen des Grundaufbaus, die elf Szenarien aus `docs/szenariodaten-grundspiel.md` §11.
+des Aufbaus, das Löschen des Grundaufbaus, die elf Szenarien aus `docs/szenariodaten-grundspiel.md` §11 (→ **M28**).
+
+---
+
+## M28 — Die elf ersten Szenarien nach dem Tableau berichtigen
+
+Entscheidung des Auftraggebers vom **2026-11-08**: die elf Szenarien, die seit M7 und
+`docs/szenariodaten-erweiterung.md` in `setups.scenario_data.bosses` stehen (Deputy Waggums,
+Virginia Fitz, The Bundits, Red Atrocious, Tilda Fields, Ernie Offal, Barry Bluff, Tartar
+Fishboy, Ms. Falls & Co., Patches, The Door Knockers), sollen so berichtigt werden, dass sie
+zeigen, was das Tableau zeigt. **Nicht Gegenstand** sind die neun, die am 2026-11-07
+dazukamen (`docs/szenariodaten-grundspiel.md`). Aufgaben `DB`–`DJ` in `docs/tasks-szenarien.md`;
+dort auch **„Wo die Spec nicht stimmt“** und **„Entscheidungen“ — vor dem Bauen lesen**.
+
+Anlass ist `docs/szenariodaten-grundspiel.md` §11: sieben von elf Einträgen mit Fehlern, vier
+ohne. **§11 ist ein Befund, keine Tatsache** — die Zahlen sind Kreuzkorrelationen, die ein
+Agent beim Erfassen der neun nebenbei erhoben hat, und geändert würden Daten, auf denen
+gespielt wird. Diese Spec **übernimmt keine Zahl aus §11**. Jede Behauptung ist am 2026-11-08
+neu gemessen (M28.1), und für jede steht eine von drei Antworten da: **bestätigt**,
+**widerlegt** (dann bleibt der Eintrag, wie er ist, und §11 bekommt eine Berichtigung) oder
+**nicht entscheidbar** (dann wird nicht geändert, und es steht unter „Offen“).
+
+**Ergebnis in sechs Sätzen.**
+
+1. Von 22 Behauptungen aus §11 sind **21 bestätigt**, **eine ist widerlegt** (Door Knockers,
+   rechter Wald: der Eintrag ist richtig), **keine ist nicht entscheidbar**; die vier Einträge
+   „ohne Befund“ haben tatsächlich keinen (M28.1).
+2. §11 hat mehr nicht gesagt oder übersehen (M28.1, Z1–Z7); drei davon zählen: der linke Zaun der Bundits braucht auch die
+   Drehung 270 (der rechte bleibt bei 90); die Wäscheleine bei Ms. Falls liegt 270 statt 90; und
+   an **18 quadratischen Plättchen** (und bei sieben weiteren vermutlich) weicht die Drehung des
+   Tableaus von den Daten ab — das ist die Klasse aus `szenariodaten-grundspiel.md` §6.7 und
+   **nicht** Teil dieser Berichtigung (M28.1, „Was §11 übersehen hat“).
+3. Geändert werden **sieben Einträge**; der Zielstand ist als Text festgelegt und mit je einem
+   Hash prüfbar (M28.2). `validateScenarioData` meldet auf dem Zielstand **0 Probleme**, 22 Läufe
+   von `build_scenario` durch die echte Maschinerie sind sauber (M28.5).
+4. **Die gespeicherten Partien werden nicht angefasst** — ein Spielstand trägt seine gelegten
+   Objekte mit eigenem Feld, eigener Drehung und eigenen Maßen und liest `scenario_data` beim
+   Laden nicht (M28.3). *Partie 14* bleibt, wie gespielt.
+5. Es wird **eine Spalte** geschrieben, mit Vorbedingung je Eintrag (Hash des heutigen Textes),
+   Rückwärtsbeweis, Vergleich-und-Tausch und einem Weg zurück (M28.6).
+6. **Ein Lauf, nicht Stücke** (M28.7).
+
+### Wie gemessen wurde — und warum man den Zahlen trauen darf
+
+Die Methode ist die aus `szenariodaten-grundspiel.md` §3 und §6 (Raster aus den gedruckten
+Linien, Umriss über das Bild, Gegenprobe an Buchstaben und Spielsteinen), **nicht** die aus
+`szenariodaten-erweiterung.md` §2 („Tiefpunktsuche mit fester Teilung 19 × 14“): eine feste
+Teilung kennt keine Perspektive, und sieben der elf Tableaus sind Fotos.
+
+1. **Bilder.** Die Rückseite jedes `Tableau: <Name>` über `https://gaming.benjathi.de/uploads/…`.
+   Sauberes Artwork (1500 × 3000) sind **Ms. Falls & Co., Patches, Tartar Fishboy, The Door
+   Knockers**; **Fotos** sind Deputy Waggums (1474 × 2918), Virginia Fitz (1396 × 2766), The
+   Bundits (1518 × 2997), Red Atrocious (1539 × 3035), Tilda Fields (1420 × 2845), Ernie Offal
+   (1687 × 3362) und Barry Bluff (1540 × 3077).
+2. **Raster.** Ein Anfangsviereck aus dem Umriss der Karte; dann je Bild die **18 senkrechten und 13
+   waagerechten Innenlinien** als dunkle dünne Linie über alle Pixel gesucht (±30 px, Neigung
+   ±0,04; Hochpass σ 1,2 − σ 7), die 234 Schnittpunkte mit RANSAC an eine Perspektive angepasst und
+   das Bild auf **19 × 14 Felder zu 64 px** entzerrt. Restfehler der Schnittpunkte: **RMS 0,9–3,7 px,
+   also 0,015–0,057 Feld**; die Ausreißer sind Linien unter Plättchen.
+3. **Eine Spalte Versatz** kennt die Linienanpassung nicht (jede Linie sieht aus wie jede). Bei
+   *Ernie Offal* lag sie um genau eine daneben — erkannt daran, dass der Kartenrand bei 0,84 statt
+   bei −0,2 Feld lag, und korrigiert. Das ist der Fehler, den die Linien allein nicht zeigen — und
+   darum folgen die nächsten zwei Proben, die von den Linien unabhängig sind.
+4. **Gegenprobe 1: Buchstaben und Zahlen.** In allen elf entzerrten Bildern stehen **A–S mittig über
+   ihren Spalten und 1–14 in ihren Zeilen** (Streifen über und neben dem Raster, alle elf angesehen).
+5. **Gegenprobe 2: die Spielsteine — unabhängig von den Linien.** Eine Schablone des T (72 px) und
+   des R (136 px) aus dem sauberen Falls-Tableau, in allen elf gesucht: **je genau fünf T und ein R**,
+   Korrelation **0,86–1,00**. Die T liegen auf **Feldmitten (größte Abweichung 0,078 Feld)**, der
+   R-Kreis auf einem **Rasterkreuz (0,062)**. Damit sind `B` und `D` aller elf Einträge *gemessen*, nicht
+   gelesen (Zeile 1–2, 23–26 der Tabelle).
+6. **Plättchen, vier Wege nebeneinander.**
+   (a) Das Asset-Foto in den vier Drehungen — im Uhrzeigersinn wie `rotate(…deg)` am Tisch, in den
+   Kasten des Eintrags eingepasst wie `object-fit: contain` — und die normierte Kreuzkorrelation
+   nach Hochpass (σ 5), mit ±3 px Spiel am Feld und ±3 Feldern Suche. *Grenze:* das Asset ist ein
+   Foto der Pappkachel, das Tableau eine Illustration; Werte unter etwa 0,2 tragen nichts.
+   (b) **Die Illustration aus einem sauberen Tableau als Vorlage.** Alle elf zeichnen dieselbe
+   Illustration; wo (a) an Foto-gegen-Illustration scheitert, trägt (b) (Maisfeld 0,67–0,91,
+   Gemüsebeet 0,63–0,74, Farmhaus 0,62–0,86, Zaun 0,53–0,71).
+   (c) **Der Kachelrahmen:** jede Platte hebt sich als Rechteck vom Boden ab; fällt der Rahmen
+   Kante für Kante auf den Kasten, ist der Bereich richtig, ragt er hinaus oder ist der Kasten zur
+   Hälfte leer, nicht.
+   (d) **Abdeckprobe:** alle Einträge eines Tableaus schwarz übermalt — was sichtbar bleibt, ist nicht
+   erfasst (so sind die vier fehlenden Plättchen bestätigt worden, und so ist sicher, dass bei den
+   anderen neun Tableaus **nichts** fehlt).
+7. **Beschriftung vor Augenmaß.** Beim Nachmessen habe ich einmal einen Ausschnitt falsch
+   beschriftet und daraus einen Fehler in §11 „gesehen“, der keiner war (der linke Zaun bei Ernie
+   steht in G, nicht in H). Gilt für jeden, der das wiederholt: Zahl vor Augenmaß, und die Achsen
+   des Ausschnitts aus demselben Raster zeichnen, das die Zahl liefert.
+
+### M28.1 — Urteil über jede Behauptung aus §11
+
+Felder sind zeilenweise gelesen, Spalte A = 0. „Asset“ ist (a), „Vorlage“ (b) aus 6. Die Spalte
+**Beleg** nennt die Stärke: **stark** (mindestens zwei Wege, Korrelation ≥ 0,4 oder Spielsteine),
+**mittel** (ein Weg ≥ 0,2), **Sicht** (die Korrelation trägt nicht; Kachelrahmen und Abdeckprobe).
+
+| # | Eintrag | Behauptung (§11) | Urteil | Eigene Messung | Beleg |
+|---|---|---|---|---|---|
+| 1 | Ernie Offal | `B` `J5:K6` → `K5:L6` | **bestätigt** | R-Kreis auf dem Kreuz K\|L × 5\|6, Mitte (10,98 \| 5,00), Abweichung 0,02, Korrelation 0,93; J5:K6 verlangte (10,0 \| 5,0) | stark |
+| 2 | Ernie Offal | `D` `N6`→`O6`, `M7`→`N7`, `K10`→`L10`; `I6`, `I7` stimmen | **bestätigt** | T-Steine bei I6 (8,50\|5,48), O6 (14,52\|5,42), I7 (8,52\|6,47), N7 (13,50\|6,48), L10 (11,50\|9,48), Korrelation 0,90–0,91; Eintrag {I6, N6, I7, M7, K10} | stark |
+| 3 | Ernie Offal | Foodtruck `I1:L3` → `I1:M3` | **bestätigt** | Asset 0,40 an I1:M3, 0,07 an I1:L3; Bildverhältnis 1,65, I1:M3 = 1,67, I1:L3 = 1,33 (19 % — die einzige Meldung von `checkScenarioAspect` für diesen Eintrag); der Rahmen ragt über L hinaus | stark |
+| 4 | Ernie Offal | Altes Fass `M3` → `N3` | **bestätigt** | Asset 0,24 an N3, 0,01 an M3; in der Abdeckprobe bleibt die Tonne sichtbar, in N3 | mittel |
+| 5 | Ernie Offal | Kochtopf `J7:K8` → `K7:L8` | **bestätigt** | Kachelrahmen des Topfes liegt Kante für Kante auf K7:L8, die Hälfte von J7:K8 ist leer (vergrößerter Ausschnitt mit den Achsen aus dem Raster); Korrelation trägt nicht (0,10 gegen 0,05: Asset = Rückseite als Foto) | Sicht |
+| 6 | Ernie Offal | rechter Zaun `N7:N10` → `O7:O10` | **bestätigt** | O7:O10 Drehung 90: Asset 0,65, Vorlage 0,71; N7:N10 höchstens 0,08 | stark |
+| 7 | Ernie Offal | Maisfeld `J11:N13` → `K11:O13` | **bestätigt** | Vorlage = Maisfeld des sauberen Tartar-Tableaus (K11:O13): in Ernie liegt die Spitze (0,69) bei **K11**; Kontrollen: Deputy L8 0,67 und Patches L9 0,91 (beide wie eingetragen), Barry (hat keins) 0,11. Die Asset-Korrelation trägt hier nichts (Muster, `szenariodaten-grundspiel.md` §6.3) | stark |
+| 8 | Ernie Offal | „Linke Hälfte stimmt“ (Gemüsebeet, Schrottkarre, linker Zaun, `D` I6/I7) | **bestätigt, mit zwei Einschränkungen** | Gemüsebeet F1:H3: Vorlage 0,63 bei F1; Schrottkarre A5:C6: Kachelrahmen; linker Zaun G7:G10: Position 0,53–0,66; D: Zeile 2. Einschränkungen: der **Zaun ist in der Drehung falsch** (Zeile 9) und die **Schrottkarre zeigt das Tableau gespiegelt** (Z3) | stark / Sicht |
+| 9 | Ernie Offal | linker Zaun: 270 statt 90 | **bestätigt** | 270: Asset 0,66, Vorlage 0,53; 90: 0,15 und 0,12 | stark |
+| 10 | Virginia Fitz | `Dichter Wald` `M10:S13` → `M9:S12` | **bestätigt** | Dichter Wald 0° an M9:S12: 0,69; an M10:S13 in allen acht Prüfungen (zwei Varianten × vier Drehungen) höchstens 0,03; der Rahmen liegt eine Zeile höher | stark |
+| 11 | Virginia Fitz | `EG5` `Q14` → `R14` (FF-Kasten) | **bestätigt** | Schablone aus dem FF-Kasten B1: Treffer B1 0,94, L3 0,88, S5 0,87, A8 0,85, **R14 0,87**, an Q14 keiner. **Das Feld steht zweimal in den Daten** (`final.terrain[4].cells` und `final.fields.EG[4]`) | stark |
+| 12 | Virginia Fitz | `Dichter Wald` `A4:G7` ist `Dichter Wald 2`; `M9:S12` ist `Dichter Wald` | **bestätigt** | A4:G7: Wald 2 **0,70**, Wald 0,03; M9:S12: Wald **0,69**, Wald 2 0,04 | stark |
+| 13 | Virginia Fitz | Schuppen `C1:E2`: 270 statt 90 | **bestätigt** | Vorlage = Tildas Schuppen (Q8:S9, Tür links = Eintrag 90), um 180° gedreht: **0,64**, ungedreht 0,25; Asset 270: 0,15 gegen 90: 0,04 (schwach); Sicht: rote Tür rechts | mittel |
+| 14 | Virginia Fitz | drei Plättchen fehlen: Dynamitbündel `H7`, TNT-Kasten `Q5`, Bärenfalle `E11` | **bestätigt** | Alle drei liegen auf dem Tableau (in der Abdeckprobe sichtbar; vergrößert neben die Asset-Fotos gelegt: H7 = Dynamitbündel, Q5 = TNT-Kasten um 90° gedreht, E11 = halb zugeschnappte Falle). `[DE S.33]` „Viktoria Spitz“ führt sieben Arten, der Eintrag legt fünf. Die Korrelation (≤ 0,15) trägt nicht: Einfeldplättchen, Illustration statt Foto | Sicht |
+| 15 | The Bundits | Farmhaus `P4:S8`: 270 statt 90 | **bestätigt** | 270: Asset 0,59, Vorlage (Patches-Farmhaus, Drehung 0, um 270°) 0,62; 90: 0,03 | stark |
+| 16 | The Bundits | Zäune `L10:L13`, `P10:P13` eine Zeile zu hoch | **bestätigt, mit einer Ergänzung** | L9:L12 Drehung 270: Asset 0,60, Vorlage 0,64 (L10:L13: 0,10 / 0,15); P9:P12 Drehung 90: 0,21 / 0,28 (P10:P13: 0,11 / 0,16); der Kachelrahmen des P-Zauns reicht von Zeile 9 bis 12, Zeile 13 ist leer. **Ergänzung:** §11 nennt die Drehung nicht — der **L-Zaun braucht 270**, der **P-Zaun bleibt 90** (270: 0,09, schwach) | stark (L) / mittel (P) |
+| 17 | The Bundits | `Miefiges Plumpsklo` fehlt (`I11:J12`) | **bestätigt** | liegt auf dem Tableau (Abdeckprobe); `[DE S.33]` „Die Karnoven“ führt sieben Arten, der Eintrag sechs | Sicht |
+| 18 | Red Atrocious | Wälder vertauscht: `P4:S10` ist `Dichter Wald 2` (Drehung 90 stimmt), `A7:D13` ist `Dichter Wald` mit 270 | **bestätigt** | P4:S10: Wald 2 / 90 **0,55**, Wald höchstens 0,03; A7:D13: Wald / 270 **0,61**, Wald 2 höchstens 0,03, Wald / 90: 0,01 | stark |
+| 19 | Barry Bluff | Trüber Fluss `L1:M12`: 270 statt 90 | **bestätigt** | 270: 0,60, 90: 0,03 | stark |
+| 20 | Ms. Falls & Co. | Farmhaus `G3:K6`: 180 fehlt | **bestätigt** | 180: Asset 0,28, Vorlage (Patches-Farmhaus um 180°) **0,79**; 0°: 0,03 | stark |
+| 21 | The Door Knockers | Farmhaus `G5:K8`: 180 fehlt | **bestätigt** | 180: Asset 0,40, Vorlage **0,86**; 0°: 0,02 | stark |
+| 22 | The Door Knockers | rechter Wald `M1:S4` „trägt `Dichter Wald 2`, ohne dass das Bild mit einer der beiden Varianten übereinstimmt (0,05) — unklar“ | **widerlegt** | `Dichter Wald 2` an M1:S4: **0,50** (Spitze 0,79 bei weniger als 0,1 Feld Versatz), `Dichter Wald`: 0,02; links A1:G4 `Dichter Wald`: 0,84. Der Kachelrahmen deckt M1:S4. **Der Eintrag ist richtig, §11 irrte** | stark |
+| 23 | Deputy Waggums | kein Befund | **bestätigt** | `B` J8:K9 und fünf `D` gemessen (Spielsteine), FF1–FF5 an O13, N4, C5, D12, R8 (Schablone 0,69–0,97); alle acht Plättchen an ihren Kästen (Vorlage/Asset 0,25–0,58, Zaun N5:Q5 schwach 0,28, Kachelrahmen deckt); Abdeckprobe: nichts übrig | stark |
+| 24 | Tilda Fields | kein Befund | **bestätigt** | `B`, `D` gemessen; sieben Plättchen an ihren Kästen; Schuppen 90: Asset 0,18 (andere ≤ 0,07), und dieselbe Illustration in Red Atrocious (ebenfalls 90) deckt sich mit Tildas zu 0,52; FF-Kasten F1:G2; Abdeckprobe: nichts übrig | stark |
+| 25 | Tartar Fishboy | kein Befund | **bestätigt** | `B`, `D` gemessen; Graben 90: 0,75 (andere ≤ 0,10); Maisfeld ist die Vorlage selbst; drei Flut in einer Reihe; Abdeckprobe: nichts übrig | stark |
+| 26 | Patches | kein Befund; „Farmhaus unverdreht“ | **bestätigt** | `B`, `D` gemessen; Farmhaus 0°: **0,66**, 180°: 0,03; Maisfeld L9 0,91; Abdeckprobe: nichts übrig | stark |
+
+**Zusammen:** 21 bestätigt (1–21), 1 widerlegt (22), 0 nicht entscheidbar; die vier „ohne Befund“
+(23–26) bestätigt. „Nicht entscheidbar“ trat bei den Behauptungen **nicht** auf, obwohl sieben der
+Tableaus Fotos sind — weil jede Behauptung etwas Großes und Sichtbares betrifft und vier Wege
+(6 a–d) auseinanderliegen. Wo die Korrelation nichts trägt (5, 14, 17 und das Maisfeld in 7), steht
+der Beleg dabei, und die Stärke ist **Sicht**, nicht Zahl.
+
+### Was §11 übersehen hat
+
+| # | Befund | Folge |
+|---|---|---|
+| **Z1** | **Ms. Falls & Co., Wäscheleine `D4:D7`: 270, nicht 90.** Die Kleidungsstücke hängen auf dem Tableau von oben nach unten *Hose, Hemd, Kleid*; das Asset in 90° zeigt sie in umgekehrter Reihenfolge, in 270° in derselben. Korrelation 270: 0,20 gegen 90: 0,03 (schwach; die Reihenfolge der Stücke entscheidet) | **in die Änderung aufgenommen**, einzeln abwählbar (`DB`, Entscheidung 4) |
+| **Z2** | **Bundits: der L-Zaun braucht 270, der P-Zaun bleibt 90** (Zeile 16). §11 nennt nur die Zeile | in der Änderung |
+| **Z3** | **Ernie, Rostige Schrottkarre `A5:C6`:** die Position stimmt, aber das Tableau zeigt den Wagen **gespiegelt** (Ladefläche links, Fahrerhaus rechts; das Asset umgekehrt). 180° ergäbe Räder oben. Die Daten kennen keine Spiegelung | **keine Änderung**, nicht darstellbar (Entscheidung 6) |
+| **Z4** | **Quadratische oder fast quadratische Plättchen zeigen auf dem Tableau eine andere Drehung als das Asset.** Von 39 geprüften Plättchen mit mindestens zwei Feldern und etwa quadratischem Bereich sind **21 sicher gedreht** (Korrelation ≥ 0,20 und mindestens 0,10 Abstand zur zweitbesten Drehung), davon **3 die Farmhäuser** aus 15, 20, 21 — bleiben **18**; bei **7 weiteren** liegt die beste Drehung ebenfalls neben dem Eintrag, aber die Korrelation ist schwach (0,11–0,19); **11** stimmen mit dem Eintrag überein. Das `Miefige Plumpsklo` liegt in **allen fünf** Tableaus, die es heute führen, um 180° (Virginia, Red, Barry, Patches, Door Knockers); die Hütte des Dorfdoktors um 90° (Virginia, Barry), 180° (Bundits) und 0° (Tilda, Red) — das Plumpsklo-Asset ist also systematisch gegen das Tableau gedreht, die Hütte liegt je Szenario anders. Liste mit Zahlen: Anhang am Ende von M28 | **nicht Teil dieser Berichtigung**, es ist die Klasse aus §6.7 (Entscheidung 5) |
+| **Z5** | **Ms. Falls & Co., `Flut / Matschpfuetze` `H8:J12`:** `checkScenarioAspect` meldet 7 % (Bereich 0,60, Bild 0,56). Der Kachelrahmen deckt H8:J12; das Asset-Foto hat einen Rand | **keine Änderung**, der Hinweis bleibt der einzige, den der Prüfer nach M28 meldet |
+| **Z6** | **Nicht entscheidbar** und nicht verändert: Ms. Falls, `Lagerfeuer` `C11:D12` (Seite und Drehung: Korrelation höchstens 0,11, vorn wie hinten); Bärenfalle bei Virginia `E11` (Seite und Drehung, wie `szenariodaten-grundspiel.md` §6.6) | Entscheidung 3 (Bärenfalle); Lagerfeuer bleibt, wie es ist |
+| **Z7** | **Die Ursache sitzt im Verfahren:** die Fehler häufen sich in den sieben Fotos (Virginia, Bundits, Red, Ernie, Barry: 5 von 7) und sind bei den vier sauberen Artworks auf drei Drehungen beschränkt (Falls: Farmhaus und Wäscheleine, Door Knockers: Farmhaus). Wer in `szenariodaten-erweiterung.md` §5.2 liest, die Waldvarianten seien „auf dem Tableaubild nicht zu unterscheiden“, und §5.5, die Drehrichtung sei „entweder symmetrisch oder am Artwork ablesbar“ — beides ist **falsch** (Zeilen 12, 18, 19 und Z1) | „Wo die Spec nicht stimmt“ in `docs/tasks-szenarien.md` |
+
+### M28.2 — Die Änderung
+
+**Ausgangsstand** (gelesen am 2026-11-08, Produktion, Aufbau `b1e10f4e-b8f2-4c2a-bb3e-54643944121b`):
+`scenario_data` **18 678 Zeichen**, sha256 beginnt mit **`2f9cf558a0f7`**, kompaktes
+`JSON.stringify` (der gespeicherte Text ist gleich dem neu serialisierten), Schlüssel in der
+Reihenfolge `gridLabel`, `bosses`, `cardZoneLabel`, `villagers`, `options`, **20** Einträge in
+`bosses`. Die Hashes der Einträge (sha256 des kompakten Textes, erste 12 Stellen) sind **dieselben
+wie am 2026-11-07** (`szenariodaten-grundspiel.md` §12) — an den elf hat seither niemand etwas
+geändert, auch M27 nicht.
+
+**Zielstand (mit Z1):** `scenario_data` **18 982 Zeichen**, sha256 beginnt mit **`5eec10582ec8`**. Er ist
+am 2026-11-08 aus einer Kopie des Ausgangsstandes erzeugt (nichts geschrieben) und gegen
+`validateScenarioData` und die echte Maschinerie geprüft (M28.5); **maßgeblich ist die Tabelle
+unten**, und ihre Hashes sind die Abnahme. Die Schlüsselreihenfolge
+innerhalb jedes Eintrags bleibt, **neue Gelände­einträge werden hinten an `terrain` angehängt** (die
+Reihenfolge der Geländekarten in der Auslage folgt der Reihenfolge der Gelände; was schon da ist,
+behält seinen Platz), Drehung steht hinter `cells`, `faceDown` hinter `rotation`.
+
+| Eintrag | Feld | alt | neu | aus Zeile |
+|---|---|---|---|---|
+| **Ernie Offal** (`f70452263c32` → **`26f455032580`**) | `fields.B` | `J5:K6` | `K5:L6` | 1 |
+| | `fields.D` | `["I6","N6","I7","M7","K10"]` | `["I6","O6","I7","N7","L10"]` | 2 |
+| | `terrain[1]` Foodtruck, `cells` | `["I1:L3"]` | `["I1:M3"]` | 3 |
+| | `terrain[2]` Altes Fass, `cells` | `["M3:M3"]` | `["N3:N3"]` | 4 |
+| | `terrain[4]` Holzzaun `{cells:["G7:G10","N7:N10"], rotation:90}` (alter Index) | **ein** Eintrag | **zwei** Einträge: `{cells:["G7:G10"], rotation:270}` und `{cells:["O7:O10"], rotation:90}` | 6, 9 |
+| | `terrain[5]` (alt) Kochtopf, `cells` (faceDown bleibt) | `["J7:K8"]` | `["K7:L8"]` | 5 |
+| | `terrain[6]` (alt) Maisfeld, `cells` | `["J11:N13"]` | `["K11:O13"]` | 7 |
+| **Virginia Fitz** (`3856872a71ea` → **`0e8f97427d33`**) | `terrain[0]`, `assetName` | `Dichter Wald` | `Dichter Wald 2` | 12 |
+| | `terrain[1]`, `cells` | `["M10:S13"]` | `["M9:S12"]` | 10 |
+| | `terrain[5]` Werkzeugschuppen, `rotation` | `90` | `270` | 13 |
+| | an `terrain` angehängt (Index 6, 7, 8) | — | `{assetName:"Auslöser", cells:["H7:H7"]}`, `{assetName:"Sprengstoff", cells:["Q5:Q5"]}`, `{assetName:"Bärenfalle / Bärenfalle (zugeschnappt)", cells:["E11:E11"]}` | 14 |
+| | `final.terrain[4]` (Grabhügel `(30)`), `cells` | `["Q14"]` | `["R14"]` | 11 |
+| | `final.fields.EG[4]` | `Q14` | `R14` | 11 |
+| **The Bundits** (`0bd09089d250` → **`909beab802e5`**) | `terrain[3]` Farmhaus, `rotation` | `90` | `270` | 15 |
+| | `terrain[5]` Holzzaun, `cells` und `rotation` | `["L10:L13"]`, `90` | `["L9:L12"]`, `270` | 16 |
+| | `terrain[6]` Holzzaun, `cells` (`rotation` bleibt 90) | `["P10:P13"]` | `["P9:P12"]` | 16 |
+| | an `terrain` angehängt (Index 7) | — | `{assetName:"Miefiges Plumpsklo", cells:["I11:J12"]}` | 17 |
+| **Red Atrocious** (`50839293ad24` → **`dfc3c087210f`**) | `terrain[3]` (`P4:S10`, `rotation:90`), `assetName` | `Dichter Wald` | `Dichter Wald 2` | 18 |
+| | `terrain[5]` (`A7:D13`), `assetName` und `rotation` | `Dichter Wald 2`, `90` | `Dichter Wald`, `270` | 18 |
+| **Barry Bluff** (`f2a12ec7c71b` → **`ebeedd302fda`**) | `terrain[0]` Trüber Fluss, `rotation` | `90` | `270` | 19 |
+| **Ms. Falls & Co.** (`84e18b1486e2` → **`80a78f3a8e4d`**) | `terrain[0]` Farmhaus, `rotation` | — | `180` | 20 |
+| | `terrain[2]` Wäscheleine, `rotation` (**Z1**, abwählbar) | `90` | `270` | Z1 |
+| **The Door Knockers** (`163ddc7225d6` → **`e7ea86b2cdb1`**) | `terrain[3]` Farmhaus, `rotation` | — | `180` | 21 |
+
+Der Text von `bosses` allein wächst von 15 263 Zeichen (sha256 beginnt mit `8c8666618388`) auf **15 567**
+(`f6c1d5f585c0`) — das ist die Zahl, die auch ein Test gegen die Fixture
+`server/test/fixtures/auslagen-kurzpartie.json` (sie hält denselben `bosses`-Text, geprüft) nachrechnen kann; die Hashes der
+*ganzen* Spalte sind Produktionswerte (die Fixture hat `options` nicht).
+
+**Unverändert bleiben** die 13 übrigen Einträge (Deputy Waggums `1fb204d54257`, Tilda Fields
+`e5a9e2eeaa7f`, Tartar Fishboy `93902e65bcb8`, Patches `931d0547a617` und die neun vom 2026-11-07),
+die Schlüssel `gridLabel`, `cardZoneLabel`, `villagers`, `options` und die Reihenfolge der
+Einträge in `bosses`. **Warum der Zaun-Eintrag bei Ernie geteilt wird:** zwei Ausrichtungen sind zwei
+Geländeeinträge (M7.1, Regel 2). Mit Z1 sind es **neun Drehungen**, die sich ändern (Virginia-Schuppen, Bundits-Farmhaus,
+Bundits-L-Zaun, Red-A7:D13, Barry-Fluss, Falls-Farmhaus, Falls-Wäscheleine, Door-Knockers-Farmhaus,
+Ernie-links) — nicht fünf, wie der Auftrag sagte; §11 selbst nennt vier, die an Red, Barry, Falls und
+Door Knockers hängen, und die Zahl fünf lässt sich nur mit Z1 herstellen.
+
+**Schreibweise der drei neuen Einfeldplättchen:** als Bereich `H7:H7` (Feldgröße, M7.1 Regel 1) wie
+bei Red Atrocious und Barry Bluff, nicht als `H7` — die Assets sind 47 × 48, 47 × 46 und 48 × 49 Punkt
+groß (TTS-Skalierung) und sollen auf dem Tisch ein Feld füllen (Entscheidung 7).
+
+### M28.3 — Was mit den gespeicherten Partien geschieht (Frage 1)
+
+**Nichts.** Belegt durch Lesen des Codes **und** der Daten, nicht durch Annahme.
+
+**Der Code.** Ein Spielstand wird in `client/src/pages/GameTable.jsx` im Effekt `loadSave`
+(Zeile ≈ 4502–4545) geladen: `applySetupScaffold(setup)` setzt **Zonen, Raster, Aktionen und
+Szenariodaten** aus der Zeile des Aufbaus — und ruft **den Executor nicht** (M22: Gerüst holen, die
+Sequenz nicht ausführen); danach `loadGameState(save.state_data, gridsForPlacement)`. Darin steht
+`placeOnGrids` (`shared/gridGeometry.js` Zeile 648): sie liest `o.gridId` und `o.cell` **am
+Objekt** und die Raster aus `grid_data` — **nicht** aus `scenario_data`. Die Szenariodaten gehen
+erst in `runSetupAction` (Zeile ≈ 4415) in den Executor ein, also wenn jemand eine Aktion auslöst.
+`build_scenario` wird beim Laden nie gerufen. Der Raumstart (`POST /api/rooms/:code/start`) baut
+frisch aus der Zeile — `game_rooms` hat heute **0** Zeilen.
+
+**Die Daten.** `save_states` hat **17** Zeilen; **8** gehören zu diesem Spiel (die anderen 9 zu zwei
+anderen Spielen, alle ohne `setup_id`), davon zeigen **5** auf den Aufbau: *Auto Save*,
+*M22-Probe Neuladen*, *Partie 13 – Kampf 1 Ende*, *Partie 13 – Endkampf, Ziehstapel leer + neu
+gemischt* und *Partie 14 – Sieg gegen Virginia Fitz*; *Partie 4*, *5* und *12* haben `setup_id`
+`NULL`. Jedes gelegte Geländeteil trägt in `state_data.tokens` `gridId`, **`cell`**, `rotation`,
+`faceDown`, `width`, `height`, `imageUrl`, `assetId` — alles, was es zum Liegen braucht, **am Objekt**.
+Gelegtes Gelände eines Eintrags, der berichtigt wird, haben:
+
+| Spielstand | `setup_id` | Eintrag | gelegt |
+|---|---|---|---|
+| *Partie 14 – Sieg gegen Virginia Fitz* | ja | Virginia Fitz | die **alten** Plätze: Wald `M10:S13`, Grabhügel `Q14`, Schuppen 90 … |
+| *Partie 5 – R2 Kampf Viktoria Spitz* | nein | Virginia Fitz | dieselben |
+| *Partie 13 – Endkampf …*, *Partie 4*, *Partie 12* | ja / nein / nein | The Bundits | Zäune `L10:L13`, `P10:P13`, Farmhaus 90 |
+
+**Was daraus folgt.**
+
+1. **Eine Berichtigung verändert keinen gespeicherten Tisch.** *Partie 14* zeigt weiter das Bild, auf
+   dem sie gespielt und gewonnen wurde. Das ist **gewollt**: ein Spielstand ist eine Aufzeichnung, und
+   eine nachträglich „richtiggerückte“ Partie wäre eine, die so nie gespielt wurde.
+2. **Wer einen Spielstand fortsetzt und danach „Kampf beginnen“ auslöst, baut den nächsten Kampf aus der
+   berichtigten Tabelle.** Das ist gewollt, und `clear_grid` räumt das alte, falsch liegende Gelände
+   ab (es sucht nach Objekten auf dem Raster, nicht nach dem Eintrag). Zu prüfen ist es in
+   `DG`: *Partie 14* laden, „Kampf beginnen“, nichts bleibt vom alten Virginia-Brett liegen.
+3. **Die Spielstände werden nicht migriert.** `state_data` zu schreiben hieße, Token einzeln anzufassen
+   (Felder, Maße, Drehung, Bild), und die Gelände­karten der Auslage mitzuziehen; für eine Aufzeichnung,
+   die niemand mehr fortführt, ist das mehr Risiko als Nutzen (Entscheidung 8). Wer *Partie 14*
+   trotzdem berichtigt sehen will, bekommt einen eigenen Auftrag.
+4. **Der Beweis steht im Schreiblauf, nicht im Vorsatz:** vor und nach dem Schreiben wird **jede Zeile
+   von `save_states` einzeln gehasht**, und die Transaktion bricht ab, wenn eine abweicht (M28.6).
+   Die Zeile *Auto Save* schreibt der Browser, sobald irgendwo ein Tisch offen ist
+   (`docs/datenzugriff.md`); „alle gleich“ ist darum nur **innerhalb** der Transaktion exakt.
+
+### M28.4 — Was „fehlen“ heißt: Plättchen dazulegen (Frage 2)
+
+Bei Virginia Fitz (drei) und The Bundits (eines) wird nichts verschoben und nichts ersetzt;
+`build_scenario` legt je Feld ein **eigenes** Objekt, ein angehängter Eintrag fügt ein Objekt
+hinzu und berührt keines der vorhandenen. „Fehlt“ heißt: die **Plättchenart** steht nicht in
+`terrain`, obwohl das Tableau sie zeigt und `[DE S.33]` sie verlangt.
+
+**Die Assets gibt es.** Alle vier sind in `table_assets` des Spiels, Typ `token`, mit Rückseitenbild,
+und in anderen Einträgen schon im Einsatz:
+
+| Asset | Maße (`width` × `height`) | Bilddatei | zeigt | schon benutzt |
+|---|---|---|---|---|
+| `Auslöser` | 47 × 46 | 472 × 464 | **das Dynamitbündel** | Handsy, Umbrello, Red Atrocious, Barry Bluff |
+| `Sprengstoff` | 47 × 48 | 472 × 476 | **den TNT-Kasten mit weißem Plunger** | dieselben |
+| `Bärenfalle / Bärenfalle (zugeschnappt)` | 48 × 49 | 484 × 492 | vorn die offene, hinten die zugeschnappte Falle | Pepin Milkfrog, Qing & Kween |
+| `Miefiges Plumpsklo` | 73 × 73 | 731 × 731 | das braune Häuschen mit Ranken | Red, Barry, Patches, Door Knockers, Virginia (`L4:M5`), Penny Pinchetti, Samuel Strawman |
+
+**Was aus der Vertauschung folgt.** `szenariodaten-grundspiel.md` §6.5 hat recht: das Asset
+**`Sprengstoff` zeigt den Kasten**, das Asset **`Auslöser` das Dynamit** — der Name sagt das
+Gegenteil dessen, was ein Leser erwartet (Sprengstoff = Dynamit, Auslöser = Zündkasten). **Der Eintrag
+nennt das Asset, dessen *Bild* auf dem Tableau steht, nicht dessen Namen:**
+
+- **`H7`** zeigt das Dynamitbündel → **`Auslöser`**;
+- **`Q5`** zeigt den TNT-Kasten (auf dem Tableau um 90° gedreht) → **`Sprengstoff`**.
+
+Wer nach dem Namen legt, vertauscht die beiden Plättchen, und **kein Prüfer merkt es** — beide Namen
+sind gültig, beide Felder auch. Darum gehört die Zuordnung als **Test** in `DB` (Zeile: an `H7` steht
+`Auslöser`, an `Q5` `Sprengstoff`), mit dem Satz „nach dem Bild, nicht nach dem Namen“ im Kommentar.
+
+**Was folgt, ohne dass es bedacht werden muss:**
+
+- Die deutsche Karte heißt `Sprengstoff & Auslöser`; kein Assetname trifft sie, `build_scenario` meldet die
+  beiden Plättchen als `note` („no terrain card … (nothing to do)“, M25.2) und legt **keine** Karte —
+  bei Red Atrocious und Barry Bluff ist es heute genauso (`szenariodaten-grundspiel.md` §9.10).
+  **Neu ist es für Virginia Fitz:** ihr Kampf-Protokoll war `ok`, es wird nach M28 `note` und nennt
+  `Dichter Wald 2`, `Auslöser`, `Sprengstoff` (Zeilen 12 und 14). Das ist kein Fehler, aber es **sieht** anders
+  aus; der Rauchtest (`scripts/auslagen-rauchtest.mjs`, `bekannt()`) lässt genau diese `note` zu.
+- Die Karte `Bärenfalle` gibt es in der Bibliothek, und der Teil vor dem Schrägstrich trifft sie: Virginias
+  Auslage bekommt **eine Karte mehr** (5 → 6; im Endkampf 6 → 7), Bundits ebenso für das Plumpsklo (6 → 7;
+  7 → 8). Die Zone fasst sie (Probelauf, M28.5).
+- **Welche Seite der Bärenfalle und welche Drehung der drei Einfeldplättchen:** das Tableau zeigt den TNT-Kasten
+  um 90° gedreht, die Falle halb zugeschnappt (Zähne links, Platte rechts — die Gestalt der Rückseite,
+  um 180° gedreht, `szenariodaten-grundspiel.md` §6.6). **Nicht entscheidbar**, welche Seite der Tisch als „scharf“ liest;
+  eingetragen wird wie bei Pepin K12 und Qing L5 **die Vorderseite ohne Drehung**, ebenso Dynamit und
+  Kasten ohne Drehung — die Klasse aus §6.7 (Entscheidung 3 und 5). Das ist ungeprüft und steht unter „Offen“.
+
+### M28.5 — Das Vokabular reicht, der Prüfer sieht es (Frage 3)
+
+**Keine Berichtigung rührt an etwas, das der Prüfer oder `build_scenario` nicht kann.** Gegen die echten
+Daten (212 Assets, 1 087 Karten, Raster `Spielfeld A–S / 1–14`, 19 × 14, Feld 50, aus der Produktion
+gelesen) geprüft **ohne etwas zu schreiben**:
+
+- **Drehungen:** 270 und 180 gibt es (`ROTATIONS = [0, 90, 180, 270]`, `rotationOf`); die neun
+  geänderten Drehungen sind siebenmal 270 und zweimal 180; 90 bleibt beim P-Zaun der Bundits und bei Ernies
+  rechtem Zaun. Die Richtung ist die des Tisches
+  (`rotate(…deg)`, im Uhrzeigersinn; bei 90/270 tauscht das Bild die Maße und passt quer in den Kasten,
+  `GameTable.jsx` Zeile ≈ 329). Alle Messungen oben sind in dieser Richtung gerechnet.
+- **Bereiche:** alle neuen Bereiche liegen im Raster (größte Spalte `S`, größte Zeile 14): `I1:M3`,
+  `K11:O13`, `O7:O10`, `M9:S12`, `L9:L12`, `P9:P12`, `I11:J12`, `K7:L8`, `R14` und `K5:L6`. **Kein Plättchen
+  reicht über den Rand** (der Prüfer meldet ein Feld außerhalb sonst als `has no field`).
+- **Geteilter Zaun:** zwei Einträge desselben Assets mit verschiedener Drehung sind erlaubt und von
+  M7.1 ausdrücklich vorgesehen; die Auslage entdoppelt nach Assetname (eine Zaunkarte).
+- **`validateScenarioData` auf dem Zielstand: 0 Probleme.**
+- **`checkScenarioAspect`** (mit den Bildmaßen der 38 Gelände-Assets): heute **2** Meldungen
+  (Ernies Foodtruck 19 %, Falls' Matschpfütze 7 %), nach M28 **1** — die Foodtruck-Meldung ist weg, weil
+  der Bereich nun 5 × 3 ist. Der Prüfer sieht von den sieben Fehlerarten nur diese **eine** (Seitenverhältnis);
+  Versatz, Drehung, Variante und fehlende Plättchen sieht er nicht. Das ist der Grund, warum §11 nötig war
+  und warum die Messwerkzeuge ins Repo gehören (`DJ`).
+- **Probelauf mit der echten Maschinerie** (`durchrechnen` aus `scripts/szenariodaten-grundspiel.mjs`:
+  Bösewicht auf die Leiste, aufdecken, `build_scenario`, `$B`, drei Dörfler, `place_card "$SHERIFF"`),
+  elf Bösewichte × Kampf und Endkampf = **22 Läufe**, mit Zielstand und, zum Vergleich, dem Ausgangsstand:
+  alle 22 laufen, die Objektzahl auf dem Raster ist in jedem gleich der erwarteten (Gelände + Endkampf-Teile +
+  Bösewicht + drei Dörfler), und das Protokoll enthält **nichts außer** den bekannten `note`
+  („Plättchen ohne Karte“) und Tildas gewolltem `$SHERIFF is not bound`. Geändert hat sich nur:
+  Virginia 10 → 13 Objekte (Kampf) und 15 → 18 (Endkampf); Bundits 11 → 12 und 12 → 13; Virginia/Bundits
+  haben je eine Auslagekarte mehr. Bei Ernie bleiben es 12 (die Zäune sind zwei Einträge statt
+  einem mit zwei Feldern — gleich viele Objekte).
+
+### M28.6 — Schreiben, ohne fremde Arbeit zu zerstören (Frage 4)
+
+Dieser Auftrag **ändert vorhandene Werte**. Die beiden Vorgänger (`szenariodaten-grundspiel.mjs`,
+`auslagen-daten.mjs`) haben nur **ergänzt**; ihr Beweis „der alte Text von `bosses` ist Präfix des
+neuen“ gilt hier nicht mehr. Was an seine Stelle tritt, ist **schärfer**, nicht lockerer.
+
+**Wer `scenario_data` sonst schreibt** (und was das für uns heißt):
+`scripts/szenariodaten-grundspiel.mjs` und `scripts/auslagen-daten.mjs` (beide mit Vergleich-und-Tausch;
+beide lassen die elf unangetastet, ein zweiter Lauf nach M28 findet „nichts zu tun“),
+`scripts/doerfler-daten.mjs` (liest und schreibt die Spalte **ohne** Vergleich, ändert aber nur
+`villagers`) — und **der Setup-Editor**: `saveSetup` in `GameTable.jsx` (Zeilen ≈ 4052 und 4059) schickt
+`scenario_data` **aus dem Zustand, den der Editor beim Öffnen geladen hat**. Eine Editor-Sitzung, die
+**vor** M28 geöffnet wurde und **nach** M28 speichert, **stellt den alten Text wieder her** — still,
+ohne Fehler. Das ist die eine Gefahr, gegen die der Vergleich-und-Tausch nicht hilft; sie wird mit einer
+Frage an den Auftraggeber („ist ein Setup-Editor offen?“) und einer Nachprüfung abgefangen (Punkt 9).
+
+**Die Absicherung, in der Reihenfolge, in der sie läuft:**
+
+1. **Sicherung ins Scratchpad, nicht ins Repo.** *Vor* dem Trockenlauf: der **rohe** Text von
+   `scenario_data` (18 678 Zeichen), seine sha256, `updated_at` der Zeile und ein Hash je Zeile von
+   `save_states` — als Datei im Scratchpad. Optional zusätzlich eine Kopie der ganzen Datenbank
+   (`db.backup()` in den Container, `docker cp` ins Scratchpad). Sie dient dem Weg zurück (Punkt 8) und
+   ist der Beleg, dass der Ausgangsstand der der Spec war. **Das Skript legt sie nicht an** (es schreibt nichts außer
+   der einen Spalte); `--write` verlangt den **Hash** dieser Sicherung als Argument und weigert sich, wenn er nicht
+   zum gelesenen Text passt — ohne Sicherung kein Schreiben.
+2. **Vorbedingung je Eintrag — kein Schalter, der sie umgeht.** Für jeden der sieben Einträge steht im
+   Skript der **Hash des heutigen Textes** (`ALT_SHA`, Tabelle M28.2) und der des Ergebnisses (`NEU_SHA`).
+   Entspricht der Eintrag in der Datenbank `ALT_SHA`: berichtigen, und das Ergebnis muss `NEU_SHA`
+   haben (sonst hat das Skript einen Fehler, kein Eintrag Schuld). Entspricht er `NEU_SHA`: schon
+   berichtigt, nichts tun. **Alles andere — jemand hat den Eintrag geändert — bricht den ganzen Lauf ab,
+   es wird nichts geschrieben**, und die Meldung nennt den Eintrag. (Das ist die Umkehrung des
+   Vorgängers: der ersetzte nie, dieser ersetzt nur *genau das*, was er erwartet.)
+3. **Der Rückwärtsbeweis** ersetzt den Präfixbeweis: im **neuen** Text wird jeder der sieben
+   berichtigten Einträge durch seinen **alten** Text ersetzt; das Ergebnis muss dem gelesenen Text
+   **Zeichen für Zeichen** entsprechen. Damit ist bewiesen, dass die 13 übrigen Einträge, jeder andere
+   Schlüssel, die Schlüsselreihenfolge und die Reihenfolge der Einträge unberührt sind. (Das setzt
+   kompaktes `JSON.stringify` voraus; der Lauf prüft es beim Lesen, wie der Vorgänger.)
+4. **`validateScenarioData` = 0 Probleme** auf dem Ergebnis, gegen die echte Assetliste und das echte Raster;
+   **22 Läufe** `durchrechnen` ohne Beanstandung; **`checkScenarioAspect`** meldet höchstens die eine
+   bekannte Meldung (Z5), nie eine neue.
+5. **Trockenlauf zuerst** (`--check`, öffnet die Datei schreibgeschützt): er druckt je Eintrag den Plan
+   als Diff (Feld, alt, neu) und alle Beweise; die Ausgabe wird **gegen die Tabelle in M28.2 gelesen**,
+   bevor `--write` läuft.
+6. **Schreiben in einer `IMMEDIATE`-Transaktion** (die Schreibsperre ist vor dem Hashen genommen), mit
+   `UPDATE setups SET scenario_data = ? WHERE id = ? AND scenario_data = <exakt der gelesene Text>`:
+   trifft er keine Zeile, hat jemand die Spalte zwischen Lesen und Schreiben geändert, und die
+   Transaktion bricht ab. **Nur diese Spalte** — nicht `zone_data`, `action_data`, `grid_data`,
+   `sequence_data`, `state_data`, `updated_at` (der Vorgänger fasst `updated_at` auch nicht an).
+7. **Fingerabdruck vorher und nachher**, in derselben Transaktion: je Tabelle ein Hash, bei `setups` ohne
+   `scenario_data`, **dazu je Zeile von `save_states` ein Hash mit Namen** — wer abweicht, wird beim
+   Namen genannt; bei jeder Abweichung Rollback. Das ist der Beweis für M28.3.
+8. **Der Weg zurück** ist Teil des Bausteins (`--zurueck <Sicherung> <db>`): derselbe Vergleich-und-Tausch
+   in die andere Richtung — der aktuelle Text muss **genau der Zielstand** sein (sonst hat jemand nach M28
+   weitergearbeitet, und es wird nichts überschrieben), dann kommt der gesicherte Text zurück. Er wird auf
+   einer Wegwerf-Datenbank **getestet**, bevor er gebraucht wird.
+9. **Kontrollausgabe, neu gelesen, nicht aus dem Plan:** Länge und Hash vorher/nachher; je Eintrag Hash alt → neu
+   und „gleich“ für die 13 übrigen; Rückwärtsbeweis; `validateScenarioData` auf der gelesenen Spalte;
+   Fingerabdruck; die Schlüssel `gridLabel`, `cardZoneLabel`, `villagers`, `options` je mit Hash vorher/nachher.
+   **Danach ein zweiter Lauf: er schreibt nichts** („schon berichtigt: 7“). Und **am Ende des Tages** noch
+   einmal `--check` — meldet er, dass etwas wieder `ALT_SHA` ist, hat ein Editor zurückgeschrieben.
+
+### M28.7 — Im Ganzen oder in Stücken (Frage 5)
+
+**Empfehlung: ein Lauf, alle sieben Einträge, in einer Transaktion.**
+
+1. **Die Einträge sind voneinander unabhängig, die Transaktion ist es nicht.** Ernie ist der schwerste Fall
+   (sieben Felder, ein Zaun wird geteilt), die Drehungen sind die leichtesten — aber kein Eintrag hängt am
+   anderen; was Ernie gelingen muss, ist dasselbe, was Barry gelingen muss. Gestaffelt gäbe es **nichts**
+   zu lernen, was die nächste Stufe sicherer macht, außer in einem Fall (siehe unten).
+2. **Ein halb berichtigter Aufbau ist schlechter als ein falscher.** Mit einer Transaktion gibt es nur
+   zwei Zustände. Stufen heißen mehrfaches Schreiben der Live-Spalte — mehrfach die Lücke, in der ein offener
+   Setup-Editor den Stand zurücksetzt (M28.6).
+3. **Die Prüfung gilt dem Ganzen.** Probelauf (22 Läufe), `validateScenarioData` und der Rückwärtsbeweis
+   laufen auf dem **Zielstand**; Stufen bräuchten jede ein eigenes Ziel, eigene Hashes, einen eigenen Beweis.
+4. **Der Weg zurück ist einer.** Eine Sicherung, ein Vergleich-und-Tausch.
+5. **Was Ernie braucht, ist kein anderer Ablauf, sondern ein Blick.** Ernie (und Virginia mit ihren
+   drei neuen Plättchen) sind die zwei Einträge, die der Auftraggeber **am Tisch** ansehen sollte
+   (`DI`, eine Prüfliste von Hand — der Browser-Bereich ist nicht angemeldet, und ein Agent trägt kein
+   Passwort ein). Das ist **nach** dem Schreiben möglich, weil der Weg zurück ein Befehl ist; es
+   braucht keine Stufe davor.
+
+**Wann stattdessen gestaffelt wird:** wenn der Auftraggeber Ernie vor dem Rest am Tisch sehen will
+(dann ist Stufe 1 *Ernie* allein, Stufe 2 die sechs übrigen — das Skript kennt dafür **keinen Schalter**; eine
+Zielliste mit nur einem Eintrag ist ein anderer Zielstand mit eigenen Hashes, kein Flag), oder wenn die
+Vorbedingung bei **einem** Eintrag scheitert (dann Abbruch, und der Auftraggeber entscheidet, ob der
+Rest ohne ihn geschrieben wird).
+
+### Bewusst nicht Teil davon
+
+- **Die neun Einträge vom 2026-11-07.** Nicht nachgemessen. Dasselbe Messgerüst liegt bereit; die Spielsteine
+  des einen Tableaus brauchen etwa eine Minute (Offen, 3).
+- **Die 18 (vermutlich 25) quadratischen Plättchen mit gedrehtem Bild** (Z4) und die Drehung der drei neuen Einfeldplättchen.
+  Das ist §6.7, eine eigene Entscheidung, und mit einer Messung, die bei der Hälfte nur 0,2–0,4 hergibt, keine,
+  die man nebenbei trifft.
+- **Eine Spiegelung** (Ernies Schrottkarre). Die Daten kennen sie nicht, und ein neues Feld dafür ist es nicht wert.
+- **Die Gelände­karten:** `Dichter Wald 2`, `Sprengstoff`, `Auslöser` haben keine; Virginia zeigt das nach M28
+  im Protokoll. Das Anlegen oder Umbenennen ist eine Entscheidung (`szenariodaten-grundspiel.md` §9.10).
+- **Die gespeicherten Partien** (M28.3) und **die Aktionen, Zonen, Raster, die Folge** — keine dieser Spalten
+  wird geschrieben.
+- **`BEW`/`LEB`, Szenarionamen und Sheriff-Karten der elf.** Nicht nachgemessen (Offen, 4).
+- **Ein Prüfer, der Bilder vergleicht.** Eine Bildprüfung im Repo ist ein eigener Auftrag; `DJ` legt nur die
+  Messwerkzeuge ab.
+
+### Abnahme
+
+1. **Zielstand:** `scenario_data` hat **18 982 Zeichen**, sha256 beginnt mit **`5eec10582ec8`**; die sieben Einträge haben
+   die Hashes aus M28.2 (`26f455032580`, `0e8f97427d33`, `909beab802e5`, `dfc3c087210f`, `ebeedd302fda`,
+   `80a78f3a8e4d`, `e7ea86b2cdb1`); die 13 übrigen **sind byteweise gleich** (Rückwärtsbeweis).
+   **Ohne Z1** (falls der Auftraggeber die Wäscheleine abwählt): **18 981 Zeichen**, sha256 beginnt mit
+   **`0fd820c8b8b8`**, der Eintrag *Ms. Falls & Co.* hat **`78204866a9de`** (656 Zeichen); alle anderen Hashes bleiben.
+2. **`validateScenarioData` auf der gelesenen Spalte: 0 Probleme.** `checkScenarioAspect`: höchstens die Meldung
+   zu `Flut / Matschpfuetze` (Z5).
+3. **22 Läufe** (elf Bösewichte × Kampf, Endkampf) mit dem **ausgelieferten** Executor und den
+   **Produktionsdaten**: sauber bis auf die bekannten `note`; die Objektzahlen wie in M28.5.
+4. **Fingerabdruck:** alle Tabellen außer `setups.scenario_data` vor und nach dem Schreiben gleich, **jede
+   Zeile von `save_states`** einzeln. *Partie 14* liegt danach unverändert da (Hash der Zeile gleich).
+5. **Zweiter Lauf schreibt nichts.** Ein Lauf mit verändertem Eintrag (Testfall) bricht ab und schreibt
+   nichts; ein Lauf nach dem Weg zurück meldet „Ausgangsstand“.
+6. **Rauchtest lesend** (`scripts/auslagen-rauchtest.mjs <db>`): wie vor M28, kein neues „ohne ok“ außer den
+   bekannten `note`.
+7. **Am Tisch (Auftraggeber, `DI`):** Ernie Offal und Virginia Fitz aufgebaut; Bösewicht und drei Dörfler
+   stehen auf den Kreuzen, die auf dem Tableau gedruckt sind; Plättchen auf ihren Platten; bei Virginia sind
+   Dynamit, Kasten und Falle da. *Partie 14* laden: das alte Bild, und „Kampf beginnen“ räumt es ab.
+8. **Tests:** `cd server && npm test` grün (Stand vorher: **1 555**; es kommen die Tests aus `DB`–`DD` dazu).
+
+### Offen und ungeprüft
+
+Vollständig; es ist mehr als die bestätigten Befunde wert.
+
+1. **Die Sichtprüfung am Tisch der Produktion.** Nicht gemacht: der Browser-Bereich ist nicht angemeldet, und
+   Anmelden ist nicht zulässig. Gemessen ist am Tableau-Bild aus der Datenbank, nicht am gedruckten Tableau
+   und nicht an den PDFs unter `Z:\Austausch\TfT\` (sie sind dieselben Fotos wie in `table_assets`, ungeprüft).
+2. **Vier der Belege sind nur Sicht** (Zeilen 5, 14, 17, Maisfeld in 7) und drei **mittel** (4, 13, 16 für den
+   P-Zaun). Wer eine Zahl will, muss das gedruckte Tableau neben den Bildschirm halten.
+3. **Die neun Einträge vom 2026-11-07** sind **nicht** nachgemessen. Es ist wahrscheinlich, dass die
+   Spielstein-Probe (fünf T und ein R) für sie dasselbe ergibt wie hier; sicher ist es nicht, und fünf von
+   neun Tableaus sind Fotos.
+4. **`BEW`/`LEB`, Szenarionamen, Sheriff-Karten der elf:** nicht neu gelesen (`szenariodaten-erweiterung.md` §7
+   hat sie gelesen und gegen `tft-regeln.md` §5.5 abgeglichen).
+5. **Bärenfalle bei Virginia `E11`:** Seite und Drehung ungeprüft (wie bei Pepin und Qing); **Dynamit und
+   Kasten ohne Drehung**, obwohl das Tableau den Kasten um 90° zeigt (§6.7).
+6. **Die 18 sicher (und 7 vermutlich) gedrehten quadratischen Plättchen** (Z4) bleiben, wie sie sind; wer sie berichtigt, braucht eine
+   Entscheidung, ob an den Daten (bis zu 25 Einträge) oder an den Assets (das Plumpsklo-Bild einmal um 180°
+   gedreht ablegen) — das zweite widerspricht „kein zweites Asset je Ausrichtung“ (M7.1).
+7. **Wäscheleine (Z1)** ist nach der Reihenfolge der Kleidungsstücke entschieden, die Korrelation (0,20 gegen
+   0,03) ist schwach. Abwählbar.
+8. **Der Zaun P9:P12 der Bundits** behält 90 mit einer schwachen Messung (0,28 gegen 0,09).
+9. **Ms. Falls, Lagerfeuer und Dorfteich** (Drehung, Seite): nicht entscheidbar bzw. quadratische Klasse.
+10. **Ob am Tisch schon eine Setup-Editor-Sitzung offen ist**, lässt sich vom Server aus nicht sehen. Es ist die einzige
+    Stelle, an der M28 still zurückgenommen werden kann (M28.6).
+11. **Das Laden eines Spielstands im Browser** wurde nicht ausgeführt (die Aussage in M28.3 stützt sich auf den
+    Code und die gelesenen Zeilen); `DG` lädt *Partie 14* über den Rauchtest, der nur sieht, was der Executor sieht.
+12. **Der Raum** (`POST /api/rooms/:code/start`) baut aus derselben Zeile; es gibt heute keinen Raum, es wurde
+    keiner gestartet.
+
+#### Anhang: gedrehte quadratische Plättchen (Z4) — 39 geprüft: 21 sicher gedreht (3 Farmhäuser), 7 unsicher, 11 wie eingetragen
+
+Nur zum Nachsehen, **keine Änderung**. „Eintrag“ ist die gespeicherte Drehung (alle 0 außer Farmhaus Bundits), „Tableau“ die beste der vier
+Drehungen gegen das Asset (Korrelation, in Klammern die zweitbeste). Sicher heißt ≥ 0,20 und ≥ 0,10 Abstand.
+
+Plumpsklo **180°**: Virginia 0,31, Red 0,29, Barry 0,24, Patches 0,41, Door Knockers 0,28 (zweitbeste ≤ 0,05).
+Hütte des Dorfdoktors: Virginia 90° 0,42, Barry 90° 0,38, Bundits 180° 0,43; **0°**: Tilda 0,22, Red 0,15.
+Wunschbrunnen 180°: Deputy 0,27, Patches 0,25. Picknick 180°: Deputy 0,39, Bundits 0,20 (Tartar 0,12, Patches 0,18 unsicher).
+Pilzwäldchen 180°: Patches 0,29 (Deputy 0,19 unsicher). Bienenstock 180°: Tilda 0,20 (Door Knockers 0,16 unsicher).
+Rangelblume: Tilda 90° 0,29, Falls 180° 0,25. Doofster-Glocke Tilda 90° 0,21. Goob's Tavern Door Knockers 270° 0,40
+(Tilda `M1:O3` 270°: 0,12 unsicher). Gemüsebeet **0°** in fünf Tableaus (0,16–0,25). Falls Dorfteich 180° (Korrelation
+0,14, aber der Steg liegt auf dem Tableau oben rechts, im Asset unten links — nach Sicht entschieden), Lagerfeuer nicht entscheidbar.

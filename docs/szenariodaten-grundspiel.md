@@ -661,6 +661,16 @@ versetzt). **Ernie Offal ist der schwerste Fall**, weil dort der Bösewicht selb
 drei Dörferfelder betroffen sind. Ob und wie das korrigiert wird, ist nicht Teil dieser
 Arbeit; die Zahlen oben reichen, es nachzuprüfen.
 
+> **Nachgemessen am 2026-11-08 (Spec M28, `docs/spec-setup-system.md`).** Jede der 22 Behauptungen in dieser Tabelle ist
+> mit eigener Messung geprüft: **21 bestätigt, eine widerlegt, keine nicht entscheidbar**; die vier Einträge „kein Befund“
+> haben tatsächlich keinen. **Widerlegt:** *The Door Knockers*, rechter Wald (`M1:S4`) — er trägt `Dichter Wald 2` und
+> stimmt mit dieser Variante zu 0,50 überein (die andere: 0,02), der Eintrag ist **richtig**; „unklar (0,05)“ war ein
+> Messfehler. **Ergänzt:** Ernies linker Zaun liegt richtig, aber falsch gedreht (270); der Bundits-L-Zaun braucht zusätzlich
+> 270, der P-Zaun bleibt 90; Virginias `EG5` steht **zweimal** in den Daten (`final.terrain` und `final.fields.EG`); die
+> Wäscheleine bei Ms. Falls liegt 270 statt 90 (nicht in dieser Tabelle). **Gemessene Zahlen, Verfahren und die Änderung:**
+> M28.1 und M28.2 — die Zahlen in dieser Tabelle sind Kreuzkorrelationen eines anderen Verfahrens und nicht dieselben.
+> Berichtigt ist hier noch nichts (Stand 2026-11-08); der Auftrag steht in `docs/tasks-szenarien.md`.
+
 ---
 
 ## 12. Schreiben, und warum ein zweiter Lauf nichts überschreibt

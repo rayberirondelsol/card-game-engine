@@ -130,6 +130,14 @@ Problem **nichts**. Werte tragen Platzhalter (`$optNachschub`, `$optMuenzen`, dr
 (`cardsInCategories`). Die Daten schreibt `scripts/auslagen-daten.mjs`, der Rauchtest lesend
 `scripts/auslagen-rauchtest.mjs` (beide im Container, siehe `docs/datenzugriff.md`).
 
+**Szenario-Berichtigung (M28):** `docs/tasks-szenarien.md` (Aufgaben `DB`–`DJ`, mit „Wo die Spec nicht stimmt“ und
+„Entscheidungen“) — sieben der elf ersten Einträge in `setups.scenario_data.bosses` stimmen an mehreren Stellen nicht mit dem
+Tableau überein (Ernie Offal: Bösewicht und drei Dörferfelder ein Feld daneben; Virginia Fitz: drei Plättchen fehlen; neun falsche
+Drehungen …). Die Spec hat jede Behauptung aus `docs/szenariodaten-grundspiel.md` §11 **neu gemessen** (21 bestätigt,
+eine widerlegt) und die Änderung als Text mit Hashes festgelegt. **Nur Daten, kein Deploy; geschrieben wird eine Spalte, eine
+Sicherung vorher ins Scratchpad.** Gespeicherte Partien werden nicht angefasst (ein Spielstand trägt seine Objekte mit eigenem
+Feld). Stand: Spec und Aufgaben geschrieben, **nichts gebaut, nichts geschrieben**.
+
 ## Produktionsdaten
 
 Wer an den echten Spieldaten arbeitet: **`docs/datenzugriff.md`** — zwei geprüfte
