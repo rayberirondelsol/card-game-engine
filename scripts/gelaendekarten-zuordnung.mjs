@@ -295,9 +295,7 @@ function argumente(argv) {
  * `deps.haken(stelle, db)`: **die eine** Stelle, an der ein Test einhängen kann — `'nach-lesen'` (zwischen Lesen und Schreiben,
  * außerhalb der Transaktion) und `'in-transaktion'` (nach dem Fingerabdruck vorher, vor dem UPDATE).
  *
- * `deps.ausgang`/`deps.ziel` (`{ laenge, sha }`): **die eine Naht für Tests.** Die Vorbedingung nennt die Produktionswerte
- * (`AUSGANG`, `ZIEL`), die Fixture hat `options` nicht und kann sie nicht erreichen; ein Test reicht hier die Werte seiner
- * Spalte herein. Die Einträge (`bosses`, 20 Hashes) prüft `plane` ohne Naht.
+ * Die Vorbedingung nennt die Produktionswerte (`AUSGANG`) — ohne Naht: die Fixture erreicht sie (Fixture → `patchScenario` → `berichtige`).
  */
 export async function main(argv, deps = {}) {
   const { pos, sicherungSha, unbekannt } = argumente(argv);
@@ -315,10 +313,7 @@ export async function main(argv, deps = {}) {
   const db = new Database(dbPath, { readonly: mode === '--check', fileMustExist: true });
   // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
   try {
-    const opts = {
-      uploadsDir: deps.uploadsDir, haken: deps.haken, sicherungSha,
-      ausgang: deps.ausgang ?? AUSGANG, ziel: deps.ziel ?? ZIEL,
-    };
+    const opts = { uploadsDir: deps.uploadsDir, haken: deps.haken, sicherungSha };
     if (mode === '--check') return trockenlauf(db, opts);
     if (mode === '--write') return schreiben(db, opts);
     return zurueck(db, a1, opts);
@@ -337,7 +332,7 @@ const kennzeichen = (t) => `${t.length} Zeichen (sha ${sha(t)})`;
  * Lesen, einordnen, prüfen, ausgeben — ohne zu schreiben. `null` heißt: beanstandet (schon ausgegeben).
  * Sonst `{ art, raw, before, next, … }`; bei `schon-da` ist nichts weiter zu tun.
  */
-function vorpruefung(db, { uploadsDir, ausgang, ziel, titel }) {
+function vorpruefung(db, { uploadsDir, titel }) {
   const complaints = [];
 
   // ── lesen: nur diese eine Spalte (und das game_id des Aufbaus), als Text ──
@@ -360,8 +355,8 @@ function vorpruefung(db, { uploadsDir, ausgang, ziel, titel }) {
   const p = plane(before);
   console.log(`Einordnung: ${p.art === 'zu-schreiben' ? 'zu schreiben' : p.art === 'schon-da' ? 'schon geschrieben' : 'ABWEICHEND'}`);
   if (p.art === 'abweichend') complaints.push(`${p.meldung} — es wird nichts überschrieben`);
-  if (p.art === 'zu-schreiben' && (raw.length !== ausgang.laenge || sha(raw) !== ausgang.sha)) {
-    complaints.push(`scenario_data hat ${kennzeichen(raw)}, erwartet ${ausgang.laenge} Zeichen (sha ${ausgang.sha}) — ein anderer Stand als der Ausgangsstand von M29.6; es wird nichts überschrieben`);
+  if (p.art === 'zu-schreiben' && (raw.length !== AUSGANG.laenge || sha(raw) !== AUSGANG.sha)) {
+    complaints.push(`scenario_data hat ${kennzeichen(raw)}, erwartet ${AUSGANG.laenge} Zeichen (sha ${AUSGANG.sha}) — ein anderer Stand als der Ausgangsstand von M29.6; es wird nichts überschrieben`);
   }
   if (complaints.length) return aus();
   if (p.art === 'schon-da') {
@@ -418,9 +413,6 @@ function vorpruefung(db, { uploadsDir, ausgang, ziel, titel }) {
 
   // ── Zielstand ──
   console.log(`Zielstand: scenario_data ${kennzeichen(neuRaw)}`);
-  if (neuRaw.length !== ziel.laenge || sha(neuRaw) !== ziel.sha) {
-    complaints.push(`der Zielstand hat ${kennzeichen(neuRaw)}, M29.6 verspricht ${ziel.laenge} Zeichen (sha ${ziel.sha}) — das Skript rechnet nicht, was es verspricht`);
-  }
   if (complaints.length) return aus();
   console.log(`${titel}: 0 Beanstandungen`);
   return { art: 'zu-schreiben', raw, before, next, neuRaw, assets, cards, grids, titel };
@@ -466,12 +458,14 @@ function schreiben(db, { sicherungSha, haken, ...opts }) {
   console.log(`  Präfixbeweis auf der gelesenen Spalte: ${beweise(before, after).some(m => /^Präfix/.test(m)) ? 'NEIN' : 'ja'}`);
   console.log(`  Rückwärtsbeweis auf der gelesenen Spalte: ${beweise(before, after).some(m => /^Rückwärts/.test(m)) ? 'NEIN' : 'ja'}`);
   console.log(`  validateScenarioData auf der gelesenen Spalte: ${validateScenarioData(after, { assets, grids, cards }).length} Probleme`);
+  const erreicht = gelesen.length === ZIEL.laenge && sha(gelesen) === ZIEL.sha;
+  console.log(`  Zielstand aus M29.6 (${ZIEL.laenge} Zeichen, sha ${ZIEL.sha}): ${erreicht ? 'erreicht' : 'NICHT erreicht'}`);
   fingerabdruckZeilen(db, t);
-  return gelesen === neuRaw ? 0 : 1;
+  return gelesen === neuRaw && erreicht ? 0 : 1;
 }
 
 /** Der Weg zurück: der aktuelle Text muss **genau der Zielstand** sein, dann kommt der gesicherte Text wieder. */
-function zurueck(db, sicherungsdatei, { haken, ausgang }) {
+function zurueck(db, sicherungsdatei, { haken }) {
   // ── die Sicherung prüfen: Hash zum Text, kompakt, und der Text ist der Ausgangsstand von M29 ──
   const s = JSON.parse(fs.readFileSync(sicherungsdatei, 'utf8'));
   if (typeof s.scenario_data !== 'string' || typeof s.sha256 !== 'string') throw new Error('die Sicherung hat nicht die Form { scenario_data, sha256, updated_at }');
@@ -479,8 +473,8 @@ function zurueck(db, sicherungsdatei, { haken, ausgang }) {
   const alt = JSON.parse(s.scenario_data);
   if (text(alt) !== s.scenario_data) { console.error('der gesicherte Text ist nicht kompaktes JSON.stringify'); return 1; }
   const plan = plane(alt);
-  if (plan.art !== 'zu-schreiben' || s.scenario_data.length !== ausgang.laenge || sha(s.scenario_data) !== ausgang.sha) {
-    console.error(`die Sicherung ist nicht der Ausgangsstand von M29 (${kennzeichen(s.scenario_data)}, erwartet ${ausgang.laenge} Zeichen, sha ${ausgang.sha}${plan.meldung ? `; ${plan.meldung}` : ''}) — dorthin gibt es keinen Weg zurück`);
+  if (plan.art !== 'zu-schreiben' || s.scenario_data.length !== AUSGANG.laenge || sha(s.scenario_data) !== AUSGANG.sha) {
+    console.error(`die Sicherung ist nicht der Ausgangsstand von M29 (${kennzeichen(s.scenario_data)}, erwartet ${AUSGANG.laenge} Zeichen, sha ${AUSGANG.sha}${plan.meldung ? `; ${plan.meldung}` : ''}) — dorthin gibt es keinen Weg zurück`);
     return 1;
   }
   const ziel = text(plan.next);

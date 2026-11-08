@@ -20,6 +20,7 @@ import {
   ZUORDNUNG, AUSGANG, ZIEL, ergaenze, plane, beweise, pruefeZiel, vergleiche,
 } from '../../scripts/gelaendekarten-zuordnung.mjs';
 import { berichtige } from '../../scripts/szenariodaten-berichtigung.mjs';
+import { patchScenario } from '../../scripts/auslagen-daten.mjs';
 import { terrainName } from '../../scripts/szenariodaten-grundspiel.mjs';
 import { validateScenarioData } from '../../shared/scenarioData.js';
 
@@ -322,11 +323,31 @@ test('DM: terrainName() aus szenariodaten-grundspiel.mjs kennt dieselben drei Pa
 
 // ── 9. Konstanten ────────────────────────────────────────────────────────────
 
-test('DM: AUSGANG und ZIEL stehen so im Baustein — M29.6 (rechnen kann sie nur die Produktion, DQ)', () => {
+test('DM: AUSGANG und ZIEL stehen so im Baustein — M29.6 — und die Fixture **rechnet** sie nach', () => {
   assert.deepEqual(AUSGANG, { laenge: 18982, sha: '5eec10582ec8' });
   assert.deepEqual(ZIEL, { laenge: 19106, sha: '914461d63f77' });
   assert.equal(ZIEL.laenge - AUSGANG.laenge, 124, 'das Fragment');
   assert.equal(text(ziel).length - text(ausgang).length, ZIEL.laenge - AUSGANG.laenge, 'auch an der Fixture');
+});
+
+// Die Spec (M29.7 Nr. 10, Entscheidung 10) nahm an, die Fixture könne den Ausgangsstand der Produktion nicht erreichen
+// (sie hat `options` nicht) und führte eine Naht ein. Sie kann: Fixture → `patchScenario` (M27 schreibt `options`) →
+// `berichtige` (M28) ist **dieselbe Kette**, mit der die Produktion dorthin kam. Das ist ein Beweis, den kein Literal ersetzt:
+// die Konstanten sind nicht aus dem Ergebnis dieses Skripts abgeleitet, und sie stimmen.
+test('DM: Fixture → M27 → M28 ergibt Zeichen für Zeichen den Ausgangsstand der Produktion, und ergaenze den Zielstand', () => {
+  const vorM28 = patchScenario(fx.scenarioBefore).next;
+  assert.equal(sha(text(vorM28)), '2f9cf558a0f7');
+  assert.equal(text(vorM28).length, 18678);
+  const voll = berichtige(vorM28).next;
+  assert.deepEqual({ laenge: text(voll).length, sha: sha(text(voll)) }, AUSGANG);
+  assert.deepEqual(Object.keys(voll), ['gridLabel', 'bosses', 'cardZoneLabel', 'villagers', 'options']);
+  // M29.6, Tabelle je Schlüssel: Zeichen und Hash.
+  const jeSchluessel = { gridLabel: [22, '29499d91a16c'], bosses: [15567, 'f6c1d5f585c0'], cardZoneLabel: [17, 'f04e85a28054'], villagers: [2895, '9d58cc5bb60a'], options: [416, '0c567cede3be'] };
+  for (const [k, [n, h]] of Object.entries(jeSchluessel)) assert.deepEqual([text(voll[k]).length, sha(text(voll[k]))], [n, h], k);
+  const z = ergaenze(voll);
+  assert.deepEqual({ laenge: text(z).length, sha: sha(text(z)) }, ZIEL);
+  assert.deepEqual(plane(voll).art, 'zu-schreiben');
+  assert.deepEqual(beweise(voll, z), []);
 });
 
 test('DM: der Prüfer des Bausteins ist validateScenarioData mit cards (eine Stelle je Regel)', () => {

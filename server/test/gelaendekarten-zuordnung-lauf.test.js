@@ -1,5 +1,5 @@
 // DN / Spec M29.7 — das Skript selbst gegen eine echte SQLite-Datei:
-// `scripts/gelaendekarten-zuordnung.mjs`, `main(argv, { Database, ausgang, ziel })`.
+// `scripts/gelaendekarten-zuordnung.mjs`, `main(argv, { Database })`.
 //
 // Run with: npm test  (node --test, keine Test-Dependency)
 //
@@ -8,10 +8,10 @@
 // (`setupDatabase` in einem Kindprozess) und den Zeilen aus dem Auszug der Produktion
 // (`fixtures/auslagen-kurzpartie.json`). Die Produktion wird von keinem Test berührt.
 //
-// Der Ausgangsstand der Fixture ist nicht der der Produktion (der hat `options` und 18 982 Zeichen); die
-// Vorbedingung nennt aber die Produktionswerte. Darum nimmt `main` ein `deps.ausgang`/`deps.ziel` — **die
-// eine Stelle**, an der ein Test die Werte der Fixture hereinreicht (Entscheidung 10). Die Einträge
-// (`bosses`, 20 Hashes) prüft das Skript ohne diese Naht, die Fixture hat sie.
+// Der Ausgangsstand ist **der der Produktion**, nicht ein Ersatz: Fixture → `patchScenario` (M27, `options`) →
+// `berichtige` (M28) ergibt 18 982 Zeichen und `5eec10582ec8` — Länge und Hash, die die Vorbedingung nennt. Die Spec
+// (M29, Entscheidung 10) nahm an, das könne nur die Produktion rechnen und führte eine Naht `deps.ausgang` ein; die
+// Messung zeigt, dass es die Fixture auch kann. Darum gibt es keine Naht: die Tests laufen gegen die echten Konstanten.
 //
 // Dieselbe Bauart wie `szenariodaten-berichtigung-lauf.test.js` (DC/DD).
 
@@ -24,6 +24,7 @@ import crypto, { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 const { main, ZUORDNUNG, AUSGANG, ZIEL, ergaenze, GAME_ID, SETUP_ID } = await import('../../scripts/gelaendekarten-zuordnung.mjs');
+const { patchScenario } = await import('../../scripts/auslagen-daten.mjs');
 const { main: main28, berichtige } = await import('../../scripts/szenariodaten-berichtigung.mjs');
 const { default: Database } = await import('better-sqlite3');
 
@@ -32,15 +33,11 @@ const { assets, cards, zones, grids, state } = fx;
 const copy = (x) => JSON.parse(JSON.stringify(x));
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
 
-// Der Ausgangsstand von M29 an der Fixture: das Ergebnis von M28. Der Zielstand: dazu die Tabelle.
-const vorM28 = fx.scenarioBefore;
+// Der Stand vor M28 (mit `options` aus M27), der Ausgangsstand von M29 (das Ergebnis von M28) und der Zielstand (dazu die Tabelle).
+const vorM28 = patchScenario(fx.scenarioBefore).next;
 const ausgangObj = berichtige(vorM28).next;
 const ausgangText = JSON.stringify(ausgangObj);
 const zielText = JSON.stringify(ergaenze(ausgangObj));
-const NAHT = {
-  ausgang: { laenge: ausgangText.length, sha: sha(ausgangText) },
-  ziel: { laenge: zielText.length, sha: sha(zielText) },
-};
 const TABELLE = JSON.stringify(ZUORDNUNG);
 
 /** Eine PNG-Datei, die nur ihren Kopf (IHDR) hat — mehr liest `pngSize` nicht. */
@@ -94,14 +91,14 @@ function frischeDatenbank({ scenario = ausgangObj, raw } = {}) {
   return { tmp, file, uploads };
 }
 
-/** `main` laufen lassen und aufschreiben, was es ausgibt. `naht: false` lässt die Vorbedingung bei den Produktionswerten. */
-async function lauf(args, { uploads, haken, naht = NAHT, run = main, Db = Database } = {}) {
+/** `main` laufen lassen und aufschreiben, was es ausgibt. */
+async function lauf(args, { uploads, haken, run = main, Db = Database } = {}) {
   const zeilen = [], fehler = [];
   const origLog = console.log, origErr = console.error;
   console.log = (...a) => zeilen.push(a.join(' '));
   console.error = (...a) => fehler.push(a.join(' '));
   try {
-    const code = await run(args, { Database: Db, uploadsDir: uploads, haken, ...(naht || {}) });
+    const code = await run(args, { Database: Db, uploadsDir: uploads, haken });
     return { code, out: [...zeilen, ...fehler].join('\n') };
   } finally {
     console.log = origLog;
@@ -153,7 +150,7 @@ test('DN: `--check` am Ausgangsstand – schreibgeschützt, „zu schreiben“, 
     assert.match(r.out, /Vorkämpfe mit note 8 → 0/);
     assert.match(r.out, /Namensnennungen 50 → 18/);
     assert.match(r.out, /Handsy\s+Kampf\s+note → ok/);
-    assert.ok(r.out.includes(`Zielstand: scenario_data ${zielText.length} Zeichen (sha ${NAHT.ziel.sha})`), r.out);
+    assert.ok(r.out.includes(`Zielstand: scenario_data ${zielText.length} Zeichen (sha ${ZIEL.sha})`), r.out);
     assert.match(r.out, /würde schreiben/);
     assert.match(r.out, /nichts geschrieben/);
     assert.deepEqual(spalten(file), vorher, '--check hat nichts geschrieben');
@@ -212,31 +209,29 @@ test('DN: `--check` an einem anderen Stand ohne Tabelle – ein Eintrag geänder
     const rawB = JSON.stringify(b);
     assert.ok(rb.out.includes(`${rawB.length} Zeichen`), rb.out);
     assert.ok(rb.out.includes(sha(rawB)), rb.out);
-    assert.ok(rb.out.includes(`${NAHT.ausgang.laenge}`) && rb.out.includes(NAHT.ausgang.sha), 'und was erwartet war');
+    assert.ok(rb.out.includes(`${AUSGANG.laenge}`) && rb.out.includes(AUSGANG.sha), 'und was erwartet war');
     assert.doesNotMatch(rb.out, /würde schreiben/);
     assert.deepEqual(spalten(dbA.file), vorherA);
     assert.deepEqual(spalten(dbB.file), vorherB);
   } finally { weg(dbA.tmp); weg(dbB.tmp); }
 });
 
-test('DN: ohne die Naht prüft `--check` gegen die Produktionswerte — die Fixture ist nicht der Ausgangsstand, also Rückgabe 1', async () => {
-  const { tmp, file, uploads } = frischeDatenbank();
-  try {
-    const r = await lauf(['--check', file], { uploads, naht: false });
-    assert.equal(r.code, 1, r.out);
-    assert.ok(r.out.includes(`${AUSGANG.laenge}`) && r.out.includes(AUSGANG.sha), r.out);
-    assert.doesNotMatch(r.out, /würde schreiben/);
-  } finally { weg(tmp); }
+test('DN: die Fixture ist der Ausgangsstand der Produktion — 18 982 Zeichen, 5eec10582ec8 — und der Zielstand der aus M29.6', () => {
+  assert.equal(sha(JSON.stringify(vorM28)), '2f9cf558a0f7', 'der Stand vor M28 (M28.2: 18 678 Zeichen)');
+  assert.equal(JSON.stringify(vorM28).length, 18678);
+  assert.deepEqual({ laenge: ausgangText.length, sha: sha(ausgangText) }, AUSGANG);
+  assert.deepEqual({ laenge: zielText.length, sha: sha(zielText) }, ZIEL);
 });
 
-test('DN: ist der Zielstand nicht der aus M29.6, bricht der Lauf ab — das Skript rechnet, was es verspricht', async () => {
-  const { tmp, file, uploads } = frischeDatenbank();
+test('DN: ein Stand ohne `options` ist **nicht** der Ausgangsstand — Rückgabe 1, Meldung mit Zeichenzahl und Hash', async () => {
+  const ohneOptions = { ...copy(ausgangObj) };
+  delete ohneOptions.options;
+  const { tmp, file, uploads } = frischeDatenbank({ scenario: ohneOptions });
   try {
     const vorher = spalten(file);
-    // Nur der Ausgang kommt aus der Naht; ZIEL bleibt bei den Produktionswerten, und die Fixture erreicht sie nicht.
-    const r = await lauf(['--check', file], { uploads, naht: { ausgang: NAHT.ausgang } });
+    const r = await lauf(['--check', file], { uploads });
     assert.equal(r.code, 1, r.out);
-    assert.ok(r.out.includes(`${ZIEL.laenge}`) && r.out.includes(ZIEL.sha), r.out);
+    assert.ok(r.out.includes(`${JSON.stringify(ohneOptions).length} Zeichen`) && r.out.includes(AUSGANG.sha), r.out);
     assert.doesNotMatch(r.out, /würde schreiben/);
     assert.deepEqual(spalten(file), vorher);
   } finally { weg(tmp); }
@@ -283,7 +278,7 @@ test('DN: ein Aufbau, der zu einem anderen Spiel gehört, wird nicht angefasst',
 });
 
 test('DN: `--json` druckt die Tabelle samt AUSGANG und ZIEL, ohne Datenbank', async () => {
-  const r = await lauf(['--json'], { naht: false });
+  const r = await lauf(['--json']);
   assert.equal(r.code, 0, r.out);
   const j = JSON.parse(r.out);
   assert.deepEqual(j.terrainCards, ZUORDNUNG);
@@ -339,11 +334,12 @@ test('DN: `--write` am Ausgangsstand schreibt genau den Zielstand und nur `scena
     assert.deepEqual(ohneScenario(nachher), ohneScenario(vorher));
     assert.equal(nachher.r.updated_at, vorher.r.updated_at, 'updated_at bleibt');
     // Kontrollausgabe, gelesen und nicht aus dem Plan.
-    assert.match(r.out, new RegExp(`geschrieben: scenario_data ${ausgangText.length} → ${zielText.length} Zeichen, sha ${NAHT.ausgang.sha} → ${NAHT.ziel.sha}`));
+    assert.match(r.out, new RegExp(`geschrieben: scenario_data ${ausgangText.length} → ${zielText.length} Zeichen, sha ${AUSGANG.sha} → ${ZIEL.sha}`));
     assert.match(r.out, /Schlüssel gridLabel\s+sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
     assert.match(r.out, /Schlüssel villagers\s+sha [0-9a-f]{12} → [0-9a-f]{12} gleich/);
     assert.match(r.out, /Schlüssel terrainCards\s+sha \(fehlt\) → aad39d745984 neu/);
     assert.equal((r.out.match(/^ {2}(?!Schlüssel|save_states)[^\n]+ sha [0-9a-f]{12} → [0-9a-f]{12} gleich$/gm) || []).length, 20, 'je Eintrag „gleich“, zwanzig');
+    assert.ok(r.out.includes(`Zielstand aus M29.6 (${ZIEL.laenge} Zeichen, sha ${ZIEL.sha}): erreicht`), r.out);
     assert.match(r.out, /Präfixbeweis auf der gelesenen Spalte: ja/);
     assert.match(r.out, /Rückwärtsbeweis auf der gelesenen Spalte: ja/);
     assert.match(r.out, /validateScenarioData auf der gelesenen Spalte: 0 Probleme/);
@@ -519,7 +515,7 @@ test('DN: `--zurueck` stellt am Zielstand den gesicherten Text wieder her – Ha
     assert.notEqual(spalten(file).r.scenario_data, ausgangText);
     const r = await lauf(['--zurueck', sicherung, file], { uploads });
     assert.equal(r.code, 0, r.out);
-    assert.equal(sha(spalten(file).r.scenario_data), NAHT.ausgang.sha);
+    assert.equal(sha(spalten(file).r.scenario_data), AUSGANG.sha);
     assert.deepEqual(spalten(file), vorher, 'wie vor dem Schreiben - Zeile für Zeile');
     assert.match(r.out, /zurückgeschrieben/);
     assert.match(r.out, /Fingerabdruck aller Tabellen .* unverändert: true/);
@@ -586,7 +582,7 @@ test('DN: nach `--write` meldet M28s `--check` weiter „7 schon berichtigt“, 
     assert.equal((await lauf(schreiben(file), { uploads })).code, 0);
     const nach = spalten(file);
 
-    const check28 = await lauf(['--check', file], { uploads, run: main28, naht: null });
+    const check28 = await lauf(['--check', file], { uploads, run: main28 });
     assert.equal(check28.code, 0, check28.out);
     assert.match(check28.out, /0 zu berichtigen, 7 schon berichtigt, 0 abweichend/);
     assert.deepEqual(spalten(file), nach);
@@ -595,14 +591,14 @@ test('DN: nach `--write` meldet M28s `--check` weiter „7 schon berichtigt“, 
     const m28 = path.join(tmp, 'm28.json');
     const text28 = JSON.stringify(vorM28);
     fs.writeFileSync(m28, JSON.stringify({ scenario_data: text28, sha256: crypto.createHash('sha256').update(text28).digest('hex'), updated_at: 'x' }));
-    const zurueck28 = await lauf(['--zurueck', m28, file], { uploads, run: main28, naht: null });
+    const zurueck28 = await lauf(['--zurueck', m28, file], { uploads, run: main28 });
     assert.equal(zurueck28.code, 1, zurueck28.out);
     assert.match(zurueck28.out, /nicht der Zielstand von M28/);
     assert.deepEqual(spalten(file), nach, 'M28 hat nichts überschrieben');
 
     // In umgekehrter Reihenfolge geht es: zuerst M29 zurück, dann M28.
     assert.equal((await lauf(['--zurueck', sicherungsdatei(tmp), file], { uploads })).code, 0);
-    const zurueck28b = await lauf(['--zurueck', m28, file], { uploads, run: main28, naht: null });
+    const zurueck28b = await lauf(['--zurueck', m28, file], { uploads, run: main28 });
     assert.equal(zurueck28b.code, 0, zurueck28b.out);
     assert.equal(spalten(file).r.scenario_data, text28);
   } finally { weg(tmp); }
