@@ -18,7 +18,13 @@
 //      nicht geprüft (`loadGameState`, `applySetupScaffold`), nur das, was der Executor
 //      daran sieht.
 //
-// Aufruf (im Backend-Container, Dateien in `/app`, siehe `docs/datenzugriff.md`):
+//   0. (M29) Die Zuordnung Plättchen → Geländekarte: die Tabelle `terrainCards` steht in den Szenariodaten
+//      (genau die drei Paare aus `gelaendekarten-zuordnung.mjs`), und `validateScenarioData` mit der Bibliothek
+//      meldet nichts. Dazu die **Sperre** in `bekannt()`: fiele die Tabelle aus, bliebe der Rauchtest sonst grün.
+//
+// Aufruf (im Backend-Container, Dateien in `/app`, siehe `docs/datenzugriff.md`; seit M29 gehören
+// `gelaendekarten-zuordnung.mjs`, `szenariodaten-berichtigung.mjs` und `szenariodaten-grundspiel.mjs` dazu — die Tabelle
+// steht **einmal** im ersten):
 //
 //   node scripts/auslagen-rauchtest.mjs /app/data/card-game-engine.db
 
@@ -26,6 +32,8 @@ import { SETUP_ID, GAME_ID, COMBINATIONS, SHERIFF_CATEGORIES, bauen, ohneIds } f
 import { executeSequenceWithLog } from '../shared/sequenceExecutor.js';
 import { seatVars } from '../shared/villagers.js';
 import { findCardByName } from '../shared/cardSearch.js';
+import { validateScenarioData } from '../shared/scenarioData.js';
+import { ZUORDNUNG } from './gelaendekarten-zuordnung.mjs';
 
 const ACTIONS = ['kampf-beginnen', 'dorfphase-beginnen', 'laden-nachfuellen'];
 const LEISTE = 'Bösewicht-Leiste';
@@ -33,7 +41,18 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Was nicht „ok" ist - ein `note` ist ein Hinweis, aber im Protokoll, und zählt hier mit. */
 const schlecht = (log) => log.filter(e => e.status !== 'ok');
-const zeile = (e) => `${e.index} ${e.type} ${e.status}: ${e.reason}`;
+
+/**
+ * M29: welche der Plättchen, die die Tabelle `terrainCards` abdeckt, ein Hinweis **namentlich** nennt (`"<Name>"` im
+ * `reason`). Der allgemeine Ausdruck in `bekannt()` lässt jedes Plättchen ohne Karte durch; für diese drei ist „ohne Karte“
+ * kein bekannter Normalfall mehr, sondern ein Zeichen, dass die Zuordnung nicht greift.
+ */
+export const wiederOhneKarte = (e) => [...(e.reason ?? '').matchAll(/"([^"]+)"/g)].map(m => m[1]).filter(n => Object.hasOwn(ZUORDNUNG, n));
+
+const zeile = (e) => {
+  const ohne = wiederOhneKarte(e);
+  return `${e.index} ${e.type} ${e.status}: ${e.reason}${ohne.length ? ` — Plättchen ${ohne.map(n => `"${n}"`).join(', ')} steht wieder ohne Karte da, obwohl die Zuordnung es abdeckt` : ''}`;
+};
 
 /**
  * Was im Protokoll eines **Kampfes** steht und **bekannt** ist - kein Fehler des Aufbaus,
@@ -47,7 +66,8 @@ const zeile = (e) => `${e.index} ${e.type} ${e.status}: ${e.reason}`;
  * - Tilda Fields' Sheriff bekommt kein benanntes Teil (`$SHERIFF is not bound`, gewollt).
  */
 export function bekannt(boss, e) {
-  if (e.type === 'build_scenario' && e.status === 'note' && /no terrain cards? in this library \(nothing to do\)/.test(e.reason ?? '')) return true;
+  // Die Sperre (M29): ein Hinweis, der eines der drei Plättchen der Tabelle nennt, ist keiner mehr.
+  if (e.type === 'build_scenario' && e.status === 'note' && /no terrain cards? in this library \(nothing to do\)/.test(e.reason ?? '')) return wiederOhneKarte(e).length === 0;
   if (boss === 'Barry Bluff' && e.status === 'skipped' && /Equal to /.test(e.reason ?? '') && ['place_asset', 'set_counter'].includes(e.type)) return true;
   if (boss === 'Tilda Fields' && e.type === 'place_card' && e.status === 'skipped' && /\$SHERIFF is not bound/.test(e.reason ?? '')) return true;
   return false;
@@ -107,6 +127,15 @@ export function rauchtest(db) {
   const env = laden(db);
   say(`Aufbau: ${env.sequence.length} Schritte, ${env.actions.length} Aktionen (${env.actions.map(a => `${a.id} ${a.steps.length}`).join(', ')}), ${env.assets.length} Assets, ${env.cards.length} Karten, ${env.zones.length} Zonen`);
   say(`  seat_villager: ${env.sequence.filter(s => s.type === 'seat_villager').length}, onlyChoice: ${env.sequence.filter(s => s.onlyChoice).length}, options: ${Object.keys(env.scenarioData.options ?? {}).join(', ')}`);
+
+  // ── 0. Die Zuordnung Plättchen → Geländekarte (M29) ──
+  say('\n0. Zuordnung Plättchen → Geländekarte: Tabelle terrainCards da, Prüfer ohne Probleme');
+  const tabelle = env.scenarioData.terrainCards;
+  const tabelleDa = same(tabelle, ZUORDNUNG);
+  const zuordnungProbleme = validateScenarioData(env.scenarioData, { assets: env.assets, grids: env.grids, cards: env.cards });
+  say(`  terrainCards: ${tabelleDa ? 'da, genau die drei Paare' : tabelle === undefined ? 'FEHLT' : 'ANDERS'}; validateScenarioData: ${zuordnungProbleme.length} Probleme`);
+  if (!tabelleDa) bad(`terrainCards ${tabelle === undefined ? 'fehlt' : `lautet anders (${JSON.stringify(tabelle)})`}, erwartet ${JSON.stringify(ZUORDNUNG)}`);
+  for (const p of zuordnungProbleme) bad(`validateScenarioData: ${p}`);
 
   // ── 1. Vier Kombinationen und die drei Aktionen ──
   say('\n1. Vier Kombinationen: Aufbau, dann Kampf beginnen → Dorfphase beginnen → Laden nachfüllen');

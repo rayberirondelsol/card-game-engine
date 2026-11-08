@@ -591,12 +591,32 @@ test('CY: trifft der UPDATE keine Zeile (die Spalten haben sich seit dem Lesen g
 
 // ── Der Rauchtest (CZ) läuft gegen dieselbe Datenbank ───────────────────────
 
-const { rauchtest } = await import('../../scripts/auslagen-rauchtest.mjs');
+const { rauchtest, bekannt } = await import('../../scripts/auslagen-rauchtest.mjs');
+const { ergaenze, ZUORDNUNG } = await import('../../scripts/gelaendekarten-zuordnung.mjs');
+const { berichtige } = await import('../../scripts/szenariodaten-berichtigung.mjs');
+
+/**
+ * M29/DO: der Rauchtest verlangt die Tabelle `terrainCards` (Abschnitt 0). `frischeDatenbank` hat sie nicht, und `--write`
+ * dieses Skripts schreibt sie nicht (es ist M27) — wer einen sauberen Rauchtest will, legt sie dazu, wie M29 es an der
+ * Produktion tut: hinten an `scenario_data`. `nachM28` berichtigt vorher die sieben Einträge, damit die Daten der
+ * Produktion nach M28 entsprechen (die Zahlen in M29.9 gelten für sie).
+ */
+function mitTabelle(file, { nachM28 = false, tabelle } = {}) {
+  const db = new Database(file);
+  const roh = db.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data;
+  let sc = JSON.parse(roh);
+  if (nachM28) sc = berichtige(sc).next;
+  sc = ergaenze(sc);
+  if (tabelle !== undefined) sc.terrainCards = tabelle;
+  db.prepare('update setups set scenario_data = ? where id = ?').run(JSON.stringify(sc), SETUP_ID);
+  db.close();
+}
 
 test('CZ: der Rauchtest findet nach dem Schreiben nichts – vier Kombinationen, 20 Bösewichte im Vor- und Endkampf', async () => {
   const { tmp, file } = frischeDatenbank();
   try {
     assert.equal((await lauf(['--write', file])).code, 0);
+    mitTabelle(file);   // M29/DO: der Rauchtest verlangt die Tabelle
     const db = new Database(file);
     // Ohne den Platzhalter-Spielstand aus der Hilfe: nur der Aufbau und seine Aktionen.
     db.prepare('delete from save_states').run();
@@ -630,6 +650,7 @@ test('CZ: der Rauchtest schlägt an – vor dem Schreiben (alte Daten) kennt der
     assert.ok(r1.problems.length > 0, 'mit den alten Daten muss der Rauchtest etwas finden');
     // Neue Daten, aber ein Spielstand, dem die Stapel fehlen (die Hilfe legt einen an).
     assert.equal((await lauf(['--write', file])).code, 0);
+    mitTabelle(file);   // M29/DO: der Rauchtest verlangt die Tabelle
     const neu = new Database(file, { readonly: true });
     const r2 = rauchtest(neu);
     neu.close();
@@ -638,6 +659,123 @@ test('CZ: der Rauchtest schlägt an – vor dem Schreiben (alte Daten) kennt der
     assert.ok(r2.problems.length >= 1, 'ein Spielstand ohne Stapel muss auffallen');
     assert.ok(r2.problems.some(p => /Partie 14: Stapel fehlen: Nachschub \(Tante Emma\), Heldentaten, Dorf-Ereignisse/.test(p)), r2.problems.join('\n'));
     assert.ok(r2.problems.every(p => /^Partie 14/.test(p)), r2.problems.join('\n'));
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ── DO / Spec M29.9: der Rauchtest und die Sperre für die drei Namen ────────
+//
+// `bekannt()` ist ein Ausdruck auf den **allgemeinen** Wortlaut („keine Karte in dieser Bibliothek“) und lässt
+// jedes Plättchen ohne Karte durch. Fiele die Tabelle aus — Daten zurückgeschrieben, Karte gelöscht, Deploy
+// zurückgenommen —, bliebe der Rauchtest grün, und die drei Namen stünden wieder in den Meldungen. Die Sperre
+// schließt das: ein Hinweis, der eines der drei Plättchen **namentlich** nennt, ist keiner mehr, und der
+// Abschnitt 0 verlangt die Tabelle.
+
+const DREI = Object.keys(ZUORDNUNG);
+const hinweis = (...namen) => ({
+  type: 'build_scenario', status: 'note',
+  reason: `${namen.length} terrain tiles on the table have no terrain card in this library (nothing to do): ${namen.map(n => `"${n}"`).join(', ')}`,
+});
+
+test('DO: die Sperre in Isolation – ein Hinweis, der eines der drei Plättchen nennt, ist nicht mehr bekannt; ein echt fehlendes bleibt es', () => {
+  assert.equal(bekannt('Virginia Fitz', hinweis('Dichter Wald 2')), false);
+  assert.equal(bekannt('Virginia Fitz', hinweis('Sprengstoff')), false);
+  assert.equal(bekannt('Virginia Fitz', hinweis('Auslöser')), false);
+  assert.equal(bekannt('Virginia Fitz', hinweis('Grabhügel / Grabhügel ausgehoben (14)')), true);
+  // Gemischt: ein einziger der drei genügt, um den Hinweis zu verwerfen.
+  assert.equal(bekannt('Virginia Fitz', hinweis('Auslöser', 'Grabhügel / Grabhügel ausgehoben (14)')), false);
+  assert.equal(bekannt('Virginia Fitz', hinweis('Grabhügel / Grabhügel ausgehoben (14)', 'Sprengstoff')), false);
+  // Der Name muss als ganzer Name dastehen: ein längerer Name, der ihn enthält, ist ein anderes Plättchen.
+  assert.equal(bekannt('Virginia Fitz', hinweis('Auslöser-Falle')), true);
+  // Der allgemeine Ausdruck ändert sich nicht: die übrigen bekannten Fälle gelten wie vorher.
+  assert.equal(bekannt('Tilda Fields', { type: 'place_card', status: 'skipped', reason: '$SHERIFF is not bound' }), true);
+  assert.equal(bekannt('Barry Bluff', { type: 'set_counter', status: 'skipped', reason: 'Equal to the highest MVMT' }), true);
+  assert.equal(bekannt('Virginia Fitz', { type: 'place_card', status: 'failed', reason: 'x' }), false);
+});
+
+test('DO: mit Tabelle (Daten wie nach M28 und M29) ist der Rauchtest sauber – Abschnitt 0 und die Zeilen aus M29.9', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    assert.equal((await lauf(['--write', file])).code, 0);
+    mitTabelle(file, { nachM28: true });
+    const db = new Database(file);
+    db.prepare('delete from save_states').run();
+    const r = rauchtest(db);
+    db.close();
+    assert.deepEqual(r.problems, [], r.out.filter(l => /!!/.test(l)).join('\n'));
+    const text = r.out.join('\n');
+    // Abschnitt 0: die Tabelle ist da, genau die drei Paare, der Prüfer meldet nichts.
+    assert.match(text, /^0\. .*Zuordnung/m);
+    assert.match(text, /^ {2}terrainCards: da, genau die drei Paare; validateScenarioData: 0 Probleme$/m);
+    // Abschnitt 1: der zweite Kampf (kurz: der Mischer zieht Virginia Fitz) hatte 1 ohne ok mit den drei Namen, jetzt 0.
+    assert.equal((text.match(/zweiter Kampf beginnen: 17 Zeilen\/0 ohne ok$/gm) || []).length, 4, 'alle vier Kombinationen');
+    // Abschnitt 2: Virginia Fitz – Vorkampf 0, Endkampf nennt nur noch die fünf Grabhügel.
+    assert.match(text, /^ {2}Virginia Fitz {5}Vorkampf: \d+ Zeilen, ohne ok: 0$/m);
+    const virginiaEnd = text.split('\n').find(l => /^ {2}Virginia Fitz {5}Endkampf: /.test(l));
+    assert.match(virginiaEnd, /ohne ok: 1 \(davon 1 bekannte Hinweise: /);
+    assert.equal((virginiaEnd.match(/Grabhügel \/ Grabhügel ausgehoben \(\d+\)/g) || []).length, 5);
+    for (const name of DREI) assert.ok(!virginiaEnd.includes(name), `${name} steht nicht mehr in den Meldungen`);
+    // Qing & Kween: beide Läufe ohne Hinweis.
+    assert.match(text, /^ {2}Qing & Kween +Vorkampf: \d+ Zeilen, ohne ok: 0$/m);
+    assert.match(text, /^ {2}Qing & Kween +Endkampf: \d+ Zeilen, ohne ok: 0;/m);
+    // Barry Bluff: 5 → 4 – die vier übrigen sind die bekannten `Equal to …`-Schritte, keine Plättchennamen mehr.
+    for (const lauf2 of ['Vorkampf', 'Endkampf']) {
+      const l = text.split('\n').find(x => new RegExp(`^ {2}Barry Bluff +${lauf2}: `).test(x));
+      assert.match(l, /ohne ok: 4 /, l);
+      for (const name of DREI) assert.ok(!l.includes(name), l);
+    }
+    // Handsy: der bestehende Ausdruck gilt weiter (mindestens ein bekannter Hinweis: die Bürger).
+    assert.match(text, /Handsy-Endkampf: \d+ Zeilen, ohne ok und unbekannt: 0, bekannte Hinweise: [1-9]\d*; Karten in der Terrain-Auslage: Einzigartige Ausrüstung$/m);
+    // Keine der Zeilen, die sich ändern, nennt noch eines der drei Plättchen.
+    for (const name of DREI) assert.ok(!text.includes(`: ${name}`) && !text.includes(`, ${name}`), `${name} steht irgendwo in der Ausgabe`);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('DO: ohne Tabelle schlägt der Rauchtest an – Abschnitt 0 und je Lauf, in dem eines der drei Plättchen ohne Karte dasteht (die Sperre)', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    assert.equal((await lauf(['--write', file])).code, 0);
+    // Daten wie nach M28, aber **ohne** die Tabelle: der Stand vor M29.
+    const db0 = new Database(file);
+    const sc = berichtige(JSON.parse(db0.prepare('select scenario_data from setups where id = ?').get(SETUP_ID).scenario_data)).next;
+    db0.prepare('update setups set scenario_data = ? where id = ?').run(JSON.stringify(sc), SETUP_ID);
+    db0.prepare('delete from save_states').run();
+    db0.close();
+    const db = new Database(file, { readonly: true });
+    const r = rauchtest(db);
+    db.close();
+    // Abschnitt 0: eine Beanstandung, die die Tabelle nennt.
+    assert.ok(r.problems.some(p => /^terrainCards fehlt/.test(p)), r.problems.join('\n'));
+    assert.match(r.out.join('\n'), /^ {2}terrainCards: FEHLT; validateScenarioData: 0 Probleme$/m);
+    // Je Lauf: die acht betroffenen Bösewichte (16 Läufe) stehen mit Namen da, und die Meldung sagt, warum das nicht mehr geht.
+    const lauf16 = r.problems.filter(p => /^(\S.*?) +(Vorkampf|Endkampf): /.test(p) && DREI.some(n => p.includes(`"${n}"`)));
+    assert.ok(lauf16.length >= 16, `${lauf16.length} Beanstandungen je Lauf\n${r.problems.join('\n')}`);
+    for (const boss of ['Virginia Fitz', 'Red Atrocious', 'Barry Bluff', 'The Door Knockers', 'Handsy', 'Lawman Dozy', 'Qing & Kween', 'Umbrello']) {
+      for (const art of ['Vorkampf', 'Endkampf']) {
+        assert.ok(lauf16.some(p => p.startsWith(boss) && p.includes(art)), `${boss} ${art}`);
+      }
+    }
+    assert.ok(lauf16.every(p => /steht wieder ohne Karte da, obwohl die Zuordnung es abdeckt/.test(p)), lauf16[0]);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('DO: eine fehlerhafte Tabelle – ein Ziel, das es nicht gibt – ist eine Beanstandung aus Abschnitt 0, mit dem Schlüssel in der Meldung', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    assert.equal((await lauf(['--write', file])).code, 0);
+    mitTabelle(file, { nachM28: true, tabelle: { ...ZUORDNUNG, Sprengstoff: 'Gibt es nicht' } });
+    const db = new Database(file);
+    db.prepare('delete from save_states').run();
+    const r = rauchtest(db);
+    db.close();
+    assert.ok(r.problems.some(p => /^validateScenarioData: .*"Sprengstoff".*Gibt es nicht/.test(p)), r.problems.join('\n'));
+    assert.ok(r.problems.some(p => /^terrainCards lautet anders/.test(p)), r.problems.join('\n'));
+    assert.match(r.out.join('\n'), /^ {2}terrainCards: ANDERS; validateScenarioData: [1-9]\d* Probleme$/m);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
