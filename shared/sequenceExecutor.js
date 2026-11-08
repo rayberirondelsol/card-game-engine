@@ -2083,14 +2083,17 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
           .filter(([key]) => !refused.has(key))
           .map(([, v]) => v);
 
-        // Der Namensvergleich ist die ganze Zuordnung - dafuer tragen die
-        // Karten seit M8.3 den Namen ihres Gelaendeteils. Kein
-        // Aehnlichkeitsrechner: einer, der "SCHROTKARRE" auf "Schrottkarre"
-        // zieht, zieht beim naechsten Deck etwas Falsches.
-        // Ein Teil mit zwei Seiten heisst `Vorderseite / Rueckseite`, die Karte
-        // traegt nur den vorderen Namen. Erst exakt vergleichen, dann gegen den
-        // Teil vor dem Schraegstrich - zwei Versuche, kein dritter und kein
-        // Aehnlichkeitsrechner.
+        // Die Zuordnung Plaettchen -> Karte hat **drei** Versuche, alle benannt, keiner gerechnet:
+        //   1. der Name des Plaettchens, exakt (norm: trim, klein) - dafuer tragen die Karten seit M8.3 den
+        //      Namen ihres Gelaendeteils;
+        //   2. bei einem zweiseitigen Teil (`Vorderseite / Rueckseite`) der Teil der Seite, auf der es liegt (M7.6);
+        //   3. eine **Tabelle**, die ein Mensch geschrieben hat: `scenario_data.terrainCards`
+        //      (`{ "<Assetname>": "<Kartenname>" }`, M29) - nur fuer Namen ohne Schraegstrich, nur wo 1 und 2 nichts finden.
+        // Kein Aehnlichkeitsrechner: einer, der "SCHROTKARRE" auf "Schrottkarre" zieht, zieht beim naechsten Deck etwas
+        // Falsches (M8.3). Die Tabelle rechnet nichts - sie ist eine geschlossene Liste von Paaren, jedes gegen das Bild
+        // geprueft (M29.1) und von `validateScenarioData` gegen die Bibliothek gehalten; ein Name, der nicht drinsteht,
+        // bleibt ohne Karte, genau wie vorher. Raten ist eine Funktion des Namens; hier entscheidet eine Zeile in den Daten.
+        // Am Tisch wird die Bibliothek nicht geprueft: eine fehlende Karte ist ein Vermerk, kein Abbruch (M8.3).
         //
         // Welcher Teil gilt, sagt die Seite, auf der das Plaettchen liegt
         // (M7.6): offen der vor dem Schraegstrich, verdeckt der dahinter. Eine
@@ -2108,10 +2111,20 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // macht moeglich, dass zwei verschieden benannte Teile auf dieselbe
         // Karte zeigen. Dieselbe Regel wie bei zwei Holzzaeunen.
         const found = [];
+        // Dritter Versuch (M29): nur ein Objekt zaehlt als Tabelle - eine Liste oder ein Text
+        // haette Schluessel `0`, `1`, ... und wuerde still etwas anderes sagen als gemeint.
+        const table = scenarioData?.terrainCards;
+        const viaTable = (name) => {
+          if (!table || typeof table !== 'object' || Array.isArray(table)) return null;
+          const key = Object.keys(table).find(k => norm(k) === norm(name));
+          const target = key === undefined ? '' : norm(table[key]);
+          return target ? cards.find(c => norm(c.name) === target) ?? null : null;
+        };
         for (const { name, down } of wanted) {
           const part = side(name, down);
           const card = cards.find(c => norm(c.name) === norm(name))
-            || (part ? cards.find(c => norm(c.name) === norm(part)) : null);
+            || (part ? cards.find(c => norm(c.name) === norm(part)) : null)
+            || (part === null ? viaTable(name) : null);
           // M25.2/CE: **das Plaettchen liegt** - nur seine Karte gibt es in
           // dieser Bibliothek nicht. Getrennt gesammelt, weil daraus kein
           // Fehlschlag wird, solange sonst nichts klemmt; der Wortlaut sagt
