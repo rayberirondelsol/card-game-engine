@@ -1889,6 +1889,8 @@ Heldentaten hängen daran.
 Die Karten sind vorhanden: Kategorie `Gelände` (20) und
 `Gelände (Üble Nachbarn)` (13).
 
+> *Hinweis 2026-11-08 (M29):* die zweite Kategorie heißt heute **`Gelände (Neue Nachbarn)`** (gemessen, 13 Karten); „Üble Nachbarn“ war der Name bis M24.1. Der Text oben bleibt, wie er war.
+
 **Warum es nicht einfach geht: die Kartennamen sind zerschossen.** Der Import
 hat den PDF-Textlayer übernommen, in dem fette und normale Schrift übereinander
 liegen. Jedes Wort steht deshalb **doppelt**, und die Buchstaben sind
@@ -6616,6 +6618,7 @@ sind gültig, beide Felder auch. Darum gehört die Zuordnung als **Test** in `DB
   **Neu ist es für Virginia Fitz:** ihr Kampf-Protokoll war `ok`, es wird nach M28 `note` und nennt
   `Dichter Wald 2`, `Auslöser`, `Sprengstoff` (Zeilen 12 und 14). Das ist kein Fehler, aber es **sieht** anders
   aus; der Rauchtest (`scripts/auslagen-rauchtest.mjs`, `bekannt()`) lässt genau diese `note` zu.
+  *(Nachtrag 2026-11-08: seit M29 behoben — die drei Plättchen finden ihre Karte, Virginias Kampf ist wieder `ok`.)*
 - Die Karte `Bärenfalle` gibt es in der Bibliothek, und der Teil vor dem Schrägstrich trifft sie: Virginias
   Auslage bekommt **eine Karte mehr** (5 → 6; im Endkampf 6 → 7), Bundits ebenso für das Plumpsklo (6 → 7;
   7 → 8). Die Zone fasst sie (Probelauf, M28.5).
@@ -6754,6 +6757,7 @@ Rest ohne ihn geschrieben wird).
 - **Eine Spiegelung** (Ernies Schrottkarre). Die Daten kennen sie nicht, und ein neues Feld dafür ist es nicht wert.
 - **Die Gelände­karten:** `Dichter Wald 2`, `Sprengstoff`, `Auslöser` haben keine; Virginia zeigt das nach M28
   im Protokoll. Das Anlegen oder Umbenennen ist eine Entscheidung (`szenariodaten-grundspiel.md` §9.10).
+  *(Nachtrag 2026-11-08: für diese drei seit M29 behoben, über die Tabelle `terrainCards`.)*
 - **Die gespeicherten Partien** (M28.3) und **die Aktionen, Zonen, Raster, die Folge** — keine dieser Spalten
   wird geschrieben.
 - **`BEW`/`LEB`, Szenarionamen und Sheriff-Karten der elf.** Nicht nachgemessen (Offen, 4).

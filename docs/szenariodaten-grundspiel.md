@@ -462,6 +462,9 @@ Karte heißt „Dichter Wald"). Dort fehlt die Wald-Karte in der Terrain-Auslage
 bei Eintrag mit zwei Wäldern (Qing) deckt die erste sie ab. Das ist dieselbe
 Klasse wie `docs/szenariodaten-erweiterung.md` §8.7, und auch hier nicht behoben.
 
+> **Nachtrag 2026-11-08: behoben mit M29.** `Dichter Wald 2` findet seine Karte jetzt über die Tabelle `terrainCards` in `scenario_data` (`docs/spec-setup-system.md`, M29): bei Handsy (5 → 7 Karten) und Lawman Dozy (6 → 7)
+> liegt die Waldkarte neu in der Terrain-Auslage, bei Qing & Kween und The Door Knockers bleibt es **eine** Waldkarte. Der Befund oben bleibt als Befund stehen.
+
 ### 6.5 Sprengstoff / Auslöser — die Assetnamen sind gegenüber der Bedeutung der Wörter vertauscht
 
 Das Asset **`Sprengstoff`** zeigt den **TNT-Kasten mit weißem Plunger**, das Asset
@@ -478,6 +481,8 @@ Bei Red Atrocious und Barry Bluff stimmt die vorhandene Belegung mit dem Artwork
 überein (Kasten in `Sprengstoff`, Dynamit in `Auslöser`). Die deutsche Geländekarte
 heißt `Sprengstoff & Auslöser` und wird, weil kein Name trifft, nie ausgelegt
 (`docs/szenariodaten-erweiterung.md` §8.7).
+
+> *Nachtrag 2026-11-08: behoben mit M29* — die Tabelle `terrainCards` ordnet beide Plättchen der Karte zu; sie wird seitdem genau einmal ausgelegt.
 
 ### 6.6 Bärenfalle
 
@@ -584,6 +589,10 @@ sicher gelesen.
     `docs/szenariodaten-erweiterung.md` §8.7–8.9: die Plättchen liegen, die Karten gibt
     es nicht oder unter anderem Namen. **Nicht behoben**, weil jede Behebung eine
     Entscheidung verlangt (Assets umbenennen oder Karten anlegen).
+
+    > **Nachtrag 2026-11-08: für drei der Plättchen behoben mit M29.** `Sprengstoff`, `Auslöser` → `Sprengstoff & Auslöser` und `Dichter Wald 2` → `Dichter Wald` über die Tabelle `terrainCards`
+    > (nicht durch Umbenennen und nicht durch neue Karten). **Bleibt unbehoben (14 Plättchenarten, acht Endkämpfe):** `Versteckter Bürger … / Große Milchkanne`, `Ritualzeichen / Weizenfeld`,
+    > `Verschlingende Welle`, dazu `Grabhügel …` (Virginia), `Die Bundo-Königin / Beruhigungs-Leckerli`, `Pile of Locals` — dort gibt es keine Karte, die man zuordnen könnte (M29.10).
 11. **`TRILLERPFEIFE` mehrdeutig** (§8): Handsy-Endkampf legt die Karte nicht.
 12. **Nicht abgebildet, weil kein Platz in den Daten:** Dozys „Schätzchen" (3 LEB je
     Dörfler, nimmt ihren Zug nach Dozy) und dass Dozy keinen Schaden nimmt, solange sie

@@ -607,6 +607,10 @@ Nicht behoben, weil jede Behebung eine Entscheidung verlangt, die der Auftrag
 nicht deckt: Assets umbenennen zöge `scenario_data` mit, Karten anzulegen hieße
 Kartendaten zu erfinden.
 
+> **Nachtrag 2026-11-08: behoben mit M29** (für die ersten beiden Zeilen der Tabelle). `Sprengstoff`/`Auslöser` und `Dichter Wald 2` finden ihre Karte über die Tabelle `terrainCards` in `scenario_data`
+> (`docs/spec-setup-system.md`, M29) — ohne Umbenennen der Assets und ohne neue Karten. „Harmlos — die Meldung ist Rauschen“ galt für `Dichter Wald 2` nur, wo ein Eintrag beide Wälder führt; bei Handsy und Lawman Dozy
+> fehlte die Waldkarte tatsächlich (`szenariodaten-grundspiel.md` §6.4). `Pile of Locals` bleibt eine echte Lücke. Der Befund bleibt als Befund stehen.
+
 ### 8.8 Geschrieben wurde nichts
 
 `setups.scenario_data` ist **unverändert**. Es gab nichts zu schreiben: die
@@ -636,6 +640,9 @@ Geprüft gegen die Produktionsdaten:
   führen zusammen **33** Karten; der Assetkategorie `Gelände` stehen **62**
   Plättchen gegenüber. **34** davon finden über die Regel aus M8.3 (Name, sonst
   der Teil vor dem Schrägstrich) **keine** Karte.
+
+  > *Hinweis 2026-11-08:* die zweite Kategorie heißt heute `Gelände (Neue Nachbarn)` (gemessen; „Üble Nachbarn“ ist der alte Name, umbenannt mit M24.1). Seit M29 finden drei dieser Plättchen
+  > (`Dichter Wald 2`, `Sprengstoff`, `Auslöser`) ihre Karte über die Tabelle `terrainCards`; der Rest dieses Absatzes gilt weiter.
 
 **Die Lücke ist eine Klasse, kein Einzelfall.** Die 34 ohne Karte sind — neben
 den drei Varianten aus 8.7 (`Dichter Wald 2`, `Holzzaun 2`, `Flut (hochkant)`)
