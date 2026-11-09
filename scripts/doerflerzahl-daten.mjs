@@ -2,7 +2,7 @@
 //
 // **Sechs Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1) und **`zonen`** (Aufgabe EU, Teil 1); die drei anderen stehen in `SCHRITTE` als `null` und melden „noch nicht gebaut“, **ohne die Datenbank
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1) und **`assets`** (Aufgabe EV, Teil 1); die zwei anderen stehen in `SCHRITTE` als `null` und melden „noch nicht gebaut“, **ohne die Datenbank
 // zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nichts.
 //
@@ -21,6 +21,17 @@
 // bis 5 steht `showWithoutAnchor: false`; `Hand Dörfler 3` wird relativ ausgedrückt (dieselbe Box). Geschrieben wird `zone_data`, sonst nichts.
 // Er setzt den **deployten** Code voraus (ein alter Client zeichnete die neuen Zonen als Geister, M31.12). Der Zielstand steht als Länge und
 // Hash in `SCHRITTE`; `patchZonen` rechnet ihn aus dem Ausgang, der Test prüft die Gleichheit.
+//
+// **`assets` (EV, M31.8 Punkt 1):** in `table_assets` kommen **acht neue Zeilen** dazu, `Marker 4|5: Leben|Bewegung|Mumm|Präzision`, je der **Klon** der Zeile
+// `Marker 3: <Wert>` — **bis auf `id` und `name` jedes Feld der Vorlage**, wie die Datenbank es liefert (`select *`): der Baustein baut die Felder **nicht** aus einer
+// eigenen Liste zusammen. Das Pflichtenheft nennt `category` und `back_image_path` als Spalten; **`category` ist keine Spalte** (`GET /table-assets` joint den Namen aus
+// `categories` über **`category_id`**), und `quantity` fehlt in seiner Liste — ein Klon aus einer festen Feldliste hätte beide stillschweigend auf den Vorgabewert gesetzt.
+// Die Ids der acht sind **Konstanten** (`ASSET_IDS`), damit der Weg zurück sie kennt. Ein Schritt, der **eine andere Tabelle** schreibt als `setups`, hat sein **eigenes**
+// Gerüst (`TABELLEN`, unten); Vorbedingung, Sicherung, Vergleich-und-Tausch, Fingerabdruck und Weg zurück sind dieselben, nur dass der Fingerabdruck `table_assets` **ohne die
+// acht Ids** hasht (die alten Zeilen dürfen sich nie ändern) und **alle** Spalten von `setups` (auch `zone_data`). **Der Weg zurück verweigert**, solange etwas auf die acht
+// verweist: ein Spielstand, ein Raum, `setups.state_data` oder der Text des Aufbaus (`Marker 4`/`Marker 5`, `ASSET_IDS`) — gelöscht, stünde dort ein Stein ohne Bild.
+// Die Sicherung ist `{ table_assets, sha256, updated_at }` mit **allen** Zeilen des Spiels als Text. Der Schritt ist vor dem Deploy unschädlich (Zeilen, die niemand liest,
+// solange keine Zone und kein Aufbau sie nennt).
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -111,7 +122,9 @@ export const SCHRITTE = {
     ausgang: { zone: { laenge: 25586, sha: 'c574e646476d' } },
     ziel: { zone: { laenge: 39886, sha: 'efe0b0743364' } },
   },
-  assets: null,
+  // `assets` (EV, M31.8 Punkt 1): eine Tabelle, keine Spalte — gezählt werden Zeilen (212 im Auszug `auslagen-kurzpartie.json`, acht dazu). Einen Hash über die Zeilen gibt es
+  // hier nicht: der Auszug trägt nicht alle Spalten (`created_at`, `source_url`, `quantity`, `category_id`), die Produktion schon; die Teil-2-Lesung nennt ihn.
+  assets: { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } },
   aktionen: null,
   optionen: null,
 };
@@ -451,14 +464,18 @@ export function beweiseWerte(before, after) {
 
 // ── Fingerabdruck ───────────────────────────────────────────────────────────
 
-/** SHA-256 je Tabelle; bei `setups` ohne die Spalten, die der Schritt ändern darf (`spalten`, z. B. `['scenario']`). */
-function fingerabdruck(db, spalten) {
+/**
+ * SHA-256 je Tabelle; bei `setups` ohne die Spalten, die der Schritt ändern darf (`spalten`, z. B. `['scenario']`). `ohneAssets` (eine Liste von Ids): bei
+ * `table_assets` ohne diese Zeilen — der Schritt `assets` fügt sie ein und löscht sie wieder, **alles andere** soll sich nie ändern.
+ */
+function fingerabdruck(db, spalten, ohneAssets = null) {
   const out = {};
   for (const { name } of db.prepare("select name from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name").all()) {
     let cols = db.prepare(`pragma table_info("${name}")`).all().map(c => c.name);
     if (name === 'setups') cols = cols.filter(c => !spalten.map(s => `${s}_data`).includes(c));
     const h = crypto.createHash('sha256');
-    for (const row of db.prepare(`select ${cols.map(c => `"${c}"`).join(', ')} from "${name}" order by rowid`).iterate()) h.update(text(row)).update('\n');
+    const ohne = name === 'table_assets' && ohneAssets?.length ? ` where id not in (${ohneAssets.map(() => '?').join(', ')})` : '';
+    for (const row of db.prepare(`select ${cols.map(c => `"${c}"`).join(', ')} from "${name}"${ohne} order by rowid`).iterate(...(ohne ? ohneAssets : []))) h.update(text(row)).update('\n');
     out[name] = h.digest('hex').slice(0, 16);
   }
   return out;
@@ -506,7 +523,7 @@ function tausche(db, { spalten, von, nach, haken }) {
 function fingerabdruckZeilen(db, t) {
   // In der Transaktion exakt: wäre etwas abgewichen, hätte `tausche` geworfen und zurückgerollt.
   console.log('  Fingerabdruck aller Tabellen (setups ohne die geschriebenen Spalten, save_states, zone_data, grid_data, state_data …), in der Transaktion vorher/nachher, unverändert: true');
-  console.log(`  Fingerabdruck nach dem Commit neu gelesen: ${text(t.vorher) === text(fingerabdruck(db, t.spalten)) ? 'gleich' : 'ABWEICHEND (ein offener Tisch kann die Zeile Auto Save schreiben — docs/datenzugriff.md)'}`);
+  console.log(`  Fingerabdruck nach dem Commit neu gelesen: ${text(t.vorher) === text(fingerabdruck(db, t.spalten, t.ohne)) ? 'gleich' : 'ABWEICHEND (ein offener Tisch kann die Zeile Auto Save schreiben — docs/datenzugriff.md)'}`);
   console.log(`  Spalten der Zeile, die nicht geschrieben wurden: ${Object.keys(t.hashes).map(k => `${k} ${t.hashes[k]}${t.hashes[k] === t.hashesNachher[k] ? '' : ` → ${t.hashesNachher[k]} GEÄNDERT`}`).join(', ')}`);
   const jetzt = saveStateHashes(db);
   for (const [id, s] of Object.entries(t.saves)) {
@@ -708,6 +725,325 @@ export function pruefeZonen(zonen) {
   return out;
 }
 
+// ── Die Assets (EV, M31.8 Punkt 1) ──────────────────────────────────────────
+
+/** Die Vorlage ist `Marker 3: <Wert>`; die neuen Plätze sind 4 und 5; die Werte sind die der Leisten (`LEISTEN`). Die Namen der Zeilen: `Marker <n>: <Wert>`. */
+const MARKER_VORLAGE = 3;
+const MARKER_NEU = [4, 5];
+const markerName = (n, w) => `Marker ${n}: ${w}`;
+/** So vergleicht `validateVillagers` (`norm` in `shared/villagers.js`): ohne Groß/Klein, ohne Leerzeichen am Rand. */
+const nameNorm = (s) => String(s ?? '').trim().toLowerCase();
+
+/** Die acht Ids (Konstanten, damit der Weg zurück sie kennt) — Name → Id, in der Reihenfolge der Zeilen: Platz 4, dann Platz 5, je die Werte der Leisten. */
+export const ASSET_IDS = {
+  'Marker 4: Leben': '0718f997-edce-41ec-8eee-11689b3b46b2',
+  'Marker 4: Bewegung': '4757a16d-a955-427f-a5a8-d74b700139e9',
+  'Marker 4: Mumm': 'b4fd2671-c30d-487d-b9f4-4d4ca8486d40',
+  'Marker 4: Präzision': '2f1ae8b8-adaf-4057-adee-d30dc70e427d',
+  'Marker 5: Leben': 'db5110c6-82fd-41f0-a718-eb02e212d1a9',
+  'Marker 5: Bewegung': '1e53fbb9-cbcc-4cdb-aced-0ec8dfbfb7e4',
+  'Marker 5: Mumm': '376eaa03-5dde-4d1f-891a-0df5c8599c4c',
+  'Marker 5: Präzision': '469380b7-3498-438c-8cc8-6993ba3729b9',
+};
+const ASSET_ID_LISTE = Object.values(ASSET_IDS);
+const NEU_ANZAHL = ASSET_ID_LISTE.length;
+
+/** Die Felder zweier Zeilen, in denen sie sich unterscheiden (ohne `ausser`): jedes Feld der Zeile zählt, nicht eine Liste, die der Baustein führt. */
+const diffFelder = (a, b, ausser) => [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => !ausser.includes(k) && text(a[k]) !== text(b[k]));
+const feldTeil = (a, b, k) => `${k} ist ${text(a[k])}, dort ${text(b[k])}`;
+
+/**
+ * Die Zeilen von `table_assets` (die des Spiels, in der Reihenfolge der Tabelle) einordnen — **eine** Frage mit drei Antworten:
+ *
+ * - `zu-schreiben`: die vier Vorlagen `Marker 3: <Wert>` sind da (**genau eine** Zeile je Name), stimmen mit `Marker 1:`/`Marker 2:` desselben Werts in jedem Feld überein
+ *   (außer `id`, `name`, `created_at`) und unter den vier Werten in jedem Feld außer dem Bild (`image_path`, `source_url`); **keiner** der acht Namen und **keine**
+ *   der acht Ids ist vergeben. Der Zielstand hängt acht Klone **hinten an**: `{ ...Vorlage, id, name }`;
+ * - `schon-da`: alle acht stehen da, jede genau der Klon (jedes Feld) mit der Id der Konstante;
+ * - `abweichend`: alles andere. **Einige da → Abbruch, kein halber Satz**; ein Name oder eine Id vergeben; eine Vorlage fehlt, doppelt oder stimmt nicht mit den anderen
+ *   überein. `probleme` nennt jede Abweichung mit Name und Feld; Zielstand gibt es keinen.
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object[]} rows  – die gelesenen Zeilen (`select *`; der Auszug der Tests trägt weniger Felder, der Klon nimmt, was da ist)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', assets?: object[], probleme?: string[] }}
+ */
+export function patchAssets(rows) {
+  if (!Array.isArray(rows) || !rows.length || !rows.every(isObject)) return { art: 'abweichend', probleme: ['table_assets ist keine nichtleere Liste von Zeilen'] };
+  const probleme = [];
+  const mitName = (name) => rows.filter(r => nameNorm(r.name) === nameNorm(name));
+
+  // ── die Vorlagen: eine Zeile je Name, und die Reihe Marker 1 bis 3 ist dieselbe Zeile ──
+  const vorlage = {};
+  for (const w of LEISTEN) {
+    const wo3 = markerName(MARKER_VORLAGE, w);
+    const hits = mitName(wo3);
+    if (hits.length !== 1) { probleme.push(`Vorlage „${wo3}“: ${hits.length} Zeilen da, erwartet genau eine`); continue; }
+    vorlage[w] = hits[0];
+    for (const n of [1, 2]) {
+      const h = mitName(markerName(n, w));
+      if (h.length !== 1) probleme.push(`„${markerName(n, w)}“: ${h.length} Zeilen da, erwartet genau eine (die Reihe Marker 1 bis 3 ist die Vorlage)`);
+      else for (const k of diffFelder(h[0], hits[0], ['id', 'name', 'created_at'])) probleme.push(`Vorlage „${wo3}“ weicht von „${markerName(n, w)}“ ab: ${feldTeil(hits[0], h[0], k)}`);
+    }
+  }
+  // ── die vier Werte untereinander: alles gleich außer dem Bild ──
+  const werte = LEISTEN.filter(w => vorlage[w]);
+  const bilder = new Map();
+  for (const w of werte) {
+    for (const k of diffFelder(vorlage[w], vorlage[werte[0]], ['id', 'name', 'image_path', 'source_url', 'created_at'])) {
+      probleme.push(`Vorlage „${markerName(MARKER_VORLAGE, w)}“ weicht von „${markerName(MARKER_VORLAGE, werte[0])}“ ab: ${feldTeil(vorlage[w], vorlage[werte[0]], k)}`);
+    }
+    const b = vorlage[w].image_path;
+    if (bilder.has(b)) probleme.push(`Vorlagen „${markerName(MARKER_VORLAGE, bilder.get(b))}“ und „${markerName(MARKER_VORLAGE, w)}“ zeigen auf dasselbe Bild (${b})`);
+    else bilder.set(b, w);
+  }
+
+  // ── die acht: keiner da, oder alle da und gleich ──
+  const soll = [];
+  for (const n of MARKER_NEU) for (const w of LEISTEN) if (vorlage[w]) { const name = markerName(n, w); soll.push({ ...vorlage[w], id: ASSET_IDS[name], name }); }
+  let da = 0;
+  for (const name of Object.keys(ASSET_IDS)) {
+    const id = ASSET_IDS[name];
+    const nameHits = mitName(name), idHits = rows.filter(r => r.id === id);
+    if (!nameHits.length && !idHits.length) continue;
+    da++;
+    if (nameHits.length !== 1 || idHits.length !== 1 || nameHits[0] !== idHits[0]) {
+      probleme.push(`„${name}“ ist vergeben (Name: ${nameHits.length} Zeilen; Id ${id}: ${idHits.length} Zeilen${idHits.length ? `, dort der Name „${idHits[0].name}“` : ''})`);
+    } else {
+      const s = soll.find(x => x.id === id);
+      if (s) for (const k of diffFelder(nameHits[0], s, [])) probleme.push(`„${name}“ weicht von der Vorlage ab: ${feldTeil(nameHits[0], s, k)}`);
+    }
+  }
+  if (da > 0 && da < NEU_ANZAHL) probleme.push(`halber Stand: ${da} von ${NEU_ANZAHL} Zeilen sind schon da — Abbruch, kein halber Satz`);
+  if (probleme.length) return { art: 'abweichend', probleme };
+  if (da === NEU_ANZAHL) return { art: 'schon-da', assets: copy(rows) };
+  return { art: 'zu-schreiben', assets: [...copy(rows), ...copy(soll)] };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und **vor** dem Schreiben: ohne die acht Zeilen (nach Id) muss der Zielstand der gelesene Text sein, Zeichen für Zeichen — das
+ * beweist, dass keine alte Zeile sich ändert und nichts verschoben wird; und die acht stehen **hinter** den alten. Verändert nichts.
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseAssets(before, after) {
+  if (!Array.isArray(after?.assets) || !Array.isArray(before?.assets)) return ['Rückwärtsbeweis table_assets: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const ids = new Set(ASSET_ID_LISTE);
+  const neu = after.assets.filter(r => ids.has(r?.id));
+  if (neu.length !== NEU_ANZAHL) meldungen.push(`Rückwärtsbeweis table_assets: der Zielstand trägt ${neu.length} der ${NEU_ANZAHL} Zeilen`);
+  const rest = text(after.assets.filter(r => !ids.has(r?.id))), alt = text(before.assets);
+  if (rest !== alt) meldungen.push(`Rückwärtsbeweis table_assets: ohne die acht Zeilen ist der Text nicht der gelesene — ${abwTeil(rest, alt)}`);
+  if (text(after.assets.slice(0, before.assets.length)) !== alt) meldungen.push('Rückwärtsbeweis table_assets: die acht Zeilen stehen nicht hinter den alten');
+  return meldungen;
+}
+
+/** Die Prüfer des Zielstands: jeder Name `Marker 1 … 5: <Wert>` genau einmal — das, was `validateVillagers` mit fünf Sitzen verlangt (`needAsset`). */
+export function pruefeAssets(rows) {
+  const out = [];
+  for (const n of [1, 2, 3, ...MARKER_NEU]) for (const w of LEISTEN) {
+    const k = rows.filter(r => nameNorm(r?.name) === nameNorm(markerName(n, w))).length;
+    if (k !== 1) out.push(`„${markerName(n, w)}“ kommt ${k} Mal vor, erwartet genau einmal`);
+  }
+  return out;
+}
+
+const leseAssets = (db) => db.prepare('select * from table_assets where game_id = ? order by rowid').all(GAME_ID);
+
+/**
+ * Was auf die acht verweist — der Weg zurück **verweigert**, solange diese Liste nicht leer ist. Gelesen wird je Zeile ein Text, nicht je Id eine Abfrage.
+ * Die Ids in `save_states.state_data`, `game_rooms.live_state_data`, `setups.state_data` (Spielstände tragen `assetId`), und in jedem Text des Aufbaus; dazu
+ * die **Namen** (`Marker 4`/`Marker 5`: die Namen `Marker 4: Leben` und `seat.markers`) in allen diesen Texten — Aufbau und Aktionen nennen ein Asset beim Namen.
+ */
+const VERWEIS_ORTE = [
+  ['save_states', 'state_data', 'name'], ['game_rooms', 'live_state_data', 'room_code'],
+  ['setups', 'state_data', 'name'], ['setups', 'sequence_data', 'name'], ['setups', 'action_data', 'name'],
+  ['setups', 'scenario_data', 'name'], ['setups', 'zone_data', 'name'], ['setups', 'grid_data', 'name'],
+];
+const NAME_MARKER = /Marker [45](?![0-9])/;
+function verweise(db) {
+  const out = [];
+  for (const [tabelle, spalte, bezeichnung] of VERWEIS_ORTE) {
+    for (const r of db.prepare(`select ${bezeichnung} as bez, "${spalte}" as t from ${tabelle}`).iterate()) {
+      if (typeof r.t !== 'string') continue;
+      const wo = `${tabelle} „${r.bez}“.${spalte}`;
+      for (const [name, id] of Object.entries(ASSET_IDS)) if (r.t.includes(id)) out.push(`${wo} nennt die Id ${id} („${name}“)`);
+      const m = NAME_MARKER.exec(r.t);
+      if (m) out.push(`${wo} nennt „${r.t.slice(Math.max(0, m.index - 20), m.index + 30).replace(/\s+/g, ' ')}“ (Marker 4/5 beim Namen)`);
+    }
+  }
+  return out;
+}
+
+/** Die Transaktion der Tabelle: Sperre, Fingerabdruck vorher, Vergleich auf den gelesenen Text, (Haken), die Änderung (`tun`), Fingerabdruck nachher. Wirft bei jeder Abweichung. */
+function tauscheAssets(db, { erwartet, haken, tun }) {
+  const tx = db.transaction(() => {
+    const vorher = fingerabdruck(db, [], ASSET_ID_LISTE);
+    const saves = saveStateHashes(db);
+    const hashes = spaltenHashes(db, []);
+    haken?.('in-transaktion', db);
+    if (text(leseAssets(db)) !== erwartet) throw new Error('table_assets hat sich seit dem Lesen geändert — nichts geschrieben');
+    tun(db);
+    const nachher = fingerabdruck(db, [], ASSET_ID_LISTE);
+    const savesNachher = saveStateHashes(db);
+    const zeilen = Object.keys({ ...saves, ...savesNachher }).filter(id => saves[id]?.sha !== savesNachher[id]?.sha)
+      .map(id => `save_states-Zeile „${(saves[id] ?? savesNachher[id]).name}“ (updated_at ${saves[id]?.updated_at} → ${savesNachher[id]?.updated_at})`);
+    const tabellen = Object.keys({ ...vorher, ...nachher }).filter(t => vorher[t] !== nachher[t]);
+    if (zeilen.length || tabellen.length) throw new Error(`unerwartet geändert: ${[...zeilen, ...tabellen].join(', ')} — Rollback`);
+    return { spalten: [], ohne: ASSET_ID_LISTE, vorher, saves, hashes, hashesNachher: spaltenHashes(db, []) };
+  });
+  return tx.immediate();
+}
+
+const zeileText = (r) => `${r.name} (Id ${r.id}) — ${r.image_path}, ${r.width}×${r.height}, ${r.type}, ${hat(r, 'category') ? `category ${text(r.category)}` : `category_id ${text(r.category_id)}`}, back_image_path ${text(r.back_image_path)}, source_url ${text(r.source_url)}, quantity ${text(r.quantity)}`;
+
+/** Lesen, einordnen, prüfen, ausgeben — ohne zu schreiben. `null` heißt: beanstandet (schon ausgegeben). */
+function vorpruefungAssets(db, { titel, schritt }) {
+  const complaints = [];
+  if (!db.prepare('select id from games where id = ?').get(GAME_ID)) { console.error(`Spiel ${GAME_ID} nicht gefunden`); return null; }
+  const rows = leseAssets(db), raw = text(rows);
+  const gesamt = db.prepare('select count(*) as n from table_assets').get().n;
+  console.log(`gelesen: table_assets ${rows.length} Zeilen des Spiels (in der Tabelle ${gesamt}), ${kennzeichen(raw)}; Marker-Zeilen ${rows.filter(r => /^Marker/.test(r.name ?? '')).length}`);
+  const aus = () => { console.log(`${titel}: ${complaints.length} Beanstandungen`); for (const c of complaints) console.log('  - ' + c); return null; };
+
+  const p = patchAssets(rows);
+  console.log(`Einordnung: ${p.art === 'zu-schreiben' ? 'zu schreiben' : p.art === 'schon-da' ? 'schon geschrieben' : 'ABWEICHEND'}`);
+  if (p.art === 'abweichend') for (const m of p.probleme) complaints.push(`${m} — es wird nichts überschrieben`);
+  if (complaints.length) return aus();
+  if (p.art === 'schon-da') {
+    console.log(`schon geschrieben: die ${NEU_ANZAHL} Marker-Zeilen für Platz 4 und 5 stehen da, jede der Klon ihrer Vorlage — nichts zu schreiben`);
+    return { art: 'schon-da', rows, raw, titel };
+  }
+  const next = p.assets;
+  console.log(`  Vorlagen und Klone (jedes Feld der Vorlage, nur id und name neu):`);
+  for (const w of LEISTEN) console.log(`    Vorlage ${zeileText(rows.find(r => nameNorm(r.name) === nameNorm(markerName(MARKER_VORLAGE, w))))}`);
+  for (const r of next.slice(rows.length)) console.log(`    neu ${zeileText(r)}`);
+  console.log(`  unberührt: die ${rows.length} vorhandenen Zeilen, jede andere Tabelle, jede Spalte von setups`);
+
+  const b = beweiseAssets({ assets: rows }, { assets: next });
+  console.log(`Rückwärtsbeweis table_assets: ${b.length ? 'NEIN' : 'ja'}`);
+  complaints.push(...b);
+  const pr = pruefeAssets(next);
+  console.log(`Marker 1 bis 5 × vier Werte, je genau eine Zeile: ${pr.length} Probleme (der Schritt liest den Aufbau nicht)`);
+  for (const m of pr) complaints.push(`Marker-Namen: ${m}`);
+
+  const { ausgang, ziel } = SCHRITTE[schritt];
+  const istAusgang = rows.length === ausgang.assets.zahl;
+  console.log(`Ausgang laut Schritt: ${istAusgang ? 'gleich' : `anders (${rows.length} Zeilen statt ${ausgang.assets.zahl})`}`);
+  console.log(`Zielstand: table_assets ${next.length} Zeilen`);
+  if (istAusgang && next.length !== ziel.assets.zahl) complaints.push(`table_assets: der gerechnete Zielstand hat ${next.length} Zeilen, die Konstante nennt ${ziel.assets.zahl}`);
+  if (complaints.length) return aus();
+  console.log(`${titel}: 0 Beanstandungen`);
+  return { art: 'zu-schreiben', rows, raw, next, istAusgang, titel };
+}
+
+function trockenlaufAssets(db, opts) {
+  const v = vorpruefungAssets(db, { ...opts, titel: 'Trockenlauf' });
+  if (!v) return 1;
+  if (v.art === 'schon-da') return 0;
+  console.log(`Hash für --sicherung-sha (über die gelesenen Zeilen): ${sicherungsHash(v.raw)}`);
+  console.log(`würde schreiben: table_assets ${v.rows.length} → ${v.next.length} Zeilen (nichts geschrieben)`);
+  return 0;
+}
+
+function schreibenAssets(db, { sicherungSha, haken, ...opts }) {
+  const v = vorpruefungAssets(db, { ...opts, titel: 'Vorprüfung' });
+  if (!v) return 1;
+  if (v.art === 'schon-da') { console.log('nichts zu schreiben'); return 0; }
+  const { rows, raw, next } = v;
+
+  if (!sicherungSha) { console.error('ohne Sicherung kein Schreiben: --sicherung-sha <Hash der gesicherten Zeilen> fehlt'); return 1; }
+  if (!/^[0-9a-f]{12,64}$/i.test(sicherungSha)) { console.error('--sicherung-sha braucht mindestens 12 Hex-Stellen'); return 1; }
+  const gelesenHash = sicherungsHash(raw);
+  if (!gelesenHash.startsWith(sicherungSha.toLowerCase())) {
+    console.error(`der Hash der Sicherung (${sicherungSha}) passt nicht zum gelesenen Text (der Hash über die gelesenen Zeilen beginnt mit ${gelesenHash.slice(0, 12)}) — die Sicherung ist nicht der Stand, der überschrieben würde`);
+    return 1;
+  }
+
+  haken?.('nach-lesen', db);
+  const neu = next.slice(rows.length);
+  const t = tauscheAssets(db, {
+    erwartet: raw, haken,
+    tun: (d) => {
+      for (const r of neu) {
+        const cols = Object.keys(r);
+        const e = d.prepare(`insert into table_assets (${cols.map(c => `"${c}"`).join(', ')}) values (${cols.map(() => '?').join(', ')})`).run(...cols.map(c => r[c]));
+        if (e.changes !== 1) throw new Error(`„${r.name}“ wurde nicht eingefügt`);
+      }
+    },
+  });
+
+  // ── Kontrollausgabe: neu gelesen, nicht aus dem Plan ──
+  const jetzt = leseAssets(db);
+  console.log(`geschrieben: table_assets ${rows.length} → ${jetzt.length} Zeilen`);
+  const alteGleich = text(jetzt.slice(0, rows.length)) === raw;
+  console.log(`  die ${rows.length} alten Zeilen: ${alteGleich ? 'Zeichen für Zeichen gleich' : 'ABWEICHEND'}`);
+  for (const r of jetzt.slice(rows.length)) console.log(`  neu ${zeileText(r)}`);
+  const gleichNext = text(jetzt) === text(next);
+  console.log(`  die gelesenen Zeilen gleich dem Zielstand: ${gleichNext ? 'ja' : 'NEIN'}`);
+  const bw = beweiseAssets({ assets: rows }, { assets: jetzt });
+  console.log(`  Rückwärtsbeweis table_assets auf den gelesenen Zeilen: ${bw.length ? 'NEIN' : 'ja'}`);
+  const pr = pruefeAssets(jetzt);
+  console.log(`  Marker-Namen auf den gelesenen Zeilen: ${pr.length} Probleme`);
+  const { ziel } = SCHRITTE.assets;
+  const gleichZiel = jetzt.length === ziel.assets.zahl;
+  console.log(v.istAusgang ? `  Zielstand aus den Konstanten (table_assets ${ziel.assets.zahl} Zeilen): ${gleichZiel ? 'erreicht' : 'NICHT erreicht'}` : '  Zielstand: nicht mit den Konstanten vergleichbar (der Ausgang war ein anderer)');
+  fingerabdruckZeilen(db, t);
+  return alteGleich && gleichNext && !bw.length && !pr.length && (!v.istAusgang || gleichZiel) ? 0 : 1;
+}
+
+/** Der Weg zurück: genau die acht Ids löschen — und **verweigern**, wenn etwas auf sie verweist (`verweise`). */
+function zurueckAssets(db, sicherungsdatei, { haken }) {
+  const s = JSON.parse(fs.readFileSync(sicherungsdatei, 'utf8'));
+  if (typeof s?.table_assets !== 'string' || typeof s.sha256 !== 'string') throw new Error('die Sicherung hat nicht die Form { table_assets, sha256, updated_at }');
+  const hashGesichert = sicherungsHash(s.table_assets);
+  if (hashGesichert !== s.sha256) {
+    console.error(`Hash der Sicherung passt nicht zu ihrem Text (${hashGesichert.slice(0, 12)} gegen ${s.sha256.slice(0, 12)}) — die Datei ist beschädigt`);
+    return 1;
+  }
+  const alt = JSON.parse(s.table_assets);
+  if (text(alt) !== s.table_assets) { console.error('der gesicherte Text ist nicht kompaktes JSON.stringify'); return 1; }
+  if (!db.prepare('select id from games where id = ?').get(GAME_ID)) { console.error(`Spiel ${GAME_ID} nicht gefunden`); return 1; }
+
+  const plan = patchAssets(alt);
+  if (plan.art !== 'zu-schreiben') {
+    console.error(`die Sicherung ist nicht der Ausgangsstand dieses Schrittes (${plan.art === 'schon-da' ? 'sie ist schon der Zielstand' : plan.probleme.join('; ')}) — dorthin gibt es keinen Weg zurück`);
+    return 1;
+  }
+  const soll = plan.assets.slice(alt.length);
+  const rows = leseAssets(db);
+  const ids = new Set(ASSET_ID_LISTE);
+  const da = rows.filter(r => ids.has(r.id));
+  console.log(`gelesen: table_assets ${rows.length} Zeilen, davon ${da.length} der ${NEU_ANZAHL} neuen; Sicherung ${alt.length} Zeilen (${kennzeichen(s.table_assets)})`);
+  if (da.length === 0) { console.log('schon zurück — keine der acht Ids ist da, nichts zu tun'); return 0; }
+  if (da.length < NEU_ANZAHL) { console.error(`halber Stand: ${da.length} von ${NEU_ANZAHL} Zeilen sind da — es wird nichts gelöscht`); return 1; }
+  for (const x of soll) {
+    const k = diffFelder(da.find(r => r.id === x.id), x, []);
+    if (k.length) { console.error(`„${x.name}“ ist seit dem Schreiben verändert (${k.join(', ')}) — jemand hat danach weitergearbeitet; es wird nichts gelöscht`); return 1; }
+  }
+  const refusal = (v) => `Weg zurück verweigert: ${v.join('; ')} — gelöscht, stünde dort ein Stein ohne Bild; nichts gelöscht`;
+  const v0 = verweise(db);
+  if (v0.length) { console.error(refusal(v0)); return 1; }
+
+  haken?.('nach-lesen', db);
+  const t = tauscheAssets(db, {
+    erwartet: text(rows), haken,
+    tun: (d) => {
+      const v = verweise(d);                                   // unter der Schreibsperre noch einmal: ein offener Tisch schreibt `Auto Save`
+      if (v.length) throw new Error(refusal(v));
+      for (const id of ASSET_ID_LISTE) if (d.prepare('delete from table_assets where id = ? and game_id = ?').run(id, GAME_ID).changes !== 1) throw new Error(`Id ${id} wurde nicht gelöscht`);
+    },
+  });
+
+  const jetzt = leseAssets(db);
+  const gleich = text(jetzt) === s.table_assets;
+  console.log(`zurückgeschrieben: table_assets ${rows.length} → ${jetzt.length} Zeilen${gleich ? ' (= die Sicherung, Zeichen für Zeichen)' : ' (weicht von der Sicherung ab: Zeilen, die seither dazukamen oder sich änderten, wurden nicht angefasst)'}`);
+  fingerabdruckZeilen(db, t);
+  return jetzt.some(r => ids.has(r.id)) ? 1 : 0;
+}
+
+/** Schritte, die **eine Tabelle** schreiben und nicht eine Spalte von `setups`: ihr eigenes Gerüst, dieselben Regeln. */
+const TABELLEN = { assets: { trockenlauf: trockenlaufAssets, schreiben: schreibenAssets, zurueck: zurueckAssets } };
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -845,6 +1181,12 @@ export async function main(argv, deps = {}) {
   // Geschlossen wird immer: ein Lauf, der abbricht, lässt die Datei nicht gesperrt liegen.
   try {
     const opts = { haken: deps.haken, sicherungSha: wert['--sicherung-sha'], schritt, def: DEFS[schritt] };
+    const tabelle = TABELLEN[schritt];
+    if (tabelle) {
+      if (mode === '--check') return tabelle.trockenlauf(db, opts);
+      if (mode === '--write') return tabelle.schreiben(db, opts);
+      return tabelle.zurueck(db, pos[0], opts);
+    }
     if (mode === '--check') return trockenlauf(db, opts);
     if (mode === '--write') return schreiben(db, opts);
     return zurueck(db, pos[0], opts);

@@ -506,14 +506,14 @@ test('ES 7: berührt nur `scenario_data` – der Zielstand trägt nichts anderes
 
 // ── 8. Das Gerüst ───────────────────────────────────────────────────────────
 
-test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, die vier anderen `null` bis gebaut (`werte` ist seit ET gebaut, siehe dort)', () => {
+test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, die noch nicht gebauten `null` (`werte` seit ET, `zonen` seit EU, `assets` seit EV gebaut, siehe dort)', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
   assert.deepEqual(Object.keys(SCHRITTE.gelaende), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) {
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k]), ['scenario'], k);
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k].scenario), ['laenge', 'sha'], k);
   }
-  for (const k of ['assets', 'aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of ['aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
   assert.equal(GAME_ID, '072123c0-cd97-4ffb-a330-369630fab93f');
   assert.equal(SETUP_ID, 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b');
 });
@@ -963,10 +963,10 @@ test('ES main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst'
   } finally { weg(tmp); }
 });
 
-test('ES main: die vier anderen Schritte melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1', async () => {
+test('ES main: die noch nicht gebauten Schritte (seit EV: `aktionen`, `optionen`) melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1', async () => {
   let geoeffnet = 0;
   class Spion { constructor() { geoeffnet++; throw new Error('die Datenbank darf nicht geöffnet werden'); } }
-  for (const schritt of ['assets', 'aktionen', 'optionen']) {
+  for (const schritt of ['aktionen', 'optionen']) {
     for (const modus of [['--check', 'gibt-es-nicht.db'], ['--write', 'gibt-es-nicht.db', '--sicherung-sha', 'abcdefabcdef'], ['--zurueck', 'sicherung.json', 'gibt-es-nicht.db']]) {
       const r = await lauf([...modus, '--schritt', schritt], { Db: Spion });
       assert.equal(r.code, 1, `${schritt} ${modus[0]}: ${r.out}`);
@@ -1537,9 +1537,9 @@ test('ET main: Vergleich-und-Tausch und Transaktion – ändert jemand `scenario
 
 // ── ET 8. Das Gerüst ────────────────────────────────────────────────────────
 
-test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }`, `zonen`/`assets`/`aktionen`/`optionen` bleiben `null`; der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
+test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }`, `aktionen`/`optionen` bleiben `null`; der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
-  for (const k of ['assets', 'aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of ['aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
   const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
   const { laenge, sha: h } = SCHRITTE.werte.ziel.scenario;
