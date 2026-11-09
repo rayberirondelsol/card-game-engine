@@ -320,6 +320,14 @@ Daraus, Punkt für Punkt:
 
 - **3 Dörfler.** Für Bösewicht-Werte und Endgegner-Terrain zählt die **Anzahl
   Dörfler im Spiel** (§5.4), solo also **3**.
+  `✅ BELEGT` (Zusatz berichtigt, 2026-11-10, M31 `EZ`): Für die **Bösewicht-Werte**
+  gilt „solo also 3" (Spalte 3P). Für das **Endgegner-Terrain** gilt es **nicht
+  allgemein**: die Zahl der Plättchen hängt nur bei **drei von acht** gemessenen
+  Bösewichten an den Dörflern, fünf haben eine feste Zahl — siehe §8.1 Nr. 1 und
+  `docs/endkampf-gelaende-doerflerzahl.md`. Der Satz oben bleibt als Quellenstand
+  stehen. Und **drei Dörfler sind seit M31 nicht mehr die Vorgabe** (zwei bis fünf
+  sind wählbar, `docs/spec-setup-system.md` M31): „solo also 3" beschreibt die
+  Regel der Anleitung, nicht mehr den Tisch.
 - **Geheime Dorf-Ereignisse vor Partiebeginn aussortieren.** Das ist eine echte
   Soloregel, keine Ableitung. Dasselbe gilt im **Doppel-Modus** `[DE S.34]` —
   die Streichung hängt also daran, dass ein Spieler mehr als einen Dörfler
@@ -1569,6 +1577,18 @@ Objective", „THE RESULTS".
    anzuzeigen. **Die Anzahl der `EG`-Terrains wird in den meisten Fällen durch die
    Anzahl der mitspielenden Dörfler bestimmt**" (solo also 3). „Unter **AUFBAU**
    wird euch erklärt, welche Terrains ihr wie platzieren müsst."
+   `✅ BELEGT` (berichtigt, 2026-11-10, M31 `EZ`; Messung:
+   `docs/endkampf-gelaende-doerflerzahl.md`): Der Zusatz „(solo also 3)" gilt nur für
+   **drei von acht** gemessene Bösewichte — **Deputy Waggums, Pepin Milkfrog, Samuel
+   Strawman** („1 je Dörfler in numerischer Reihenfolge", auf dem Plan `FF1`–`FF5`
+   nummeriert; bei zwei Dörflern `FF1`–`FF2`, bei drei `FF1`–`FF3`). **Virginia Fitz
+   und Handsy haben fest 5, The Bundits, Tilda Fields und Umbrello fest 1 Plättchen**
+   — bei jeder Dörflerzahl, also auch solo. **Die zwölf übrigen Bösewichte sind nicht
+   gemessen**; ob „in den meisten Fällen" über alle 20 gerechnet stimmt, ist offen.
+   Das Handsy-Beispiel unten ist richtig und widersprach dem „solo also 3" schon
+   immer. Der Satz oben bleibt stehen, weil er der Wortlaut der Anleitung ist; die
+   Faustregel der Messung (*nummeriert auf dem Plan ⇒ je Dörfler, sonst fest*) ist
+   eine Beobachtung an acht, keine gedruckte Regel.
 2. **Der neue Sheriff** (§8.2) und ggf. „weitere unter „Aufbau" beschriebene
    Aufbau-Schritte".
 3. **Dörfler- und Bösewicht-Fähigkeiten.** „Im Endgegner-Kampf können **neue**
@@ -2513,6 +2533,11 @@ RUNDE r = 1..4
    kannst du weder zum Ziel einer Bösewicht-Aktion werden" `[DE S.22]` — wer kein
    Ziel sein kann, dürfte auch nicht in eine Zielmenge zählen. Das deckt aber nur
    die Zielbestimmung, keine Mengenangaben in Effekten.
+   *Seit M31 (2026-11-10):* die Zahl „Dörfler im Spiel" liest der Tisch aus den
+   Tableaus, die am Tisch liegen (`villagerCount`, Platzhalter `$doerflerzahl`,
+   Spec M31.2) — nicht aus einer Wahl; nimmt jemand ein Tableau weg, ändert sich die
+   Zahl der nächsten Dorfphase. Dass die Zahl der Endgegner-Terrains nur bei drei von
+   acht an ihr hängt, steht in §8.1 Nr. 1.
 6. **Deutsche Namen von Yancy Plover und Quintus Binch.** **TEILWEISE GEKLÄRT.**
    `[DE S.5]` nennt alle sieben Basis-Dörfler auf Deutsch; durch Ausschluss
    bleiben **Ludwig Knilch** und **Siggi von Saumagen** — welcher welcher ist,

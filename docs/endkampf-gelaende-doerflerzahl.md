@@ -297,6 +297,22 @@ sie kennen nur die 3-Dörfler-Aufstellung. Für Deputy, Pepin und Samuel fehlen
 müsste `FF3` entfallen. Die Positionen oben sind gelesen und können übernommen
 werden, **sobald** der Aufbau die Dörflerzahl kennt.
 
+> **Nachtrag (M31, 2026-11-10): die Lücke ist geschlossen.** Seit Aufgabe `ES` tragen die
+> Daten die Plättchen für vier und fünf Dörfler: bei Deputy Waggums, Pepin Milkfrog und
+> Samuel Strawman hat der Eintrag `FF3` den Schlüssel `fromCount: 3`, dahinter stehen
+> zwei neue Einträge (`FF4` mit `fromCount: 4`, `FF5` mit `5`) auf den Feldern dieses
+> Abschnitts — **drei Schlüssel und sechs neue Einträge** (Spec M31.7). **`fields.EG`
+> trug alle fünf Felder schon vorher**; es fehlten nur die Plättchen. `build_scenario`
+> legt Plättchen **und** Karten aus derselben gefilterten Liste (`terrainFor(part, n)`),
+> bei zwei Dörflern entfällt also `FF3`, wie hier gelesen; die fünf festen Bösewichte
+> sind byteweise unverändert. **Erschlossen, nicht gelesen:** welches Bürger-Asset bei
+> Pepin auf `FF4` und `FF5` liegt (der Baustein nimmt `(Dörfler)` und `(blond)` in der
+> Reihenfolge der fünf Plättchen, die Handsy trägt; verdeckt liegt überall die
+> Milchkanne, diese Messung nennt keine Zuordnung). Die Berichtigung des Halbsatzes in
+> `docs/tft-regeln.md` §8.1 Nr. 1 steht seit `EZ` dort, mit dem alten Satz daneben.
+> Geschrieben in `scenario_data`: 20 858 → 21 473 Zeichen (`82592d1ac883` →
+> `69dbe9e2b8cb`, `scripts/doerflerzahl-daten.mjs`, `SCHRITTE.gelaende`).
+
 ---
 
 ## 5. Die 2P-Gegenprobe der Vorderseiten
@@ -349,6 +365,12 @@ Bluff hat Formeln statt Zahlen (§5.4) und zählt nicht mit.
    müssten diese mit.
 5. **Die Engine reicht keine Dörflerzahl in den Aufbau** (Abschnitt 4, „Lücke").
    Das ist hier nicht angefasst.
+
+   > **Nachtrag (M31, 2026-11-10).** Seit M31 kennt der Aufbau die Zahl: sie wird **aus
+   > dem Tisch gelesen** (`villagerCount` in `shared/villagers.js`, Platzhalter
+   > `$doerflerzahl`), nicht aus einer Wahl (Spec M31.2); `build_scenario` fragt sie für
+   > `statsByCount` und `fromCount`. Die Zahl ist im Dialog wählbar, zwei bis fünf,
+   > Vorgabe zwei.
 
 ---
 

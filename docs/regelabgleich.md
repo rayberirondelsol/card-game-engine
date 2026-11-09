@@ -1331,6 +1331,11 @@ auf die **Besetzung der Partie** abstellen, nicht auf den Kampfstand:
   Kampfaufbau einmal festgelegt und ändert sich im Kampf nicht.
 - Endgegner-Terrain: „Die Anzahl der EG-Terrains wird in den meisten Fällen durch die
   **Anzahl der mitspielenden Dörfler** bestimmt." (S. 23)
+  *Berichtigt, 2026-11-10 (M31 `EZ`):* gemessen an acht Bösewichten hängt die Zahl der
+  Endgegner-Plättchen nur bei **dreien** an den Dörflern (Deputy Waggums, Pepin
+  Milkfrog, Samuel Strawman); Virginia Fitz und Handsy haben fest 5, The Bundits, Tilda
+  Fields und Umbrello fest 1; die zwölf übrigen sind nicht gemessen
+  (`docs/endkampf-gelaende-doerflerzahl.md`, `docs/tft-regeln.md` §8.1 Nr. 1).
 - Laden erneuern: „**pro Dörfler** 2 Münzen" (S. 12) — in der Dorfphase, wo alle
   wieder dabei sind.
 

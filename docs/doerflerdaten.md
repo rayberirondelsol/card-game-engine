@@ -35,6 +35,17 @@ Spiel `072123c0-cd97-4ffb-a330-369630fab93f`. Quellen: `table_assets`
    > das Spielfeld) und *Dorfphase beginnen* (Schritte 12–14, wieder weg). Die
    > Aussage „in keinem Aufbau benutzt" in 0 und 7 gilt nur für die Sequenz.
 
+> **Nachtrag (M31, 2026-11-10).** Seit M31 ist die Dörflerzahl wählbar (zwei bis fünf,
+> Vorgabe zwei); **Münzen und Werte folgen der Zahl**: je Dörfler 15 (kurze Partie) bzw. 10
+> (lange) Münzen zu Beginn und 6 nach jedem Kampf, BEW und LEB des Bösewichts aus der
+> Spalte der Zahl (2P / 3P / 4P / 5P). Die Plätze 4 und 5 hängen an `Tableau: Blopsy
+> Twins` und `Tableau: Yancy Plover`, gewählt nach der Spaltenlage aus 6.3 (Blopsy wellig
+> wie Henlo und Granny, Yancy gerade wie Fridgette); ihre Wertleisten sind **Kopien** der
+> Vorlage ihrer Familie, **innerhalb der Familie nicht gemessen**. Die Erhebung selbst
+> bleibt, wie sie war — wo sie „drei Dörfler" voraussetzt (Abschnitt 4), ist das der Stand
+> von M26/M27; den Tisch von damals baut der Aufbau mit `doerfler3: Granny`. Siehe
+> `docs/spec-setup-system.md` M31.
+
 ---
 
 ## 1. Methode

@@ -90,7 +90,7 @@ Sie gehören **neben** `/app`, damit `../shared/…` zu `/shared` wird:
 ```bash
 SP="<Scratchpad>"; SSH="ssh -o UserKnownHostsFile=$SP/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes root@192.168.178.96"
 $SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin/master -q \
-  && for f in setupwahl-daten.mjs setups-aufraeumen.mjs auslagen-daten.mjs auslagen-rauchtest.mjs doerfler-daten.mjs equipment-zones.mjs gelaendekarten-zuordnung.mjs szenariodaten-berichtigung.mjs szenariodaten-grundspiel.mjs; do \
+  && for f in setupwahl-daten.mjs setups-aufraeumen.mjs auslagen-daten.mjs auslagen-rauchtest.mjs doerfler-daten.mjs equipment-zones.mjs gelaendekarten-zuordnung.mjs szenariodaten-berichtigung.mjs szenariodaten-grundspiel.mjs doerflerzahl-daten.mjs; do \
        docker cp scripts/\$f card-game-engine-backend:/app/\$f; done \
   && docker exec -w /app card-game-engine-backend node /app/auslagen-daten.mjs --check /app/data/card-game-engine.db"
 ```
@@ -105,6 +105,12 @@ $SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin
 
 **Für M30 gehören neun Dateien nach `/app/`** (vollständig; die Abhängigkeiten sind aus den `import`-Zeilen gelesen, `docs/tasks-m30-setupwahl.md`, Nr. 13 und 18). `setupwahl-daten.mjs` braucht nur `/shared` (und keine andere Skriptdatei); `setups-aufraeumen.mjs` braucht nichts davon. Der Rauchtest `auslagen-rauchtest.mjs` importiert direkt `auslagen-daten.mjs` und `gelaendekarten-zuordnung.mjs`; darüber kommen `doerfler-daten.mjs`, `equipment-zones.mjs`, `szenariodaten-berichtigung.mjs` und `szenariodaten-grundspiel.mjs` hinzu. Allein der Rauchtest braucht also sieben Dateien. Die Liste im Befehl oben ist die vollständige.
 
+**Für M31 gehören zehn Dateien nach `/app/`** — die neun von M30 **plus `doerflerzahl-daten.mjs`** (Stand 2026-11-10; `equipment-zones.mjs` stand schon in der Liste). `doerflerzahl-daten.mjs` importiert `/shared` und `equipment-zones.mjs` und liest die Datenbank für alle sechs Schritte (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`). **Der Rauchtest importiert seit `EY` auch `doerflerzahl-daten.mjs`** (`SPALTEN`, `MESSUNG`, `zahlBei`); er braucht damit acht Dateien.
+
+> ⚠️ **Vor jedem Produktionslauf die *Anwesenheit* jeder gebrauchten Datei prüfen, nicht nur ihren Hash.** Ein neu angelegter Container hat die von Hand kopierten Skripte nicht mehr, und **ein fehlendes Skript hat keinen Hash**: im Lauf `EW`+`EX` waren Backend und Frontend drei Minuten alt, `/app` war leer, und ein Auftrag, der nur „prüfe den Hash" sagte, hätte nichts gefunden. Auf der VM:
+> `docker exec card-game-engine-backend sh -c 'for f in <die zehn Namen>; do [ -f /app/$f ] || echo "FEHLT $f"; done'`
+> Blieb das Checkout der VM unangetastet (kein `git reset`), ging der Weg über gzip + base64 in Stücken von höchstens 12 000 Zeichen.
+
 `--check` öffnet die Datei schreibgeschützt; `--write` ist **eine** `IMMEDIATE`-Transaktion. Der Rauchtest
 (`auslagen-rauchtest.mjs <db>`) schreibt nie. `doerfler-daten.mjs` und `equipment-zones.mjs` brauchen die
 beiden anderen, weil `auslagen-daten.mjs` `VILLAGERS` daraus liest. Eine **Sicherung** der betroffenen Spalten
@@ -115,6 +121,9 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
 > ist daher nur *innerhalb* der Transaktion exakt (sie nimmt die Schreibsperre, bevor sie hasht); zwei
 > getrennte Lesungen können eine Abweichung zeigen, die nicht vom Skript kommt. `auslagen-daten.mjs` hasht
 > darum je Zeile und nennt die abweichende beim Namen.
+> **Gemessen (M31):** ein offener Tisch speichert **alle zwei Minuten** (`POST /saves/auto`), `save_states` ändert sich also **zwischen** zwei getrennten
+> Lesevorgängen, ohne dass irgendein Skript etwas getan hat. **„Unverändert" gilt nur *innerhalb* der Transaktion**; ein Vorher/Nachher aus zwei Lesungen
+> beweist es nicht.
 
 ## Regeln fürs Schreiben
 
@@ -132,6 +141,8 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
    - **Rückwärtsbeweis statt Präfixbeweis:** im neuen Text jeden geänderten Eintrag durch seinen alten ersetzen — das muss den
      gelesenen Text Zeichen für Zeichen ergeben (der Präfixbeweis des Ergänzens scheitert bei jeder echten Änderung).
    - **Sicherung vorher, ihr Hash als Argument** (`--sicherung-sha`): ohne gültige Sicherung kein Schreiben.
+     **Welcher Hash?** Der **innere** `sicherungsHash(<Spaltentexte>)` — `sha256(JSON.stringify([<Text der Spalte>, …]))` (`scripts/doerflerzahl-daten.mjs`, `scripts/setupwahl-daten.mjs`),
+     genau der Wert, den `--check` als „Hash für --sicherung-sha" nennt. **Nicht** die sha256 der Sicherungsdatei: sie sieht gleich aus und wird abgewiesen (oder, schlimmer, für richtig gehalten).
    - **Vergleich-und-Tausch** (`UPDATE … WHERE scenario_data = <gelesener Text>`), `IMMEDIATE`-Transaktion, Fingerabdruck je Tabelle und je Zeile
      von `save_states` vorher/nachher, Rollback bei Abweichung.
    - **Weg zurück:** `--zurueck <Sicherung> <db>` ersetzt nur den **exakten Zielstand**; vorher auf einer Wegwerf-Datenbank getestet.
@@ -176,3 +187,26 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
 - **Nach `EB` prüfen die `--check` von M28 und M29 weiter sauber durch** — am 2026-11-09 nach allen vier Schnitten gemessen, 0 Beanstandungen: sie prüfen ihr eigenes Stück am Inhalt, nicht die Spalte am Gesamthash. `auslagen-daten.mjs` und `doerfler-daten.mjs` sind dagegen Stand M26/M27 und dürfen **nicht** mehr mit `--write` fahren. **Und: ein Funktionsname ist kein Beleg im Frontend-Bundle** — der Minifier benennt ihn um (`zoneSlotNumberAt` findet man mit 0 Treffern, und das ist richtig). Belegbar sind nur Zeichenketten, etwa `require_marker`, `cannot be read`, `has no place`. (M30)
 - **Was `validateScenarioData` sagt, gilt.** Gegen die echte Assetliste und das
   echte Raster laufen lassen, bevor etwas als fertig gemeldet wird.
+- **„Erst deployen, dann schreiben": die Einordnung „vor dem Deploy unschädlich" ist an der Quelle zu prüfen, nicht an der Form der Daten.** In M31 hieß es, `ES` (Endkampf-Plättchen) und `ET` seien es; **`ES` war es nicht** —
+  der alte Prüfer kannte `fromCount` nicht und hätte für Deputy Waggums, Pepin Milkfrog und Samuel Strawman **gar kein** Endkampf-Gelände gelegt. **Vor dem Deploy war nur `EV` unschädlich** (Asset-Zeilen, die niemand
+  liest). Der Deploy lief zufällig vorher, es entstand kein Schaden. **Und `ET` als „unschädlich" ist nach dem Deploy nicht mehr nachprüfbar** — das ist **kein Freibrief** für künftige Wellen (Welle 2): wer die Einordnung braucht, liest
+  den Prüfer und den Executor des **alten** Stands, bevor er schreibt. (M31 `ES`)
+- **Zwei Schritte, die einander voraussetzen, laufen in *einem* Lauf.** `EW` (Aktionen mit `onlySeated: 4`/`5`) zeigt auf Plätze, die erst `EX` anlegt, und `EX` verlangt `EW` zuerst; sein `--check` ist erst **nach dem Schreiben von
+  `aktionen`** möglich („Voraussetzung aktionen … nicht erfüllt" davor ist **kein Fehler**). Zwischen den beiden ist „0 Beanstandungen" unerreichbar (je Runde zwei + zwei + zehn Zeilen `is not a seat`). Also: Schreibvorgang nach
+  Schreibvorgang, **dann** der Rauchtest. (M31 `EW`/`EX`)
+- **`table_assets`: `category` ist keine Spalte.** Die Spalten sind `quantity`, `category_id` und `back_image_path`; der Name „Marker" kommt über `category_id` aus `categories` (UUID `597b3d0e-530b-46d1-bc0b-6bf7e00ddfc6`).
+  Wer eine Zeile aus einer festen Feldliste klont, setzt `quantity` und `category_id` still auf den Vorgabewert — die Marker lägen nicht im Pool `Marker`. **`select *` klonen**, nur `id` und `name` ersetzen. Die Bilddateien der
+  Marker sind **128 × 128** Pixel; die 22 × 22 der Spec sind `width`/`height` **der Zeile** (die Tischgröße). Und: 220 Zeilen gehören zu **diesem Spiel**, die ganze Tabelle hat 261 (das Skript zählt je `game_id`). (M31 `EV`)
+- **Textvergleiche Windows ↔ Container immer erst nach `tr -d '\r'`.** Die Arbeitskopie ist **je nach Datei** CRLF oder LF (`git ls-files --eol <Datei>`; gemessen am 2026-11-10: `shared/sequenceExecutor.js` `w/crlf`,
+  `scripts/doerflerzahl-daten.mjs` `w/lf`), der Container entspricht dem Git-Blob (LF). Eine rohe sha256 erzeugt sonst ein „ABWEICHUNG" aus nichts als Zeilenenden. Beide Seiten gleich behandeln:
+  `tr -d '\r' < <Datei> | sha256sum`. (M31 `EX`)
+- **Ein offener Setup-Editor kann auch die Schritte von M31 still zurücknehmen** — besonders `zonen` (der Zonen-Editor speichert die Zonenliste), aber jeden der sechs. `--check` von M28, M29, M30 **und** M31 am Ende des Tages.
+  **Der Server kann einen schlafenden Tab nicht sehen:** ein Tab, der vor dem Schreiben geöffnet wurde und den niemand angefasst hat, steht in keinem Log, bis er speichert. `zone_data` wird **nur** von `zonen` geschrieben
+  (Welle 2 fügt `haende` hinzu, Aufgabe `FF`, noch nicht gebaut), `table_assets` **nur** von `assets`. (M31)
+- **Nach `EX` melden die M30-Checks erwartungsgemäß `ABWEICHEND` (Exit 1) — das ist kein Fehler.** `setupwahl-daten.mjs --check` für `optionen`, `zaehler` und `boss` läuft gegen den Zielstand von M31 auf Abweichung (auf einer
+  Wegwerf-Datenbank geprüft): M31 hat die Spalten, die M30 geschrieben hat, weiterentwickelt. Der Tages-Check darf es **nicht** als Fehler lesen. `szenariodaten-berichtigung.mjs` und `gelaendekarten-zuordnung.mjs` prüften nach M30
+  am Inhalt (M30, Nr. 14; **nach `EX` nicht erneut gemessen**). Für M31 selbst gilt `doerflerzahl-daten.mjs --check <db> --schritt <…>`. (M31 `EX`)
+- **Der Rauchtest pinnt seine Bestandsfälle auf `doerfler3: Granny`, und der volle Textvergleich dort muss bleiben.** Seit `EX` ist die Vorgabe **zwei** Dörfler; Abschnitt 1 und 2 des Rauchtests (Stetigkeit gegen die alte Ausgabe)
+  liefen danach **still mit zwei Dörflern, ohne dass er es meldete**. Er pinnt sie jetzt auf Granny (`grannyWenn`, nur wo der Aufbau die Wahl überhaupt kennt — sonst bräche der M27-Aufbau). **Ein Vergleich nur über die Zeilenzahl
+  fängt den Verlust des Pins nicht** (eine Mutationsprobe überlebte ihn); der ausgeschriebene Textvergleich fängt ihn. Dazu zwei Dinge, die er **nicht** prüft: Barry Bluffs Formeln rechnet der Executor nicht (geprüft wird, dass
+  **kein** Marker liegt), und `rotate_zone` dreht **einen** Schritt zyklisch unter den Spielsteinen, nicht n Mal (mit drei gemessen: Henlo 1→3, Fridgette 2→1, Granny 3→2). (M31 `EY`)

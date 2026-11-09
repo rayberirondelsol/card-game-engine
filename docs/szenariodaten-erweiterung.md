@@ -474,6 +474,11 @@ Das deckt sich mit `docs/tft-regeln.md` §8.1, die die Dörflerzahl nur für „
 meisten Fälle" an die `EG`-Zahl bindet — es gibt Endgegner-Kämpfe ganz ohne
 `EG`-Terrain, und das sind diese sechs.
 
+*Nachtrag, 2026-11-10 (M31 `EZ`):* „die meisten Fälle" ist gemessen **nur an acht**
+Bösewichten des Grundspiels, und dort hängt die Zahl bei **dreien** an den Dörflern
+(`docs/endkampf-gelaende-doerflerzahl.md`); die Berichtigung steht bei
+`docs/tft-regeln.md` §8.1 Nr. 1.
+
 ### 8.2 Woher das kommt und wie geprüft wurde
 
 | Angabe | Quelle |
