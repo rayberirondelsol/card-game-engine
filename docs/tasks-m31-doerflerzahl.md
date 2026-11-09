@@ -496,7 +496,9 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 12. **Offen, zur Kenntnis:** Heldentaten bleiben **6** (bei fünf Dörflern 1,2 je Dörfler, schwerer als jede gedruckte Regel); die Ladenerneuerung kostet 4 bis 10 Münzen (von Hand); die fünf Werte „je Dörfler" auf den Tableaus sind **ungeprüft**.
 13. **Rückweg bekannt:** `--zurueck` je Schritt, **zuerst `optionen`**, dann `aktionen`, `assets`, `zonen`, `werte`, `gelaende`.
 
-**Fertig, wenn:** der Auftraggeber 2–11 abgehakt oder einen Befund genannt hat und 1 beantwortet ist. **Dann beginnt Welle 2.**
+**Geschrieben als `docs/m31-welle1-abnahme.md`** (2026-11-10) — dort stehen die Punkte in der Fassung, die der Auftraggeber liest, samt der Berichtigung zu Punkt 9, der Pepin-Lücke und dem fehlenden `EU`-Lauf-Protokoll.
+
+**Fertig, wenn:** der Auftraggeber die Sichtprüfung abgehakt oder einen Befund genannt hat und die Frage nach der Vorgabe beantwortet ist. **Dann beginnt Welle 2.**
 
 ---
 
