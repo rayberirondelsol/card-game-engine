@@ -80,6 +80,36 @@ export function counterDisplay(counter) {
 }
 
 /**
+ * M31.4: ein Zählerwert darf **ein Produkt zweier ganzer Zahlen** sein – `"15*3"`,
+ * `"+6*3"`, `"-2*3"` – und wird hier zu der Zahl gefaltet, die er meint: `"45"`,
+ * `"+18"`, `"-6"`. **Das Vorzeichen bleibt, wie es geschrieben steht**: `"+6*3"`
+ * heißt „um 18 erhöhen", `"15*3"` „auf 45" – den Unterschied liest `counterValueForm`.
+ *
+ * Die **eine** Stelle, an der ein `*` etwas bedeutet (M6): `counterValueForm`,
+ * `counterValue` und `place_counter` fragen sie, keiner rechnet selbst. Alles, was
+ * kein solches Produkt ist, kommt **unverändert** zurück – ein Text ohne `*`, eine
+ * Zahl, aber auch das Unlesbare (`"6*"`, `"*3"`, `"2*3*4"`, `"1.5*2"`, `"a*b"`,
+ * `"6 * 3"` mit Leerzeichen). Geraten wird nicht: ob so etwas ein Wert ist, sagen
+ * die Leser danach, und `isUnreadableProduct` hält es für `place_counter` fest.
+ * Ein Produkt jenseits der sicheren ganzen Zahlen ist ebenfalls unlesbar.
+ */
+export function foldProduct(raw) {
+  if (typeof raw !== 'string') return raw;
+  const m = /^([+-]?)(\d+)\*(\d+)$/.exec(raw.trim());
+  if (!m) return raw;
+  const product = Number(m[2]) * Number(m[3]);
+  return Number.isSafeInteger(product) ? `${m[1]}${product}` : raw;
+}
+
+/**
+ * Trägt der Wert ein `*`, das `foldProduct` nicht lesen konnte? Dann ist er ein
+ * kaputtes Produkt – **nicht** „ein Text, der 0 wird". `place_counter` hält hier,
+ * statt aus `Number("6*")` = `NaN` still einen Zähler auf 0 zu legen.
+ */
+export const isUnreadableProduct = (raw) =>
+  typeof raw === 'string' && raw.includes('*') && foldProduct(raw) === raw;
+
+/**
  * Was ein `set_counter`-Wert *ist*, ohne den Zähler zu kennen (R1):
  * `'set'` (auf diese Zahl), `'add'` (um diese Zahl), `'max'` (auf die
  * Obergrenze) – oder `null`, wenn der geschriebene Wert keine davon trifft.
@@ -95,7 +125,7 @@ export function counterDisplay(counter) {
  */
 export function counterValueForm(raw) {
   if (typeof raw === 'number') return Number.isFinite(raw) ? 'set' : null;
-  const s = String(raw ?? '').trim();
+  const s = foldProduct(String(raw ?? '').trim());
   if (!s) return null;
   if (s.toLowerCase() === 'max') return 'max';
   // M11.4: die fuenfte Lesart. Sie steht hier und nicht als eigener Schritt,
@@ -118,7 +148,7 @@ export function counterValue(counter, raw) {
     const n = counterMax(form === 'max' ? counter?.max : counter?.base);
     return n === undefined ? null : n;
   }
-  const n = Number(typeof raw === 'number' ? raw : String(raw).trim());
+  const n = Number(typeof raw === 'number' ? raw : foldProduct(String(raw).trim()));
   return form === 'add' ? Number(counter?.value ?? 0) + n : n;
 }
 

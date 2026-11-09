@@ -15,7 +15,7 @@
  * Die Form (Spec M7, „Die Szenariodaten"):
  *
  *   { gridLabel, bosses: { "<Basisname>": {
- *       scenario, terrain: [{ assetName, cells: [], rotation, faceDown }],
+ *       scenario, terrain: [{ assetName, cells: [], rotation, faceDown, fromCount }],
  *       fields: { B: "J5", D: ["A1", ...] },
  *       decks: [{ category, label }],
  *       final: { terrain: [...], fields: { EG: [...] } } } } }
@@ -36,8 +36,78 @@ import { ROTATIONS, rotationOf } from './assetToken.js';
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
 /** Was an einem Geländeeintrag stehen darf (M7, M7.1, M7.6). */
-const TERRAIN_KEYS = ['assetName', 'cells', 'rotation', 'faceDown'];
+const TERRAIN_KEYS = ['assetName', 'cells', 'rotation', 'faceDown', 'fromCount'];
 const text = (s) => String(s ?? '').trim();
+/** M31.6: eine Dörflerzahl - die ganze Zahl 1 … 5 (der Dialog baut zwei bis fünf, eine bleibt als Netz). */
+const countOk = (n) => Number.isInteger(n) && n >= 1 && n <= 5;
+const plain = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : {});
+
+/**
+ * M31.6: die Werte eines Abschnitts für die Zahl `count` der Dörfler am Tisch - `stats`, darüber
+ * `statsByCount[<Zahl>]`. `count` `null` heißt „die Zahl, für die `stats` gedruckt ist“: dann zählt
+ * nur `stats`. Die **eine** Stelle, an der beides zusammenkommt (M6): der Aufbau bindet daraus.
+ */
+export function statsOf(part, count) {
+  return { ...plain(part?.stats), ...(count === null ? {} : plain(plain(part?.statsByCount)[String(count)])) };
+}
+
+/**
+ * M31.6: welche Werte für `count` Dörfler **fehlen** - die Namen, deren endgültiger Wert (spätere
+ * Abschnitte gewinnen) eine Zahl aus einem `stats` ist, die ein `statsByCount[<Zahl>]` desselben
+ * Abschnitts nicht ersetzt hat. Eine Zahl steht für eine Spalte (die für `baseCount`); sie für eine
+ * andere Zahl gelten zu lassen wäre der stille Rückfall. Ein Text (Barry Bluffs Formel) ist keine
+ * Zahl und fehlt nie.
+ */
+export function missingStats(parts, count) {
+  const open = new Map();
+  for (const part of parts) {
+    for (const [name, value] of Object.entries(plain(part?.stats))) open.set(name, typeof value === 'number');
+    for (const name of Object.keys(plain(plain(part?.statsByCount)[String(count)]))) open.set(name, false);
+  }
+  return [...open].filter(([, isOpen]) => isOpen).map(([name]) => name);
+}
+
+/**
+ * `statsByCount` eines Abschnitts (M31.6): ein Objekt, dessen Schlüssel ganze Zahlen 1 … 5 sind - aber
+ * nicht `baseCount` (zwei Quellen für dieselbe Spalte) -, jeder Wert mit **denselben Namen** wie `stats`
+ * desselben Abschnitts und denselben Arten (Zahl bleibt Zahl, Text bleibt Text).
+ */
+function statsByCountProblems(part, who, baseCount, problems) {
+  const table = part?.statsByCount;
+  if (table === undefined) return;
+  if (!table || typeof table !== 'object' || Array.isArray(table)) {
+    problems.push(`${who}: statsByCount must be an object { "<villagers>": { "<name>": value } }`);
+    return;
+  }
+  const stats = plain(part?.stats);
+  for (const [key, entry] of Object.entries(table)) {
+    const at = `${who}: statsByCount["${key}"]`;
+    if (!/^[1-5]$/.test(key)) { problems.push(`${at}: the key must be a whole number from 1 to 5`); continue; }
+    if (Number(key) === baseCount) { problems.push(`${at}: that is baseCount - stats holds those values`); continue; }
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) { problems.push(`${at}: must be an object`); continue; }
+    if (Object.keys(entry).sort().join() !== Object.keys(stats).sort().join()) {
+      problems.push(`${at}: must name exactly the values of stats (${Object.keys(stats).join(', ') || 'none'}), not ${Object.keys(entry).join(', ') || 'none'}`);
+      continue;
+    }
+    for (const [name, value] of Object.entries(entry)) {
+      const isNumber = typeof stats[name] === 'number';
+      if (typeof value !== typeof stats[name]) problems.push(`${at}.${name}: must be ${isNumber ? 'a number' : 'text'}, like stats.${name}`);
+      else if (isNumber && !Number.isFinite(value)) problems.push(`${at}.${name}: not a finite number`);
+    }
+  }
+}
+
+/**
+ * M31.7: die Geländeplättchen eines Abschnitts, die bei `n` Dörflern liegen - ein Eintrag ohne
+ * `fromCount` immer, einer mit `fromCount: k` ab `k` Dörflern aufwärts. Ist die Zahl unbekannt
+ * (`0`, `undefined`, keine Dörferdaten), liegen **alle**: ein Halt dafür gehört `stats`, nicht hierher.
+ * Die **eine** Stelle, die filtert (M6): der Aufbau legt Plättchen **und** Karten aus dieser Liste, und
+ * die Vorprüfung geht über die ungefilterte, damit ein Tippfehler bei `FF5` nicht bis zu fünf Dörflern wartet.
+ */
+export function terrainFor(part, n) {
+  const all = Array.isArray(part?.terrain) ? part.terrain : [];
+  return n > 0 ? all.filter(t => !Number.isInteger(t?.fromCount) || n >= t.fromCount) : all;
+}
 
 /**
  * Die Tabelle `terrainCards` (M29): `{ "<Assetname>": "<Kartenname>" }`, von Hand geschrieben und vom
@@ -105,6 +175,11 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [], ca
   // Die Tabelle `terrainCards` zuerst und **vor** der frühen Rückkehr: sie gehört dem Aufbau,
   // nicht einem Bösewicht, und ein Aufbau ohne Einträge kann trotzdem eine haben.
   const problems = terrainCardProblems(scenarioData?.terrainCards, assets, cards);
+  // M31.6: die Zahl, für die `stats` gedruckt ist. Fehlt sie, verhält sich alles wie vor M31.
+  const baseCount = scenarioData?.villagers?.baseCount;
+  if (baseCount !== undefined && !countOk(baseCount)) {
+    problems.push('villagers.baseCount: must be a whole number from 1 to 5');
+  }
   const bosses = scenarioData?.bosses;
   const entries = bosses && typeof bosses === 'object' ? Object.entries(bosses) : [];
   // Keine Einträge, nichts zu prüfen – ein Setup ohne Szenarien ist kein Fehler,
@@ -148,6 +223,11 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [], ca
       for (const key of Object.keys(t || {})) {
         if (!TERRAIN_KEYS.includes(key)) problems.push(`${who}: asset "${asset}" has unknown key "${key}"`);
       }
+      // M31.7: ab wie vielen Dörflern das Plättchen liegt - zwei bis fünf (bei einem fehlt der Schlüssel,
+      // und bei sechs säße keiner). Ein Text oder eine Kommazahl fiele in `terrainFor` still durch.
+      if (t?.fromCount !== undefined && !(Number.isInteger(t.fromCount) && t.fromCount >= 2 && t.fromCount <= 5)) {
+        problems.push(`${who}: asset "${asset}" has fromCount ${JSON.stringify(t.fromCount)}; it must be a whole number from 2 to 5`);
+      }
       const cells = Array.isArray(t?.cells) ? t.cells : [];
       if (cells.length === 0) { problems.push(`${who}: asset "${asset}" names no field`); continue; }
       for (const cell of cells) {
@@ -178,6 +258,7 @@ export function validateScenarioData(scenarioData, { assets = [], grids = [], ca
       });
     }
 
+    statsByCountProblems(part, who, baseCount, problems);
     return terrain.length > 0 || Object.keys(fields).length > 0;
   }
 

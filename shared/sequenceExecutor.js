@@ -26,11 +26,11 @@ import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneSlotNumberAt, zoneCenter,
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
-import { validateScenarioData } from './scenarioData.js';
-import { normalizeCounter, counterValue, counterMax } from './counters.js';
+import { validateScenarioData, statsOf, missingStats, terrainFor } from './scenarioData.js';
+import { normalizeCounter, counterValue, counterMax, foldProduct, isUnreadableProduct } from './counters.js';
 import { findCardByName } from './cardSearch.js';
 import { resolveChoices, checkGate } from './setupOptions.js';
-import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
+import { seatVars, seatedVillagers, villagerCount, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -2080,11 +2080,40 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // Endkampf-Abschnitt, den dieser Aufbau vielleicht gar nicht braucht: ein
       // Tippfehler dort faellt sonst erst im letzten Kampf der Partie auf, und
       // dann steht schon alles andere.
+      // M31.6: `villagers.baseCount` geht mit, damit die Prüfung auch eine kaputte Zahl dort und einen
+      // `statsByCount`-Schlüssel gleich `baseCount` kennt - sonst prüfte sie nur, was am Eintrag steht.
       const problems = validateScenarioData(
-        { gridLabel: scenarioData?.gridLabel, bosses: { [key]: entry } },
+        {
+          gridLabel: scenarioData?.gridLabel,
+          bosses: { [key]: entry },
+          ...(scenarioData?.villagers?.baseCount === undefined ? {} : { villagers: { baseCount: scenarioData.villagers.baseCount } }),
+        },
         { assets, grids }
       );
       if (problems.length) return fail(problems.join('; '));
+
+      // M31.6: für welche Zahl gelten die Werte? `baseCount` nennt die Spalte von `stats`; fehlt sie oder
+      // gibt es keine Dörferdaten, wird die Zahl nicht gefragt und alles bleibt wie vor M31. Gefragt wird
+      // **hier**, vor dem ersten Plättchen: die Werte werden erst nach dem Legen gebunden, und ein Halt
+      // dort ließe ein halbes Kampffeld stehen. Und kein Rückfall auf `stats` für eine andere Zahl - der
+      // Tisch spielte sonst mit zwei Dörflern gegen die Werte für drei.
+      // M31.7: wer sitzt, wird **einmal** gezählt, vor dem Legen - `0` heißt „unbekannt“ (keine Dörferdaten,
+      // niemand am Tisch): dann liegen alle Plättchen (`terrainFor`), wie vor M31. Die Werte (`stats`) fragen
+      // dieselbe Zahl und halten bei `0` selbst (unten).
+      const seated = hasVillagers(scenarioData?.villagers) ? villagerCount(state, assets, scenarioData.villagers) : 0;
+      const baseCount = scenarioData?.villagers?.baseCount;
+      let count = null;
+      if (baseCount !== undefined && hasVillagers(scenarioData?.villagers)) {
+        const n = seated;
+        if (n === 0) return fail('nobody sits at the table - there are no values to read for the boss');
+        if (n !== baseCount) {
+          const gaps = missingStats(parts, n);
+          if (gaps.length) {
+            return fail(`no values for ${n} villager${n === 1 ? '' : 's'} (boss "${key}": ${gaps.join(', ')}) - add statsByCount["${n}"]`);
+          }
+          count = n;
+        }
+      }
 
       const grid = findGrid(grids, scenarioData?.gridLabel);
       if (!grid) return fail(`grid "${scenarioData?.gridLabel ?? ''}" not found`);
@@ -2109,8 +2138,11 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // daneben, denn das Teil liegt nicht (M7.6/M8.3 - eine falsche Karte ist
       // schlimmer als keine).
       const refused = new Set();
-      for (const part of parts) {
-        for (const t of (Array.isArray(part?.terrain) ? part.terrain : [])) {
+      // M31.7: **die** Liste der Plättchen, die dieser Aufbau legt - je Abschnitt gefiltert nach der Zahl der
+      // Dörfler. Sie speist das Legen und (unten) die Karten; die Vorprüfung oben ging über die ungefilterte.
+      const laid = parts.map(part => terrainFor(part, seated));
+      for (const terrain of laid) {
+        for (const t of terrain) {
           const asset = findAsset(assets, t?.assetName);
           if (!asset) { missing.push(`asset "${t?.assetName ?? ''}" not found`); continue; }
           for (const label of (Array.isArray(t?.cells) ? t.cells : [])) {
@@ -2184,8 +2216,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // Der Schluessel ist Name **und** Seite: dasselbe Plaettchen offen und
         // verdeckt sind zwei verschiedene Gelaende und damit zwei Karten
         // (M7.6). Zweimal dieselbe Seite bleibt eine.
-        const wanted = [...new Map(parts
-          .flatMap(p => (Array.isArray(p?.terrain) ? p.terrain : []))
+        // M31.7: aus der **gelegten** Liste - ein Plättchen, das nicht liegt, bekommt keine Karte.
+        const wanted = [...new Map(laid
+          .flat()
           .map(t => [`${norm(t?.assetName)}|${Boolean(t?.faceDown)}`,
             { name: String(t?.assetName ?? '').trim(), down: Boolean(t?.faceDown) }]))]
           .filter(([key]) => !refused.has(key))
@@ -2291,7 +2324,9 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         // sie ein. Barry Bluffs Formel ist hier ein Text wie jeder andere; sie
         // bindet, und der Zaehlerschritt dahinter sagt, dass er sie nicht lesen
         // kann.
-        for (const [name, value] of Object.entries(part?.stats || {})) {
+        // M31.6: `stats`, darüber `statsByCount[<Zahl>]` desselben Abschnitts - `statsOf` ist die eine
+        // Stelle, die beides zusammenlegt (`count` ist `null` für die Zahl, für die `stats` gedruckt ist).
+        for (const [name, value] of Object.entries(statsOf(part, count))) {
           ctx.vars[name] = String(value).trim();
         }
       }
@@ -2326,7 +2361,14 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       // Ausgangswert soll sich unverändert verhalten (Abnahme 3), und ein
       // stillschweigend gesetzter machte aus jedem Münztopf einen, den die
       // Dorfphase auf seinen Anfangsstand zurückdrehen könnte.
-      state.counters.push(normalizeCounter({ name, value: step.value, max: step.max, base: step.base, x, y }));
+      // M31.4: ein Produkt (`"15*3"`) wird **vor** `normalizeCounter` gefaltet - das
+      // macht aus `Number("15*3")` = NaN sonst still eine 0. Ein `*`, das sich nicht
+      // falten lässt (`"6*"`), ist ein Halt, keine 0: ein Münzzähler auf null wäre
+      // der Schaden, den niemand sieht. Text ohne `*` bleibt, wie er war.
+      if (isUnreadableProduct(step.value)) {
+        return skip(`counter "${name}": "${String(step.value).trim()}" is not a value it can take`);
+      }
+      state.counters.push(normalizeCounter({ name, value: foldProduct(step.value), max: step.max, base: step.base, x, y }));
       return state;
     }
 

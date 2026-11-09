@@ -11,7 +11,7 @@
  * for one. Offering a field the handler ignores is worse than offering none:
  * it is a promise the setup does not keep.
  */
-import { counterMax, counterValueForm } from '../../../shared/counters.js';
+import { counterMax, counterValueForm, foldProduct } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder, categoryList, onlyFinalOf, cardsInCategories } from '../../../shared/sequenceExecutor.js';
@@ -344,18 +344,39 @@ export function describeStep(step) {
   // hinten, weil die Zeile zuerst sagt, *was* der Schritt tut.
   const gate = onlyFinalOf(step?.onlyFinal);
   const when = gate === null ? '' : gate ? ' · only in the final fight' : ' · not in the final fight';
-  return describeWork(step) + describeChoiceGate(step?.onlyChoice) + when;
+  return describeWork(step) + describeChoiceGate(step?.onlyChoice) + describeSeatedGate(step?.onlySeated) + when;
 }
 
 /**
  * M27.2/CV: `onlyChoice` als Nachsatz („· only with partie=kurz, troedel=mit"),
  * und nur an Schritten, die eines tragen. Eine Liste liest sich „kurz or lang".
  * Etwas, das kein Objekt ist, steht gar nicht da: `validateStep` meldet es.
+ *
+ * M31.3/EP: die Verneinung `"!keiner"` liest sich „doerfler3 not keiner" - mit
+ * `=` stünde „doerfler3=!keiner" da, und das `!` ginge im Satz unter.
  */
 function describeChoiceGate(gate) {
   if (!gate || typeof gate !== 'object' || Array.isArray(gate)) return '';
-  const parts = Object.entries(gate).map(([option, v]) => `${option}=${(Array.isArray(v) ? v : [v]).join(' or ')}`);
+  const parts = Object.entries(gate).map(([option, v]) => (
+    typeof v === 'string' && v.startsWith('!')
+      ? `${option} not ${v.slice(1)}`
+      : `${option}=${(Array.isArray(v) ? v : [v]).join(' or ')}`));
   return parts.length ? ` · only with ${parts.join(', ')}` : '';
+}
+
+/**
+ * M31.3/EP: `onlySeated` als Nachsatz („· only with a villager at seat 4 or 5").
+ * Wie bei `onlyChoice` steht nur da, was verstanden wird - ein Platz oder eine
+ * nicht leere Liste ganzer Zahlen ab 1; `validateStep` meldet den Rest. Die obere
+ * Grenze kennt der Editor nicht (die Szenariodaten des Aufbaus prüft erst der Lauf).
+ */
+const seatsOf = (value) => {
+  const list = Array.isArray(value) ? value : [value];
+  return list.length && list.every(n => Number.isInteger(n) && n >= 1) ? list : null;
+};
+function describeSeatedGate(value) {
+  const seats = value === undefined ? null : seatsOf(value);
+  return seats ? ` · only with a villager at seat ${seats.join(' or ')}` : '';
 }
 
 /**
@@ -437,7 +458,8 @@ function describeWork(step) {
     // und „18" sehen nebeneinander gleich aus und tun Verschiedenes.
     case 'set_counter': {
       const form = counterValueForm(step?.value);
-      const n = Number(String(step?.value ?? '').trim());
+      // M31.4/EP: ein wörtliches Produkt ("+6*3") rechnet `foldProduct`, wie der Executor - sonst „by NaN".
+      const n = Number(foldProduct(String(step?.value ?? '').trim()));
       const what = form === 'max' ? 'to its maximum'
         : form === 'base' ? 'to its starting value'
         : form === 'add' ? `by ${n}`
@@ -741,6 +763,12 @@ export function validateStep(step, ctx = {}) {
       const r = checkGate(step.onlyChoice, ctx.options, known);
       if (!r.ok) problems.push(r.problem);
     }
+  }
+  // M31.3/EP: das Gate `onlySeated` - ein Platz (ganze Zahl ab 1) oder eine nicht leere Liste davon.
+  // Die obere Grenze (`seats.length`) kennt der Editor nicht, er kennt die Szenariodaten nicht; sie
+  // prüft der Lauf (fail-loud). In einer Aktion erlaubt: es liest den Tisch, den die Aktion sieht.
+  if (step?.onlySeated !== undefined && !seatsOf(step.onlySeated)) {
+    problems.push(`onlySeated: ${JSON.stringify(step.onlySeated) ?? String(step.onlySeated)} is not a seat (a whole number from 1) or a list of seats`);
   }
   if (ctx?.inAction) {
     for (const ph of new Set(optPlaceholdersIn(step))) {
