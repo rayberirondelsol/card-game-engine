@@ -169,6 +169,10 @@ Fotos des gedruckten Tableaus, leicht verkippt. Die PDFs unter
 wurde mit den Bildern aus der Datenbank, die dieselben Fotos sein dürften
 (ungeprüft, §9).
 
+> **Nachtrag 2026-11-09: die PDFs sind jetzt geöffnet** (§9.17). Sie sind keine zweite
+> Quelle für die Feldadressen — gemessen bleibt am Bild aus der Datenbank —, aber sie
+> klären, **was** auf den Tableauseiten steht.
+
 **Ableseverfahren.** Je Rückseite wurde die Rasterlage **aus den gedruckten
 Linien** bestimmt: Spalten- und Zeilenprofil des entzerrten Bildes, Tiefpunkte an
 den erwarteten Linien, lineare Anpassung über die Stützpunkte (15–18 von 18
@@ -593,6 +597,11 @@ sicher gelesen.
     > **Nachtrag 2026-11-08: für drei der Plättchen behoben mit M29.** `Sprengstoff`, `Auslöser` → `Sprengstoff & Auslöser` und `Dichter Wald 2` → `Dichter Wald` über die Tabelle `terrainCards`
     > (nicht durch Umbenennen und nicht durch neue Karten). **Bleibt unbehoben (14 Plättchenarten, acht Endkämpfe):** `Versteckter Bürger … / Große Milchkanne`, `Ritualzeichen / Weizenfeld`,
     > `Verschlingende Welle`, dazu `Grabhügel …` (Virginia), `Die Bundo-Königin / Beruhigungs-Leckerli`, `Pile of Locals` — dort gibt es keine Karte, die man zuordnen könnte (M29.10).
+    >
+    > **Nachtrag 2026-11-09: und es wird auch keine geben.** Die PDFs der Tableaus zeigen, warum: die Regeln dieser Gelände stehen auf der **Tableau-Rückseite** in einem eigenen
+    > Kasten `TERRAIN: <Name>` — belegt an Virginia Fitz (`TERRAIN: BURIAL MOUND`), The Bundits (`TERRAIN: THE BUNDO QUEEN`) und Handsy (`TERRAIN: HIDING CITIZENS`). Das Spiel
+    > druckt sie dort statt auf einer Karte, und die Plättchen tragen auf dem Tableau ihr Etikett (*OBSTACLE* / *FEATURE*). **Die Entscheidung aus Nr. 10 entfällt damit:** weder
+    > umbenennen noch Karten anlegen — es ist kein Mangel, sondern die Bauart. Die acht Hinweise des Rauchtests sind der richtige Zustand.
 11. **`TRILLERPFEIFE` mehrdeutig** (§8): Handsy-Endkampf legt die Karte nicht.
 12. **Nicht abgebildet, weil kein Platz in den Daten:** Dozys „Schätzchen" (3 LEB je
     Dörfler, nimmt ihren Zug nach Dozy) und dass Dozy keinen Schaden nimmt, solange sie
@@ -612,6 +621,23 @@ sicher gelesen.
 16. **Seitenverhältnis:** `checkScenarioAspect` meldet drei Treffer (je 6 %), alle an
     Bürger-/Milchkannen-Plättchen (Bildverhältnis 0,94–0,95 gegen 1,00) — Foto-Ränder,
     kein Tippfehler (die Schwelle liegt bei 5 %). Alles andere liegt darunter.
+
+17. **Die Tableauseiten — was worauf steht** (geklärt 2026-11-09 an den PDFs unter
+    `Z:\Austausch\TfT\`, 15 Bösewicht-Tableaus beidseitig):
+
+    | Seite | Inhalt |
+    |---|---|
+    | **Vorderseite** | Der Charakterbogen: Porträt, Erzähltext, `MVMT`/`HEALTH`/`AMBUSH`, die Stufen `CHUMP`/`HOOLIGAN`/`TROUBLEMAKER`, `WEAKNESS`, `Ruffian Gear Rewards`. **Kein Spielplan.** |
+    | **Rückseite** | Der **Spielplan** (Raster A–S / 1–14 mit eingezeichnetem Gelände, `R`- und `T`-Startfeldern), darunter das Banner `FINAL FIGHT / <Szenarioname>`, `SETUP`, die Fähigkeiten, `HOW TO WIN`, `THE RESULTS`, `WEAKNESS` — und bei acht Bösewichten der Kasten `TERRAIN: <Name>` (Nr. 10). |
+
+    **Daraus folgt, was die Daten ohnehin tun:** ein Bösewicht hat **genau ein**
+    Geländelayout, nicht eines je Kampfart. Das deckt sich mit `[DE S.33]`, wo je
+    Grundspiel-Bösewicht **sieben** Terrains stehen (`docs/tft-regeln.md` §6.3), und mit
+    dem Executor, der `final` **additiv** auflegt (`parts = [entry, useFinal ? entry.final : null]`):
+    Vorkampf = die sieben, Endkampf = die sieben **plus** die Sonderteile. Darum ist
+    `final.terrain` bei zwölf der zwanzig leer — sie legen nichts obendrauf, nicht: sie
+    hätten keinen Plan. Wird einer von ihnen als erster aufgedeckt, liegt sein volles
+    Gelände genauso (`useFinal = false`).
 
 ---
 
