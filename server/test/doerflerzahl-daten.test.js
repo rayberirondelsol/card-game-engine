@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { seatedVillagers } from '../../shared/villagers.js';
 import { validateScenarioData, terrainFor } from '../../shared/scenarioData.js';
 import { resolveZones, anchorBoxes } from '../../shared/anchoring.js';
-import { zoneContains, objectsInZone, zoneSlots } from '../../shared/zoneGeometry.js';
+import { zoneContains, objectsInZone, zoneSlots, zoneSlotNumberAt } from '../../shared/zoneGeometry.js';
 import { executeSequenceWithLog } from '../../shared/sequenceExecutor.js';
 import { bauen, ohneIds, seededRng } from '../../scripts/auslagen-daten.mjs';
 
@@ -513,7 +513,7 @@ test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, d
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k]), ['scenario'], k);
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k].scenario), ['laenge', 'sha'], k);
   }
-  for (const k of ['optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of Object.keys(SCHRITTE)) assert.notEqual(SCHRITTE[k], null, `${k} ist gebaut (optionen seit EX)`);
   assert.equal(GAME_ID, '072123c0-cd97-4ffb-a330-369630fab93f');
   assert.equal(SETUP_ID, 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b');
 });
@@ -550,7 +550,7 @@ test('ES 8: die Datei startet nur, wenn `process.argv[1]` auf ihren **eigenen** 
 // ── Die Läufe gegen eine Wegwerf-Datenbank ──────────────────────────────────
 
 /** Das echte Schema (`setupDatabase` in einem Kindprozess), die Bibliothek aus dem Auszug, die Kurzpartie mit den drei Spalten **aus der Fixture**, ein zweiter Aufbau, drei Spielstände. */
-function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.actions } = {}) {
+function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.actions, zon = zones, ast = assets } = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cge-doerflerzahl-'));
   const file = path.join(tmp, 'test.db');
   execFileSync(process.execPath, ['--input-type=module', '-e',
@@ -564,7 +564,7 @@ function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.acti
     if (!cat.has(name)) { cat.set(name, randomUUID()); db.prepare('insert into categories (id, game_id, name) values (?, ?, ?)').run(cat.get(name), GAME_ID, name); }
     return cat.get(name);
   };
-  for (const a of assets) {
+  for (const a of ast) {
     db.prepare('insert into table_assets (id, game_id, type, name, image_path, back_image_path, width, height, category_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .run(a.id, GAME_ID, a.type, a.name, a.image_path, a.back_image_path, a.width, a.height, catId(a.category));
   }
@@ -573,7 +573,7 @@ function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.acti
       .run(c.id, GAME_ID, catId(c.category), c.name, c.image_path, c.width, c.height);
   }
   db.prepare('insert into setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(SETUP_ID, GAME_ID, 'TFT Aufbau', JSON.stringify(state), JSON.stringify(zones), seq, JSON.stringify(grids), act, scen);
+    .run(SETUP_ID, GAME_ID, 'TFT Aufbau', JSON.stringify(state), JSON.stringify(zon), seq, JSON.stringify(grids), act, scen);
   db.prepare("insert into setups (id, game_id, name, sequence_data, scenario_data, action_data) values (?, ?, 'Grundaufbau', '[{\"type\":\"shuffle\"}]', '{}', '[]')").run(randomUUID(), GAME_ID);
   for (const [n, d] of [['Auto Save', '{"a":0}'], ['Partie 14 – Sieg gegen Virginia Fitz', '{"a":1}'], ['Partie 13 – Endkampf', '{"a":2}']]) {
     db.prepare('insert into save_states (id, game_id, name, state_data, setup_id) values (?, ?, ?, ?, ?)').run(randomUUID(), GAME_ID, n, d, SETUP_ID);
@@ -963,18 +963,7 @@ test('ES main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst'
   } finally { weg(tmp); }
 });
 
-test('ES main: die noch nicht gebauten Schritte (seit EW: nur noch `optionen`) melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1', async () => {
-  let geoeffnet = 0;
-  class Spion { constructor() { geoeffnet++; throw new Error('die Datenbank darf nicht geöffnet werden'); } }
-  for (const schritt of ['optionen']) {
-    for (const modus of [['--check', 'gibt-es-nicht.db'], ['--write', 'gibt-es-nicht.db', '--sicherung-sha', 'abcdefabcdef'], ['--zurueck', 'sicherung.json', 'gibt-es-nicht.db']]) {
-      const r = await lauf([...modus, '--schritt', schritt], { Db: Spion });
-      assert.equal(r.code, 1, `${schritt} ${modus[0]}: ${r.out}`);
-      assert.match(r.out, new RegExp(`Schritt „${schritt}“ ist noch nicht gebaut`));
-    }
-  }
-  assert.equal(geoeffnet, 0);
-});
+// (Der Test „die noch nicht gebauten Schritte melden »noch nicht gebaut«“ steht seit EX bei den `EX main`-Tests: es gibt keinen ungebauten Schritt mehr, der Mechanismus wird dort mit einem kurz auf `null` gestellten gezeigt.)
 
 test('ES main: stimmt der gerechnete Zielstand nicht mit der Konstante überein, hält der Lauf an – `--check` wie `--write` (die Konstante wird für den Test kurz verstellt)', async () => {
   const { tmp, file } = frischeDatenbank();
@@ -1537,9 +1526,9 @@ test('ET main: Vergleich-und-Tausch und Transaktion – ändert jemand `scenario
 
 // ── ET 8. Das Gerüst ────────────────────────────────────────────────────────
 
-test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }`, `optionen` bleibt `null` (`aktionen` seit EW gebaut); der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
+test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }` (alle sechs Schritte sind seit EX gebaut); der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
-  for (const k of ['optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of Object.keys(SCHRITTE)) assert.notEqual(SCHRITTE[k], null, k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
   const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
   const { laenge, sha: h } = SCHRITTE.werte.ziel.scenario;
@@ -2155,9 +2144,8 @@ test('EW 8: berührt nur `action_data` – der Zielstand trägt nichts anderes, 
   assert.equal(text(EW.patchAssets(copy(assets)).assets), as);
 });
 
-test('EW 8: `SCHRITTE` – `aktionen` ist gebaut (`{ ausgang, ziel }`), nur `optionen` bleibt `null`; der Kopf des Skripts nennt weder Länge noch Hash des Ziels und des Ausgangs', () => {
+test('EW 8: `SCHRITTE` – `aktionen` ist gebaut (`{ ausgang, ziel }`); der Kopf des Skripts nennt weder Länge noch Hash des Ziels und des Ausgangs', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
-  assert.equal(SCHRITTE.optionen, null);
   assert.deepEqual(Object.keys(SCHRITTE.aktionen), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) assert.deepEqual(Object.keys(SCHRITTE.aktionen[k].action), ['laenge', 'sha'], k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
@@ -2494,4 +2482,1294 @@ test('EW main: die Reihenfolge zu `gelaende` (ES) ist gleichgültig – erst `ak
     } finally { weg(tmp); }
   }
   assert.deepEqual(fertig[0], fertig[1]);
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EX Teil 1 / Spec M31.5, M31.8 Punkt 8, M31.12 — die Option: der Schalter: Schritt `optionen`
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// **Dieser Schritt macht zwei bis fünf Dörfler möglich.** Eingang ist der Ausgang aus `ES` und `ET` (`SC_PROD`: `scenario_data` mit `fromCount` und `statsByCount`, **drei** Plätze, kein
+// `baseCount`) und die Folge der Fixture (29 Schritte); dazu **die fünf davor geschriebenen Schritte** als Vorgänger: die Zonen aus `EU`, die Assets aus `EV`, die Aktionen aus `EW`
+// (`EX_VORG`) — der Baustein verlangt sie **vor dem ersten Byte**. Die Tische kommen aus dem Aufbau (`bauen`) mit dem Zielstand dieses Schrittes.
+//
+// **Der Zielstand steht hier ein zweites Mal, ausgeschrieben** (`exOption`, `EX_SEQ`, `exScNeu`) — aus dem Pflichtenheft, nicht aus dem Baustein gelesen. Wer die Stücke aus dem Baustein holte,
+// prüfte ihn gegen sich selbst. Die Länge und der Hash des Ziels stehen **einmal** im Skript (`SCHRITTE`). Alle Tische darunter bauen mit dem **Ausgang des Bausteins** (`exZ`), nicht mit
+// dem ausgeschriebenen Text: sie prüfen, was der Baustein schreibt.
+
+const EX_NEUN = [['Henlo', 'Henlo Bulwark'], ['Fridgette', 'Fridgette Jones'], ['Granny', 'Granny Melba'], ['Blopsy', 'Blopsy Twins'], ['Georgie', 'Georgie Irongut'],
+  ['Judy', 'Judy Marks'], ['Norman', 'Norman Fishboy'], ['Quintus', 'Quintus Binch'], ['Yancy', 'Yancy Plover']];
+const exWahlen = (n) => Object.fromEntries(EX_NEUN.map(([k, v]) => [k, { label: v, vars: { [`Doerfler${n}`]: v } }]));
+/** Eine optionale Option der Leiter, im Wortlaut der Spec (M31.5): `label`, `default`, `optional`, `choices` — `keiner` **zuletzt**. */
+const exOption = (n, on, keiner) => ({
+  label: `Dörfler ${n}`,
+  default: 'keiner',
+  optional: { off: 'keiner', on, addLabel: 'Weiteren Dörfler hinzufügen' },
+  choices: { ...exWahlen(n), keiner: { label: keiner, vars: { [`Doerfler${n}`]: '' } } },
+});
+const exOptionsNeu = () => {
+  const o = copy(SC_PROD.options);
+  o.partie.choices.kurz.vars = { MuenzenJeDoerfler: '15' };
+  o.partie.choices.lang.vars = { MuenzenJeDoerfler: '10' };
+  o.doerfler3 = exOption(3, 'Granny', 'kein dritter Dörfler');
+  o.doerfler4 = exOption(4, 'Blopsy', 'kein vierter Dörfler');
+  o.doerfler5 = exOption(5, 'Yancy', 'kein fünfter Dörfler');
+  return o;
+};
+const exSeat = (n, anchor, x) => ({ anchor, zones: `Dörfler ${n}`, markers: `Marker ${n}`, vorrat: `Ausrüstung Dörfler ${n}`, tableau: { x, y: 1600 } });
+const exScNeu = () => {
+  const s = copy(SC_PROD);
+  s.options = exOptionsNeu();
+  s.villagers.seats.push(exSeat(4, 'Tableau: Blopsy Twins', 2040), exSeat(5, 'Tableau: Yancy Plover', 2620));
+  s.villagers.baseCount = 3;
+  return s;
+};
+const EX_SEQ = {
+  s3alt: '{"type":"seat_villager","seat":3,"villager":"$optDoerfler3"}',
+  s3: '{"type":"seat_villager","seat":3,"villager":"$optDoerfler3","onlyChoice":{"doerfler3":"!keiner"}}',
+  s4: '{"type":"seat_villager","seat":4,"villager":"$optDoerfler4","onlyChoice":{"doerfler4":"!keiner"}}',
+  s5: '{"type":"seat_villager","seat":5,"villager":"$optDoerfler5","onlyChoice":{"doerfler5":"!keiner"}}',
+  muenzenAlt: '{"type":"place_counter","name":"Münzen (gemeinsam)","value":"$optMuenzen","x":2080,"y":1430}',
+  muenzen: '{"type":"place_counter","name":"Münzen (gemeinsam)","value":"$optMuenzenJeDoerfler*$doerflerzahl","x":2000,"y":1040}',
+};
+const exSeqNeu = () => [...copy(sequence.slice(0, 27)), ...[EX_SEQ.s3, EX_SEQ.s4, EX_SEQ.s5, EX_SEQ.muenzen].map(s => JSON.parse(s))];
+const EX_VORG = { zone: EW_ZONEN, assets: EW_ASSETS, action: ZIEL_AKT };
+const EX_Z = SCHRITTE.optionen?.ziel;                // ohne Konstante: undefined, die Tests darunter sind rot
+const exCache = {};
+/** Der Zielstand des Bausteins, einmal gerechnet (Länge und Hash prüft `EX 1`). */
+const exZ = () => {
+  if (process.env.EX_ZIEL_AUS_TEXT) return { art: 'zu-schreiben', scenario: exScNeu(), sequence: exSeqNeu() };   // nur zum Prüfen der Tests vor dem Baustein
+  return (exCache.z ??= EW.patchSchalter(SC_PROD, sequence, EX_VORG));
+};
+const exAbw = (sc, seq = sequence, v = EX_VORG) => {
+  const p = EW.patchSchalter(sc, seq, v);
+  assert.equal(p.art, 'abweichend', `erwartet abweichend, ist ${p.art}`);
+  assert.equal(p.scenario, undefined, 'bei einer Abweichung gibt es keinen Zielstand');
+  assert.equal(p.sequence, undefined);
+  return p.probleme.join('\n');
+};
+const exMit = (fn) => { const s = copy(SC_PROD); fn(s); return s; };
+const exMitSeq = (fn) => { const s = copy(sequence); fn(s); return s; };
+
+// ── EX 0. Die Messung: die Fixture ist, was der Befund erwartet ─────────────
+
+test('EX 0: **gezählt**, nicht geglaubt – 29 Schritte, Platz 3 an Schritt 27, die Münzen an Schritt 28; drei Plätze, kein `baseCount`; fünf Optionen davor in der Reihenfolge `partie`, `troedel`, `doerfler1` … `doerfler3`', () => {
+  assert.equal(sequence.length, 29);
+  assert.deepEqual(sequence.map((s, i) => [i, s.type]).filter(([, t]) => t === 'seat_villager').map(([i]) => i), [25, 26, 27]);
+  assert.equal(text(sequence[27]), EX_SEQ.s3alt, 'Schritt 27: Platz 3');
+  assert.equal(text(sequence[28]), EX_SEQ.muenzenAlt, 'Schritt 28: die Münzen, der letzte Schritt');
+  assert.equal(sequence.filter(s => s.type === 'place_counter').length, 1);
+  assert.deepEqual(Object.keys(SC_PROD.options), ['partie', 'troedel', 'doerfler1', 'doerfler2', 'doerfler3']);
+  assert.deepEqual(Object.keys(SC_PROD.options.doerfler3), ['label', 'default', 'choices']);
+  assert.equal(SC_PROD.options.doerfler3.optional, undefined);
+  assert.deepEqual(SC_PROD.options.partie.choices.kurz.vars, { Muenzen: '45' });
+  assert.deepEqual(SC_PROD.options.partie.choices.lang.vars, { Muenzen: '30' });
+  assert.equal(SC_PROD.villagers.seats.length, 3);
+  assert.equal(SC_PROD.villagers.baseCount, undefined);
+  assert.deepEqual(Object.keys(SC_PROD.villagers), ['fightZone', 'barZone', 'seats', 'roster']);
+  assert.deepEqual(Object.values(SC_PROD.villagers.roster).map(v => v.short), EX_NEUN.map(([k]) => k), 'die neun Kurznamen, in der Reihenfolge des Rosters');
+  assert.deepEqual(Object.keys(SC_PROD.villagers.roster), EX_NEUN.map(([, v]) => v));
+  assert.deepEqual(Object.keys(SC_PROD.options.doerfler3.choices), EX_NEUN.map(([k]) => k));
+  // Der Ausgang dieses Schritts: `scenario` ist das Ziel von `werte` (dieselbe Zahl), `sequence` der Stand nach M30.
+  assert.deepEqual([text(SC_PROD).length, sha(text(SC_PROD))], [SCHRITTE.werte.ziel.scenario.laenge, SCHRITTE.werte.ziel.scenario.sha]);
+  assert.deepEqual(SCHRITTE.optionen?.ausgang, { scenario: SCHRITTE.werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } });
+  assert.deepEqual(SCHRITTE.optionen?.ausgang.sequence, sw.SCHRITTE.boss.ziel.sequence);
+  assert.deepEqual([dz.sequence.length, sha(dz.sequence)], [2621, 'e859bd457002']);
+  // Die Vorgänger: jeder der fünf steht im Ziel (so, wie `EX_VORG` sie hält).
+  assert.equal(EW.patchGelaende(SC_PROD).art, 'schon-da');
+  assert.equal(EW.patchWerte(SC_PROD).art, 'schon-da');
+  assert.equal(EW.patchZonen(EX_VORG.zone).art, 'schon-da');
+  assert.equal(EW.patchAssets(EX_VORG.assets).art, 'schon-da');
+  assert.equal(EW.patchAktionen(EX_VORG.action).art, 'schon-da');
+});
+
+// ── EX 1. Der Zielstand ─────────────────────────────────────────────────────
+
+test('EX 1: Zielstand – genau der ausgeschriebene Text aus dem Pflichtenheft, **beide** Spalten; 29 → 31 Schritte; Länge und Hash, so wie das Skript sie als Konstanten trägt', () => {
+  const z = exZ();
+  assert.equal(z.art, 'zu-schreiben', (z.probleme ?? []).join('\n'));
+  assert.deepEqual(Object.keys(z), ['art', 'scenario', 'sequence'], 'der Zielstand trägt genau `scenario` und `sequence`');
+  assert.equal(text(z.scenario), text(exScNeu()));
+  assert.equal(text(z.sequence), text(exSeqNeu()));
+  assert.equal(z.sequence.length, 31);
+  const [sc, sq] = [text(z.scenario), text(z.sequence)];
+  assert.deepEqual([sc.length, sha(sc)], [EX_Z.scenario.laenge, EX_Z.scenario.sha]);
+  assert.deepEqual([sq.length, sha(sq)], [EX_Z.sequence.laenge, EX_Z.sequence.sha]);
+  assert.ok(sc.length > text(SC_PROD).length && sq.length > dz.sequence.length, 'beide Texte sind länger geworden');
+  assert.deepEqual(Object.keys(SCHRITTE.optionen), ['ausgang', 'ziel']);
+  for (const k of ['ausgang', 'ziel']) assert.deepEqual(Object.keys(SCHRITTE.optionen[k]), ['scenario', 'sequence'], k);
+});
+
+test('EX 1: die Stücke des Befunds – `options.doerfler3/4/5` mit `optional` und `keiner` zuletzt, `partie` bindet `MuenzenJeDoerfler` 15 / 10, `baseCount` 3, fünf Sitze, vier Schritte hinten', () => {
+  const o = exZ().scenario.options;
+  for (const [n, on, keiner] of [[3, 'Granny', 'kein dritter Dörfler'], [4, 'Blopsy', 'kein vierter Dörfler'], [5, 'Yancy', 'kein fünfter Dörfler']]) {
+    const d = o[`doerfler${n}`];
+    assert.deepEqual(d.optional, { off: 'keiner', on, addLabel: 'Weiteren Dörfler hinzufügen' }, `doerfler${n}.optional`);
+    assert.equal(d.default, 'keiner');
+    assert.equal(Object.keys(d.choices).length, 10, 'neun Wahlen plus `keiner`');
+    assert.equal(Object.keys(d.choices).at(-1), 'keiner', '`keiner` steht **zuletzt**');
+    assert.deepEqual(d.choices.keiner, { label: keiner, vars: { [`Doerfler${n}`]: '' } });
+  }
+  assert.deepEqual(o.partie.choices.kurz.vars, { MuenzenJeDoerfler: '15' });
+  assert.deepEqual(o.partie.choices.lang.vars, { MuenzenJeDoerfler: '10' });
+  assert.equal(exZ().scenario.villagers.baseCount, 3);
+  assert.equal(exZ().scenario.villagers.seats.length, 5);
+  assert.deepEqual(exZ().scenario.villagers.seats.slice(3), [exSeat(4, 'Tableau: Blopsy Twins', 2040), exSeat(5, 'Tableau: Yancy Plover', 2620)]);
+  const q = exZ().sequence;
+  assert.deepEqual(q.slice(27).map(text), [EX_SEQ.s3, EX_SEQ.s4, EX_SEQ.s5, EX_SEQ.muenzen]);
+  assert.equal(q.at(-1).x, 2000);
+  assert.equal(q.at(-1).y, 1040);
+  assert.equal(q.at(-1).value, '$optMuenzenJeDoerfler*$doerflerzahl', '`$doerflerzahl` klein, das Produkt in dieser Reihenfolge');
+});
+
+test('EX 1: **alles andere byteweise gleich** – jeder Schlüssel von `scenario_data` außer `options` und `villagers`, `partie` bis auf `vars`, `troedel`, `doerfler1`, `doerfler2`, Roster, `fightZone`, `barZone`, die drei alten Sitze; die ersten 27 Schritte', () => {
+  const a = SC_PROD, b = exZ().scenario;
+  assert.deepEqual(Object.keys(b), Object.keys(a), 'die Schlüssel von scenario_data, in derselben Reihenfolge');
+  for (const k of Object.keys(a).filter(x => x !== 'options' && x !== 'villagers')) assert.equal(text(b[k]), text(a[k]), `scenario_data.${k}`);
+  for (const k of ['troedel', 'doerfler1', 'doerfler2']) assert.equal(text(b.options[k]), text(a.options[k]), `options.${k}`);
+  for (const k of ['label', 'default']) assert.equal(text(b.options.partie[k]), text(a.options.partie[k]), `options.partie.${k}`);
+  for (const k of ['kurz', 'lang']) assert.equal(text(b.options.partie.choices[k].label), text(a.options.partie.choices[k].label), `options.partie.choices.${k}.label`);
+  assert.deepEqual(Object.keys(b.options.partie.choices.kurz), Object.keys(a.options.partie.choices.kurz));
+  for (const k of ['fightZone', 'barZone', 'roster']) assert.equal(text(b.villagers[k]), text(a.villagers[k]), `villagers.${k}`);
+  assert.equal(text(b.villagers.seats.slice(0, 3)), text(a.villagers.seats));
+  assert.equal(text(exZ().sequence.slice(0, 27)), text(sequence.slice(0, 27)));
+  assert.equal(text({ ...exZ().sequence[27], onlyChoice: undefined }), text(sequence[27]), 'Platz 3 trägt nur das Gate dazu');
+  // Gegen den Ausgang verglichen unterscheiden sich genau die Pfade der Stücke – nichts sonst.
+  const ERLAUBT = /^\/(options\/(partie\/choices\/(kurz|lang)\/vars\/(Muenzen|MuenzenJeDoerfler)|doerfler3\/(default|optional|choices\/keiner)|doerfler[45])|villagers\/(seats\/[34]|baseCount))$/;
+  const pfade = unterschiede(a, b);
+  assert.deepEqual(pfade.filter(p => !ERLAUBT.test(p)), [], 'außerhalb der Stücke unterscheidet sich nichts');
+  assert.ok(pfade.length >= 10, `die Stücke sind da: ${pfade.join(' ')}`);
+});
+
+test('EX 1: die Reihenfolge ist **gepinnt** – `options`: `partie`, `troedel`, `doerfler1` … `doerfler5`; `doerfler<n>`: `label`, `default`, `optional`, `choices`; `optional`: `off`, `on`, `addLabel`; `choices`: die neun, dann `keiner`; Gate am Ende des Schritts', () => {
+  const { scenario: s, sequence: q } = exZ();
+  assert.deepEqual(Object.keys(s.options), ['partie', 'troedel', 'doerfler1', 'doerfler2', 'doerfler3', 'doerfler4', 'doerfler5']);
+  for (const n of [3, 4, 5]) {
+    const d = s.options[`doerfler${n}`];
+    assert.deepEqual(Object.keys(d), ['label', 'default', 'optional', 'choices']);
+    assert.deepEqual(Object.keys(d.optional), ['off', 'on', 'addLabel']);
+    assert.deepEqual(Object.keys(d.choices), [...EX_NEUN.map(([k]) => k), 'keiner']);
+    assert.deepEqual(Object.keys(d.choices.Henlo), ['label', 'vars']);
+  }
+  assert.deepEqual(Object.keys(s.villagers), ['fightZone', 'barZone', 'seats', 'roster', 'baseCount'], '`baseCount` kommt hinten dazu (wie `mitBasis` in ET 6)');
+  assert.deepEqual(Object.keys(s.villagers.seats[3]), ['anchor', 'zones', 'markers', 'vorrat', 'tableau']);
+  assert.deepEqual(Object.keys(q[27]), ['type', 'seat', 'villager', 'onlyChoice']);
+  assert.deepEqual(Object.keys(q[30]), ['type', 'name', 'value', 'x', 'y']);
+});
+
+test('EX 1: Rückwärtsbeweis **und** Vorwärtsprobe – die Stücke zurück: der gelesene Text, beide Spalten, Zeichen für Zeichen; aus dem Zurückgerechneten entsteht genau der Zielstand', () => {
+  const z = exZ();
+  assert.deepEqual(EW.beweiseSchalter({ scenario: SC_PROD, sequence }, { scenario: z.scenario, sequence: z.sequence }, EX_VORG), []);
+  assert.deepEqual(EW.beweiseSchalter({ scenario: SC_PROD, sequence }, { scenario: exScNeu(), sequence: exSeqNeu() }, EX_VORG), [], 'auch gegen den ausgeschriebenen Zielstand dieses Tests');
+});
+
+test('EX 1: die Beweise fangen, was nicht stimmt – eine andere Reihenfolge, ein falscher Wert (die Vorwärtsprobe, nicht der Rückwärtsbeweis), ein Stück zu viel, ein fremder Schlüssel, ein veränderter alter Schritt', () => {
+  const mut = (fn) => { const c = { scenario: exScNeu(), sequence: exSeqNeu() }; fn(c); return c; };
+  const FALL = {
+    'options: `troedel` vor `partie`': (c) => { const { partie, troedel, ...rest } = c.scenario.options; c.scenario.options = { troedel, partie, ...rest }; },
+    'options: `doerfler5` vor `doerfler4`': (c) => { const { doerfler4, doerfler5, ...rest } = c.scenario.options; c.scenario.options = { ...rest, doerfler5, doerfler4 }; },
+    '`keiner` nicht zuletzt': (c) => { const ch = c.scenario.options.doerfler4.choices; const { keiner, ...rest } = ch; c.scenario.options.doerfler4.choices = { keiner, ...rest }; },
+    '`default` nicht keiner': (c) => { c.scenario.options.doerfler5.default = 'Yancy'; },
+    '`optional.on` am falschen Dörfler': (c) => { c.scenario.options.doerfler4.optional.on = 'Yancy'; },
+    '`addLabel` anders': (c) => { c.scenario.options.doerfler3.optional.addLabel = 'Dörfler dazu'; },
+    '`MuenzenJeDoerfler` kurz 10 statt 15': (c) => { c.scenario.options.partie.choices.kurz.vars.MuenzenJeDoerfler = '10'; },
+    '`baseCount` 4': (c) => { c.scenario.villagers.baseCount = 4; },
+    '`baseCount` fehlt': (c) => { delete c.scenario.villagers.baseCount; },
+    'nur ein neuer Sitz': (c) => { c.scenario.villagers.seats.pop(); },
+    'ein Sitz mit anderem Anker': (c) => { c.scenario.villagers.seats[4].anchor = 'Tableau: Norman Fishboy'; },
+    'ein Sitz mit `counters`': (c) => { c.scenario.villagers.seats[3].counters = {}; },
+    'ein vierter alter Sitz verändert': (c) => { c.scenario.villagers.seats[0].tableau.x = 301; },
+    'ein fremder Schlüssel in scenario_data': (c) => { c.scenario.fremd = 1; },
+    'Gate mit `keiner` statt `!keiner`': (c) => { c.sequence[28].onlyChoice = { doerfler4: 'keiner' }; },
+    'Gate am Platz 3 fehlt': (c) => { delete c.sequence[27].onlyChoice; },
+    'Platz 4 und 5 hinter den Münzen': (c) => { const q = c.sequence; [q[28], q[29], q[30]] = [q[30], q[28], q[29]]; },
+    'Münzen: Summe statt Produkt': (c) => { c.sequence[30].value = '$optMuenzenJeDoerfler+$doerflerzahl'; },
+    'Münzen nicht verschoben (x)': (c) => { c.sequence[30].x = 2080; },
+    'Münzen nicht verschoben (y)': (c) => { c.sequence[30].y = 1430; },
+    'ein Schritt mehr': (c) => { c.sequence.push({ type: 'shuffle', stackLabel: 'Heldentaten' }); },
+    'ein alter Schritt verändert': (c) => { c.sequence[3].x = 1781; },
+  };
+  for (const [name, fn] of Object.entries(FALL)) {
+    const c = mut(fn);
+    const m = EW.beweiseSchalter({ scenario: SC_PROD, sequence }, c, EX_VORG);
+    assert.ok(m.length > 0, `der Beweis fängt nicht: ${name}`);
+  }
+  assert.ok(EW.beweiseSchalter({ scenario: SC_PROD, sequence }, { scenario: exScNeu() }, EX_VORG).length > 0, 'ohne `sequence` im Zielstand');
+  assert.ok(EW.beweiseSchalter({ scenario: SC_PROD, sequence }, {}, EX_VORG).length > 0, 'ohne Zielstand');
+});
+
+// ── EX 2. Die Prüfer ────────────────────────────────────────────────────────
+
+test('EX 2: `validateOptions` → `[]`, `validateScenarioData` → keine Probleme, `validateVillagers` mit allen Assets und Zonen → keine; `optionalOf` an 3, 4, 5 nicht `null`; jedes `vars.Doerfler<n>` außer `keiner` ist ein Schlüssel des Rosters', async () => {
+  const { optionalOf, ladderOf } = await import('../../shared/setupOptions.js');
+  const { validateVillagers } = await import('../../shared/villagers.js');
+  const { scenario: s, sequence: q } = exZ();
+  assert.deepEqual(validateOptions(s.options, q, EX_VORG.action), []);
+  assert.deepEqual(validateScenarioData(s, { assets: EW_ASSETS, grids, cards }), []);
+  assert.deepEqual(validateScenarioData(s), []);
+  assert.deepEqual(validateVillagers(s.villagers, { assets: EW_ASSETS, cards, zones: EW_ZONEN }), [], 'mit **allen** Assets und Zonen: fünf Plätze');
+  assert.deepEqual(validateVillagers(SC_PROD.villagers, { assets: EW_ASSETS, cards, zones: EW_ZONEN }), [], 'und die drei alten Plätze wie vorher');
+  for (const n of [3, 4, 5]) {
+    const o = optionalOf(s.options[`doerfler${n}`]);
+    assert.notEqual(o, null, `doerfler${n} ist optional`);
+    assert.equal(o.isOff, true, 'die Vorgabe ist aus');
+    assert.deepEqual([o.off, o.on, o.addLabel], ['keiner', EX_NEUN[[2, 3, 8][n - 3]][0], 'Weiteren Dörfler hinzufügen']);
+  }
+  for (const n of [1, 2]) assert.equal(optionalOf(s.options[`doerfler${n}`]), null, 'Dörfler 1 und 2 sind die Untergrenze');
+  const roster = s.villagers.roster;
+  for (const n of [3, 4, 5]) {
+    const d = s.options[`doerfler${n}`];
+    for (const [k, c] of Object.entries(d.choices)) {
+      const v = c.vars[`Doerfler${n}`];
+      if (k === 'keiner') { assert.equal(v, ''); continue; }
+      assert.ok(Object.prototype.hasOwnProperty.call(roster, v), `${k}: „${v}“ ist ein Schlüssel von villagers.roster`);
+      assert.equal(roster[v].short, k, `${k}: der Schlüssel der Wahl ist der Kurzname`);
+    }
+    // `on` ist der Dörfler, dessen Tableau der Anker des Platzes ist (M31.5).
+    const on = Object.entries(roster).find(([, v]) => v.short === d.optional.on)[0];
+    assert.equal(s.villagers.seats[n - 1].anchor, `Tableau: ${on}`, `Platz ${n}: \`on\` ist der Dörfler am Anker`);
+  }
+  // Die Leiter (der Dialog fragt sie): Vorgabe = Plus bei Dörfler 3, nichts bei 4 und 5.
+  assert.deepEqual(ladderOf(s.options, {}), { kinds: { partie: 'field', troedel: 'field', doerfler1: 'field', doerfler2: 'field', doerfler3: 'plus', doerfler4: 'hidden', doerfler5: 'hidden' }, minus: null });
+  assert.deepEqual(ladderOf(s.options, { doerfler3: 'Granny' }), { kinds: { partie: 'field', troedel: 'field', doerfler1: 'field', doerfler2: 'field', doerfler3: 'field', doerfler4: 'plus', doerfler5: 'hidden' }, minus: 'doerfler3' });
+  assert.deepEqual(ladderOf(s.options, { doerfler3: 'Granny', doerfler4: 'Blopsy', doerfler5: 'Yancy' }).minus, 'doerfler5');
+  assert.ok(!Object.values(ladderOf(s.options, { doerfler3: 'Granny', doerfler4: 'Blopsy', doerfler5: 'Yancy' }).kinds).includes('plus'), 'bei fünf kein Plus mehr');
+});
+
+test('EX 2: der Prüfer des Bausteins (`pruefeSchalter`) ist zufrieden – und meldet jede Abweichung: ein `on` am falschen Platz, eine Wahl, die nicht im Roster steht, ein falscher Anker, ein unbekannter Platzhalter', () => {
+  const z = exZ();
+  assert.deepEqual(EW.pruefeSchalter(z.scenario, z.sequence, EX_VORG), []);
+  const meld = (fn) => { const c = { scenario: copy(z.scenario), sequence: copy(z.sequence) }; fn(c); return EW.pruefeSchalter(c.scenario, c.sequence, EX_VORG).join('\n'); };
+  assert.match(meld(c => { c.scenario.options.doerfler4.optional.on = 'Yancy'; }), /doerfler4.*on/);
+  assert.match(meld(c => { c.scenario.options.doerfler4.choices.Judy.vars.Doerfler4 = 'Judy Marx'; }), /Judy Marx/);
+  assert.match(meld(c => { c.scenario.villagers.seats[4].anchor = 'Tableau: Henlo Bulwark'; }), /seat 5|Platz 5|doerfler5/);
+  assert.match(meld(c => { c.sequence[30].value = '$optMuenzen*$doerflerzahl'; }), /optMuenzen/);
+  assert.match(meld(c => { c.sequence[29].onlyChoice = { doerfler6: '!keiner' }; }), /doerfler6/);
+  assert.match(meld(c => { delete c.scenario.options.doerfler5.choices.keiner; }), /keiner|does not set|optional/);
+  assert.match(meld(c => { c.scenario.villagers.seats[4].zones = 'Dörfler 9'; }), /Dörfler 9/, 'validateVillagers: die Zone gibt es nicht');
+});
+
+// ── EX 3. Die Vorbedingung je Stück ─────────────────────────────────────────
+
+test('EX 3: die Fixture trägt genau die Stücke, die der Schritt erwartet – er schreibt, und der Ausgang ist `zu-schreiben`', () => {
+  const p = EW.patchSchalter(SC_PROD, sequence, EX_VORG);
+  assert.equal(p.art, 'zu-schreiben', (p.probleme ?? []).join('\n'));
+});
+
+test('EX 3: jedes Stück muss genau das sein – ein Wert, ein Schlüssel, ein Schritt anders: Abbruch **mit Pfad**, kein Zielstand', () => {
+  const FALL = [
+    // partie
+    [exMit(s => { s.options.partie.choices.kurz.vars.Muenzen = '44'; }), /options\.partie.*kurz/],
+    [exMit(s => { s.options.partie.choices.lang.vars = { Muenzen: '30', Zusatz: '1' }; }), /options\.partie.*lang/],
+    [exMit(s => { delete s.options.partie.choices.kurz.vars.Muenzen; s.options.partie.choices.kurz.vars.MuenzenJe = '45'; }), /options\.partie.*kurz/],
+    [exMit(s => { delete s.options.partie; }), /options\.partie/],
+    // doerfler3
+    [exMit(s => { s.options.doerfler3.default = 'Henlo'; }), /options\.doerfler3/],
+    [exMit(s => { s.options.doerfler3.choices.Judy.label = 'Judy'; }), /options\.doerfler3/],
+    [exMit(s => { delete s.options.doerfler3.choices.Yancy; }), /options\.doerfler3/],
+    [exMit(s => { s.options.doerfler3.choices.keiner = { label: 'kein dritter Dörfler', vars: { Doerfler3: '' } }; }), /options\.doerfler3/],
+    [exMit(s => { delete s.options.doerfler3; }), /options\.doerfler3/],
+    // die Schlüssel von options
+    [exMit(s => { s.options.doerfler6 = copy(s.options.doerfler3); }), /options.*doerfler6|Schlüssel/],
+    [exMit(s => { const { partie, troedel, ...rest } = s.options; s.options = { troedel, partie, ...rest }; }), /options.*Reihenfolge|Schlüssel/],
+    [exMit(s => { s.options = []; }), /options/],
+    // villagers
+    [exMit(s => { s.villagers.seats.pop(); }), /villagers\.seats/],
+    [exMit(s => { s.villagers.seats.push(exSeat(4, 'Tableau: Blopsy Twins', 2040), exSeat(5, 'Tableau: Yancy Plover', 2620), exSeat(5, 'x', 1)); }), /villagers\.seats/],
+    [exMit(s => { s.villagers.seats[2].tableau.x = 1461; }), /villagers\.seats\[2\]|seats.*3/],
+    [exMit(s => { s.villagers.seats[0].counters = {}; }), /villagers\.seats\[0\]|seats.*1/],
+    [exMit(s => { s.villagers.baseCount = 4; }), /baseCount/],
+    [exMit(s => { s.villagers.roster['Blopsy Twins'].short = 'Blop'; }), /Blopsy|short|Kurzname/],
+    [exMit(s => { delete s.villagers; }), /villagers/],
+    [exMit(s => { delete s.bosses['Deputy Waggums'].final.terrain[2].fromCount; }), /Deputy Waggums|fromCount|gelaende/],
+  ];
+  for (const [sc, re] of FALL) assert.match(exAbw(sc), re, text(sc).slice(0, 0));
+  const SEQ = [
+    [exMitSeq(q => { q[27].seat = 4; }), /sequence_data\[27\]/],
+    [exMitSeq(q => { q[27].villager = 'Granny Melba'; }), /sequence_data\[27\]/],
+    [exMitSeq(q => { q[28].value = '45'; }), /sequence_data\[28\]/],
+    [exMitSeq(q => { q[28].x = 2081; }), /sequence_data\[28\]/],
+    [exMitSeq(q => { q[28].y = 1040; }), /sequence_data\[28\]/],
+    [exMitSeq(q => { q.pop(); }), /sequence_data/],
+    [exMitSeq(q => { q.push({ type: 'shuffle', stackLabel: 'Heldentaten' }); }), /sequence_data/],
+    [exMitSeq(q => { q.splice(28, 0, { type: 'seat_villager', seat: 4, villager: '$optDoerfler4' }); }), /sequence_data/],
+  ];
+  for (const [q, re] of SEQ) assert.match(exAbw(SC_PROD, q), re);
+});
+
+test('EX 3: Form – kein Objekt, keine Liste, ein Schritt kein Objekt: Abbruch mit Pfad, kein Wurf', () => {
+  for (const sc of [null, undefined, [], 'text', { options: null }, {}]) assert.equal(EW.patchSchalter(sc, sequence, EX_VORG).art, 'abweichend', text(sc));
+  for (const q of [null, undefined, {}, 'x', [null], []]) assert.equal(EW.patchSchalter(SC_PROD, q, EX_VORG).art, 'abweichend', text(q));
+  assert.match(exAbw(SC_PROD, [...sequence.slice(0, 27), 7, 8]), /sequence_data\[27\]/);
+});
+
+test('EX 3: **die fünf davor geschriebenen Schritte** sind Vorbedingung – fehlt einer (oder ist er nur halb da), Abbruch **vor** dem ersten Byte, mit dem Namen des Schritts', () => {
+  // ES: fromCount an den Endkampf-Plättchen
+  const ohneGelaende = exMit(s => { for (const n of ['Deputy Waggums', 'Pepin Milkfrog', 'Samuel Strawman']) s.bosses[n].final.terrain.splice(3); delete s.bosses['Deputy Waggums'].final.terrain[2].fromCount; });
+  assert.match(exAbw(ohneGelaende), /gelaende|ES|fromCount/);
+  const gelaendeHalb = exMit(s => { s.bosses['Deputy Waggums'].final.terrain.splice(3); });
+  assert.match(exAbw(gelaendeHalb), /gelaende|ES|fromCount|Deputy Waggums/);
+  // ET: statsByCount an den 19
+  const ohneWerte = exMit(s => { for (const b of Object.values(s.bosses)) delete b.statsByCount; });
+  assert.match(exAbw(ohneWerte), /werte|ET|statsByCount/);
+  const werteHalb = exMit(s => { delete s.bosses['Handsy'].statsByCount; });
+  assert.match(exAbw(werteHalb), /werte|ET|statsByCount|Handsy/);
+  const werte18 = exMit(s => { delete s.bosses['Handsy'].statsByCount['5']; });
+  assert.match(exAbw(werte18), /werte|ET|statsByCount|Handsy/);
+  // EU: die 28 Zonen
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, zone: zones }), /zonen|EU|28 Zonen/);
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, zone: EW_ZONEN.slice(0, -1) }), /zonen|EU|Zonen/);
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, zone: EW_ZONEN.filter(z => !/^Dörfler 5: /.test(z.label)) }), /zonen|EU|Zonen/);
+  // EV: die acht Assets
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, assets }), /assets|EV|Marker/);
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, assets: EW_ASSETS.slice(0, -1) }), /assets|EV|Marker/);
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, assets: EW_ASSETS.filter(a => a.name !== 'Marker 5: Mumm') }), /assets|EV|Marker 5: Mumm/);
+  // EW: onlySeated in den Aktionen
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, action: AKT }), /aktionen|EW|onlySeated/);
+  const aktHalb = copy(ZIEL_AKT); delete aktHalb[0].steps[11].onlySeated;
+  assert.match(exAbw(SC_PROD, sequence, { ...EX_VORG, action: aktHalb }), /aktionen|EW|onlySeated|kampf-beginnen/);
+  // nichts übergeben oder unlesbar
+  for (const v of [undefined, null, {}, { zone: EW_ZONEN, assets: EW_ASSETS }, { zone: EW_ZONEN, action: ZIEL_AKT }, { assets: EW_ASSETS, action: ZIEL_AKT }, { zone: 'x', assets: EW_ASSETS, action: ZIEL_AKT }]) {
+    assert.equal(EW.patchSchalter(SC_PROD, sequence, v).art, 'abweichend', text(v)?.slice(0, 60));
+  }
+  // Auch **schon im Ziel** gilt es: wer den Schalter geschrieben hat und dessen Vorgänger fehlen, bekommt keine Entwarnung.
+  assert.equal(EW.patchSchalter(exScNeu(), exSeqNeu(), { ...EX_VORG, action: AKT }).art, 'abweichend');
+  assert.equal(EW.patchSchalter(exScNeu(), exSeqNeu(), { ...EX_VORG, zone: zones }).art, 'abweichend');
+});
+
+test('EX 3: die Vorgänger werden **nicht verändert** – der Baustein liest sie nur (eingefrorene Eingaben: kein Wurf, dieselbe Antwort)', () => {
+  const v = { zone: frost(copy(EW_ZONEN)), assets: frost(copy(EW_ASSETS)), action: frost(copy(ZIEL_AKT)) };
+  const sc = frost(copy(SC_PROD)), q = frost(copy(sequence));
+  const p = EW.patchSchalter(sc, q, v);
+  assert.equal(p.art, 'zu-schreiben', (p.probleme ?? []).join('\n'));
+  assert.equal(text(p.scenario), text(exZ().scenario));
+});
+
+test('EX 3: schon geschrieben – „schon-da“, die Eingabe kommt gleich zurück (als Kopie) und wird nicht verändert', () => {
+  const sc = frost(exScNeu()), q = frost(exSeqNeu());
+  const p = EW.patchSchalter(sc, q, EX_VORG);
+  assert.equal(p.art, 'schon-da', (p.probleme ?? []).join('\n'));
+  assert.equal(text(p.scenario), text(sc));
+  assert.equal(text(p.sequence), text(q));
+  assert.notEqual(p.scenario, sc, 'eine Kopie');
+  assert.deepEqual(Object.keys(p), ['art', 'scenario', 'sequence']);
+});
+
+test('EX 3: ein **anderer** Wert am Ziel ist ein Abbruch – jedes Stück, das schon geschrieben aussieht, aber nicht genau das Ziel ist', () => {
+  const FALL = [
+    [(s) => { s.options.partie.choices.kurz.vars.MuenzenJeDoerfler = '10'; }, /options\.partie/],
+    [(s) => { s.options.partie.choices.lang.vars.MuenzenJeDoerfler = '15'; }, /options\.partie/],
+    [(s) => { s.options.doerfler3.default = 'Granny'; }, /options\.doerfler3/],
+    [(s) => { s.options.doerfler4.optional.on = 'Yancy'; }, /options\.doerfler4/],
+    [(s) => { s.options.doerfler5.optional.addLabel = 'Mehr'; }, /options\.doerfler5/],
+    [(s) => { s.options.doerfler5.choices.keiner.label = 'niemand'; }, /options\.doerfler5/],
+    [(s) => { const c = s.options.doerfler4.choices; const { keiner, ...rest } = c; s.options.doerfler4.choices = { keiner, ...rest }; }, /options\.doerfler4/],
+    [(s) => { s.villagers.baseCount = 2; }, /baseCount/],
+    [(s) => { s.villagers.seats[4].tableau.x = 2621; }, /villagers\.seats/],
+    [(s) => { s.villagers.seats[3].vorrat = 'Ausrüstung Dörfler 5'; }, /villagers\.seats/],
+  ];
+  for (const [fn, re] of FALL) assert.match(exAbw(mitFn(exScNeu(), fn), exSeqNeu()), re);
+  const SEQ = [
+    [(q) => { q[27].onlyChoice = { doerfler3: 'Granny' }; }, /sequence_data\[27\]/],
+    [(q) => { q[28].onlyChoice = { doerfler4: 'keiner' }; }, /sequence_data\[28\]/],
+    [(q) => { q[29].seat = 4; }, /sequence_data\[29\]/],
+    [(q) => { q[30].value = '$optMuenzenJeDoerfler+$doerflerzahl'; }, /sequence_data\[30\]/],
+    [(q) => { q[30].x = 2080; }, /sequence_data\[30\]/],
+    [(q) => { [q[28], q[30]] = [q[30], q[28]]; }, /sequence_data/],
+  ];
+  for (const [fn, re] of SEQ) { const q = exSeqNeu(); fn(q); assert.match(exAbw(exScNeu(), q), re); }
+});
+const mitFn = (x, fn) => { fn(x); return x; };
+
+test('EX 3: ein **teilweise** geschriebener Stand ist ein Abbruch – jedes Stück einzeln neu bei sonst altem Stand, und jedes einzeln alt bei sonst neuem; **beide** Spalten', () => {
+  const N = { sc: exScNeu(), q: exSeqNeu() };
+  const STUECKE = {
+    'partie': { sc: (s, quelle) => { s.options.partie = copy(quelle.options.partie); } },
+    'doerfler3': { sc: (s, quelle) => { s.options.doerfler3 = copy(quelle.options.doerfler3); } },
+    'doerfler4': { sc: (s, quelle) => { if (quelle.options.doerfler4) s.options.doerfler4 = copy(quelle.options.doerfler4); else delete s.options.doerfler4; } },
+    'doerfler5': { sc: (s, quelle) => { if (quelle.options.doerfler5) s.options.doerfler5 = copy(quelle.options.doerfler5); else delete s.options.doerfler5; } },
+    'seats': { sc: (s, quelle) => { s.villagers.seats = copy(quelle.villagers.seats); } },
+    'baseCount': { sc: (s, quelle) => { if (quelle.villagers.baseCount === undefined) delete s.villagers.baseCount; else s.villagers.baseCount = quelle.villagers.baseCount; } },
+  };
+  // Szenario: ein Stück vom einen Stand, der Rest vom anderen.
+  for (const [name, st] of Object.entries(STUECKE)) {
+    const mitNeu = copy(SC_PROD); st.sc(mitNeu, N.sc);
+    assert.match(exAbw(mitNeu), /halber Stand|teils|teilweise/, `nur ${name} neu`);
+    const mitAlt = copy(N.sc); st.sc(mitAlt, SC_PROD);
+    assert.match(exAbw(mitAlt, exSeqNeu()), /halber Stand|teils|teilweise/, `nur ${name} alt`);
+  }
+  // Folge: die drei Stücke (Platz 3 mit Gate, Platz 4 und 5, Münzen).
+  const alt = { s3: sequence[27], m: sequence[28] }, neu = { s3: N.q[27], s45: N.q.slice(28, 30), m: N.q[30] };
+  const fold = (s3, s45, m) => [...sequence.slice(0, 27), s3, ...s45, m].map(copy);
+  const SEQ = {
+    'Platz 3': [fold(neu.s3, [], alt.m), fold(alt.s3, neu.s45, neu.m)],
+    'Platz 4 und 5': [fold(alt.s3, neu.s45, alt.m), fold(neu.s3, [], neu.m)],
+    'Münzen': [fold(alt.s3, [], neu.m), fold(neu.s3, neu.s45, alt.m)],
+  };
+  for (const [name, [nurNeu, nurAlt]] of Object.entries(SEQ)) {
+    assert.match(exAbw(SC_PROD, nurNeu), /halber Stand|teils|teilweise/, `Folge: nur ${name} neu`);
+    assert.match(exAbw(exScNeu(), nurAlt), /halber Stand|teils|teilweise/, `Folge: nur ${name} alt`);
+  }
+  // Die Spalten gegeneinander: Szenario neu, Folge alt – und umgekehrt.
+  assert.match(exAbw(exScNeu(), sequence), /halber Stand|teils|teilweise/, 'scenario_data im Ziel, sequence_data im Ausgang');
+  assert.match(exAbw(SC_PROD, exSeqNeu()), /halber Stand|teils|teilweise/, 'scenario_data im Ausgang, sequence_data im Ziel');
+});
+
+test('EX 3: der Ausgang gilt auch für ein Szenario, das **keine** Stücke trägt außer `options` – es kommt gleich als `abweichend` mit Pfad zurück, nicht als Wurf', () => {
+  for (const sc of [{ options: SC_PROD.options }, { villagers: SC_PROD.villagers }, { options: SC_PROD.options, villagers: SC_PROD.villagers }]) {
+    assert.equal(EW.patchSchalter(sc, sequence, EX_VORG).art, 'abweichend');
+  }
+});
+
+// ── EX 4. Der Tisch von vor M31 ─────────────────────────────────────────────
+//
+// Der Kern: mit `doerfler3: Granny` baut der neue Aufbau **denselben** Tisch wie der von vor M31 – mit **einer** genannten Ausnahme, dem Münzzähler (2000, 1040).
+// Verglichen wird gegen den **Ausgang** (die Daten der Fixture, die Zonen und Assets des Auszugs, **ohne** EU und EV): was die beiden zusätzlichen Zonen, Marker und Sitze verändern
+// könnten, würde hier auffallen.
+
+const SO = await import('../../shared/setupOptions.js');
+const exSc = () => exZ().scenario;
+const exBau = (choices = {}, o = {}) => bauen({ state, sequence: o.sequence ?? exZ().sequence, zones: o.zones ?? EW_ZONEN, grids, assets: o.assets ?? EW_ASSETS, cards, scenarioData: o.sc ?? exSc() }, choices, 1);
+const exAktion = (id, st, o = {}) => executeSequenceWithLog(st, stepsOf(o.acts ?? NEU(), id), EW_ZONEN, { assets: EW_ASSETS, cards, grids, scenarioData: o.sc ?? exSc(), rng: seededRng(7) });
+const exNamen = (st, sc = exSc()) => seatedVillagers(st, EW_ASSETS, sc.villagers).map(s => s.name);
+const exMuenzen = (st) => st.counters.find(c => c.name === 'Münzen (gemeinsam)');
+const exZeilen = (r) => r.log.map(e => [e.type, e.target, e.status, e.reason]);
+const exSchlecht = (r) => r.log.filter(e => e.status === 'failed' || e.status === 'skipped');
+const exWahl = (n) => ({ ...(n >= 3 ? { doerfler3: 'Granny' } : {}), ...(n >= 4 ? { doerfler4: 'Blopsy' } : {}), ...(n >= 5 ? { doerfler5: 'Yancy' } : {}) });
+const exZonen = (st) => resolveZones(EW_ZONEN, anchorBoxes(st.boards, st.tokens));
+const exFiguren = (st) => st.tokens.filter(t => t.gridId && exNamen(st).includes(t.label));
+const exMarker = (st) => st.tokens.filter(t => /^Marker \d: /.test(t.label ?? ''));
+/** Die Zahl auf der Leiste `Bösewicht: Leben` / `Bösewicht: Bewegung` – so liest die Wache und so liest der Tisch den Marker. */
+function exWert(st, was) {
+  const t = st.tokens.find(x => x.label === `Marker: Bösewicht ${was}`);
+  assert.ok(t, `der Marker ${was} liegt`);
+  return zoneSlotNumberAt(exZonen(st).find(z => z.label === (was === 'LEB' ? 'Bösewicht: Leben' : 'Bösewicht: Bewegung')), t.x, t.y);
+}
+/** Liegen alle Marker eines Platzes auf den Startwerten ihres Dörflers? */
+function exStartwerte(st, platz) {
+  const s = seatedVillagers(st, EW_ASSETS, exSc().villagers).find(x => x.n === platz);
+  assert.ok(s?.data, `an Platz ${platz} sitzt ein bekannter Dörfler`);
+  for (const stat of ['Leben', 'Bewegung', 'Mumm', 'Präzision']) {
+    const m = st.tokens.filter(t => t.label === `Marker ${platz}: ${stat}`);
+    assert.equal(m.length, 1, `Marker ${platz}: ${stat}`);
+    assert.equal(zoneSlotNumberAt(exZonen(st).find(z => z.label === `Dörfler ${platz}: ${stat}`), m[0].x, m[0].y), s.data.start[stat], `${s.name}: ${stat} liegt auf dem Startwert`);
+  }
+}
+/** Den ersten Kampf dieses Bösewichts (der Leistenplatz bekommt seinen Namen) aufbauen, `final` erzwungen oder nicht. */
+function exKampfLauf(st, name, final) {
+  return executeSequenceWithLog(mitBoss(st, name), [
+    { type: 'reveal_next', zoneLabel: 'Bösewicht-Leiste', targetZoneLabel: 'Bösewicht-Platz' },
+    { type: 'build_scenario', final },
+  ], EW_ZONEN, { assets: EW_ASSETS, cards, grids, scenarioData: exSc(), rng: seededRng(7) });
+}
+/** Die Endkampf-Plättchen: was mit `final: true` mehr liegt als mit `final: false`, als Feld je Plättchen. */
+function exEndFelder(st, name) {
+  const vorher = new Set(st.tokens.map(t => t.id));
+  const mit = exKampfLauf(st, name, true), ohne = exKampfLauf(st, name, false);
+  for (const r of [mit, ohne]) assert.deepEqual(r.log.filter(e => e.status === 'failed'), [], `${name}: ${r.log.map(e => e.reason).join(' | ')}`);
+  const rest = gelegt(mit, vorher).map(t => t.cell);
+  for (const c of gelegt(ohne, vorher).map(t => t.cell)) rest.splice(rest.indexOf(c), 1);
+  return rest;
+}
+const VIER = [['kurz', 'mit'], ['kurz', 'ohne'], ['lang', 'mit'], ['lang', 'ohne']];
+
+test('EX 4: **der Tisch von vor M31** – mit `doerfler3: Granny` und `partie`/`troedel` in **allen vier** Kombinationen derselbe Zustand wie der Ausgangsstand (tokens, counters, cards, stacks, boards) – **mit der einen Ausnahme**: der Münzzähler steht auf (2000, 1040)', () => {
+  for (const [partie, troedel] of VIER) {
+    const wo = `${partie}/${troedel}`;
+    const alt = bauen({ state, sequence, zones, grids, assets, cards, scenarioData: scenario }, { partie, troedel }, 1);
+    const neu = exBau({ partie, troedel, doerfler3: 'Granny' });
+    assert.deepEqual(neu.log.filter(e => e.status !== 'ok' && e.status !== 'note'), [], `${wo}: keine Zeile außer ok und erwarteten notes`);
+    assert.deepEqual(exZeilen(neu), exZeilen(alt), `${wo}: dieselben Protokollzeilen (ohne den Index: die Münzen stehen jetzt an Schritt 30)`);
+    assert.deepEqual(neu.log.map(e => e.index), [...alt.log.map(e => e.index).slice(0, -1), 30], `${wo}: derselbe Lauf, die Münzen hinten`);
+    for (const feld of ['tokens', 'cards', 'boards']) assert.deepEqual(ohneIds(neu.state[feld]), ohneIds(alt.state[feld]), `${wo}: ${feld}`);
+    assert.deepEqual(ohneIds(neu.state.stacks), ohneIds(alt.state.stacks), `${wo}: stacks`);
+    // Die Ausnahme, **genannt**: alle Zähler außer den Münzen sind gleich, die Münzen sind es bis auf den Ort.
+    const ohneM = (st) => ohneIds(st.counters.filter(c => c.name !== 'Münzen (gemeinsam)'));
+    assert.deepEqual(ohneM(neu.state), ohneM(alt.state), `${wo}: die Zähler außer den Münzen`);
+    const [mAlt, mNeu] = [exMuenzen(alt.state), exMuenzen(neu.state)];
+    assert.deepEqual([mAlt.x, mAlt.y], [2080, 1430], 'vorher');
+    assert.deepEqual([mNeu.x, mNeu.y], [2000, 1040], 'jetzt');
+    assert.deepEqual(ohneIds({ ...mNeu, x: 2080, y: 1430 }), ohneIds(mAlt), `${wo}: der Münzzähler ist bis auf (x, y) derselbe`);
+    assert.equal(mNeu.value, partie === 'kurz' ? 45 : 30, `${wo}: Münzen 45 / 30`);
+    // Nicht leer verglichen: es ist etwas gebaut.
+    assert.equal(exNamen(neu.state).length, 3);
+    assert.equal(exMarker(neu.state).length, 12);
+    assert.ok(neu.state.cards.length > 0 && neu.state.stacks.length > 0 && neu.state.tokens.length > 20);
+  }
+});
+
+test('EX 4: derselbe Tisch gilt auch in den Aktionen – Kampf, Dorfphase, Ereignis mit den neuen Daten auf dem Tisch von vor M31: dasselbe wie mit den Daten von vor M31 (Münzen +18)', () => {
+  for (const [partie, troedel] of VIER) {
+    const alt = bauen({ state, sequence, zones, grids, assets, cards, scenarioData: scenario }, { partie, troedel }, 1);
+    const neu = exBau({ partie, troedel, doerfler3: 'Granny' });
+    let a = alt.state, n = neu.state;
+    for (const id of ['kampf-beginnen', 'dorfphase-beginnen', 'dorfereignis']) {
+      const ra = executeSequenceWithLog(a, stepsOf(AKT, id), zones, { assets, cards, grids, scenarioData: scenario, rng: seededRng(7) });
+      const rn = exAktion(id, n);
+      assert.deepEqual(ohneIds(rn.state.tokens), ohneIds(ra.state.tokens), `${partie}/${troedel} ${id}: tokens`);
+      assert.deepEqual(ohneIds(rn.state.cards), ohneIds(ra.state.cards), `${partie}/${troedel} ${id}: cards`);
+      assert.deepEqual(rn.log.map(e => [e.type, e.status, e.reason]).filter(([, st]) => st !== 'ok').length, ra.log.filter(e => e.status !== 'ok').length, `${id}: gleich viele Beanstandungen wie vorher`);
+      assert.deepEqual(rn.log.filter(e => e.status === 'failed' || e.status === 'skipped'), [], `${id}: keine Beanstandung`);
+      a = ra.state; n = rn.state;
+    }
+    assert.equal(exMuenzen(n).value - exMuenzen(neu.state).value, 18);
+    assert.equal(exMuenzen(n).value, exMuenzen(a).value);
+  }
+});
+
+// ── EX 5. Die Vorgabe ───────────────────────────────────────────────────────
+
+test('EX 5: **die Vorgabe** (`choices: {}`) – zwei Dörfler (Henlo, Fridgette), Münzen 30 / 20, kein Tableau von Granny, **keine** Beanstandung; `dorfereignis` teilt zwei Karten', () => {
+  for (const [wahl, muenzen] of [[{}, 30], [{ partie: 'kurz' }, 30], [{ partie: 'lang' }, 20]]) {
+    const r = exBau(wahl);
+    assert.deepEqual(r.log.filter(e => e.status !== 'ok'), [], text(wahl));
+    assert.deepEqual(exNamen(r.state), ['Henlo Bulwark', 'Fridgette Jones'], text(wahl));
+    assert.equal(exMuenzen(r.state).value, muenzen, `Münzen ${text(wahl)}`);
+    assert.ok(!r.state.tokens.some(t => /Granny|Blopsy|Yancy/.test(t.label ?? '')), 'weder Tableau noch Spielstein noch Figur der drei leeren Plätze');
+    assert.equal(exMarker(r.state).length, 8);
+    assert.deepEqual(r.state.counters.map(c => c.name), ['Münzen (gemeinsam)'], 'der Münzzähler ist der einzige Zähler');
+  }
+  const st = exBau({}).state;
+  const e = exAktion('dorfereignis', st);
+  assert.deepEqual(exSchlecht(e), []);
+  assert.equal(e.state.cards.length - st.cards.length, 2, 'dorfereignis teilt zwei Karten');
+  assert.ok(e.log.filter(x => x.type === 'deal_to_zone').length === 2, 'zwei Austeilungen, die der leeren Plätze fallen ohne Zeile aus');
+});
+
+test('EX 5: der Aufbau mit der Vorgabe legt **nur** die Plätze 1 und 2 – ein Platz ohne Wahl lässt keine Zeile zurück (auch nicht `skipped`), ein Lauf mit `choices` ohne Dörfler gleich einem Lauf ohne `choices`', () => {
+  const a = exBau({}), b = exBau({ doerfler3: 'keiner', doerfler4: 'keiner', doerfler5: 'keiner' }), c = exBau({ doerfler1: 'Henlo', doerfler2: 'Fridgette' });
+  assert.deepEqual(exZeilen(a), exZeilen(b));
+  assert.deepEqual(ohneIds(a.state.tokens), ohneIds(b.state.tokens));
+  assert.deepEqual(ohneIds(a.state.tokens), ohneIds(c.state.tokens));
+  assert.equal(a.log.length, 31 - 3 - 1, '31 Schritte; Platz 3, 4 und 5 laufen nicht und schreiben keine Zeile, ebenso der eine Schritt nur für die lange Partie: 27');
+});
+
+// ── EX 6. Je Zahl 2, 3, 4, 5 ────────────────────────────────────────────────
+
+test('EX 6: je Zahl **2, 3, 4, 5** – so viele Tableaus **auf ihrem Anker** (Platz 3 Granny, 4 Blopsy, 5 Yancy: kein `anchorId`), je vier Marker auf den Startwerten (n · 4), die Steine auf den ersten n Plätzen der Leiste, Münzen 30 / 45 / 60 / 75 (kurz) und 20 / 30 / 40 / 50 (lang), **keine** Beanstandung', () => {
+  const KURZ = { 2: 30, 3: 45, 4: 60, 5: 75 }, LANG = { 2: 20, 3: 30, 4: 40, 5: 50 };
+  for (const n of [2, 3, 4, 5]) {
+    for (const [partie, soll] of [['kurz', KURZ], ['lang', LANG]]) {
+      const r = exBau({ ...exWahl(n), partie });
+      assert.deepEqual(r.log.filter(e => e.status !== 'ok'), [], `${n} Dörfler, ${partie}: ${r.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | ')}`);
+      const sitzende = seatedVillagers(r.state, EW_ASSETS, exSc().villagers);
+      assert.deepEqual(sitzende.map(s => s.n), [1, 2, 3, 4, 5].slice(0, n), `Plätze 1 … ${n}`);
+      assert.deepEqual(sitzende.map(s => s.name), ['Henlo Bulwark', 'Fridgette Jones', 'Granny Melba', 'Blopsy Twins', 'Yancy Plover'].slice(0, n));
+      for (const s of sitzende) assert.equal(s.token.anchorId, undefined, `Platz ${s.n}: das Tableau liegt auf seinem Anker, kein anchorId`);
+      assert.equal(exMarker(r.state).length, n * 4, `${n} · 4 Marker`);
+      for (const s of sitzende) exStartwerte(r.state, s.n);
+      assert.equal(exMuenzen(r.state).value, soll[n], `Münzen bei ${n} (${partie})`);
+      assert.deepEqual([exMuenzen(r.state).x, exMuenzen(r.state).y], [2000, 1040]);
+      // Die Steine: auf den ersten n Plätzen der Leiste, in der Reihenfolge der Plätze.
+      const leisteZone = exZonen(r.state).find(z => z.label === "Buyin'/Beatin'-Leiste");
+      const plaetze = zoneSlots(leisteZone);
+      const steine = sitzende.map(s => r.state.tokens.find(t => t.assetId === EW_ASSETS.find(a => a.name === s.data.short)?.id));
+      steine.forEach((t, i) => { assert.ok(t, `Spielstein ${sitzende[i].data.short}`); assert.deepEqual([t.x, t.y], [plaetze[i].x, plaetze[i].y], `Stein ${i + 1} auf Platz ${i + 1} der Leiste`); });
+      assert.equal(r.state.tokens.filter(t => zoneContains(leisteZone, t.x, t.y)).length, n, `genau ${n} Steine auf der Leiste`);
+    }
+  }
+});
+
+test('EX 6: `describeChoices` nennt die Wahl lesbar – „kein dritter Dörfler“, „kein vierter Dörfler“, „kein fünfter Dörfler“; mit Wahl den vollen Namen', () => {
+  const o = exSc().options;
+  const wie = (wahl) => SO.describeChoices(o, SO.resolveChoices(o, wahl).choices);
+  assert.match(wie({}), /kein dritter Dörfler, kein vierter Dörfler, kein fünfter Dörfler/);
+  assert.match(wie(exWahl(3)), /Granny Melba, kein vierter Dörfler, kein fünfter Dörfler/);
+  assert.match(wie(exWahl(5)), /Granny Melba, Blopsy Twins, Yancy Plover/);
+  assert.doesNotMatch(wie(exWahl(5)), /kein /);
+  assert.match(wie({}), /^Kurz \(3-Runden-Modus\), mit Toller Trödel, Henlo Bulwark, Fridgette Jones, kein dritter/);
+});
+
+// ── EX 7. Der ganze Kreis je Zahl ───────────────────────────────────────────
+
+test('EX 7: **der ganze Kreis je Zahl** – Aufbau → `kampf-beginnen` (Deputy: LEB 12 / 14 / 17 / 20, BEW 6 / 6 / 7 / 7, n Figuren; Endkampf mit **n** Plättchen) → `dorfphase-beginnen` (+12 / +18 / +24 / +30, **18 + 5 · n** Zeilen, bei fünf **43**, ohne `skipped`) → Kampf 2 (Virginia: LEB 12 / 15 / 18 / 21, im Endkampf **5** Plättchen bei jeder Zahl)', () => {
+  const DEPUTY = { 2: [6, 12], 3: [6, 14], 4: [7, 17], 5: [7, 20] }, VIRGINIA_LEB = { 2: 12, 3: 15, 4: 18, 5: 21 }, ZUWACHS = { 2: 12, 3: 18, 4: 24, 5: 30 };
+  for (const n of [2, 3, 4, 5]) {
+    const s0 = exBau(exWahl(n)).state;
+    // Kampf 1: Deputy Waggums
+    const k1 = exAktion('kampf-beginnen', s0);
+    assert.deepEqual(exSchlecht(k1), [], `Kampf 1 bei ${n}: ${k1.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | ')}`);
+    assert.ok(k1.state.tokens.some(t => t.label === 'Bösewicht: Deputy Waggums'), 'Deputy Waggums ist der erste Kampf');
+    assert.deepEqual([exWert(k1.state, 'BEW'), exWert(k1.state, 'LEB')], DEPUTY[n], `Deputy bei ${n}: BEW / LEB`);
+    assert.equal(exFiguren(k1.state).length - exFiguren(s0).length, n, `${n} Figuren`);
+    assert.equal(exEndFelder(s0, 'Deputy Waggums').length, n, `Endkampf Deputy: ${n} Plättchen`);
+    // Dorfphase
+    const d1 = exAktion('dorfphase-beginnen', k1.state);
+    assert.deepEqual(exSchlecht(d1), [], `Dorfphase bei ${n}`);
+    assert.equal(d1.log.length, 18 + 5 * n, `${n} Dörfler: Zeilen der Dorfphase`);
+    if (n === 5) assert.equal(d1.log.length, 43, 'bei fünf Dörflern laufen alle 43 Schritte');
+    assert.equal(exMuenzen(d1.state).value - exMuenzen(k1.state).value, ZUWACHS[n], `Münzen +${ZUWACHS[n]}`);
+    for (let p = 1; p <= n; p++) exStartwerte(d1.state, p);
+    assert.equal(exMarker(d1.state).length, 4 * n);
+    // Ereignis, dann Kampf 2: Virginia Fitz
+    const e1 = exAktion('dorfereignis', d1.state);
+    assert.deepEqual(exSchlecht(e1), []);
+    assert.equal(e1.state.cards.length - d1.state.cards.length, n, `${n} Ereignis-Karten`);
+    const k2 = exAktion('kampf-beginnen', e1.state);
+    assert.deepEqual(exSchlecht(k2), [], `Kampf 2 bei ${n}`);
+    assert.ok(k2.state.tokens.some(t => t.label === 'Bösewicht: Virginia Fitz'), 'Virginia Fitz ist der zweite Kampf');
+    assert.equal(exWert(k2.state, 'LEB'), VIRGINIA_LEB[n], `Virginia bei ${n}: LEB`);
+    assert.equal(exFiguren(k2.state).length - exFiguren(e1.state).length, n);
+    assert.equal(exEndFelder(e1.state, 'Virginia Fitz').length, 5, `Endkampf Virginia: 5 Plättchen bei ${n}`);
+  }
+});
+
+test('EX 7: der Endkampf der drei „je Dörfler“ legt 2 / 3 / 4 / 5 Plättchen, die fünf festen bei jeder Zahl 5 / 5 / 1 / 1 / 1 – am Tisch, den der Schalter baut', () => {
+  const FEST = { 'Virginia Fitz': 5, Handsy: 5, 'The Bundits': 1, 'Tilda Fields': 1, Umbrello: 1 };
+  for (const n of [2, 3, 4, 5]) {
+    const s0 = exBau(exWahl(n)).state;
+    for (const name of ['Deputy Waggums', 'Pepin Milkfrog', 'Samuel Strawman']) assert.equal(exEndFelder(s0, name).length, n, `${name} bei ${n}`);
+    for (const [name, k] of Object.entries(FEST)) assert.equal(exEndFelder(s0, name).length, k, `${name} bei ${n}`);
+  }
+});
+
+// ── EX 8. Jeder der neun Dörfler an Platz 4 und 5 ───────────────────────────
+
+test('EX 8: **fünf Dörfler auf allen Plätzen** – jeder der **neun** Dörfler an Platz 4 und an Platz 5 (je ein Lauf) baut **ohne Problem**, trägt das Tableau auf dem Anker des Platzes (ein fremdes mit `anchorId`), die Marker auf den Startwerten – im Aufbau **und** nach Kampf und Dorfphase; Georgie meldet das `note`', () => {
+  const kurz = EX_NEUN.map(([k]) => k);
+  const anker = (platz) => EW_ASSETS.find(a => a.name === (platz === 4 ? 'Tableau: Blopsy Twins' : 'Tableau: Yancy Plover')).id;
+  let laeufe = 0;
+  for (const platz of [4, 5]) {
+    for (const [k, voll] of EX_NEUN) {
+      const andere = kurz.filter(x => x !== k);
+      const wahl = { doerfler1: andere[0], doerfler2: andere[1], doerfler3: andere[2], doerfler4: platz === 4 ? k : andere[3], doerfler5: platz === 5 ? k : andere[3] };
+      const wo = `${k} an Platz ${platz}`;
+      const r = exBau(wahl);
+      const nicht = r.log.filter(e => e.status !== 'ok');
+      assert.ok(nicht.every(e => e.status === 'note' && /Georgie/.test(e.reason)), `${wo}: ${nicht.map(e => `${e.status} ${e.reason}`).join(' | ')}`);
+      assert.equal(nicht.length, Object.values(wahl).includes('Georgie') ? 1 : 0, `${wo}: das note von Georgie, und nur das`);
+      const sitzende = seatedVillagers(r.state, EW_ASSETS, exSc().villagers);
+      assert.equal(sitzende.length, 5, wo);
+      assert.equal(sitzende.find(s => s.n === platz).name, voll, `${wo}: er sitzt`);
+      const tab = sitzende.find(s => s.n === platz).token;
+      const eigen = (platz === 4 ? 'Blopsy' : 'Yancy') === k;
+      assert.equal(tab.anchorId, eigen ? undefined : anker(platz), `${wo}: ${eigen ? 'auf dem eigenen Anker' : 'ein fremdes Tableau trägt die Id des Platzes'}`);
+      for (let p = 1; p <= 5; p++) exStartwerte(r.state, p);
+      assert.equal(exMuenzen(r.state).value, 75);
+      // Kampf und Dorfphase mit diesem Tisch: nichts übersprungen, die Marker liegen wieder auf den Startwerten.
+      const k1 = exAktion('kampf-beginnen', r.state);
+      assert.deepEqual(exSchlecht(k1), [], `${wo}: Kampf`);
+      const d1 = exAktion('dorfphase-beginnen', k1.state);
+      assert.deepEqual(exSchlecht(d1), [], `${wo}: Dorfphase`);
+      assert.equal(d1.log.length, 43);
+      for (let p = 1; p <= 5; p++) exStartwerte(d1.state, p);
+      laeufe++;
+    }
+  }
+  assert.equal(laeufe, 18);
+});
+
+// ── EX 9. Die Doppelwahl ────────────────────────────────────────────────────
+
+test('EX 9: **die Doppelwahl** – `Judy` / `Judy` / `keiner`: ein Dörfler sitzt, **eine** `skipped`-Zeile; `kampf-beginnen` **hält** (`no values for 1 villager`), das Kampffeld ist **unverändert**', () => {
+  const r = exBau({ doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'keiner' });
+  const nicht = r.log.filter(e => e.status !== 'ok');
+  assert.equal(nicht.length, 1, nicht.map(e => e.reason).join(' | '));
+  assert.equal(nicht[0].status, 'skipped');
+  assert.equal(nicht[0].type, 'seat_villager');
+  assert.equal(nicht[0].index, 26);
+  assert.match(nicht[0].reason, /"Judy Marks" already sits at seat 1/);
+  assert.deepEqual(exNamen(r.state), ['Judy Marks']);
+  assert.equal(exMuenzen(r.state).value, 15, 'ein Dörfler: 15 Münzen');
+  const k = exAktion('kampf-beginnen', r.state);
+  const halt = k.log.find(e => e.status === 'failed');
+  assert.ok(halt, 'der Kampf hält');
+  assert.equal(halt.type, 'build_scenario');
+  assert.match(halt.reason, /no values for 1 villager/);
+  // **Befund (festgehalten, nicht gebaut):** `build_scenario` scheitert, die Aktion **hält nicht an** – was davor lief (der Bösewicht ist aufgedeckt, sein Tableau liegt) bleibt, was dahinter von der Bindung
+  // abhängt, fällt mit `is not bound` aus (die Werte, die Figur von Platz 1, das Feld `$B`); unverändert ist das **Kampffeld**, nicht der ganze Tisch.
+  assert.deepEqual(k.log.filter(e => e.status === 'skipped').map(e => e.index), [6, 7, 8, 9, 10]);
+  assert.ok(k.state.tokens.some(t => t.label === 'Bösewicht: Deputy Waggums') || k.state.tokens.some(t => t.label === 'Tableau: Deputy Waggums'), 'das Tableau des aufgedeckten Bösewichts liegt');
+  const feld = (st) => ohneIds(st.tokens.filter(t => t.gridId));
+  assert.deepEqual(feld(k.state), feld(r.state), 'kein Plättchen, keine Figur: das Kampffeld ist unverändert');
+  assert.equal(feld(k.state).length, 0);
+  assert.ok(!k.state.tokens.some(t => /^Marker: Bösewicht/.test(t.label ?? '')), 'und keine Werte');
+});
+
+test('EX 9: `Judy` / `Judy` / `Granny` – zwei Dörfler sitzen, Münzen 30, die Werte der 2P-Spalte; eine `skipped`-Zeile für den leeren Platz 2', () => {
+  const r = exBau({ doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny' });
+  const nicht = r.log.filter(e => e.status !== 'ok');
+  assert.deepEqual(nicht.map(e => [e.status, e.index]), [['skipped', 26]]);
+  assert.deepEqual(exNamen(r.state), ['Judy Marks', 'Granny Melba'], 'zwei sitzen, Platz 2 ist leer');
+  assert.deepEqual(seatedVillagers(r.state, EW_ASSETS, exSc().villagers).map(s => s.n), [1, 3]);
+  assert.equal(exMuenzen(r.state).value, 30);
+  const k = exAktion('kampf-beginnen', r.state);
+  // Platz 2 trägt **kein** Gate (M31.3: nicht entfernbar, eine Doppelwahl ist eine Fehlwahl): der leere Platz zeigt sich in den Aktionen als `skipped … is not bound` – und nur dort, nur für Platz 2.
+  assert.deepEqual(k.log.filter(e => e.status !== 'ok').map(e => [e.index, e.type, e.target, e.status, e.reason]), [[10, 'place_asset', '$F2', 'skipped', '"$F2": $F2 is not bound']]);
+  assert.deepEqual([exWert(k.state, 'BEW'), exWert(k.state, 'LEB')], [6, 12], 'Deputy Waggums in der 2P-Spalte');
+  assert.equal(exFiguren(k.state).length, 2);
+  const d = exAktion('dorfphase-beginnen', k.state);
+  assert.deepEqual(d.log.filter(e => e.status !== 'ok').map(e => [e.type, e.target, e.status]), [['clear_table', '$F2', 'skipped'], ...['Leben', 'Bewegung', 'Mumm', 'Präzision'].map(w => ['place_asset', `Marker 2: ${w}`, 'skipped'])], 'Platz 2: fünf Zeilen in der Dorfphase, alle „is not bound“');
+  assert.ok(d.log.filter(e => e.status !== 'ok').every(e => /is not bound/.test(e.reason)));
+  assert.deepEqual(exAktion('dorfereignis', d.state).log.filter(e => e.status !== 'ok'), [], 'das Ereignis teilt in die Hände 1, 2 und 3: ohne Zeile');
+  assert.equal(exMuenzen(d.state).value - exMuenzen(k.state).value, 12);
+});
+
+test('EX 9: andere Doppelwahlen – derselbe Dörfler an Platz 4 und 5 (Blopsy / Blopsy), an Platz 1 und 3: je eine Zeile, die Zahl ist die am Tisch', () => {
+  const a = exBau({ ...exWahl(3), doerfler4: 'Blopsy', doerfler5: 'Blopsy' });
+  assert.deepEqual(a.log.filter(e => e.status !== 'ok').map(e => [e.status, e.index]), [['skipped', 29]]);
+  assert.equal(exNamen(a.state).length, 4);
+  assert.equal(exMuenzen(a.state).value, 60, '4 · 15: gezählt wird, wer sitzt');
+  const b = exBau({ doerfler1: 'Granny', doerfler3: 'Granny' });
+  assert.deepEqual(b.log.filter(e => e.status !== 'ok').map(e => [e.status, e.index]), [['skipped', 27]]);
+  assert.equal(exNamen(b.state).length, 2);
+  assert.equal(exMuenzen(b.state).value, 30);
+  // Eine Lücke (Platz 3 leer, Platz 5 besetzt) ist erlaubt und wird gebaut, wie sie ist.
+  const l = exBau({ doerfler5: 'Yancy' });
+  assert.deepEqual(l.log.filter(e => e.status !== 'ok'), []);
+  assert.deepEqual(seatedVillagers(l.state, EW_ASSETS, exSc().villagers).map(s => s.n), [1, 2, 5]);
+  assert.equal(exMuenzen(l.state).value, 45);
+});
+
+// ── EX 10. Die Reihenfolge der Aufbauschritte ───────────────────────────────
+
+test('EX 10: **die Reihenfolge der Aufbauschritte** – `seat_villager` 25 bis 29, **dann** die Münzen (Schritt 30); sonst bände `$doerflerzahl` zu früh', () => {
+  const q = exZ().sequence;
+  assert.equal(q.length, 31);
+  assert.deepEqual(q.map((s, i) => [i, s.type, s.seat]).filter(([, t]) => t === 'seat_villager'), [[25, 'seat_villager', 1], [26, 'seat_villager', 2], [27, 'seat_villager', 3], [28, 'seat_villager', 4], [29, 'seat_villager', 5]]);
+  assert.equal(q[30].type, 'place_counter');
+  assert.ok(q.findIndex(s => s.type === 'place_counter') > Math.max(...q.map((s, i) => (s.type === 'seat_villager' ? i : -1))), 'die Münzen **hinter** dem letzten Dörfler');
+  assert.ok(q.slice(0, 25).every(s => s.type !== 'seat_villager'), 'davor kein Dörfler');
+  assert.ok(q.slice(0, 30).every(s => s.type !== 'place_counter'), 'und davor keine Münzen');
+  assert.ok(q.slice(0, 25).every(s => !/doerflerzahl/.test(text(s))), 'kein Schritt vor den Dörflern liest die Zahl');
+  assert.deepEqual(q.map((s, i) => /doerflerzahl/.test(text(s)) ? i : null).filter(i => i !== null), [30], 'genau ein Schritt liest die Zahl');
+});
+
+test('EX 10: der Grund – stünden die Münzen vor Platz 4 und 5, bände `$doerflerzahl` zu früh (3 statt 5: 45 statt 75); ganz vorn „is not bound“; hinter dem Dörfler-Block stimmt es', () => {
+  const q = exZ().sequence;
+  const muenzen = q[30];
+  const vorVier = [...q.slice(0, 28), muenzen, ...q.slice(28, 30)];
+  const r = exBau({ ...exWahl(5), partie: 'kurz' }, { sequence: vorVier });
+  assert.equal(exNamen(r.state).length, 5);
+  assert.equal(exMuenzen(r.state).value, 45, 'zu früh gebunden: 3 · 15');
+  const vorn = [muenzen, ...q.slice(0, 30)];
+  const r2 = exBau({ ...exWahl(5), partie: 'kurz' }, { sequence: vorn });
+  assert.equal(exMuenzen(r2.state), undefined, 'ohne Dörfler kein Zähler');
+  assert.match(r2.log[0].reason, /\$doerflerzahl is not bound/);
+  assert.equal(exMuenzen(exBau({ ...exWahl(5), partie: 'kurz' }).state).value, 75, 'hinter dem Block: 5 · 15');
+});
+
+// ── EX 11. Der Rundlauf ─────────────────────────────────────────────────────
+
+const { choicesFromSearch, formatChoices } = await import('../../client/src/utils/setupChoices.js');
+
+test('EX 11: Roundtrip – `?opt=doerfler4:Blopsy` und `?opt=doerfler3:keiner` aus der Adresse, durch `resolveChoices`, in den Aufbau; zurück in die Adresse', () => {
+  const o = exSc().options;
+  const a = choicesFromSearch('?opt=doerfler3:Granny&opt=doerfler4:Blopsy');
+  assert.deepEqual(a, { choices: { doerfler3: 'Granny', doerfler4: 'Blopsy' }, problems: [] });
+  const r = SO.resolveChoices(o, a.choices);
+  assert.deepEqual(r.problems, []);
+  assert.deepEqual(r.choices, { partie: 'kurz', troedel: 'mit', doerfler1: 'Henlo', doerfler2: 'Fridgette', doerfler3: 'Granny', doerfler4: 'Blopsy', doerfler5: 'keiner' });
+  assert.equal(r.vars.optDoerfler4, 'Blopsy Twins');
+  assert.equal(r.vars.optDoerfler5, '', '`keiner` bindet den leeren Text');
+  assert.equal(r.vars.optMuenzenJeDoerfler, '15');
+  assert.equal(r.vars.optMuenzen, undefined, 'die alte Variable gibt es nicht mehr');
+  assert.deepEqual(exNamen(exBau(a.choices).state), ['Henlo Bulwark', 'Fridgette Jones', 'Granny Melba', 'Blopsy Twins']);
+  const k = choicesFromSearch('?opt=doerfler3:keiner');
+  assert.deepEqual(k.choices, { doerfler3: 'keiner' });
+  assert.deepEqual(SO.resolveChoices(o, k.choices).problems, []);
+  assert.equal(exNamen(exBau(k.choices).state).length, 2);
+  assert.equal(formatChoices({ doerfler4: 'Blopsy', doerfler3: 'keiner' }), 'opt=doerfler4:Blopsy&opt=doerfler3:keiner');
+  assert.deepEqual(choicesFromSearch(`?${formatChoices(r.choices)}`).choices, r.choices, 'die aufgelöste Wahl überlebt die Adresse');
+});
+
+test('EX 11: `resolveChoices` mit **allen neun** Namen an Platz 3, 4 und 5 – jede Wahl ist gültig und bindet ihren vollen Namen; `keiner` den leeren Text; ein Tippfehler ist ein Problem und fällt nie auf die Vorgabe zurück', () => {
+  const o = exSc().options;
+  for (const n of [3, 4, 5]) {
+    for (const [k, voll] of EX_NEUN) {
+      const r = SO.resolveChoices(o, { [`doerfler${n}`]: k });
+      assert.deepEqual(r.problems, [], `${k} an ${n}`);
+      assert.equal(r.choices[`doerfler${n}`], k);
+      assert.equal(r.vars[`optDoerfler${n}`], voll);
+    }
+    assert.equal(SO.resolveChoices(o, { [`doerfler${n}`]: 'keiner' }).vars[`optDoerfler${n}`], '');
+    assert.match(SO.resolveChoices(o, { [`doerfler${n}`]: 'Keiner' }).problems.join(), /no choice "Keiner"/);
+    assert.match(SO.resolveChoices(o, { [`doerfler${n}`]: 'Granny Melba' }).problems.join(), /no choice "Granny Melba"/);
+  }
+  assert.match(SO.resolveChoices(o, { doerfler6: 'Henlo' }).problems.join(), /no option "doerfler6"/);
+  // Das Gate: `!keiner` ist die einzige Verneinung, und sie passt zu jeder Wahl außer `keiner`.
+  for (const n of [3, 4, 5]) {
+    const g = (w) => SO.checkGate({ [`doerfler${n}`]: '!keiner' }, o, SO.resolveChoices(o, { [`doerfler${n}`]: w }).choices);
+    assert.deepEqual(g('keiner'), { ok: true, applies: false });
+    for (const [k] of EX_NEUN) assert.deepEqual(g(k), { ok: true, applies: true }, `${k}`);
+  }
+});
+
+// ── EX 12. Disjunkt ─────────────────────────────────────────────────────────
+
+test('EX 12: berührt nur `scenario_data` und `sequence_data` – der Zielstand trägt nichts anderes; die Pfade gegenüber `gelaende` und `werte` sind **disjunkt**, jede Reihenfolge ergibt **denselben Text**', () => {
+  assert.deepEqual(Object.keys(exZ()), ['art', 'scenario', 'sequence']);
+  const pfade = unterschiede(SC_PROD, exZ().scenario);
+  assert.ok(pfade.length > 0 && pfade.every(p => /^\/(options|villagers)\//.test(p)), pfade.join(', '));
+  assert.deepEqual(pfade.filter(p => /\/bosses\//.test(p) || /stats|terrain|fromCount/i.test(p)), [], 'kein Bösewicht, kein stats, kein terrain');
+  // Die Schritte davor schreiben nur Bösewichte: auf den Ausgang vor ES angewendet, **vor** oder **nach** dem Schalter gerechnet, kommt derselbe Text.
+  const a = text(exScNeuVon(patchWerte(patchGelaende(scenario).scenario).scenario));          // erst ES und ET, dann der Schalter
+  const b = text(patchWerte(patchGelaende(exScNeuVon(scenario)).scenario).scenario);           // erst der Schalter, dann ES und ET
+  const c = text(patchGelaende(patchWerte(exScNeuVon(scenario)).scenario).scenario);          // … und ET vor ES
+  assert.equal(a, b, 'Schalter nach `gelaende`/`werte` = Schalter davor');
+  assert.equal(b, c, 'und `werte`/`gelaende` in der anderen Reihenfolge');
+  assert.equal(a, text(exZ().scenario), 'und das ist der Zielstand');
+  // Die anderen Spalten kennt der Schritt nur lesend: die Vorgänger sind danach unverändert da.
+  const vorher = text(EX_VORG);
+  EW.patchSchalter(SC_PROD, sequence, EX_VORG);
+  assert.equal(text(EX_VORG), vorher);
+  assert.equal(EW.patchZonen(EX_VORG.zone).art, 'schon-da');
+  assert.equal(EW.patchAktionen(EX_VORG.action).art, 'schon-da');
+});
+/** Dieselben Stücke wie `exScNeu`, auf ein beliebiges Szenario angewendet (die Bösewichte kommen aus der Eingabe). */
+function exScNeuVon(sc) {
+  const s = copy(sc);
+  const neu = exOptionsNeu();
+  s.options = neu;
+  s.villagers.seats = copy(exScNeu().villagers.seats);
+  s.villagers.baseCount = 3;
+  return s;
+}
+
+// ── EX 8 (Gerüst). SCHRITTE ─────────────────────────────────────────────────
+
+test('EX Gerüst: `SCHRITTE` – alle sechs Schritte gebaut, `optionen` mit `{ ausgang, ziel }` für **beide** Spalten; der Kopf des Skripts nennt weder Länge noch Hash des Ausgangs oder Ziels', () => {
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
+  for (const k of Object.keys(SCHRITTE)) assert.notEqual(SCHRITTE[k], null, `${k} ist gebaut`);
+  assert.deepEqual(Object.keys(SCHRITTE.optionen), ['ausgang', 'ziel']);
+  for (const k of ['ausgang', 'ziel']) {
+    assert.deepEqual(Object.keys(SCHRITTE.optionen[k]), ['scenario', 'sequence'], k);
+    for (const sp of ['scenario', 'sequence']) assert.deepEqual(Object.keys(SCHRITTE.optionen[k][sp]), ['laenge', 'sha'], `${k}.${sp}`);
+  }
+  // Der Ausgang von `optionen` ist **dieselbe** Zahl wie das Ziel von `werte` (scenario) und von M30 (sequence): eine Quelle.
+  assert.deepEqual(SCHRITTE.optionen.ausgang.scenario, SCHRITTE.werte.ziel.scenario);
+  assert.deepEqual(SCHRITTE.optionen.ausgang.sequence, sw.SCHRITTE.boss.ziel.sequence);
+  const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
+  const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
+  for (const z of [SCHRITTE.optionen.ziel.scenario, SCHRITTE.optionen.ziel.sequence]) {
+    assert.ok(!kopf.includes(z.sha), `der Kopf nennt ${z.sha}`);
+    for (const l of [String(z.laenge), String(z.laenge).replace(/(\d)(\d{3})$/, '$1 $2'), String(z.laenge).replace(/(\d)(\d{3})$/, '$1.$2')]) assert.ok(!kopf.includes(l), `der Kopf nennt ${l}`);
+  }
+  assert.match(kopf, /\*\*`optionen`/, 'der Kopf beschreibt den Schritt');
+  assert.doesNotMatch(kopf, /noch nicht gebaut|steht in `SCHRITTE` als `null`/, 'der Kopf nennt keinen ungebauten Schritt mehr');
+});
+
+// ── EX main. Die Läufe gegen eine Wegwerf-Datenbank ─────────────────────────
+
+const exAusgangScen = text(SC_PROD);
+const exDb = (over = {}) => frischeDatenbank({ scen: exAusgangScen, seq: dz.sequence, act: text(ZIEL_AKT), zon: EW_ZONEN, ast: EW_ASSETS, ...over });
+const EX_ZIELSC = () => text(exZ().scenario), EX_ZIELSEQ = () => text(exZ().sequence);
+const exOhneSpalten = (a) => ({ ...a, setups: a.setups.map(r => ({ ...r, scenario_data: undefined, sequence_data: undefined })) });
+const exSicherung = (tmp, scen = exAusgangScen, seq = dz.sequence) => {
+  const datei = path.join(tmp, 'sicherung-optionen.json');
+  const h = sicherungsHash(scen, seq);
+  fs.writeFileSync(datei, JSON.stringify({ scenario_data: scen, sequence_data: seq, sha256: h, updated_at: '2026-11-09 00:00:00' }));
+  return { datei, h };
+};
+const exSchreiben = (file, h, extra = []) => ['--write', file, '--schritt', 'optionen', '--sicherung-sha', h.slice(0, 16), ...extra];
+const exCheck = (file) => ['--check', file, '--schritt', 'optionen'];
+
+test('EX main: `--check` am Ausgangsstand – schreibgeschützt, „zu schreiben“, Plan, **beide** Beweise, Prüfer, Zielstand beider Spalten, Hash für die Sicherung', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const vorher = alles(file);
+    fs.chmodSync(file, 0o444);
+    const r = await lauf(exCheck(file));
+    fs.chmodSync(file, 0o666);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, new RegExp(`gelesen: scenario_data ${exAusgangScen.length} Zeichen.*sequence_data ${dz.sequence.length} Zeichen`));
+    assert.match(r.out, /Einordnung: zu schreiben/);
+    assert.match(r.out, /29 → 31/);
+    for (const wort of ['doerfler3', 'doerfler4', 'doerfler5', 'baseCount', 'MuenzenJeDoerfler', '2000', '1040']) assert.ok(r.out.includes(wort), `der Plan nennt ${wort}`);
+    assert.match(r.out, /Rückwärtsbeweis scenario_data: ja/);
+    assert.match(r.out, /Rückwärtsbeweis sequence_data: ja/);
+    assert.match(r.out, /Probleme/);
+    assert.ok(r.out.includes(`Zielstand: scenario_data ${EX_Z.scenario.laenge} Zeichen (sha ${EX_Z.scenario.sha}), sequence_data ${EX_Z.sequence.laenge} Zeichen (sha ${EX_Z.sequence.sha})`), r.out);
+    assert.ok(r.out.includes(sicherungsHash(exAusgangScen, dz.sequence)), 'der Hash, den --write als Sicherung verlangt, steht da');
+    assert.match(r.out, /würde schreiben: scenario_data .* → .* Zeichen, sequence_data .* → .* Zeichen/);
+    assert.match(r.out, /die fünf davor geschriebenen Schritte/i, 'die Vorbedingung wird genannt');
+    assert.doesNotMatch(r.out, /Beanstandungen:? [1-9]/);
+    assert.deepEqual(alles(file), vorher, '--check hat nichts geschrieben');
+  } finally { weg(tmp); }
+});
+
+test('EX main: `--check` öffnet schreibgeschützt, `--write` nicht; geschrieben wird mit **einem** UPDATE auf **genau zwei** Spalten, gelesen werden `scenario_data`, `sequence_data` und – nur lesend, als Vorbedingung – `zone_data`, `action_data`, `table_assets`', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const optionen = [], sql = [];
+    class Spion extends Database {
+      constructor(pfad, opt) { optionen.push(opt); super(pfad, opt); }
+      prepare(s) { sql.push(s); return super.prepare(s); }
+    }
+    assert.equal((await lauf(exCheck(file), { Db: Spion })).code, 0);
+    assert.equal(optionen.at(-1).readonly, true);
+    sql.length = 0;
+    const { h } = exSicherung(tmp);
+    const w = await lauf(exSchreiben(file, h), { Db: Spion });
+    assert.equal(w.code, 0, w.out);
+    assert.equal(optionen.at(-1).readonly, false);
+    const norm = (s) => s.replace(/\s+/g, ' ').trim();
+    const schreibend = sql.filter(s => /^\s*(update|insert|delete|replace|drop|alter|create)\b/i.test(s));
+    assert.equal(schreibend.length, 1, schreibend.join('\n'));
+    assert.match(norm(schreibend[0]), /^update setups set scenario_data = \?, sequence_data = \? where id = \? and scenario_data = \? and sequence_data = \?$/i);
+    const erlaubt = sql.filter(s => !/order by rowid|sqlite_master|^\s*pragma|^\s*update setups set scenario_data/i.test(s)).map(norm);
+    const gelesen = [...new Set(erlaubt)];
+    assert.deepEqual(gelesen.filter(s => !/^select \* from setups where id = \?$/i.test(s)).sort(),
+      ['select game_id, scenario_data, sequence_data from setups where id = ?', 'select zone_data, action_data from setups where id = ?'].sort(), gelesen.join('\n'));
+    for (const s of gelesen) assert.doesNotMatch(s, /grid_data|state_data|from cards|save_states/i, s);
+    assert.ok(sql.some(s => /select \* from table_assets where game_id = \? order by rowid/i.test(norm(s))), 'die Assets werden gelesen (Vorbedingung)');
+  } finally { weg(tmp); }
+});
+
+test('EX main: `--write` mit Sicherung – beide Spalten auf dem Zielstand, **nichts sonst** geändert (`zone_data`, `action_data`, `grid_data`, `state_data`, Assets, Spielstände), Kontrolle neu gelesen, **eine** Transaktion', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const vorher = alles(file);
+    const { h } = exSicherung(tmp);
+    const r = await lauf(exSchreiben(file, h));
+    assert.equal(r.code, 0, r.out);
+    const z = zeile(file);
+    assert.equal(z.scenario_data, EX_ZIELSC());
+    assert.equal(z.sequence_data, EX_ZIELSEQ());
+    assert.deepEqual([z.scenario_data.length, sha(z.scenario_data)], [EX_Z.scenario.laenge, EX_Z.scenario.sha]);
+    assert.deepEqual([z.sequence_data.length, sha(z.sequence_data)], [EX_Z.sequence.laenge, EX_Z.sequence.sha]);
+    assert.deepEqual(exOhneSpalten(alles(file)), exOhneSpalten(vorher), 'jede andere Spalte, Zeile und Tabelle (auch updated_at, save_states, zone_data, action_data, table_assets) ist gleich');
+    for (const k of ['zone_data', 'action_data', 'grid_data', 'state_data']) assert.equal(z[k], zeile(file)[k]);
+    assert.equal(z.action_data, text(ZIEL_AKT));
+    assert.ok(r.out.includes(`scenario_data ${exAusgangScen.length} → ${EX_Z.scenario.laenge} Zeichen, sha ${sha(exAusgangScen)} → ${EX_Z.scenario.sha}`), r.out);
+    assert.ok(r.out.includes(`sequence_data ${dz.sequence.length} → ${EX_Z.sequence.laenge} Zeichen, sha ${sha(dz.sequence)} → ${EX_Z.sequence.sha}`), r.out);
+    assert.match(r.out, /Rückwärtsbeweis scenario_data auf der gelesenen Spalte: ja/);
+    assert.match(r.out, /Rückwärtsbeweis sequence_data auf der gelesenen Spalte: ja/);
+    assert.match(r.out, /Zielstand aus den Konstanten \(.*\): erreicht/);
+    assert.match(r.out, /save_states Auto Save: sha \w+ → \w+ gleich/);
+    assert.match(r.out, /validateOptions[^\n]*: 0 Probleme/);
+    assert.match(r.out, /validateVillagers[^\n]*: 0 Probleme/);
+    assert.match(r.out, /options\.doerfler3/, 'die Kontrolle nennt die drei Optionen');
+    assert.match(r.out, /31 Schritte/, 'und die 31 Schritte der Folge');
+  } finally { weg(tmp); }
+});
+
+test('EX main: der zweite Lauf – „schon geschrieben“, Rückgabe 0, nichts geschrieben, auch ohne Sicherung', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const { h } = exSicherung(tmp);
+    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    const nach1 = alles(file);
+    for (const args of [exSchreiben(file, h), ['--write', file, '--schritt', 'optionen'], exCheck(file)]) {
+      const r = await lauf(args);
+      assert.equal(r.code, 0, r.out);
+      assert.match(r.out, /schon geschrieben/);
+      assert.deepEqual(alles(file), nach1);
+    }
+  } finally { weg(tmp); }
+});
+
+test('EX main: ohne Sicherung kein Schreiben – fehlender Hash, falsche Form, falscher Hash, der Hash **einer** Spalte; nichts geändert', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const vorher = alles(file);
+    const { h } = exSicherung(tmp);
+    const FALL = [
+      [['--write', file, '--schritt', 'optionen'], /ohne Sicherung kein Schreiben/],
+      [['--write', file, '--schritt', 'optionen', '--sicherung-sha', 'abc'], /mindestens 12 Hex-Stellen/],
+      [['--write', file, '--schritt', 'optionen', '--sicherung-sha', 'zzzzzzzzzzzzzzzz'], /mindestens 12 Hex-Stellen/],
+      [exSchreiben(file, 'f'.repeat(16)), /passt nicht zum gelesenen Text/],
+      [exSchreiben(file, sicherungsHash(exAusgangScen)), /passt nicht zum gelesenen Text/],
+      [exSchreiben(file, sicherungsHash(dz.sequence)), /passt nicht zum gelesenen Text/],
+      [exSchreiben(file, sicherungsHash(dz.sequence, exAusgangScen)), /passt nicht zum gelesenen Text/],
+    ];
+    for (const [args, re] of FALL) { const r = await lauf(args); assert.equal(r.code, 1, r.out); assert.match(r.out, re); }
+    assert.deepEqual(alles(file), vorher);
+    assert.equal((await lauf(exSchreiben(file, h))).code, 0, 'mit dem richtigen Hash geht es');
+  } finally { weg(tmp); }
+});
+
+test('EX main: ein anderer Stand ist ein Abbruch mit Pfad – ein Wert, ein Schlüssel, ein Schritt anders: `--check` wie `--write`, nichts geschrieben, **kein** Schalter dagegen', async () => {
+  const FALL = [
+    [(sc) => { sc.options.partie.choices.kurz.vars.Muenzen = '44'; }, null, /options\.partie/],
+    [(sc) => { sc.options.doerfler3.default = 'Henlo'; }, null, /options\.doerfler3/],
+    [(sc) => { sc.villagers.seats.pop(); }, null, /villagers\.seats/],
+    [null, (q) => { q[28].x = 1; }, /sequence_data\[28\]/],
+    [null, (q) => { q[27].seat = 5; }, /sequence_data\[27\]/],
+  ];
+  for (const [fs_, fq, re] of FALL) {
+    const sc = copy(SC_PROD), q = copy(sequence);
+    fs_?.(sc); fq?.(q);
+    const { tmp, file } = exDb({ scen: text(sc), seq: text(q) });
+    try {
+      const vorher = alles(file);
+      for (const args of [exCheck(file), ['--write', file, '--schritt', 'optionen', '--sicherung-sha', sicherungsHash(text(sc), text(q)).slice(0, 16)]]) {
+        const r = await lauf(args);
+        assert.equal(r.code, 1, r.out);
+        assert.match(r.out, /Einordnung: ABWEICHEND/);
+        assert.match(r.out, re);
+        assert.match(r.out, /es wird nichts überschrieben/);
+      }
+      assert.deepEqual(alles(file), vorher);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: **die fünf davor geschriebenen Schritte** – fehlt einer, bricht der Lauf ab, **bevor** ein Byte geschrieben ist (kein UPDATE, nichts geändert), und nennt den Schritt', async () => {
+  const FALL = [
+    ['gelaende', { scen: text(exMit(s => { for (const n of ['Deputy Waggums', 'Pepin Milkfrog', 'Samuel Strawman']) { s.bosses[n].final.terrain.splice(3); } delete s.bosses['Deputy Waggums'].final.terrain[2].fromCount; })) }, /gelaende|ES|fromCount/],
+    ['werte', { scen: text(exMit(s => { for (const b of Object.values(s.bosses)) delete b.statsByCount; })) }, /werte|ET|statsByCount/],
+    ['zonen', { zon: zones }, /zonen|EU|Zonen/],
+    ['assets', { ast: assets }, /assets|EV|Marker/],
+    ['aktionen', { act: dz.actions }, /aktionen|EW|onlySeated/],
+  ];
+  for (const [name, over, re] of FALL) {
+    const { tmp, file } = exDb(over);
+    try {
+      const vorher = alles(file);
+      const sql = [];
+      class Spion extends Database { prepare(s) { sql.push(s); return super.prepare(s); } }
+      const scen = over.scen ?? exAusgangScen;
+      for (const args of [exCheck(file), ['--write', file, '--schritt', 'optionen', '--sicherung-sha', sicherungsHash(scen, dz.sequence).slice(0, 16)]]) {
+        const r = await lauf(args, { Db: Spion });
+        assert.equal(r.code, 1, `${name}: ${r.out}`);
+        assert.match(r.out, re, name);
+        assert.ok(r.out.includes(`Voraussetzung ${name} (`), `${name}: der Abbruch nennt den fehlenden Schritt — ${r.out}`);
+      }
+      assert.deepEqual(sql.filter(s => /^\s*(update|insert|delete)\b/i.test(s)), [], `${name}: kein UPDATE`);
+      assert.deepEqual(alles(file), vorher, name);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: ein **halber** Stand ist ein Abbruch – nur `scenario_data` im Ziel, nur `sequence_data` im Ziel: nichts geschrieben', async () => {
+  for (const [scen, seq] of [[EX_ZIELSC(), dz.sequence], [exAusgangScen, EX_ZIELSEQ()]]) {
+    const { tmp, file } = exDb({ scen, seq });
+    try {
+      const vorher = alles(file);
+      for (const args of [exCheck(file), ['--write', file, '--schritt', 'optionen', '--sicherung-sha', sicherungsHash(scen, seq).slice(0, 16)]]) {
+        const r = await lauf(args);
+        assert.equal(r.code, 1, r.out);
+        assert.match(r.out, /halber Stand/);
+      }
+      assert.deepEqual(alles(file), vorher);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: ein Stand, der nicht kompaktes JSON.stringify ist, wird nicht angefasst – in **jeder** der beiden Spalten (der Text-Vergleich trüge nicht)', async () => {
+  for (const [scen, seq] of [[JSON.stringify(SC_PROD, null, 1), dz.sequence], [exAusgangScen, JSON.stringify(sequence, null, 1)]]) {
+    const { tmp, file } = exDb({ scen, seq });
+    try {
+      const vorher = alles(file);
+      const r = await lauf(exCheck(file));
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /nicht kompaktes JSON\.stringify/);
+      assert.deepEqual(alles(file), vorher);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: Vergleich-und-Tausch – ändert jemand `scenario_data` **oder** `sequence_data` zwischen Lesen und Schreiben, wird nichts geschrieben, die fremde Änderung bleibt stehen', async () => {
+  for (const spalte of ['scenario_data', 'sequence_data']) {
+    const { tmp, file } = exDb();
+    try {
+      const { h } = exSicherung(tmp);
+      const fremd = spalte === 'scenario_data' ? exAusgangScen.replace('"gridLabel"', '"gridLabel"') + ' ' : dz.sequence + ' ';
+      const r = await lauf(exSchreiben(file, h), { haken: (stelle, db) => { if (stelle === 'nach-lesen') db.prepare(`update setups set ${spalte} = ? where id = ?`).run(fremd, SETUP_ID); } });
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /hat sich seit dem Lesen geändert|nichts geschrieben/);
+      assert.equal(zeile(file)[spalte], fremd, 'die fremde Änderung bleibt stehen');
+      const andere = spalte === 'scenario_data' ? 'sequence_data' : 'scenario_data';
+      assert.equal(zeile(file)[andere], andere === 'scenario_data' ? exAusgangScen : dz.sequence, 'und die andere Spalte ist nicht halb geschrieben');
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: ändert sich in der Transaktion eine andere Tabelle (Auto Save) oder eine andere Spalte des Aufbaus (`zone_data`, `action_data`), rollt **alles** zurück – auch die zweite der beiden Spalten', async () => {
+  for (const [wo, fn] of [
+    ['save_states', (db) => db.prepare("update save_states set state_data = '{\"a\":9}' where name = 'Auto Save'").run()],
+    ['zone_data', (db) => db.prepare('update setups set zone_data = ? where id = ?').run('[]', SETUP_ID)],
+    ['action_data', (db) => db.prepare('update setups set action_data = ? where id = ?').run('[]', SETUP_ID)],
+    ['table_assets', (db) => db.prepare("update table_assets set width = width + 1 where name = 'Marker 1: Leben'").run()],
+  ]) {
+    const { tmp, file } = exDb();
+    try {
+      const { h } = exSicherung(tmp);
+      const vorher = alles(file);
+      const r = await lauf(exSchreiben(file, h), { haken: (stelle, db) => { if (stelle === 'in-transaktion') fn(db); } });
+      assert.equal(r.code, 1, `${wo}: ${r.out}`);
+      assert.match(r.out, /unerwartet geändert/, wo);
+      assert.deepEqual(alles(file), vorher, `${wo}: nichts bleibt geändert, beide Spalten wie vorher`);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, **beide** Spalten, Zeichen für Zeichen; ein zweites Mal ist „schon der Ausgangsstand“', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const vorher = alles(file);
+    const { h, datei } = exSicherung(tmp);
+    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    const r = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /zurückgeschrieben/);
+    assert.match(r.out, /= die Sicherung, Zeichen für Zeichen/);
+    assert.deepEqual(alles(file), vorher, 'alles wie vor dem Schalter');
+    const r2 = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
+    assert.equal(r2.code, 0, r2.out);
+    assert.match(r2.out, /schon der Ausgangsstand/);
+  } finally { weg(tmp); }
+});
+
+test('EX main: `--zurueck` ersetzt nur den exakten Zielstand – hat jemand danach weitergearbeitet (eine der beiden Spalten), bleibt alles stehen', async () => {
+  for (const spalte of ['scenario_data', 'sequence_data']) {
+    const { tmp, file } = exDb();
+    try {
+      const { h, datei } = exSicherung(tmp);
+      assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+      setze(file, spalte, zeile(file)[spalte] + ' ');
+      const vorher = alles(file);
+      const r = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /nicht der Zielstand und nicht der Ausgangsstand/);
+      assert.deepEqual(alles(file), vorher);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EX main: `--zurueck` prüft die Sicherung – beschädigt, nicht kompakt, nicht der Ausgang dieses Schritts, schon der Zielstand, falsche Form: nichts wird überschrieben', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const { h } = exSicherung(tmp);
+    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    const vorher = alles(file);
+    const schreibe = (name, obj) => { const d = path.join(tmp, name); fs.writeFileSync(d, JSON.stringify(obj)); return d; };
+    const gut = { scenario_data: exAusgangScen, sequence_data: dz.sequence, sha256: sicherungsHash(exAusgangScen, dz.sequence), updated_at: 'x' };
+    const FALL = [
+      [schreibe('b1.json', { ...gut, sha256: 'a'.repeat(64) }), /beschädigt/],
+      [schreibe('b2.json', { scenario_data: JSON.stringify(SC_PROD, null, 1), sequence_data: dz.sequence, sha256: sicherungsHash(JSON.stringify(SC_PROD, null, 1), dz.sequence) }), /nicht kompaktes/],
+      [schreibe('b3.json', { scenario_data: EX_ZIELSC(), sequence_data: EX_ZIELSEQ(), sha256: sicherungsHash(EX_ZIELSC(), EX_ZIELSEQ()) }), /schon der Zielstand|Ausgangsstand dieses Schrittes/],
+      [schreibe('b4.json', { scenario_data: exAusgangScen, sha256: 'x' }), /nicht die Form/],
+      [schreibe('b5.json', { scenario_data: text(exMit(s => { s.options.doerfler3.default = 'Henlo'; })), sequence_data: dz.sequence, sha256: sicherungsHash(text(exMit(s => { s.options.doerfler3.default = 'Henlo'; })), dz.sequence) }), /nicht der Ausgangsstand/],
+    ];
+    for (const [datei, re] of FALL) {
+      const r = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, re);
+    }
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EX main: es gibt kein `--force` und kein Wort dafür – jedes unbekannte Argument ist ein Benutzungsfehler, auch beim Rückweg; geschrieben wird nichts', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const vorher = alles(file);
+    const { h, datei } = exSicherung(tmp);
+    for (const wort of ['--force', '--erzwingen', '--ignore-vorgaenger', '--ohne-pruefung', '--yes', '-f']) {
+      for (const args of [[...exSchreiben(file, h), wort], [...exCheck(file), wort], ['--zurueck', datei, file, '--schritt', 'optionen', wort]]) {
+        const r = await lauf(args);
+        assert.equal(r.code, 2, `${wort}: ${r.out}`);
+        assert.match(r.out, /unbekanntes Argument|usage/i);
+      }
+    }
+    assert.deepEqual(alles(file), vorher);
+    const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8');
+    assert.ok(!/['"]--force['"]/.test(quelle.replace(/\/\/.*$/gm, '')), 'das Wort steht nirgends als Argument');
+  } finally { weg(tmp); }
+});
+
+test('EX main: die Transaktion ist `IMMEDIATE` – die Schreibsperre liegt vor dem ersten Hash, nicht erst beim UPDATE; beide Spalten in **einer**', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const aufrufe = [];
+    class Spion extends Database {
+      transaction(fn) {
+        const t = super.transaction(fn);
+        const wrap = (...a) => { aufrufe.push('direkt'); return t(...a); };
+        wrap.immediate = (...a) => { aufrufe.push('immediate'); return t.immediate(...a); };
+        wrap.deferred = t.deferred; wrap.exclusive = t.exclusive;
+        return wrap;
+      }
+    }
+    const { h } = exSicherung(tmp);
+    assert.equal((await lauf(exSchreiben(file, h), { Db: Spion })).code, 0);
+    assert.deepEqual(aufrufe, ['immediate'], 'genau **eine** Transaktion für beide Spalten');
+  } finally { weg(tmp); }
+});
+
+test('EX main: ein Prüfer, der etwas findet, hält den Lauf an – ein Stand, den `validateOptions` beanstandet (ein `onlyChoice` in einer Aktion), wird nicht geschrieben', async () => {
+  const akt = copy(ZIEL_AKT);
+  stepsOf(akt, 'dorfphase-beginnen')[3].onlyChoice = { partie: 'kurz' };
+  const { tmp, file } = exDb({ act: text(akt) });
+  try {
+    const vorher = alles(file);
+    for (const args of [exCheck(file), ['--write', file, '--schritt', 'optionen', '--sicherung-sha', sicherungsHash(exAusgangScen, dz.sequence).slice(0, 16)]]) {
+      const r = await lauf(args);
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /onlyChoice is not allowed in an action/);
+    }
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EX main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst', async () => {
+  const { tmp, file } = exDb();
+  try {
+    const db = new Database(file);
+    db.pragma('foreign_keys = OFF');
+    db.prepare("insert into games (id, name) values ('anderes', 'X')").run();
+    db.prepare('update setups set game_id = ? where id = ?').run('anderes', SETUP_ID);
+    db.close();
+    const vorher = alles(file);
+    const r = await lauf(exCheck(file));
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /gehört zu Spiel anderes/);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EX main: stimmt der gerechnete Zielstand nicht mit der Konstante überein, hält der Lauf an – für **jede** der beiden Spalten, `--check` wie `--write` (die Konstante wird für den Test kurz verstellt)', async () => {
+  for (const spalte of ['scenario', 'sequence']) {
+    const { tmp, file } = exDb();
+    const alt = SCHRITTE.optionen.ziel[spalte];
+    SCHRITTE.optionen.ziel[spalte] = { laenge: alt.laenge, sha: '000000000000' };
+    try {
+      const vorher = alles(file);
+      const { h } = exSicherung(tmp);
+      for (const args of [exCheck(file), exSchreiben(file, h)]) {
+        const r = await lauf(args);
+        assert.equal(r.code, 1, `${spalte}: ${r.out}`);
+        assert.match(r.out, new RegExp(`${spalte}_data: der gerechnete Zielstand hat`));
+      }
+      assert.deepEqual(alles(file), vorher);
+    } finally { SCHRITTE.optionen.ziel[spalte] = alt; weg(tmp); }
+  }
+});
+
+test('EX main: die noch nicht gebauten Schritte melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1 (seit EX gibt es keinen mehr; der Mechanismus wird mit einem kurz auf `null` gestellten Schritt gezeigt)', async () => {
+  let geoeffnet = 0;
+  class Spion { constructor() { geoeffnet++; throw new Error('die Datenbank darf nicht geöffnet werden'); } }
+  const gebaut = SCHRITTE.optionen;
+  SCHRITTE.optionen = null;
+  try {
+    for (const modus of [['--check', 'gibt-es-nicht.db'], ['--write', 'gibt-es-nicht.db', '--sicherung-sha', 'abcdefabcdef'], ['--zurueck', 'sicherung.json', 'gibt-es-nicht.db']]) {
+      const r = await lauf([...modus, '--schritt', 'optionen'], { Db: Spion });
+      assert.equal(r.code, 1, `${modus[0]}: ${r.out}`);
+      assert.match(r.out, /Schritt „optionen“ ist noch nicht gebaut/);
+    }
+  } finally { SCHRITTE.optionen = gebaut; }
+  assert.equal(geoeffnet, 0);
+  assert.equal(Object.values(SCHRITTE).filter(x => x === null).length, 0, 'alle sechs sind gebaut');
+});
+
+test('EX main: die Reihenfolge zu den fünf Schritten davor ist **nicht** gleichgültig – der Schalter verlangt sie; aber **nach** dem Schalter sind sie weiter „schon geschrieben“ (jeder erkennt sein Ergebnis im Zielstand von `optionen`)', async () => {
+  const z = exZ();
+  assert.equal(EW.patchGelaende(z.scenario).art, 'schon-da');
+  assert.equal(EW.patchWerte(z.scenario).art, 'schon-da');
+  assert.equal(EW.patchZonen(EX_VORG.zone).art, 'schon-da');
+  assert.equal(EW.patchAssets(EX_VORG.assets).art, 'schon-da');
+  assert.equal(EW.patchAktionen(EX_VORG.action).art, 'schon-da');
+  // … und `gelaende`/`werte` laufen auch **gegen** den Zielstand dieses Schritts als „schon-da“ durch `main`.
+  const { tmp, file } = exDb();
+  try {
+    const { h } = exSicherung(tmp);
+    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    for (const schritt of ['gelaende', 'werte']) {
+      const r = await lauf(['--check', file, '--schritt', schritt]);
+      assert.equal(r.code, 0, `${schritt}: ${r.out}`);
+      assert.match(r.out, /schon geschrieben/);
+    }
+  } finally { weg(tmp); }
 });

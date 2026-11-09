@@ -1,10 +1,10 @@
-// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option (Spec M31.4, M31.6, M31.7, M31.8, M31.9, M31.12).
+// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12).
 //
 // **Sechs Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1) und **`aktionen`** (Aufgabe EW, Teil 1); der andere steht in `SCHRITTE` als `null` und meldet „noch nicht gebaut“, **ohne die Datenbank
-// zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
-// Kontrolle, Weg zurück) ändert sich nichts.
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — alle sechs. Ein Schritt, der in `SCHRITTE` `null` wäre,
+// hielte laut an, **ohne die Datenbank zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
+// Kontrolle, Weg zurück) ändert sich nur, was ein Schritt **mehr** braucht (siehe `liest` bei `optionen`).
 //
 // **`werte`:** in `scenario_data.bosses[…]` bekommen die **19** Bösewichte mit Zahlenwerten einen neuen Schlüssel `statsByCount` mit genau den
 // Schlüsseln `"2"`, `"4"`, `"5"`, je `{ BEW, LEB }` (die Namen, die `stats` im Datensatz trägt). **Kein** Schlüssel `"3"`: die Spalte für drei
@@ -40,6 +40,15 @@
 // (ein Stück neu, ein anderes alt) ist ein Abbruch. Er setzt den **deployten Code** voraus (der alte Executor kennt `onlySeated` nicht, und `place_counter`/`set_counter` hielte bei dem Produkt), **und er ist
 // erst folgenlos, wenn `villagers.seats` fünf Plätze hat** (`EX`): ein Gate auf einen Platz jenseits der Plätze ist ein `failed` mit `is not a seat` (M31.3) — bei drei Plätzen in den Daten sind das zwei, zwei und
 // zehn Zeilen je Runde, ohne dass sich der Tisch ändert. Er schreibt `action_data`, sonst nichts. Der Rückwärtsbeweis wirft Gates, Wert, Text und Zonenliste weg; **die Vorwärtsprobe** fängt, was er dabei übersähe.
+//
+// **`optionen` (EX, M31.5, M31.8 Punkt 8, M31.12) — der Schalter, der letzte Schritt:** er macht zwei bis fünf Dörfler möglich und ist der einzige, der den Setup-Dialog ändert. Er schreibt **zwei** Spalten in **einer** `IMMEDIATE`-Transaktion:
+// in `scenario_data` bekommen `options.doerfler3`, `doerfler4`, `doerfler5` je ein `optional { off "keiner", on <Granny|Blopsy|Yancy>, addLabel }` (Vorgabe `keiner`, neun Wahlen, `keiner` **zuletzt**), `options.partie` bindet
+// `MuenzenJeDoerfler` (15 / 10) statt `Muenzen` (45 / 30), `villagers.baseCount` wird 3, `villagers.seats` bekommt zwei Plätze; in `sequence_data` bekommen `seat_villager` für Platz 3, 4 und 5 das Gate `onlyChoice { doerfler<n>: "!keiner" }`
+// (4 und 5 stehen **hinter** Platz 3 und **vor** den Münzen), die Münzen werden `"$optMuenzenJeDoerfler*$doerflerzahl"` und ziehen nach (2000, 1040). **Er verlangt die fünf Schritte davor** (`patchSchalter` bekommt `zone_data`, die Zeilen von
+// `table_assets` und `action_data` als dritten Parameter und prüft sie **vor dem ersten Byte** mit den Einordnern der Schritte davor; `liest` im Eintrag holt sie, **nur lesend**): fehlt einer oder ist er halb da, ist es ein Abbruch. Er setzt den
+// **deployten Code** voraus (Gate `onlySeated`, Verneinung, Leiter, Produkt im Zählerwert). **Wer ihn schreibt, schaltet das Spiel auf die Vorgabe zwei um** (`default: "keiner"`): ein Aufbau ohne Wahl baut zwei Dörfler; der Tisch von vor
+// M31 entsteht mit `doerfler3: Granny`. Geschrieben werden `scenario_data` und `sequence_data`, sonst nichts. Rückwärtsbeweis **und** Vorwärtsprobe: der Rückwärtsbeweis wirft gerade die Werte weg, die falsch sein könnten (`on`, `addLabel`,
+// den Zähler), die Vorwärtsprobe fängt sie.
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -94,7 +103,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
-import { validateOptions } from '../shared/setupOptions.js';
+import { validateOptions, optionalOf } from '../shared/setupOptions.js';
+import { validateVillagers, TABLEAU_PREFIX } from '../shared/villagers.js';
 import { relativeBox } from '../shared/anchoring.js';
 import { DOERFLER, equipmentZones, equipmentZonesFor } from './equipment-zones.mjs';
 
@@ -121,10 +131,11 @@ const gelaende = {
   ausgang: { scenario: { laenge: 20858, sha: '82592d1ac883' } },
   ziel: { scenario: { laenge: 21473, sha: '69dbe9e2b8cb' } },
 };
+// `werte` läuft nach `gelaende` (Reihenfolge ES, ET): sein Ausgang ist dessen Ziel — **dieselbe** Zahl. Der Text ist in beiden Reihenfolgen derselbe.
+const werte = { ausgang: gelaende.ziel, ziel: { scenario: { laenge: 23104, sha: '5613ccf1cd29' } } };
 export const SCHRITTE = {
   gelaende,
-  // `werte` läuft nach `gelaende` (Reihenfolge ES, ET): sein Ausgang ist dessen Ziel — **dieselbe** Zahl. Der Text ist in beiden Reihenfolgen derselbe.
-  werte: { ausgang: gelaende.ziel, ziel: { scenario: { laenge: 23104, sha: '5613ccf1cd29' } } },
+  werte,
   // `zonen` (EU, M31.8): Ausgang gerechnet aus `auslagen-kurzpartie.json` (Länge und sha der Text von `zone_data`), Ziel aus `patchZonen` auf
   // dem Ausgang gerechnet. Nur `zone` — die Spalte, die dieser Schritt schreibt.
   zonen: {
@@ -136,7 +147,11 @@ export const SCHRITTE = {
   assets: { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } },
   // `aktionen` (EW, M31.4/M31.8/M31.9): `action_data`, vier Aktionen. Ausgang: der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchAktionen` gerechnet.
   aktionen: { ausgang: { action: { laenge: 5803, sha: '33033dace238' } }, ziel: { action: { laenge: 7564, sha: '9f41211076a4' } } },
-  optionen: null,
+  // `optionen` (EX, M31.5/M31.8/M31.12): **zwei** Spalten. Ausgang: `scenario` ist das Ziel von `werte` (dieselbe Zahl), `sequence` der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchSchalter` gerechnet.
+  optionen: {
+    ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
+    ziel: { scenario: { laenge: 25284, sha: '7368e504b85a' }, sequence: { laenge: 2878, sha: '712f93e99e1a' } },
+  },
 };
 
 // ── Die Messung ─────────────────────────────────────────────────────────────
@@ -1215,6 +1230,256 @@ export function pruefeAktionen(actions) {
   return out;
 }
 
+// ── Der Schalter (EX, M31.5, M31.8 Punkt 8, M31.12) ─────────────────────────
+
+/**
+ * Die Leiter (M31.5): Dörfler 3, 4 und 5 sind je **eine** optionale Option. `on` ist der Dörfler, den das Plus wählt — der, dessen Tableau der **Anker** des Platzes ist
+ * (Granny, Blopsy, Yancy; M31.8 Punkt 2) —, `keiner` der Satz der Wahl „nicht da“. Die Namen stehen hier **einmal**; die Anker der Plätze 4 und 5 und die Kurznamen folgen aus dem Roster.
+ */
+const LEITER = [
+  { n: 3, on: 'Granny', keiner: 'kein dritter Dörfler' },
+  { n: 4, on: 'Blopsy', keiner: 'kein vierter Dörfler' },
+  { n: 5, on: 'Yancy', keiner: 'kein fünfter Dörfler' },
+];
+const ADD_LABEL = 'Weiteren Dörfler hinzufügen';
+/** Die Zahl, für die `stats` und die Plättchen gedruckt sind (Regelstand Solo): `villagers.baseCount` (M31.6). Sie zu schreiben schaltet `statsByCount` ein. */
+const BASIS_ZAHL = 3;
+/** Was `partie` je Wahl bindet: im Ausgang `Muenzen` (45 / 30 für drei Dörfler), im Ziel `MuenzenJeDoerfler` (15 / 10 je Dörfler; der Aufbau multipliziert mit `$doerflerzahl`). */
+const PARTIE = { kurz: { alt: '45', neu: '15' }, lang: { alt: '30', neu: '10' } };
+const OPT_ALT = ['partie', 'troedel', 'doerfler1', 'doerfler2', 'doerfler3'];
+const OPT_NEU = [...OPT_ALT, 'doerfler4', 'doerfler5'];
+/** Der Schritt (0-basiert) von `seat_villager` für Platz 3 im Ausgang; die Münzen sind der **letzte** Schritt dahinter. */
+const SEQ_PLATZ3 = 27;
+const SEQ_ALT = 29, SEQ_NEU = 31;
+const qSeat = (n, mitGate) => ({ type: 'seat_villager', seat: n, villager: `$optDoerfler${n}`, ...(mitGate ? { onlyChoice: { [`doerfler${n}`]: '!keiner' } } : {}) });
+const qMuenzen = (value, spot) => ({ type: 'place_counter', name: 'Münzen (gemeinsam)', value, x: spot.x, y: spot.y });
+const Q_MUENZEN_ALT = qMuenzen('$optMuenzen', MUENZKASTEN.alt);
+const Q_MUENZEN_NEU = qMuenzen('$optMuenzenJeDoerfler*$doerflerzahl', MUENZKASTEN.ziel);
+
+const vollerName = (roster, kurz) => Object.entries(roster).find(([, v]) => v?.short === kurz)?.[0];
+const wahlenVon = (roster, n) => Object.fromEntries(Object.entries(roster).map(([name, v]) => [v.short, { label: name, vars: { [`Doerfler${n}`]: name } }]));
+/** Die Option im Ausgang (`doerfler3`: ohne `optional`, Vorgabe Granny) und im Ziel (`label`, `default`, `optional`, `choices`; `keiner` **zuletzt**). */
+const optionAlt = (roster, n, vorgabe) => ({ label: `Dörfler ${n}`, default: vorgabe, choices: wahlenVon(roster, n) });
+const optionNeu = (roster, { n, on, keiner }) => ({
+  label: `Dörfler ${n}`,
+  default: 'keiner',
+  optional: { off: 'keiner', on, addLabel: ADD_LABEL },
+  choices: { ...wahlenVon(roster, n), keiner: { label: keiner, vars: { [`Doerfler${n}`]: '' } } },
+});
+const sitz = (n, anchor) => ({ anchor, zones: `Dörfler ${n}`, markers: `Marker ${n}`, vorrat: `Ausrüstung Dörfler ${n}`, tableau: { x: TISCH_X[n], y: TISCH_Y } });
+
+/** Was am Roster nicht trägt, damit der Baustein Wahlen daraus bauen kann (leer = in Ordnung): Kurznamen als Schlüssel, eindeutig, und die drei `on`. */
+function rosterFehler(roster) {
+  if (!isObject(roster) || !Object.keys(roster).length) return ['scenario_data.villagers.roster fehlt oder ist leer'];
+  const p = [], gesehen = new Set();
+  for (const [name, v] of Object.entries(roster)) {
+    if (typeof v?.short !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(v.short)) p.push(`villagers.roster.${name}.short ist kein Schlüssel (Buchstaben, Ziffern, „_“, „-“): ${text(v?.short)}`);
+    else if (gesehen.has(v.short)) p.push(`villagers.roster: der Kurzname „${v.short}“ kommt zweimal vor — er ist der Schlüssel der Wahl`);
+    else gesehen.add(v.short);
+  }
+  for (const { n, on } of LEITER) if (!gesehen.has(on)) p.push(`villagers.roster: kein Dörfler mit dem Kurznamen „${on}“ — das Plus von doerfler${n} wählte nichts`);
+  return p;
+}
+
+/** Die **fünf davor geschriebenen Schritte** (M31.12) — jeder muss im Ziel stehen, sonst baute der Schalter ein Spiel, das nicht stimmt (M31.1). Eine Meldung je Schritt, leer = alle da. */
+function vorgaengerProbleme(scenario, v) {
+  const out = [];
+  const braucht = (name, r) => {
+    if (r.art !== 'schon-da') out.push(`Voraussetzung ${name} nicht erfüllt — ${r.art === 'zu-schreiben' ? 'noch nicht geschrieben' : r.probleme.join('; ')}`);
+  };
+  braucht('gelaende (ES, scenario_data): fromCount an den Endkampf-Plättchen', patchGelaende(scenario));
+  braucht('werte (ET, scenario_data): statsByCount an den 19 Bösewichten', patchWerte(scenario));
+  braucht('zonen (EU, zone_data): die 28 Zonen der Plätze 4 und 5', patchZonen(v?.zone));
+  braucht('assets (EV, table_assets): die acht Marker-Assets', patchAssets(v?.assets));
+  braucht('aktionen (EW, action_data): onlySeated in den Aktionen', patchAktionen(v?.action));
+  return out;
+}
+
+/**
+ * Die Stücke des Schrittes `optionen` einordnen. **Zehn Stücke**, jedes `alt` oder `neu`: `options.partie.choices.kurz.vars`, `….lang.vars`, `options.doerfler3` (mit `optional`, Vorgabe `keiner`),
+ * `options.doerfler4`, `options.doerfler5`, `villagers.seats` (die zwei neuen), `villagers.baseCount`; in der Folge der Schritt an 27 (Platz 3, mit Gate), die zwei Schritte für Platz 4 und 5 und die Münzen.
+ * Jedes Stück steht **genau** im Wortlaut des Ausgangs oder des Ziels; alles andere — auch ein Stück, das nur halb stimmt — ist ein Problem mit Pfad; stehen Stücke in **beiden** Ständen, ist es ein halber.
+ */
+function einordnenSchalter(scenario, sequence, probleme) {
+  const stand = {};
+  const stueck = (pfad, ist, alt, neu) => {
+    const i = ist === undefined ? undefined : text(ist);
+    if (i === alt) stand[pfad] = 'alt';
+    else if (i === neu) stand[pfad] = 'neu';
+    else {
+      const gegen = (soll) => (soll === undefined ? 'nicht da' : abwTeil(soll, i ?? ''));
+      probleme.push(`${pfad}: ${i === undefined ? 'fehlt' : 'ist weder der Ausgang noch das Ziel'} — gegen den Ausgang: ${gegen(alt)}; gegen das Ziel: ${gegen(neu)}`);
+    }
+  };
+  const o = scenario?.options, v = scenario?.villagers;
+  if (!isObject(o)) probleme.push('scenario_data.options fehlt oder ist kein Objekt');
+  if (!isObject(v)) probleme.push('scenario_data.villagers fehlt oder ist kein Objekt');
+  const rf = isObject(v) ? rosterFehler(v.roster) : [];
+  probleme.push(...rf);
+  if (!Array.isArray(sequence)) probleme.push('sequence_data ist kein Feld von Schritten');
+  if (!isObject(o) || !isObject(v) || rf.length || !Array.isArray(sequence)) return null;
+  const roster = v.roster;
+
+  // ── scenario_data.options ──
+  for (const k of ['kurz', 'lang']) {
+    const wo = `scenario_data.options.partie.choices.${k}.vars`;
+    stueck(wo, o.partie?.choices?.[k]?.vars, text({ Muenzen: PARTIE[k].alt }), text({ MuenzenJeDoerfler: PARTIE[k].neu }));
+  }
+  for (const l of LEITER) stueck(`scenario_data.options.doerfler${l.n}`, o[`doerfler${l.n}`], l.n === 3 ? text(optionAlt(roster, 3, LEITER[0].on)) : undefined, text(optionNeu(roster, l)));
+
+  // ── scenario_data.villagers: die drei alten Plätze bleiben, wie sie sind; die zwei neuen sind das Stück ──
+  const seats = v.seats;
+  if (!Array.isArray(seats)) probleme.push('scenario_data.villagers.seats fehlt oder ist keine Liste');
+  else {
+    for (let i = 0; i < Math.min(3, seats.length); i++) {
+      if (text(seats[i]) !== text(sitz(i + 1, seats[i]?.anchor))) probleme.push(`scenario_data.villagers.seats[${i}]: ist ${text(seats[i])}, erwartet die Form { anchor, zones „Dörfler ${i + 1}“, markers, vorrat, tableau (${TISCH_X[i + 1]}, ${TISCH_Y}) } wie im Ausgang`);
+    }
+    if (seats.length < 3) probleme.push(`scenario_data.villagers.seats: hat ${seats.length} Einträge, der Ausgang hat drei`);
+    else if (seats[2]?.anchor !== `${TABLEAU_PREFIX}${vollerName(roster, LEITER[0].on)}`) probleme.push(`scenario_data.villagers.seats[2].anchor: ist ${text(seats[2]?.anchor)}, der Anker von Platz 3 ist das Tableau von „${vollerName(roster, LEITER[0].on)}“ (on von doerfler3)`);
+    const neu = LEITER.slice(1).map(l => sitz(l.n, `${TABLEAU_PREFIX}${vollerName(roster, l.on)}`));
+    stueck('scenario_data.villagers.seats[3…4] (Plätze 4 und 5)', seats.length >= 3 ? seats.slice(3) : undefined, text([]), text(neu));
+  }
+  stueck('scenario_data.villagers.baseCount', v.baseCount, undefined, text(BASIS_ZAHL));
+
+  // ── sequence_data: Platz 3 mit Gate, Platz 4 und 5, die Münzen (der letzte Schritt) ──
+  stueck(`sequence_data[${SEQ_PLATZ3}] (Platz 3)`, sequence[SEQ_PLATZ3], text(qSeat(3, false)), text(qSeat(3, true)));
+  const tail = sequence.slice(SEQ_PLATZ3 + 1);
+  if (tail.length !== 1 && tail.length !== 3) probleme.push(`sequence_data: hat ${sequence.length} Schritte, erwartet ${SEQ_ALT} (Ausgang) oder ${SEQ_NEU} (Ziel)`);
+  else {
+    const m = SEQ_PLATZ3 + tail.length;
+    stueck(`sequence_data[${m}] (die Münzen)`, tail.at(-1), text(Q_MUENZEN_ALT), text(Q_MUENZEN_NEU));
+    if (tail.length === 3) {
+      const gewollt = [qSeat(4, true), qSeat(5, true)];
+      const stimmt = gewollt.map((s, k) => text(tail[k]) === text(s));
+      stimmt.forEach((ok, k) => { if (!ok) probleme.push(`sequence_data[${SEQ_PLATZ3 + 1 + k}] (Platz ${4 + k}): ist ${text(tail[k])}, erwartet ${text(gewollt[k])}`); });
+      if (stimmt.every(Boolean)) stand[`sequence_data[${SEQ_PLATZ3 + 1}…${SEQ_PLATZ3 + 2}] (Platz 4 und 5)`] = 'neu';
+    } else stand['sequence_data (Platz 4 und 5)'] = 'alt';
+  }
+
+  // ── zusammen: alle zehn alt, oder alle zehn neu; dann die Reihenfolge der Schlüssel ──
+  const namen = Object.keys(stand);
+  const neuNamen = namen.filter(n => stand[n] === 'neu'), altNamen = namen.filter(n => stand[n] === 'alt');
+  if (!probleme.length && neuNamen.length && altNamen.length) probleme.push(`halber Stand: schon geschrieben ${neuNamen.join('; ')}; noch alt ${altNamen.join('; ')}`);
+  if (probleme.length) return null;
+  const soll = neuNamen.length ? OPT_NEU : OPT_ALT;
+  if (text(Object.keys(o)) !== text(soll)) {
+    probleme.push(`scenario_data.options: die Schlüssel sind ${Object.keys(o).join(', ')}, erwartet in dieser Reihenfolge ${soll.join(', ')}`);
+    return null;
+  }
+  return neuNamen.length ? 'neu' : 'alt';
+}
+
+/**
+ * Die Stücke des Schrittes `optionen` (der **Schalter**) einordnen — **eine** Frage mit drei Antworten, über **beide** Spalten:
+ *
+ * - `zu-schreiben`: jedes der zehn Stücke steht genau wie im Ausgang (`options` mit den fünf Schlüsseln `partie` … `doerfler3`, `partie` bindet `Muenzen` 45 / 30, `doerfler3` ohne `optional`, drei Plätze, kein
+ *   `baseCount`, 29 Schritte mit Platz 3 an 27 und den Münzen an 28) **und** die fünf davor geschriebenen Schritte stehen im Ziel (`fromCount`, `statsByCount` an den 19, die 28 Zonen, die acht Assets,
+ *   `onlySeated` in den Aktionen — `vorgaenger` trägt `{ zone, assets, action }`, gelesen, nie verändert);
+ * - `schon-da`: jedes Stück steht im Ziel (und die Vorgänger auch);
+ * - `abweichend`: alles andere, auch jeder halbe Stand (ein Stück neu, ein anderes alt, die eine Spalte im Ziel, die andere nicht) und jeder fehlende Vorgänger. `probleme` nennt jede Abweichung mit Pfad;
+ *   Zielstand gibt es keinen.
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object} scenario    – `scenario_data` (gelesen)
+ * @param {Array}  sequence    – `sequence_data` (gelesen)
+ * @param {{ zone: object[], assets: object[], action: object[] }} vorgaenger – `zone_data`, die Zeilen von `table_assets`, `action_data`
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', scenario?: object, sequence?: Array, probleme?: string[] }}
+ */
+export function patchSchalter(scenario, sequence, vorgaenger) {
+  const probleme = vorgaengerProbleme(scenario, vorgaenger);
+  const stand = einordnenSchalter(scenario, sequence, probleme);
+  if (probleme.length) return { art: 'abweichend', probleme };
+  if (stand === 'neu') return { art: 'schon-da', scenario: copy(scenario), sequence: copy(sequence) };
+
+  const next = copy(scenario), q = copy(sequence);
+  const roster = next.villagers.roster;
+  for (const k of Object.keys(PARTIE)) next.options.partie.choices[k].vars = { MuenzenJeDoerfler: PARTIE[k].neu };
+  for (const l of LEITER) next.options[`doerfler${l.n}`] = optionNeu(roster, l);
+  next.villagers.seats.push(...LEITER.slice(1).map(l => sitz(l.n, `${TABLEAU_PREFIX}${vollerName(roster, l.on)}`)));
+  next.villagers.baseCount = BASIS_ZAHL;
+  q.splice(SEQ_PLATZ3, 2, qSeat(3, true), qSeat(4, true), qSeat(5, true), Q_MUENZEN_NEU);
+  return { art: 'zu-schreiben', scenario: next, sequence: q };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und **vor** dem Schreiben: die Stücke zurück — `partie` bindet wieder `Muenzen`, `doerfler3` verliert `optional`, `keiner` und die Vorgabe `keiner`, `doerfler4`/`doerfler5`
+ * heraus, die zwei Plätze und `baseCount` heraus, die Schritte für Platz 4 und 5 heraus, das Gate von Platz 3 und die Münzen wie im Ausgang — das muss den gelesenen Text ergeben, **beide** Spalten, Zeichen für Zeichen.
+ * **Dazu die Vorwärtsprobe** (Lektion aus EU: der Rückwärtsbeweis wirft gerade die Werte weg, die falsch sein könnten): aus dem Zurückgerechneten entsteht genau der Zielstand.
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseSchalter(before, after, vorgaenger) {
+  if (!isObject(after?.scenario) || !Array.isArray(after?.sequence)) return ['Rückwärtsbeweis scenario_data: der Zielstand trägt kein scenario und keine sequence'];
+  const meldungen = [];
+  const sc = copy(after.scenario), q = copy(after.sequence);
+  if (isObject(sc.options)) {
+    delete sc.options.doerfler4; delete sc.options.doerfler5;
+    for (const k of Object.keys(PARTIE)) if (isObject(sc.options.partie?.choices?.[k])) sc.options.partie.choices[k].vars = { Muenzen: PARTIE[k].alt };
+    const d3 = sc.options.doerfler3;
+    if (isObject(d3)) { delete d3.optional; if (isObject(d3.choices)) delete d3.choices.keiner; d3.default = LEITER[0].on; }
+  }
+  if (isObject(sc.villagers)) {
+    if (Array.isArray(sc.villagers.seats)) sc.villagers.seats = sc.villagers.seats.slice(0, 3);
+    delete sc.villagers.baseCount;
+  }
+  const rest = q.filter(s => !(isObject(s) && s.type === 'seat_villager' && s.seat > 3)).map(s => {
+    if (!isObject(s)) return s;
+    if (s.type === 'seat_villager') { const { onlyChoice: _g, ...o } = s; return o; }
+    if (s.type === 'place_counter' && s.name === 'Münzen (gemeinsam)') return copy(Q_MUENZEN_ALT);
+    return s;
+  });
+  if (text(sc) !== text(before?.scenario)) meldungen.push(`Rückwärtsbeweis scenario_data: ohne options.doerfler4/5, optional, die Münz-Variable, die zwei Plätze und baseCount ist der Text nicht der gelesene — ${abwTeil(text(sc), text(before?.scenario))}`);
+  if (text(rest) !== text(before?.sequence)) meldungen.push(`Rückwärtsbeweis sequence_data: ohne die Schritte für Platz 4 und 5, die Gates und das Produkt ist der Text nicht der gelesene — ${abwTeil(text(rest), text(before?.sequence))}`);
+  const vor = patchSchalter(sc, rest, vorgaenger);
+  if (vor.art !== 'zu-schreiben') meldungen.push(`Rückwärtsbeweis scenario_data (Vorwärtsprobe): das Zurückgerechnete ist kein Ausgang (${vor.art}: ${(vor.probleme ?? []).join('; ')})`);
+  else {
+    if (text(vor.scenario) !== text(after.scenario)) meldungen.push(`Rückwärtsbeweis scenario_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.scenario), text(after.scenario))}`);
+    if (text(vor.sequence) !== text(after.sequence)) meldungen.push(`Rückwärtsbeweis sequence_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.sequence), text(after.sequence))}`);
+  }
+  return meldungen;
+}
+
+/**
+ * Die Prüfer des Zielstands: **`validateOptions`** (Optionen gegen Folge **und** Aktionen), **`validateScenarioData`** (ohne Bibliothek und Raster), **`validateVillagers`** mit **allen** Assets und Zonen
+ * (fünf Plätze: der Prüfer ist die Wache für die Reihenfolge der Schritte, M31.8 Punkt 8), `optionalOf` an `doerfler3`–`5` nicht `null`, und das Roster: jede Wahl nennt einen Schlüssel des Rosters
+ * (außer `keiner`), und `on` ist der Dörfler am Anker des Platzes. `[{ titel, probleme }]`.
+ */
+function schalterPruefer(scenario, sequence, vorgaenger) {
+  const o = scenario?.options, v = scenario?.villagers, roster = v?.roster;
+  const wahl = [];
+  for (const { n } of LEITER) {
+    const d = o?.[`doerfler${n}`], wo = `options.doerfler${n}`;
+    if (optionalOf(d) === null) wahl.push(`${wo}: optionalOf ist null — der Dialog zeichnete ein gewöhnliches Feld ohne Plus`);
+    if (!isObject(roster)) continue;
+    for (const [k, c] of Object.entries(d?.choices ?? {})) {
+      if (k === 'keiner') continue;
+      const name = c?.vars?.[`Doerfler${n}`];
+      if (typeof name !== 'string' || !hat(roster, name)) wahl.push(`${wo}.choices.${k}.vars.Doerfler${n}: „${name}“ ist kein Schlüssel von villagers.roster`);
+      else if (roster[name].short !== k) wahl.push(`${wo}.choices.${k}: der Schlüssel ist nicht der Kurzname von „${name}“ (${roster[name].short})`);
+    }
+    const eigen = d?.optional?.on, voll = vollerName(roster, eigen);
+    if (voll === undefined) wahl.push(`${wo}: optional.on „${eigen}“ ist kein Kurzname im Roster`);
+    else if (v?.seats?.[n - 1]?.anchor !== `${TABLEAU_PREFIX}${voll}`) wahl.push(`${wo}: optional.on „${eigen}“ ist nicht der Dörfler am Anker von Platz ${n} (${text(v?.seats?.[n - 1]?.anchor)}, erwartet ${TABLEAU_PREFIX}${voll}) — das Plus setzte ihn an einen fremden Platz`);
+  }
+  return [
+    { titel: 'validateOptions (mit der Folge und den Aktionen)', probleme: validateOptions(o, sequence, vorgaenger?.action) },
+    { titel: 'validateScenarioData', probleme: validateScenarioData(scenario) },
+    { titel: 'validateVillagers (mit allen Assets und Zonen)', probleme: validateVillagers(v, { assets: vorgaenger?.assets ?? [], zones: vorgaenger?.zone ?? [] }) },
+    { titel: 'Wahlen gegen das Roster, on gegen den Anker', probleme: wahl },
+  ];
+}
+
+/** Dieselben Prüfer als flache Liste von Meldungen (wie `pruefeAktionen`), jede mit dem Titel ihres Prüfers davor. */
+export const pruefeSchalter = (scenario, sequence, vorgaenger) => schalterPruefer(scenario, sequence, vorgaenger).flatMap(g => g.probleme.map(m => `${g.titel}: ${m}`));
+
+/** Die drei Dinge, die der Schalter **liest**, ohne sie zu schreiben (Vorbedingung): `zone_data`, `action_data` und die Zeilen von `table_assets`. Nicht lesbar heißt `undefined` — `patchSchalter` bricht dann ab. */
+function leseVorgaenger(db) {
+  const row = db.prepare('select zone_data, action_data from setups where id = ?').get(SETUP_ID);
+  const json = (t) => { try { return JSON.parse(t); } catch { return undefined; } };
+  return { zone: json(row?.zone_data), action: json(row?.action_data), assets: leseAssets(db) };
+}
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -1333,6 +1598,37 @@ const DEFS = {
       console.log(`  die Aktion laden-nachfuellen: ${text(aktionVon(before.action, 'laden-nachfuellen')[0]) === text(aktionVon(after.action, 'laden-nachfuellen')[0]) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
     },
   },
+  optionen: {
+    spalten: ['scenario', 'sequence'],
+    liest: leseVorgaenger,
+    patch: (b, x) => patchSchalter(b.scenario, b.sequence, x),
+    beweise: beweiseSchalter,
+    gelesen: (b, x) => `die fünf davor geschriebenen Schritte: zone_data ${Array.isArray(x?.zone) ? x.zone.length : '?'} Zonen (EU), table_assets ${x?.assets?.length ?? '?'} Zeilen (EV), action_data ${Array.isArray(x?.action) ? x.action.length : '?'} Aktionen (EW), fromCount und statsByCount in scenario_data (ES, ET) — nur gelesen`,
+    schonDa: () => 'schon geschrieben: options.doerfler3–5 (optional, keiner), partie bindet MuenzenJeDoerfler, baseCount 3, fünf Plätze, 31 Schritte im Aufbau — nichts zu schreiben',
+    plan: (b, n) => {
+      const o = n.scenario.options, d = (i) => o[`doerfler${i}`];
+      console.log(`  options: ${Object.keys(b.scenario.options).length} → ${Object.keys(o).length} Schlüssel (${Object.keys(o).join(', ')}); doerfler3 bekommt optional und default keiner, doerfler4 und doerfler5 kommen dazu; je neun Wahlen plus keiner (zuletzt)`);
+      for (const { n: i } of LEITER) console.log(`    options.doerfler${i}: default ${d(i).default}, optional { off ${d(i).optional.off}, on ${d(i).optional.on}, addLabel „${d(i).optional.addLabel}“ }, ${Object.keys(d(i).choices).length} Wahlen`);
+      console.log(`  options.partie bindet MuenzenJeDoerfler statt Muenzen: kurz ${PARTIE.kurz.neu}, lang ${PARTIE.lang.neu} (vorher ${PARTIE.kurz.alt} / ${PARTIE.lang.alt})`);
+      console.log(`  villagers: baseCount ${n.scenario.villagers.baseCount}, seats ${b.scenario.villagers.seats.length} → ${n.scenario.villagers.seats.length}`);
+      console.log(`  Aufbau: ${b.sequence.length} → ${n.sequence.length} Schritte — seat_villager für Platz 4 und 5 hinter Platz 3 (je onlyChoice "!keiner", auch Platz 3), die Münzen "${Q_MUENZEN_NEU.value}" nach (${Q_MUENZEN_NEU.x}, ${Q_MUENZEN_NEU.y})`);
+      console.log('  unberührt: Bösewichte, terrainCards, gridLabel, cardZoneLabel, troedel, doerfler1 und doerfler2, die drei alten Plätze, das Roster, die ersten 27 Schritte der Folge; zone_data, action_data, table_assets, grid_data, state_data, save_states');
+    },
+    pruefer: (n, x) => schalterPruefer(n.scenario, n.sequence, x),
+    kontrolle: (before, after) => {
+      for (const k of Object.keys(after.scenario).filter(y => y !== 'options' && y !== 'villagers')) {
+        console.log(`  Schlüssel ${k.padEnd(18)} sha ${sha(text(before.scenario[k]))} → ${sha(text(after.scenario[k]))} ${text(before.scenario[k]) === text(after.scenario[k]) ? 'gleich' : 'GEÄNDERT'}`);
+      }
+      const o = after.scenario.options, v = after.scenario.villagers, d = (i) => o[`doerfler${i}`];
+      console.log(`  options: ${Object.keys(o).join(', ')}`);
+      for (const { n: i } of LEITER) console.log(`  options.doerfler${i}: default ${text(d(i)?.default)}, optional ${text(d(i)?.optional)}, ${Object.keys(d(i)?.choices ?? {}).length} Wahlen, zuletzt „${Object.keys(d(i)?.choices ?? {}).at(-1)}“`);
+      console.log(`  options.partie: kurz ${text(o.partie.choices.kurz.vars)}, lang ${text(o.partie.choices.lang.vars)}`);
+      console.log(`  options troedel, doerfler1, doerfler2: ${['troedel', 'doerfler1', 'doerfler2'].every(k => text(o[k]) === text(before.scenario.options[k])) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+      console.log(`  villagers: baseCount ${v.baseCount}, ${v.seats.length} Plätze (${v.seats.map(s => s.anchor.replace(TABLEAU_PREFIX, '')).join(', ')}); die ersten drei und das Roster: ${text(v.seats.slice(0, 3)) === text(before.scenario.villagers.seats) && text(v.roster) === text(before.scenario.villagers.roster) ? 'gleich' : 'GEÄNDERT'}`);
+      const q = after.sequence;
+      console.log(`  sequence_data: ${q.length} Schritte; seat_villager an ${q.map((s, i) => (s.type === 'seat_villager' ? i : null)).filter(i => i !== null).join(', ')}, Münzen an ${q.findIndex(s => s.type === 'place_counter')} (${q.at(-1).x}, ${q.at(-1).y}) mit ${text(q.at(-1).value)}; die ersten 27 Schritte ${text(q.slice(0, 27)) === text(before.sequence.slice(0, 27)) ? 'gleich' : 'GEÄNDERT'}`);
+    },
+  },
 };
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -1420,7 +1716,9 @@ function vorpruefung(db, { titel, schritt, def }) {
     before[k] = JSON.parse(t);
     if (text(before[k]) !== t) complaints.push(`${k}_data: der gespeicherte Text ist nicht kompaktes JSON.stringify — byteweiser Vergleich nicht möglich`);
   }
-  console.log(`gelesen: ${def.spalten.map(s => `${s}_data ${kennzeichen(raw[s])}`).join(', ')}, ${def.gelesen(before)}`);
+  // Was der Schritt nur **liest**, ohne es zu schreiben (Vorbedingung: die Schritte davor), steht in `extra`; ein Schritt ohne `liest` hat keines.
+  const extra = def.liest?.(db);
+  console.log(`gelesen: ${def.spalten.map(s => `${s}_data ${kennzeichen(raw[s])}`).join(', ')}, ${def.gelesen(before, extra)}`);
 
   const aus = () => {
     console.log(`${titel}: ${complaints.length} Beanstandungen`);
@@ -1429,7 +1727,7 @@ function vorpruefung(db, { titel, schritt, def }) {
   };
 
   // ── Einordnung ──
-  const p = def.patch(before);
+  const p = def.patch(before, extra);
   console.log(`Einordnung: ${p.art === 'zu-schreiben' ? 'zu schreiben' : p.art === 'schon-da' ? 'schon geschrieben' : 'ABWEICHEND'}`);
   if (p.art === 'abweichend') for (const m of p.probleme) complaints.push(`${m} — es wird nichts überschrieben`);
   if (complaints.length) return aus();
@@ -1444,14 +1742,14 @@ function vorpruefung(db, { titel, schritt, def }) {
   def.plan(before, next);
 
   // ── Beweise ──
-  const b = def.beweise(before, next);
+  const b = def.beweise(before, next, extra);
   for (const k of spaltenNamen(def)) {
     console.log(`Rückwärtsbeweis ${k}: ${b.some(m => m.startsWith(`Rückwärtsbeweis ${k}`)) ? 'NEIN' : 'ja'}`);
   }
   complaints.push(...b);
 
   // ── die Prüfer: ohne Bibliothek und Raster — dieser Schritt liest sie nicht (`table_assets`, `cards`, `grid_data`) ──
-  for (const { titel: t, probleme: pr } of def.pruefer(next)) {
+  for (const { titel: t, probleme: pr } of def.pruefer(next, extra)) {
     console.log(`${t}: ${pr.length} Probleme (ohne Bibliothek und Raster — der Schritt liest sie nicht)`);
     for (const m of pr) complaints.push(`${t}: ${m}`);
   }
@@ -1509,11 +1807,13 @@ function schreiben(db, { sicherungSha, haken, ...opts }) {
   const abw = (k) => (gelesen[k] === neuRaw[k] ? '' : ' — WEICHT VOM ZIELSTAND AB');
   console.log(`geschrieben: ${def.spalten.map((k, i) => `${i ? '  ' : ''}${k}_data ${raw[k].length} → ${gelesen[k].length} Zeichen, sha ${sha(raw[k])} → ${sha(gelesen[k])}${abw(k)}`).join('\n')}`);
   def.kontrolle(before, after);
-  const bw = def.beweise(before, after);
+  // Die Vorgänger werden nach dem Schreiben **neu** gelesen, nicht aus der Vorprüfung übernommen.
+  const extraJetzt = def.liest?.(db);
+  const bw = def.beweise(before, after, extraJetzt);
   for (const k of spaltenNamen(def)) {
     console.log(`  Rückwärtsbeweis ${k} auf der gelesenen Spalte: ${bw.some(m => m.startsWith(`Rückwärtsbeweis ${k}`)) ? 'NEIN' : 'ja'}`);
   }
-  const weitere = def.pruefer(after);
+  const weitere = def.pruefer(after, extraJetzt);
   for (const { titel: tt, probleme: pr } of weitere) console.log(`  ${tt} auf der gelesenen Spalte: ${pr.length} Probleme`);
   const { ziel } = SCHRITTE[schritt];
   const gleichZiel = def.spalten.every(k => gelesen[k].length === ziel[k].laenge && sha(gelesen[k]) === ziel[k].sha);
@@ -1544,7 +1844,7 @@ function zurueck(db, sicherungsdatei, { haken, def }) {
   const row = lese(db, def);
   if (!row) { console.error(`Aufbau ${SETUP_ID} nicht gefunden`); return 1; }
   if (row.game_id !== GAME_ID) { console.error(`Aufbau gehört zu Spiel ${row.game_id}, erwartet ${GAME_ID}`); return 1; }
-  const plan = def.patch(alt);
+  const plan = def.patch(alt, def.liest?.(db));
   if (plan.art !== 'zu-schreiben') {
     console.error(`die Sicherung ist nicht der Ausgangsstand dieses Schrittes (${plan.art === 'schon-da' ? 'sie ist schon der Zielstand' : plan.probleme.join('; ')}) — dorthin gibt es keinen Weg zurück`);
     return 1;

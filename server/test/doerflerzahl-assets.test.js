@@ -223,11 +223,10 @@ test('EV 4: die Prüfer – genau eine Zeile je Name `Marker 1…5: <Wert>`; Dop
   assert.ok(dz.pruefeAssets([...ziel().assets, { ...vorlageVon(AUSGANG, 'Leben'), id: 'dopp', name: 'Marker 4: Leben' }]).some(m => /Marker 4: Leben/.test(m)));
 });
 
-test('EV 4: `SCHRITTE` – `assets` ist gebaut (Ausgang 212, Ziel 220 Zeilen), `aktionen` seit EW gebaut, `optionen` bleibt `null`', () => {
+test('EV 4: `SCHRITTE` – `assets` ist gebaut (Ausgang 212, Ziel 220 Zeilen), `aktionen` seit EW, `optionen` seit EX gebaut', () => {
   assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
   assert.deepEqual(dz.SCHRITTE.assets, { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } });
-  for (const k of ['optionen']) assert.equal(dz.SCHRITTE[k], null, k);
-  assert.notEqual(dz.SCHRITTE.aktionen, null);
+  for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, `${k} ist gebaut`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,11 +551,13 @@ test('EV main: --zurueck – eine der acht wurde seither verändert, oder es feh
   assert.equal(alleTabellen(file), vor);
 }));
 
-test('EV main: unbekannte Argumente – `--force` auch beim Rückweg ist ein Benutzungsfehler; `optionen` meldet „noch nicht gebaut“, ohne die Datenbank zu öffnen (`aktionen` seit EW gebaut)', async () => {
+test('EV main: unbekannte Argumente – `--force` auch beim Rückweg ist ein Benutzungsfehler; ein ungebauter Schritt meldet „noch nicht gebaut“, ohne die Datenbank zu öffnen (seit EX gibt es keinen: `optionen` wird dafür kurz auf `null` gestellt)', async () => {
   assert.equal((await lauf(['--zurueck', 'x.json', 'y.db', '--schritt', 'assets', '--force'])).code, 2);
-  for (const k of ['optionen']) {
-    const r = await lauf(['--check', '/gibt/es/nicht.db', '--schritt', k]);
+  const gebaut = dz.SCHRITTE.optionen;
+  dz.SCHRITTE.optionen = null;
+  try {
+    const r = await lauf(['--check', '/gibt/es/nicht.db', '--schritt', 'optionen']);
     assert.equal(r.code, 1);
     assert.match(r.out, /noch nicht gebaut/);
-  }
+  } finally { dz.SCHRITTE.optionen = gebaut; }
 });
