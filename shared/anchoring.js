@@ -145,7 +145,9 @@ export function resolveZones(zones, anchors = []) {
     // An absent anchor shows no side at all. The zone stays usable: "which way
     // round is a board that is not on the table" has no answer, and silencing
     // the zone would hide the missing asset behind a second symptom.
-    if (!anchor) return { ...rest, anchorMissing: true };
+    // M31.8 Punkt 7: ein leerer Platz zeigt seine Zonen nicht. Nur ein ausdrückliches
+    // `false` wirkt (wie `showInPlay`); ohne das Feld bleibt es bei `anchorMissing`.
+    if (!anchor) return { ...rest, anchorMissing: true, ...(zone.showWithoutAnchor === false && { facingAway: true }) };
     const resolved = { ...rest, ...resolveBox(zone.anchor, anchor) };
     const showing = anchor.faceDown ? 'back' : 'front';
     if (zone.anchorSide && zone.anchorSide !== showing) resolved.facingAway = true;

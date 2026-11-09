@@ -94,6 +94,67 @@ export function describeChoices(options, choices) {
 }
 
 /**
+ * M31.5: was an `option.optional` nicht stimmt - eine Meldung je Fehler (ohne den
+ * Namen der Option, den setzt der Prüfer davor), leer heißt brauchbar. **Die eine
+ * Regel**: `optionalOf` fragt sie, `validateOptions` zeigt sie; ein `optional`, das
+ * hier durchfällt, macht die Option zu einem gewöhnlichen Feld.
+ */
+function optionalFaults(option) {
+  const o = option.optional;
+  if (!isObject(o)) return ['optional must be an object { off, on, addLabel }'];
+  const choices = choicesOf(option);
+  const out = [];
+  for (const k of ['off', 'on']) {
+    if (typeof o[k] !== 'string' || !choices[o[k]]) out.push(`optional.${k} "${String(o[k] ?? '')}" is not one of its choices (${list(choices)})`);
+  }
+  if (!out.length && o.off === o.on) out.push('optional.on and optional.off must differ (the plus would change nothing)');
+  if (typeof o.addLabel !== 'string') out.push('optional.addLabel must be text');
+  return out;
+}
+
+/**
+ * M31.5: ist diese Option eine, die man ausschalten kann - und ist sie es? `null`
+ * für eine gewöhnliche Option (kein `optional`, oder ein unbrauchbares);
+ * sonst `{ isOff, off, on, addLabel }`. `chosen` fehlt → `default`. **Die eine
+ * Stelle** für „ist diese Option aus?" (M6): Leiter und Zeichnung fragen hier.
+ */
+export function optionalOf(option, chosen) {
+  if (!isObject(option) || optionalFaults(option).length) return null;
+  const { off, on, addLabel } = option.optional;
+  return { isOff: (chosen ?? option.default) === off, off, on, addLabel };
+}
+
+/**
+ * M31.5: die Leiter - **die Beziehung zwischen Optionen**, die der Dialog zum ersten Mal
+ * kennt. `{ kinds: { <Option>: 'field' | 'plus' | 'hidden' }, minus: <Option> | null }`,
+ * in der Reihenfolge der Schlüssel (dieselbe, die der Dialog zeichnet):
+ *   - eine gewöhnliche Option und jede **eingeschaltete** optionale: `'field'`;
+ *   - die **erste** ausgeschaltete optionale: `'plus'`; jede weitere: `'hidden'`;
+ *   - `minus` ist die **letzte** eingeschaltete optionale, sonst `null`.
+ * Ausgeschaltet-dazwischen (3 aus, 5 an) ist eine Lücke und wird gezeigt, wie sie ist
+ * (Plus bei 3, nichts bei 4, Feld bei 5) - sie wird nicht verboten und nicht gezählt.
+ * Rein; die Zeichnung (`SetupChoiceFields`) rechnet nichts, sie fragt hier.
+ */
+export function ladderOf(options, choices) {
+  const kinds = {};
+  let minus = null;
+  let plus = false;
+  for (const [name, option] of Object.entries(optionsOf(options))) {
+    const opt = optionalOf(option, choices?.[name]);
+    if (!opt || !opt.isOff) {
+      kinds[name] = 'field';
+      if (opt) minus = name;
+    } else if (!plus) {
+      kinds[name] = 'plus';
+      plus = true;
+    } else {
+      kinds[name] = 'hidden';
+    }
+  }
+  return { kinds, minus };
+}
+
+/**
  * Trifft das Gate `onlyChoice` auf diese Wahl zu? `{ ok: true, applies }`, oder
  * `{ ok: false, problem }` bei allem Unverstandenen.
  *
@@ -103,7 +164,8 @@ export function describeChoices(options, choices) {
  * `problem` eine `failed`-Zeile, und der Schritt läuft nicht.
  *
  * `onlyChoice` ist ein Objekt `{ <Option>: <Wahl> | [<Wahl>, …] }`; **alle**
- * genannten Optionen müssen passen (UND).
+ * genannten Optionen müssen passen (UND). `"!<Wahl>"` (allein, kein Listenelement)
+ * heißt „jede Wahl außer dieser" (M31.3).
  */
 export function checkGate(onlyChoice, options, choices) {
   if (!isObject(onlyChoice)) return { ok: false, problem: 'onlyChoice must be an object { <option>: <choice> }' };
@@ -115,15 +177,19 @@ export function checkGate(onlyChoice, options, choices) {
   for (const name of names) {
     const option = opts[name];
     if (!option) return { ok: false, problem: `onlyChoice: no option "${name}"` };
-    const want = Array.isArray(onlyChoice[name]) ? onlyChoice[name] : [onlyChoice[name]];
+    // M31.3: `"!keiner"` heißt „jede Wahl außer `keiner`". Die Verneinung steht **allein**
+    // und nur als Text: in einer Liste ist `!keiner` keine Wahl und scheitert wie jede.
+    const raw = onlyChoice[name];
+    const not = typeof raw === 'string' && raw.startsWith('!');
+    const want = not ? [raw.slice(1)] : Array.isArray(raw) ? raw : [raw];
     for (const w of want) {
       if (typeof w !== 'string' || !choicesOf(option)[w]) {
-        return { ok: false, problem: `onlyChoice: option "${name}" has no choice "${String(w)}" (${list(choicesOf(option))})` };
+        return { ok: false, problem: `onlyChoice: option "${name}" has no choice "${not ? raw : String(w)}" (${list(choicesOf(option))})` };
       }
     }
     const made = choices?.[name];
     if (typeof made !== 'string') return { ok: false, problem: `onlyChoice: no choice made for option "${name}"` };
-    if (!want.includes(made)) applies = false;
+    if (want.includes(made) === not) applies = false;
   }
   return { ok: true, applies };
 }
@@ -167,6 +233,10 @@ export function validateOptions(options, sequence = [], actions = []) {
     } else if (!choices[option.default]) {
       problems.push(`${who}: default "${option.default}" is not one of its choices (${list(choices)})`);
     }
+
+    // M31.5: `optional` (der Plus-Knopf) ist ein Objekt mit zwei Wahlen und einem Text. Ist es das nicht,
+    // zeichnet der Dialog ein gewöhnliches Feld - das soll beim Schreiben auffallen, nicht erst am Bildschirm.
+    if (option.optional !== undefined) for (const f of optionalFaults(option)) problems.push(`${who}: ${f}`);
 
     const names = new Set();
     for (const [key, choice] of Object.entries(choices)) {

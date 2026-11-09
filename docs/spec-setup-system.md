@@ -7690,3 +7690,444 @@ Aufgaben `DU`–`EF` in `docs/tasks-m30-setupwahl.md`; dort steht je Aufgabe der
 8. Die verwaisten Zähler der acht Spielstände entfernt der Spieler von Hand; es gibt dafür keinen Schritt.
 
 **Rückweg, falls nötig:** zuerst `EE` (`setupwahl-daten.mjs --zurueck <Sicherung> <db> --schritt boss`), dann `ED`, dann `EC`, dann `EB` aus der Sicherung (M30.9). Jeder Schritt ändert nur seine Stücke.
+
+## M31 — Die Dörflerzahl und die Spielerzahl: zwei bis fünf Dörfler, mehrere Spieler
+
+Auftrag vom **2026-11-09**, wörtlich:
+
+> „noch besser wäre es wenn man unter dem Dörfler 2 in der start setup maske noch ein weiteren dörfler hinzufügen plus button hätte (ich glaube 2 dörfler sollten immer spielen, sonst wird das spiel zu schwer)"
+
+Auf die Rückfrage, wie weit es bei den Endkampf-Geländen gehen soll: **„Tableaus neu lesen"** — die vollständige Lösung, nichts abgekürzt (Messung: `docs/endkampf-gelaende-doerflerzahl.md`). Auf die Rückfrage nach der Voreinstellung, **wörtlich**:
+
+> „Zwei Felder und durch das plus lässt sich auf 3 erhöhen aber auch auf 4 dörfler und letztendlich bis auf 5 dörfler."
+
+**Dieser Abschnitt hat zwei Wellen** (eine Spec, getrennte Abschnittsgruppen und Aufgabenbuchstaben): **Welle 1 — die Dörflerachse** (M31.1–M31.13, Aufgaben `EH`–`EZ`), für sich vollständig und abnehmbar, und **Welle 2 — die Spielerachse** (M31.14–M31.21, Aufgaben `FA`–`FJ`, ganz unten, nach einer Trennlinie), die Welle 1 voraussetzt. Wo die Achsen ineinandergreifen, steht in M31.20; Welle 1 braucht von Welle 2 nichts.
+
+**Zwei Dinge der ersten Fassung von Welle 1 sind überholt:** die Spanne ist **2 … 5**, nicht 2 ⇄ 3, und die **Vorgabe ist zwei**, nicht drei. Was daraus folgt, steht in M31.5 (die Leiter), M31.8 (die Plätze 4 und 5) und M31.13 (die Folge der Vorgabe).
+Aufgaben `EH`–`EZ` (Welle 1) und `FA`–`FJ` (Welle 2) in `docs/tasks-m31-doerflerzahl.md` (der Buchstabe `EG` ist **übersprungen**, Begründung im Kopf dort: `EG` heißt im Spiel „Endgegner-Gelände"). M31 setzt unmittelbar auf M30 auf: M30.3 (Dörfler wählen), M30.4 (Doppelwahl), M30.7 (`require_marker`), M30.9 (Stand nach M30: `scenario_data` 20 858 / `82592d1ac883`, `sequence_data` 2 621 / `e859bd457002`, `action_data` 5 803 / `33033dace238`).
+
+**Welle 1 — Ergebnis in vierzehn Sätzen.**
+
+1. **Die Dörflerzahl hängt an drei Dingen, und sie gehören zusammen** (M31.1): Bösewicht-BEW und -LEB (die Spalte 2P / 4P / 5P statt 3P), die Münzen (je Dörfler 10 zu Beginn, 6 nach jedem Kampf) und die Zahl der Endkampf-Plättchen — **bei drei von acht** Bösewichten. Ein halber Einbau machte das Spiel **schwerer** statt leichter (bei zwei) oder **leichter** (bei vier und fünf) als die Tableaus es wollen.
+2. **Nur drei Dörfler sind Regel** (`[DE S.34]`, §2.2); **2, 4 und 5 sind Hausregel**. Die Anleitung federt sie über die Spalten 2P/4P/5P der Tableaus ab — **aber nur, wenn wir alle drei Dinge mitziehen**. Was der Regeltext **nicht** abfedert, steht in M31.10 mit der Entscheidung, es **nicht** anzufassen.
+3. **Die Zahl kommt aus dem Tisch, nicht aus der Wahl** (M31.2): wer sitzt, steht in den Tableau-Token. Die Wahl entscheidet, **wer gebaut wird**; was daraus folgt, rechnet **eine** Funktion aus dem Tisch.
+4. **Ein Gate `onlySeated`** (M31.3) für die Schritte der Plätze 3, 4 und 5 — in Aktionen erlaubt, fail-loud — und eine Verneinung `"!keiner"` in `onlyChoice` für den Aufbau.
+5. **`$doerflerzahl` und ein Produkt in Zählerwerten** (`"+6*$doerflerzahl"`, M31.4).
+6. **Der Plus-Knopf ist eine Leiter** (M31.5): `doerfler3`, `doerfler4`, `doerfler5` sind je eine Option mit der Wahl `keiner` und der Angabe `optional`; **ein** Plus schaltet die erste ausgeschaltete ein, **ein** Minus die letzte eingeschaltete aus. Das ist **eine Beziehung zwischen Optionen — die Reihenfolge der Schlüssel**, und sie liegt in **einer** Funktion in `shared/`, nicht in der Zeichnung (die erste Fassung hatte behauptet, der Knopf brauche keine Beziehung; bei fünf Plätzen stimmt das nicht mehr).
+7. **Die Vorgabe ist zwei** (M31.5): wer einfach loslegt, spielt **zu zweit gegen die 2P-Spalte** — das gehört in die Abnahme und als Satz an den Auftraggeber (M31.13, `EZ`).
+8. **BEW/LEB additiv** (M31.6): `stats` bleibt (3P, `villagers.baseCount`), daneben `statsByCount` für **2, 4 und 5**. Eine fehlende Zahl hält laut vor dem ersten Plättchen.
+9. **Endkampf-Plättchen mit `fromCount`** (M31.7): `FF3`, `FF4`, `FF5` von Deputy Waggums, Pepin Milkfrog, Samuel Strawman — drei Einträge ändern sich, **sechs kommen dazu**; die fünf festen Bösewichte bleiben **byteweise gleich**.
+10. **Die Plätze 4 und 5 sind billiger, als sie aussehen, und teurer, als „ein Lauf des Generators" sagt** (M31.8): acht Marker-Assets auf vorhandene Bilder, **28** Zonen — der Generator `scripts/equipment-zones.mjs` liefert nur **7 von 14** je Platz und ist auf **drei** Plätze verdrahtet; der Rest ist **Kopie** einer gemessenen Vorlage (kein neuer Messwert).
+11. **Der Münzzähler steht auf Platz 4** und zieht um (M31.8): von (2080, 1430) nach **(2000, 1040)**, gemessen frei; die Tableaus 4 und 5 liegen auf x 2040 und 2620 in derselben Reihe.
+12. **Ein leerer Platz zeigt seine Zonen nicht** (M31.8): neu ist das Zonenfeld `showWithoutAnchor: false` — fehlt der Anker, setzt `resolveZones` das vorhandene `facingAway` (kein neuer Weg). Ohne das stünden bei der Vorgabe zwei **drei leere Plätze mit 27 beschrifteten Geisterzonen** auf dem Tisch.
+13. **`require_marker`, `rotate_zone` und die Spielsteine brauchen nichts** (M31.9) — **bis auf** den Text der Wache und ihre Zonenliste (fünf Leisten); die erste Fassung hatte „die Leiste ist mit vier Dörflern voll" behauptet, das war **falsch**: sie hat fünf Plätze für fünf Dörfler, der Bösewicht hat einen eigenen.
+14. **Der Zielstand steht als Text, die Zahlen entstehen beim Bauen** (M31.12); **erst deployen, dann schreiben**; `optionen` ist der **eine Schalter**.
+
+---
+
+## Welle 1 — die Dörflerachse (M31.1–M31.13)
+
+**Welle 1 liefert die Lage „solo" mit zwei bis fünf Dörfern** — ein Spieler führt sie alle, Heldentaten und Geld sind gemeinsam (so, wie der Aufbau heute ist). Die Spielerzahl kommt in Welle 2.
+
+### M31.1 — Was an der Dörflerzahl hängt, und warum es zusammen gehört
+
+**Die Regel.** Solo sind es **drei** Dörfler (`[DE S.34]`, `docs/tft-regeln.md` §2.2). Für Bösewicht-Werte und Endkampf-Gelände zählt die „Anzahl Dörfler im Spiel" (§5.4, §8.1; §13 Nr. 5: die Besetzung der Partie, nicht der Kampfstand). **Alles andere als drei ist Hausregel:** zwei, weil das Tableau eine 2P-Spalte druckt; vier und fünf, weil es die Spalten 4P/5P druckt (für **mehrere Spieler**, die zusammen vier oder fünf Dörfler stellen). Dass **ein** Spieler sie alle führt, sagt nur der Solo-Absatz — und der nennt drei.
+
+**Die drei Dinge.**
+
+| # | Was | Heute (3 Dörfler) | Mit 2 / 4 / 5 |
+|---|---|---|---|
+| 1 | **BEW und LEB des Bösewichts** | `scenario_data.bosses[<Name>].stats` trägt nur die 3P-Spalte (`{BEW: 6, LEB: 14}`); `docs/tft-regeln.md` §5.5 hat alle vier Spalten für alle 20. **Barry Bluff** trägt Formeltexte („höchste Dörfler-BEW +1", „Summe aller Dörfler-LEB +3"): sie hängen an den **Dörflern selbst**, nicht an einer Spalte, und bleiben Text (M30/R1). | die Spalte 2P / 4P / 5P (wie viele der 19 Zahlenwerte sich vom 3P-Wert unterscheiden, zählt `ET`) |
+| 2 | **Die Münzen** | **10 je Dörfler** zu Beginn (solo 3 × 10 = die 30 im gemeinsamen Topf, `[DE S.34]`); im 3-Runden-Modus **+5 je Dörfler** (45 = 3 × 15; `partie` bindet `$optMuenzen` = 45 / 30); **6 je Dörfler** nach jedem Kampf (§7 Nr. 2; heute `set_counter Münzen (gemeinsam) +18`, `dorfphase-beginnen` Schritt 16, 0-basiert) | 30 / 20 und +12 · 60 / 40 und +24 · **75 / 50 und +30** |
+| 3 | **Die Endkampf-Plättchen** (auf den englischen Tableaus `FF1`–`FF5`, in der deutschen Anleitung `EG`) | `scenario_data.bosses[…].final.terrain`, für drei Dörfler | **nur bei drei von acht** Bösewichten hängt die Zahl an den Dörflern (wörtlich „1 je Dörfler"); fünf sind fest (M31.7) |
+
+**Warum die drei zusammen ausgeliefert werden, nicht einzeln.** Der Auftraggeber will ein **spielbares** Spiel („sonst wird das Spiel zu schwer"). Zwei Dörfler gegen einen Bösewicht auf den Werten für **drei** sind das Gegenteil: weniger Leben auf Seiten der Dörfler gegen denselben Bösewicht (Deputy Waggums: LEB 14 statt 12), 12 Münzen weniger zum Start, 6 weniger je Kampf — und im Endkampf ein Plättchen zu viel. **Fünf** Dörfler gegen dieselben Werte sind das Umgekehrte (der Bösewicht ist zu schwach), und ihre Münzen blieben auf 30. **Die Anleitung rechtfertigt jede Zahl außer drei nur über die passende Spalte.** Wer den Dialog freigibt, bevor Werte, Münzen und Gelände mitziehen, liefert ein Spiel, das nicht stimmt. Darum: ein Meilenstein, drei Stücke, **ein** Schalter am Ende (M31.12).
+
+**Was an der Zahl hängt, ohne dass ein Regeltext es sagt — Hausregel, M31.10.** Die Heldentaten-Auslage (6), die Ladenerneuerung („pro Dörfler 2 Münzen"), die geheimen Dorf-Ereignisse. Dazu **fünf Werte laut Tableautext, ungeprüft** (`docs/endkampf-gelaende-doerflerzahl.md` §6 Nr. 4, `docs/tft-regeln.md` §5.5): Bundo-Königin „3 HP per townsfolk", Virginias Schuld „12 Coins per townsfolk", Samuels Schwäche „1 DMG per townsfolk", Deputy Waggums „2 energy per townsfolk", die Gefolgschaft von Ms. Falls & Co. („3 LEB je Dörfler"). **Keiner dieser Werte steht, soweit bekannt, in unseren Daten** — „soweit bekannt" ist der ungeprüfte Teil: sie stehen als Text auf der Pappe, und wer „per townsfolk" liest, zählt die Dörfler am Tisch. **Was die Prüfung kostet:** fünf Tableau-Rückseiten lesen (Methode der Messung) **und** `scenario_data`, `sequence_data`, `action_data` und die Kartenbibliothek nach der Zahl durchsuchen (eine Zeichenkettensuche); Arbeit ergibt sich **nur**, wenn dort doch eine Zahl steht. Nicht Teil von M31 (M31.11).
+
+### M31.2 — Woher eine Aktion die Zahl nimmt: aus dem Tisch
+
+**Das Problem.** `executeSequenceWithLog` kennt die Wahl nur, **wenn der Aufrufer sie gibt** (`options.choices`, `given`); eine **Aktion** ruft den Executor ohne sie auf — ein Spielstand kennt die Wahl nicht (M22, M27.2), und `validateOptions` verbietet `onlyChoice` und `$opt…` in jeder Aktion. `onlyChoice` ist fail-loud: ein Schritt, dessen Option keine Wahl hat, meldet `failed`. Der **Aufbau** kennt die Wahl; `dorfereignis`, `dorfphase-beginnen`, `kampf-beginnen` und das Tauschmenü kennen sie **nicht**, brauchen aber die Zahl:
+
+- `dorfereignis` 1–3: `deal_to_zone … "Hand Dörfler n"`;
+- `dorfphase-beginnen` 11–13 (`clear_table $F1…$F3`), 21–32 (`place_asset "Marker n: <Wert>" … slot "$V<n><KUERZEL>"`), 16 (`+18`), 1 (die Wache);
+- `kampf-beginnen` 9–11 (`place_asset $F1…$F3` auf `$D1…$D3`) und `build_scenario` (BEW/LEB, Endkampf-Plättchen).
+
+**Entscheidung: die Zahl ist die Anzahl der Plätze, an denen ein Tableau liegt — gelesen aus dem Tisch, in jedem Lauf neu.** `seatedVillagers(state, assets, villagers)` (`shared/villagers.js`) beantwortet „wer sitzt wo" aus den Tableau-Token; die Platzhalter `$V1`/`$F1` und das Tauschmenü fragen es schon. Der Executor bindet es zu Beginn jedes Laufs und **nach jedem `seat_villager`/`swap_villager` neu** (`ctx.seatVars`) — der Aufbau sieht die Zahl also, **nachdem** er die Dörfler gesetzt hat, die Aktion sieht sie, weil der Tisch sie trägt. **Eine** Quelle, **ein** Weg für Aufbau und Aktion.
+
+*Verworfen: die Zahl aus der Wahl* (Option `doerflerzahl` mit `vars: { doerflerzahl: "2" }`). Drei Gründe: (1) **eine Aktion bekommt sie nicht** — für Aktionen bräuchte man trotzdem den Tisch, es wären zwei Quellen; (2) sie **widerspräche dem Tisch**, sobald eine Doppelwahl (M30.4) einen Platz leer lässt: die Wahl sagt „vier", es sitzen drei, und die Münzen müssen sich nach dem richten, was **liegt**; (3) ein Spielstand überlebt das Laden (M22): die Zahl, die er braucht, steht in seinen Tableaus, nicht in einem Gedächtnis daneben.
+
+**Was das für die Doppelwahl heißt (M30.4, unverändert).** Judy / Judy / Granny: Platz 2 bleibt leer, **zwei** sitzen, die Zahl ist **2**; Münzen, Werte und Gelände richten sich nach dem Tisch, den der Spieler sieht. Wählt jemand denselben Dörfler **fünfmal**, ist die Zahl 1; dann hält der erste Kampf laut, weil es keinen Wert für 1 gibt (M31.6). Die **Untergrenze zwei** ist damit keine Prüfung, sondern die Form des Dialogs (Dörfler 1 und 2 sind nicht entfernbar) **plus** dieser Halt als Netz.
+
+### M31.3 — Das Gate `onlySeated`
+
+`{ "type": "…", "onlySeated": 3 }` (oder eine Liste `[4, 5]`, ODER-verknüpft wie bei `onlyChoice`): der Schritt läuft **nur, wenn an diesem Platz ein Tableau liegt** (`seatToken`, dieselbe Frage wie `seatedVillagers`). Er läuft sonst **gar nicht und bekommt keine Protokollzeile** — dieselbe Entscheidung wie bei `onlyFinal` und `onlyChoice` (M20.1: ein Schritt, der nicht zu diesem Tisch gehört, ist nicht gescheitert, und eine Zeile je Schritt wäre Lärm).
+
+- **Fail-loud wie `onlyChoice`**, nicht fail-open wie `onlyFinal`: ein unverstandener Wert (`"drei"`, `0`, ein Platz jenseits von `seats.length`, keine Dörferdaten) lässt den Schritt **nicht** laufen und ergibt eine `failed`-Zeile. „Laufen lassen" hieße, einen Dörfler-4-Schritt gegen einen leeren Platz zu fahren.
+- **In Aktionen erlaubt.** Anders als `onlyChoice` liest es den **Tisch**, den eine Aktion sieht; `validateOptions` bleibt, wie es ist.
+- **Die eine Stelle** ist `stepApplies` (wie die anderen Gates). Der Executor führt `ctx.seated` (die besetzten Plätze) neben `ctx.seatVars` und bindet **beides** an **einer** Stelle neu (heute zwei Aufrufstellen für `seatVars`).
+- **Welche Schritte es tragen: die der Plätze 3, 4 und 5** — der drei Plätze, die wegfallen können. Platz 1 und 2 sind nicht entfernbar (M31.5); ein Schritt an Platz 2 ist gegen eine Doppelwahl **nicht** abgesichert, und das ist gewollt: eine Doppelwahl ist eine **Fehlwahl** mit sichtbarem leerem Platz und einer Zeile (M30.4), keine Spielart. *Umkehr:* ein Gate an jedem Schritt von Platz 1 und 2.
+- **`onlyChoice` bekommt eine Verneinung:** `{ "doerfler3": "!keiner" }` heißt „jede Wahl **außer** `keiner`". Der Aufbau braucht sie für die Schritte `seat_villager` an Platz 3, 4, 5: dort sitzt noch niemand, `onlySeated` kann nicht fragen. Ein Schlüssel kann kein `!` tragen (`KEY`), die Schreibweise ist eindeutig; die Verneinung steht **allein**, nicht in einer Liste. *Verworfen:* die neun Namen aufzählen — eine **zweite Quelle** dafür, welche Dörfler es gibt (der Roster).
+
+*Verworfen: ein Zähl-Gate* (`onlyCount`) für Schritte. Für Plätze wäre es falsch: bei leerem Platz 2 und besetzten 1 und 3 sitzen **zwei**, aber Platz 3 existiert. Was an einem **Platz** hängt (Hand, Marker, Figur), hängt am Platz; was an der **Zahl** hängt (Münzen, Werte, Gelände), liest die Zahl.
+
+### M31.4 — `$doerflerzahl` und das Produkt im Zählerwert
+
+**Der Platzhalter.** `seatVars` bindet `doerflerzahl` = Anzahl der Plätze mit Tableau, **als Text**; ein Platz mit unbekanntem Dörfler (Hookbox) zählt mit (er sitzt). **Sitzt niemand** (oder gibt es keine Dörferdaten), bindet es **nichts**: der Schritt dahinter wird übersprungen und sagt `is not bound`, statt mit 0 zu rechnen (wie `$V1`). Die Zahl rechnet **eine** exportierte Funktion `villagerCount(state, assets, villagers)` in `shared/villagers.js`; `seatVars` **und** `build_scenario` fragen sie — **keine zweite Zählung** (M6). Ein `$doerflerzahl` in einer Aktion ist **erlaubt** (`validateOptions` verbietet nur `$opt…`). **Klein geschrieben** (`doerflerzahl`, nicht `Doerflerzahl`): die Ersetzung im Executor unterscheidet Gross und Klein, und die Schritte schreiben `$doerflerzahl`. *Berichtigt am 2026-11-09 beim Bauen von `EK` — die erste Fassung dieses Satzes schrieb den Schlüssel groß, womit jeder Schritt `skipped … is not bound` geworden wäre.*
+
+**Das Produkt.** Zählerwerte (`place_counter.value`, `set_counter.value`) dürfen **ein Produkt zweier ganzer Zahlen** sein: `"15*3"`, `"+6*3"`, `"-2*3"`. Nach dem Ersetzen der Platzhalter wird es **gefaltet** (`"+6*$doerflerzahl"` → `"+6*3"` → `"+18"`), durch **eine** Funktion in `shared/counters.js` (`foldProduct`), die `counterValueForm`, `counterValue` und `place_counter` fragen. Das Vorzeichen bleibt, wie es geschrieben steht (M11.4/R1). Alles andere (`"6*"`, `"a*b"`, `"2*3*4"`, Kommazahlen) ist **unlesbar** und hält wie ein unlesbarer Wert heute — **nicht** still 0: `place_counter` legt heute aus `Number("15*3")` = `NaN` einen Zähler auf **0**, und genau das muss die Faltung **vorher** abfangen.
+
+**Die Münzen im Wortlaut.**
+
+- Aufbau: `place_counter "Münzen (gemeinsam)"` mit `value` **`"$optMuenzenJeDoerfler*$doerflerzahl"`**; die Option `partie` bindet statt `Muenzen` (45 / 30) die Variable **`MuenzenJeDoerfler`** = **15** (kurz) / **10** (lang).
+- `dorfphase-beginnen`, Schritt 16: `set_counter` `value` **`"+6*$doerflerzahl"`**.
+- Drei Dörfler: 15 × 3 = **45**, 10 × 3 = **30**, 6 × 3 = **18** — **der Tisch von vor M31, Zeichen für Zeichen** (ein Test; er läuft jetzt über die Wahl `doerfler3: Granny`, M31.13). Zwei: 30 / 20 / +12; fünf: 75 / 50 / +30.
+
+*Verworfen:* (a) **je Platz ein Schritt** (`+6` fünfmal, je mit `onlySeated`): spiegelt den Regeltext „Jeder: Nimm dir 6 Münzen", aber die **6 stünde fünfmal** — eine Regel an mehreren Stellen (M6). (b) **abgeleitete Platzhalter aus den Daten** (`villagers.perVillager`): die Multiplikation verschwände im Executor, der Aufbau brauchte die **Option und die Zahl** in einem Produkt, das (b) nicht kann. (c) **eine Option `doerflerzahl`** (M31.2).
+
+### M31.5 — Der Plus-Knopf ist eine Leiter, und die Vorgabe ist zwei
+
+**Der Wunsch:** zwei Felder, ein Plus, das auf 3, 4 und „letztendlich bis auf 5" erhöht.
+
+**Entscheidung: (b), ein echter Knopf — als Leiter über die Reihenfolge der Optionen.** Dörfler 3, 4 und 5 sind je **eine** Option mit der zusätzlichen Wahl `keiner` und einer Angabe, die der Zeichnung sagt, welche Wahl „nicht da" heißt und was das Plus wählt:
+
+```
+doerfler3: { label: "Dörfler 3", default: "keiner",
+             optional: { off: "keiner", on: "Granny", addLabel: "Weiteren Dörfler hinzufügen" },
+             choices: { Henlo: { label: "Henlo Bulwark", vars: { Doerfler3: "Henlo Bulwark" } }, … neun …,
+                        keiner: { label: "kein dritter Dörfler", vars: { Doerfler3: "" } } } }
+doerfler4: { … on: "Blopsy", keiner: { label: "kein vierter Dörfler", vars: { Doerfler4: "" } } … }
+doerfler5: { … on: "Yancy",  keiner: { label: "kein fünfter Dörfler", vars: { Doerfler5: "" } } … }
+```
+
+- **Die Leiter.** `ladderOf(options, choices)` (neu, **rein**, `shared/setupOptions.js`) geht die Optionen **in der Reihenfolge ihrer Schlüssel** durch und antwortet je Option: ein Feld (gewöhnlich, oder eine optionale, die **an** ist), **das Plus** (die **erste** optionale, die **aus** ist), oder nichts (jede weitere ausgeschaltete); und welche optionale ein **Minus** trägt (die **letzte** eingeschaltete). Die Zeichnung (`SetupChoiceFields`) fragt sie und zeichnet, was sie sagt: Feld, Knopf „+ `addLabel`" (wählt `on` der Plus-Option), Knopf „−" (wählt `off`), sonst nichts. **Dörfler 1 und 2 tragen kein `optional`: sie sind die Untergrenze.**
+- **Das ist eine Beziehung zwischen Optionen — die Reihenfolge.** Die erste Fassung hatte behauptet, der Knopf brauche keine; das galt für **einen** Knopf an **einer** Option und gilt für fünf Plätze nicht mehr: „das Plus erhöht um **einen**" heißt, dass die Optionen eine Reihenfolge haben, in der die nächste eingeschaltet wird. Die Reihenfolge der Schlüssel ist dieselbe, die der Dialog schon zeichnet (M30.3 Nr. 5). Die Beziehung steht in **einer** Funktion in `shared/`, aus `server/test/` geprüft; **die Zeichnung rechnet nichts** (M27.3/CW), sie liest `ladderOf` und ruft `onChange({ ...value, [name]: <Schlüssel> })` — **ein** Schlüssel, derselbe Vertrag wie heute.
+- **Lücken sind erlaubt und werden gezeigt.** Die Adresse kann `doerfler5:Yancy` bei `doerfler3: keiner` sagen: der Aufbau setzt, wer gewählt ist (die Zahl ist die am Tisch, M31.2), und der Dialog zeigt es, wie es ist (Plus bei Dörfler 3, Feld bei Dörfler 5 mit „−"). Er verbietet nichts.
+- **Was die geteilte Zeichnung davon mitbekommt** (damit es **eine** bleibt): `SetupChoiceFields` ist der **einzige** Ort, den der Dialog am Tisch (`SetupChoiceDialog`) **und** `CreateRoomModal` zeichnen. Die Änderung steht **in dieser Datei** (und in `shared/setupOptions.js`); keine Eigenschaft ändert sich (`options`, `value`, `onChange`, `testIdPrefix`), keiner der beiden Aufrufer wird angefasst. Neue Test-Ids `${prefix}-plus` und `${prefix}-${name}-minus`; `${prefix}-${name}` bleibt die Auswahl. Eine Option **ohne** `optional` wird **unverändert** gezeichnet (derselbe Baum).
+- **Adresse und Raum** bekommen es umsonst: `?opt=doerfler4:Blopsy` (Schlüssel nach `KEY`); `rooms.js` speichert die Wahl in `game_rooms.setup_choices` und gibt sie dem Executor mit (M30.3 Nr. 4).
+- **`validateOptions` lernt** (an der einen Stelle): `optional` ist ein Objekt, `off` und `on` sind Wahlen der Option und **verschieden**, `addLabel` ist Text; dass `off` dieselben Variablen setzt wie jede andere Wahl, folgt aus der bestehenden Regel („jede Wahl setzt dieselben"). `describeChoices` zeigt „kein dritter Dörfler".
+- **`on` ist der Dörfler, dessen Tableau der Anker des Platzes ist** (Henlo, Fridgette, Granny, Blopsy, Yancy, M31.8): wer „+" drückt, bekommt den Dörfler, der an dem Platz **ohne** `anchorId` sitzt.
+
+*Verworfen:* **(a)** eine gewöhnliche Option `doerflerzahl` (2 … 5). Keine Zeile Client — aber **tote Felder** (3–5 blieben bei „2" sichtbar) und die Zahl als zweite Quelle neben dem Tisch (M31.2). **(b′)** eine **eingeschränkte Zählung**: `doerflerzahl` versteckt und `doerfler3`–`5` mit `showWhen` — eine Bedingung je Feld, die jemand rechnen müsste, und wieder zwei Quellen. Die Leiter kostet **eine** Funktion und etwa dreißig Zeilen in einer Datei.
+
+**Die Vorgabe: zwei** (Auftraggeber: „Zwei Felder und durch das plus …"). `default: "keiner"` an `doerfler3`–`doerfler5`. **Folge, ausgeschrieben:**
+
+1. **Wer einfach loslegt, spielt zu zweit gegen die 2P-Spalte.** Der Dialog ohne Änderung bestätigt, ein Lesezeichen `?setup=…` ohne `opt`, ein Raum ohne Wahl, jeder Executor-Aufruf mit `choices: {}` bauen **Henlo und Fridgette**, Münzen **30** (kurz) / **20** (lang), die 2P-Werte, im Endkampf zwei Plättchen bei Deputy, Pepin, Samuel. Das ist **eine Hausregel als Voreinstellung** (§2.2 verlangte das Gegenteil, „Voreinstellung = aktiv"; der Auftraggeber hat anders entschieden).
+2. **Der Tisch von vor M31 entsteht nur noch mit `doerfler3: Granny`.** Der Gleichwertigkeitsbeweis (der Aufbau mit drei Dörflern ist Zeichen für Zeichen der von vor M31) läuft über **diese** Wahl; die Abnahme von M30 („ohne Änderung entsteht der Tisch von vor M30", M30.11 Nr. 2) **gilt nicht mehr**.
+3. **Gespeicherte Partien** tragen ihre Tableaus und damit ihre Zahl; kein Spielstand ändert sich.
+4. **Der Auftraggeber bekommt es als Satz** in der Liste (`EZ` Teil 2): „Wer ohne Änderung startet, spielt jetzt zu zweit."
+
+**Was der Knopf nicht tut.** Er verhindert keine Doppelwahl: „+" wählt `on` (Granny), auch wenn Granny schon an Platz 1 sitzt — Platz 3 bleibt leer, eine Zeile (M30.4, unverändert). Er schlägt keinen „freien" Dörfler vor: das wäre eine Beziehung zwischen jedem Paar von Optionen und genau die Rechnung, die M27.3 der Zeichnung verbietet.
+
+### M31.6 — Bösewicht-BEW und -LEB je Dörflerzahl
+
+**Die Form (additiv).**
+
+```
+scenario_data.villagers.baseCount: 3                    // die Zahl, für die `stats` und die Plättchen gedruckt sind (Regelstand Solo)
+bosses["Deputy Waggums"].stats:        { "BEW": 6, "LEB": 14 }                   // 3P, unverändert
+bosses["Deputy Waggums"].statsByCount: { "2": { "BEW": 6, "LEB": 12 },           // NEU: die anderen Zahlen
+                                         "4": { "BEW": 7, "LEB": 17 }, "5": { "BEW": 7, "LEB": 20 } }
+```
+
+- `stats` **bleibt** die Spalte der Regelzahl; **kein** Eintrag in `statsByCount["3"]` (zwei Quellen für 3P wären M6). M31 schreibt **2, 4 und 5** — alle Zahlen, die der Dialog bauen kann; die Werte stehen in §5.5, alle vier Spalten in derselben Zeile.
+- **Gelesen** wird in `build_scenario` je Abschnitt (`parts = [entry, final]`): `stats` des Abschnitts, **darüber** `statsByCount[<Zahl>]` desselben Abschnitts; spätere Abschnitte gewinnen wie bisher. Die Zahl ist `villagerCount` (M31.4).
+- **Die Regel für eine andere Zahl als `baseCount`:** hat ein Abschnitt in `stats` einen **Zahlenwert** und kein `statsByCount[<Zahl>]` mit demselben Namen, ist das ein **Halt, bevor irgendein Plättchen liegt** (`fail` im Block der Vorprüfung — die Werte werden sonst **nach** dem Legen gebunden, und ein Halt dort ließe ein halbes Kampffeld zurück, M7/M9.3). Ein **Text** (Barry Bluff) bindet unverändert weiter, **ohne** Eintrag. **Kein stiller Rückfall auf 3P.**
+- **Fehlt `villagers.baseCount`, oder gibt es keine Dörferdaten:** **Verhalten wie heute**, die Zahl wird nicht gefragt — der Code ist **vor** den Daten deploybar und folgenlos (wie M29.8, M30.5); **das Schreiben von `baseCount` schaltet es ein** (M31.12).
+- **Sitzt niemand** (Zahl 0), aber `baseCount` ist gesetzt: **Halt** `nobody sits at the table`. Eine Zahl **1** hat keinen Eintrag: **Halt** `no values for 1 villager` (das Netz unter der Untergrenze zwei).
+- **`validateScenarioData`:** `statsByCount` ist ein Objekt, die Schlüssel sind ganze Zahlen 1 … 5, jeder Wert hat **dieselben Namen** wie `stats`, Zahlen bleiben Zahlen, Text bleibt Text, **kein** Schlüssel gleich `baseCount`; `baseCount` ist eine ganze Zahl 1 … 5.
+- **Die Daten schreibt der Baustein** (`ET`) aus `docs/tft-regeln.md` §5.5, **nachdem** `EQ` die sechs bisher nicht am Bild gegengelesenen Bösewichte geprüft hat (Ernie Offal, Red Atrocious, Tartar Fishboy, The Door Knockers, Ms. Falls & Co., Patches) — **alle acht Zellen** (2P–5P, BEW und LEB), nicht nur 2P. **Stand der Gegenprobe** (`docs/endkampf-gelaende-doerflerzahl.md` §5): 64 von 64 Zellen der acht Vorderseiten gleich §5.5; damit sind **13 von 19** Zahlenbösewichten gegen das Bild gelesen (die neun aus `docs/szenariodaten-grundspiel.md` §5 und vier neue), **sechs nicht**. Will Barlows Druckfehler (FAQ S.2: die Spalte 3P ist als „2D" beschriftet) betrifft **3P**; die Spalten 2P/4P/5P sind unberührt, ein Test pinnt LEB 2P = 11.
+
+*Verworfen:* `stats` zur Tabelle machen (`{ "2": …, "3": …, … }`) für alle 19: eindeutiger, aber **19 geänderte Einträge**, bricht jeden Leser von `stats`, und der Code müsste die Form **erraten**. Additiv bleibt **jedes Byte** der 19 Einträge, und `--zurueck` heißt „Schlüssel entfernen".
+
+### M31.7 — Die Endkampf-Plättchen je Dörflerzahl
+
+**Was gemessen ist** (`docs/endkampf-gelaende-doerflerzahl.md`, alle acht Wortlaute sicher gelesen, `FF4` und `FF5` mit):
+
+| Bösewicht | SETUP-Kasten | Plan | Zahl |
+|---|---|---|---|
+| Deputy Waggums | „Place 1 Sedative Treat … per townsfolk (in numerical order)" | `FF1`–`FF5` (O13, N4, C5, D12, R8) | **je Dörfler** (2 → `FF1`–`FF2` … 5 → alle) |
+| Pepin Milkfrog | „Place 1 Giant Milk Jug … per townsfolk (in numerical order)" | `FF1`–`FF5` (N14, A1, S9, M1, A9) | **je Dörfler** |
+| Samuel Strawman | „Place 1 Wheat Field … per townsfolk (in numerical order)" | `FF1`–`FF5` (R1:S2, C13:D14, A1:B2, R12:S13, M1:N2) | **je Dörfler** |
+| Virginia Fitz | „Shuffle 5 Burial Mounds" | fünf, **unnummeriert** | **fest 5**, auch bei fünf Dörflern |
+| Handsy | „Place 5 Hiding Citizens" (an die Siegbedingung gebunden) | fünf, unnummeriert | **fest 5** |
+| The Bundits, Tilda Fields, Umbrello | ein Sonderplättchen | eines, unnummeriert | **fest 1** |
+
+Das ist das „in den meisten Fällen" aus `[DE S.23]` — **an diesen acht eine Minderheit** (3 von 8); „5 = Dörflerzahl + 2" ist widerlegt. Die Faustregel der Messung ist eine Beobachtung an acht: *nummeriert auf dem Plan ⇒ die Zahl hängt an den Dörflern, sonst fest.* **Die zwölf anderen Bösewichte sind nicht gemessen** und tragen heute **kein** `final.terrain`. **Die heutigen Daten decken sich für drei Dörfler bei allen acht Feld für Feld mit den Kästen** — es gibt nichts zu berichtigen.
+
+**Die Form: ein Eintrag der Liste sagt, ab welcher Dörflerzahl er liegt.**
+
+```
+final.terrain: [ { assetName, cells: ["O13"] },                        // FF1: immer
+                 { assetName, cells: ["N4"]  },                        // FF2: immer
+                 { assetName, cells: ["C5"],  "fromCount": 3 },        // FF3: ab 3 Dörflern
+                 { assetName, cells: ["D12"], "fromCount": 4 },        // FF4: NEU
+                 { assetName, cells: ["R8"],  "fromCount": 5 } ]       // FF5: NEU
+```
+
+- `fromCount` fehlt = **immer** (die fünf festen bleiben **byteweise unverändert**, ebenso `FF1`/`FF2`). `fromCount: n` = der Eintrag liegt, wenn **mindestens `n`** Dörfler sitzen. **Geschrieben werden jetzt `FF3` (ein Schlüssel an einem vorhandenen Eintrag) und `FF4`, `FF5` (sechs neue Einträge) an drei Bösewichten.**
+- **Die sechs neuen Einträge** haben die Form ihrer Nachbarn (gleiches `faceDown`, gleiche Drehung): Deputy dasselbe Plättchen wie `FF1`–`FF3`; Samuel `Ritualzeichen / Weizenfeld`, `faceDown`, 2 × 2 (`R12:S13`, `M1:N2`). **Pepin:** die drei vorhandenen Plättchen sind drei **verschiedene** Assets (`Versteckter Bürger (Katze)`, `(Dörflerin)`, `(Soßenflasche)` / `Große Milchkanne`, `faceDown`); für `FF4`/`FF5` nimmt der Baustein `(Dörfler)` und `(blond)` — **in der Reihenfolge der fünf Plättchen, die Handsy trägt**. Das ist **erschlossen, nicht gelesen** (verdeckt liegt überall die Milchkanne, die Messung nennt keine Zuordnung zum Bürger); `ER`/`ES` führt es als Hinweis im Bauprotokoll.
+- **Eine** Filterfunktion für beide Stellen: `build_scenario` legt Plättchen **und** je Plättchen eine Karte (M8.3/M29). Beide lesen dieselbe gefilterte Liste (`terrainFor(part, n)`); die Kartenliste (`wanted`) kommt aus der **gelegten** Liste, nicht aus der ungefilterten. Die Vorprüfung prüft **alle** Einträge, auch die, die dieser Aufbau nicht legt (ein Tippfehler bei `FF5` fiele sonst erst bei fünf Dörflern auf).
+- Ist die Zahl **unbekannt** (keine Dörferdaten, niemand sitzt), liegen **alle** Einträge, wie heute; einen Halt dafür gibt es nicht (den kennt nur `stats`, M31.6).
+- **`fromCount` ist monoton** (ab n aufwärts), weil die Messung es ist. **Nicht** ausgedrückt: ein Plättchen, das bei 2 an **anderer** Stelle liegt als bei 3 — die Messung kennt keinen solchen Fall; käme einer, wäre es eine **neue** Form.
+- `fields.EG` (die fünf gedruckten Felder, bindet `$EG1…$EG5`) bleibt unverändert: sie stehen dort **schon**, gemessen und gelesen; es fehlten nur die Plättchen.
+- **Benennung.** Die Tableaus schreiben `FF` (*Final Fight*), die deutsche Anleitung `EG`; **die Daten heißen `EG`** und bleiben es. Diese Spec schreibt `FF1`–`FF5`, wo sie die Pappe meint.
+- **Eine Berichtigung gehört dazu:** `docs/tft-regeln.md` §8.1 Nr. 1 sagt „… durch die Anzahl der mitspielenden Dörfler bestimmt (solo also 3)". Der Zusatz stimmt nur für **drei von acht**; Virginia und Handsy sind fest 5, Bundits, Tilda und Umbrello fest 1. Berichtigt in `EZ`.
+
+*Verworfen:* `terrainByCount: { "2": […], "4": […] }` neben `terrain`: dupliziert Zeilen (**zwei Quellen für O13**), der Prüfer müsste beweisen, dass jede Liste eine Teilmenge der nächsten ist. Mit `fromCount` ist sie es zwangsläufig.
+
+### M31.8 — Die Plätze 4 und 5
+
+**Gemessen** (Fixture `server/test/fixtures/auslagen-kurzpartie.json`, 54 Zonen, 212 Assets; ohne Produktionszugriff; die Rechnung steht als Skript im Scratchpad, **nicht** im Repo): die Zonen aus dem Auszug der Produktion, mit den Mitten der Anker aus dem Aufbau (Hauptplan 700/560, Sideboard 1470/560, Tableaus 300 / 880 / 1460 bei y 1600).
+
+**1. Die Marker-Assets sind nicht nach Platz getrennt — acht Zeilen, keine Bildarbeit.** `Marker 1: Leben`, `Marker 2: Leben`, `Marker 3: Leben` zeigen auf **dieselbe** Datei (`marker-leben.png`, 22 × 22); ebenso `-bewegung`, `-mumm`, `-treffer` (Präzision). Nur der **Name** trägt die Nummer, damit jeder Platz seinen eigenen beweglichen Stein hat (`place_asset` verschiebt, was schon liegt, M8.10 L5). `Marker 4: …` und `Marker 5: …` sind **acht `table_assets`-Zeilen**, geklont von `Marker 3: <Wert>` (`type token`, `category Marker`, `image_path` gleich, neue Id).
+
+**2. Die Anker der Plätze.** Eine Zone hängt an der **Asset-Id** eines Tableaus (`seat.anchor`); ein getauschtes Tableau trägt `anchorId` (M26). Platz 4 bekommt den Anker `Tableau: Blopsy Twins` (`af3a4982-a0f5-4884-834f-221447ba5377`), Platz 5 `Tableau: Yancy Plover` (`dae61142-a596-46c9-acba-640f82e9433c`). **Gewählt nach der Spaltenlage** (`docs/doerflerdaten.md` 6.3): Henlo, Granny, Blopsy, Norman, Quintus haben die **Wellenlinie**, Fridgette, Judy, Yancy **gerade** Spalten. Platz 1 (Henlo) und 3 (Granny) sind wellig, Platz 2 (Fridgette) gerade; **Platz 4 (Blopsy) wellig, Platz 5 (Yancy) gerade**. Das ist die Vorlage für die Leisten (Punkt 4) und der Grund, warum `on` von `doerfler4`/`doerfler5` Blopsy und Yancy heißt (M31.5).
+
+**3. Der Generator — parametrisiert, aber auf drei verdrahtet, und er liefert nur die Hälfte.** `scripts/equipment-zones.mjs` baut je Platz **sieben** Zonen: die sechs Ausrüstungsplätze und den Vorrat. `equipmentZones()` läuft über die Liste `DOERFLER` — **drei** Literale mit Asset-Ids — und `VORRAT_IDS` (drei Literale); `MEASURED_ANCHORS` (`150 + i · 580`) und `RETIRED_IDS` leiten sich aus `DOERFLER` ab und wachsen mit. **Die anderen sieben je Platz hat kein Generator:** `Hand Dörfler n` (absolut), die vier Wertleisten (gemessen, nummeriert, M8.10), `Erfüllte Heldentaten` und `Ausliegend`. **Entscheidung:** eine neue Funktion `equipmentZonesFor(seats)` (**parametrisiert**) neben der alten; `equipmentZones()` ruft sie mit den drei bestehenden und bleibt **unverändert** (`server/test/equipment-zones.test.js` erwartet 21 Zonen und bleibt grün); die neuen Plätze 4 und 5 sind **neue Konstanten im Baustein** (`scripts/doerflerzahl-daten.mjs`), nicht Einträge in `DOERFLER`. Das ältere Skript `doerfler-daten.mjs` bleibt, wie M30 es festgehalten hat (nicht mehr mit `--write`).
+
+**4. Die übrigen sieben Zonen je Platz sind Kopien gemessener Vorlagen — kein neuer Messwert.** Gemessen an der Fixture: die vier Wertleisten von Platz 1 und Platz 3 sind **Zeichen für Zeichen gleich** (Plätze und Ankerbruch, bis auf die Asset-Id) — Henlo und Granny haben dieselbe Lage, und es ist **dieselbe Zahl**, nicht zwei Messungen; Platz 2 weicht ab (gerade). `Erfüllte Heldentaten` und `Ausliegend` sind an allen drei Plätzen gleich (`relY` 2,235). **Regel:** Platz 4 kopiert die Leisten von Platz 1, Platz 5 die von Platz 2, **mit** der neuen Anker-Id und neuen Zonen-Ids (`showInPlay: false`, `accepts: ['asset']` wie die Vorlage); beide kopieren `Erfüllte Heldentaten` und `Ausliegend` von Platz 3. **Nicht gemessen** (und im Bericht zu sagen): dass Blopsy und Yancy **innerhalb** ihrer Familie die Kreise genau dort haben wie Henlo und Fridgette — das Dokument sagt „gleiche Lage", **belegt** ist es nicht; die Abweichung zwischen Familien war 8 Weltpunkte (M26). Ein Rest ist die Sichtprüfung (`EZ`).
+
+**5. Die Hände — zwei Messwerte, die die Anordnung bestimmen.** `Hand Dörfler 1–3` sind **absolut** (x 150 / 560 / 970, y 1140, 360 × 170, Abstand 410) und hängen **nicht** an den Tableaus (x 150 / 730 / 1310). Bei Abstand 410 läge `Hand Dörfler 4` auf 1380 … 1740 × 1140 … 1310 und überschnitte die **Heldentaten-Auslage** (1360 … 1720 × 1100 … 1340): gemessen, **nicht** möglich. **Entscheidung:** die Hände 4 und 5 hängen **über ihrem Tableau** (Anker des Platzes, `relX 0`, `relY −0,65` = y 1140, 360 × 170, also x 1890 … 2250 und 2470 … 2830), und `Hand Dörfler 3` wird **neu ausgedrückt** — dieselbe absolute Box (970 … 1330 × 1140 … 1310), jetzt relativ zu ihrem Anker —, damit sie verschwinden kann (Punkt 7). Hand 1 und 2 bleiben **unverändert**. Die Anordnung ist dadurch uneinheitlich (zwei Abstände); das ist **kosmetisch** und benannt.
+
+**6. Das Layout — gemessen, und eine Entscheidung.** Die Tableaus liegen auf x 300 / 880 / 1460 (Abstand 580, 300 breit, y 1400 … 1800); Platz 4 liegt auf **2040**, Platz 5 auf **2620** (Boxen 1890 … 2190 und 2470 … 2770). Ein Platz belegt von **120 links des Tableaus bis 120 rechts davon** (Ausrüstung links und rechts, je 120 breit; 40 Punkte Luft zum Nachbarn), der Vorrat ist 580 breit (unter dem Tableau, y 2132 … 2272), `Erfüllte Heldentaten` / `Ausliegend` darunter (y 2294 … 2434). **Alle vorhandenen Zonen enden bei x ≤ 2200** (`Bösewicht-Tableau` 1900 … 2200 × 200 … 800, `Besiegte Bösewichte` bis y 950); die Stapel stehen auf x 1730 … 1830, y ≤ 860; Platz 3 reicht bis 1890. **Rechts von 2200 ist alles frei**; in `GameTable.jsx` habe ich keine Begrenzung des Tisches gefunden (Suche nach `WORLD`/`BOUNDS`/`clamp`, ohne Treffer — **nicht** ausprobiert). Die Plätze 4 und 5 brauchen also **nichts zu verschieben**.
+**Die eine Kollision:** der Zähler `Münzen (gemeinsam)` steht auf (2080, 1430), der Kasten ist 185 × 102 mit Versatz −70 / −40 (`counter.x − 70`, `COUNTER_SIZE`), also **2010 … 2195 × 1390 … 1492** — mitten im Tableau von **Platz 4** (1890 … 2190 × 1400 … 1800) und über dessen rechter Ausrüstung (2190 … 2310). **Entscheidung: die Münzen ziehen nach (2000, 1040)** (Kasten 1930 … 2115 × 1000 … 1102): gemessen **frei** gegen alle Zonen der fünf Plätze samt der Hand von Platz 4 und ihrem Schild (y 1119 …) und gegen `Besiegte Bösewichte` (endet y 950, 50 Punkte Luft); in der Nähe der Heldentaten-Auslage, dem anderen gemeinsamen Ding. *Verworfen:* **rechts von Platz 5** (x ≥ 3100): am weitesten weg von allem Gemeinsamen; **zwischen Platz 3 und 4**: 40 Punkte Luft (1730 … 1770), der Kasten ist 185 breit; **eine zweite Reihe** unter den Plätzen 1 und 2: unter den Heldentaten-Zonen (y ≥ 2434) beginnt ein neues Band, das niemand erwartet, und alle Zonen müssten wandern; **einen kleineren Abstand**: 120 + 300 + 120 + 40 sind 580. Der Test in `EU` rechnet die Kollision **aus den Zonen der Fixture** nach (`ZONE_LABEL_HEIGHT` und alle fünf Plätze), nicht aus dieser Beschreibung.
+**Die gespeicherte Ansicht** „Dörfler" (Mitte 1149,5 / 1675, Zoom 0,41, Fenster 932 × 738, `scripts/equipment-zones.mjs`) zeigt x ≈ 12 … 2287; die Plätze 4 und 5 reichen bis 3050. Ansichten leben im Spielstand (`state.views`), **nicht** im Aufbau — M31 schreibt keine (`state_data` bleibt unberührt); der Auftraggeber legt sich eine an.
+
+**7. Ein leerer Platz zeigt seine Zonen nicht.** Bei der Vorgabe zwei sind **drei Plätze leer**. Eine Zone, deren Anker nicht am Tisch liegt, setzt `resolveZones` auf `anchorMissing` — und lässt **keine** Box zurück (die Zonen der Fixture tragen kein gespeichertes `x`/`y`; **gelesen im Code, nicht am Bildschirm probiert:** `ZoneOverlay` zeichnet mit `left: undefined`, die Schilder stapelten sich in der Tischecke). Bei drei Plätzen kam das nie vor; mit drei leeren Plätzen sind es **30 beschriftete Zonen** (je Platz die sechs Ausrüstungsplätze, der Vorrat, `Erfüllte Heldentaten`, `Ausliegend`, die Hand) plus die vier Leisten je Platz (nur Rahmen).
+**Entscheidung: ein Zonenfeld `showWithoutAnchor`**, dasselbe Muster wie `showInPlay` („nur ein ausdrückliches `false` legt eine Zone still", `shared/zoneGeometry.js`). Hat eine Zone `showWithoutAnchor: false` **und** fehlt ihr Anker, setzt `resolveZones` — **eine Zeile** — dazu `facingAway: true` (`shared/anchoring.js`). **`facingAway` gibt es schon**, und seine Leser sind die richtigen: `ZoneOverlay` zeichnet die Zone nicht, `zoneAt` trifft sie nicht, `zoneRejects` weist sie ab, `objectsInZone` gibt `[]`, das Schild-oben-Maß überspringt sie — **kein neuer Weg**; der Zonen-Editor bekommt dieselben aufgelösten Zonen und zeichnet sie weiter **alle** (man kann keine Zone korrigieren, die man nicht sieht). Das Feld steht an den **14** Zonen der Plätze **3, 4 und 5** (Platz 3: 13 vorhandene bekommen den Schlüssel, die Hand wird neu ausgedrückt; Platz 4 und 5: neu); Platz 1 und 2 nicht — sie sind nicht entfernbar.
+*Verworfen:* die Zonen **aus** `resolveZones` entfernen: der Executor liest dieselbe Liste, und `require_marker` hielte dann mit `zone … not found` statt 0 zu lesen (M31.9). *Verworfen:* ein Feld **im** `anchor` — `setAnchor` ersetzt das Objekt, ein neu verankerter Platz verlöre es.
+**Folge für die Reihenfolge:** `zonen` darf **erst nach dem Deploy** geschrieben werden — der alte Client zeichnete die neuen Zonen als Geister (M31.12).
+
+**8. Was an den Daten sonst hängt.** `villagers.seats` bekommt **zwei** Einträge (`anchor` wie Punkt 2, `zones` `Dörfler 4`, `markers` `Marker 4`, `vorrat` `Ausrüstung Dörfler 4`, `tableau` `{ x: 2040, y: 1600 }` bzw. `{ x: 2620, y: 1600 }`; **ohne** `counters`, M30.5); `validateVillagers` prüft dabei, dass Assets und Zonen **da sind** — er ist die Wache für die Reihenfolge der Schritte (M31.12). Die `Buyin'/Beatin'-Leiste` hat `capacity` 5 und nimmt fünf Spielsteine; **der Bösewicht hat einen eigenen Platz** (`Bösewicht-Platz`), die Leiste ist nicht „voll", wenn fünf Dörfler stehen. **Die Folgen:**
+
+- **Aufbau** (`sequence_data`): `seat_villager` für Platz 4 und 5 **hinter** Platz 3 und **vor** den Münzen; Gates `onlyChoice { doerfler<n>: "!keiner" }`; die Münzen ziehen nach (2000, 1040). 29 → **31** Schritte (Erwartung, beim Bauen gemessen).
+- **`dorfereignis`:** `Hand Dörfler 5`, `4` **vor** `3` (die Reihenfolge der Austeilung bleibt absteigend), je `onlySeated`; 4 → **6**.
+- **`kampf-beginnen`:** `$F4` auf `$D4`, `$F5` auf `$D5` hinter `$F3`; die Startfelder `D` haben bei allen Bösewichten **fünf** Zellen (gelesen an den Daten); 17 → **19**.
+- **`dorfphase-beginnen`:** `clear_table $F4`, `$F5` hinter `$F3`; **acht** Schritte `Marker 4/5: <Wert>`; die Wache nennt **fünf** Lebensleisten; 33 → **43**. Die Zahl der Schritte und ihre Plätze sind **zu messen**, nicht zu glauben.
+
+### M31.9 — Was nichts braucht — und was bei fünf Plätzen nicht mehr stimmt
+
+**Weiter richtig (geprüft, nicht vermutet):**
+
+- **`rotate_zone` und die Spielsteine.** Der Kommentar im Executor sagt es: gedreht werden die **Stellen der vorhandenen** Objekte. Mit zwei dreht er zwei, mit fünf fünf; die Leiste hat `capacity` 5, der Bösewicht einen eigenen Platz (M31.8 Punkt 8). **Die erste Fassung hatte behauptet, bei fünf Dörflern sei die Leiste „voll" und es brauche sechs Plätze — das war falsch gelesen** und steht hier berichtigt. Dass `place_asset` die Steine auf den **ersten freien** Platz legt (bei zwei auf die Plätze, auf denen heute Stein 1 und 2 liegen), zeigt der Rauchtest (`EY`), es wird nicht gebaut.
+- **Das Tauschmenü** (`swapAction`): fragt vier Leisten **eines Platzes**, zählt nichts; unverändert. Ein Tausch an einem leeren Platz ist nicht möglich (`swap_villager`: `nobody sits at seat n`).
+- **Die geheimen Dorf-Ereignisse.** Die Soloregel streicht sie, weil **ein Spieler mehr als einen Dörfler führt** (`docs/tft-regeln.md` §2.2, gilt ebenso im Doppel-Modus) — das trifft in der Lage **solo** jede Zahl von zwei bis fünf. Der Aufbau zieht die Dorf-Ereignisse aus den **benannten** Kategorien (75 + 5, die 25 geheimen sind eine eigene Kategorie und draußen); es ist kein Schritt, der an der **Dörflerzahl** hängt. Unverändert in Welle 1. **Der Normalmodus** (jeder Dörfler ein eigener Spieler) nimmt sie hinein — das ist Welle 2 (M31.17).
+
+**Was von „nichts zu bauen" nicht mehr stimmt:**
+
+- **Die Wache „alle besiegt" — der Text und die Zonenliste.** M30.7: `none` = 0; die Wache besteht, wenn **mindestens eine** Zone einen Wert > `above` hat; eine unlesbare Zone neben einer bestandenen schadet nicht. Das **Verhalten trägt** — bei zwei Dörflern, bei fünf, bei jeder Zahl. **Zwei Dinge ändern sich:** (1) der **Text** „… alle drei Dörfler sind besiegt" lügt bei jeder Zahl außer drei und wird zahlfrei („… alle Dörfler sind besiegt …"); (2) die **Zonenliste** nennt heute drei Lebensleisten und muss **fünf** nennen — sonst fragte die Wache bei vier Dörflern, wenn die ersten drei besiegt sind. **Die leeren Plätze sind nicht „unlesbar", sondern `none`:** die Leisten eines leeren Platzes gehören zu Zonen mit `showWithoutAnchor: false` und fehlendem Anker, also `facingAway`, und `objectsInZone` gibt für sie `[]` (M31.8 Punkt 7) — der Wert ist 0, **kein** Halt. *Berichtigt gegen die Vorarbeit, die „drei unlesbare" vermutete:* ohne das Feld läse die Wache die leere Zone mit den **Standardmaßen** `x 0, y 0, 100 × 140` (`box()` in `shared/zoneGeometry.js`) — und ein Plättchen, das jemand in die linke obere Tischecke geparkt hat, zählte als „Marker auf Leiste 4". Das Feld schließt das; ein Test parkt ein Plättchen dorthin (`EO`). Und `zoneSlots` einer Leiste ohne Box ist **nicht** `null` (die Plätze sind Bruchteile einer Standardbox), die Wache hielte also **nicht** mit `has no places` — auch das ist ein Test, kein Glaube.
+- **Der Aufbau und die Aktionen tragen Schritte der Plätze 4 und 5** (M31.8 Punkt 8), alle mit `onlySeated`. Das ist Datenarbeit (`ET`, `EV`), kein Code.
+
+### M31.10 — Die Hausregel: was kein Regeltext sagt, und was M31 deshalb nicht anfasst
+
+Die Soloregeln sind für **drei** Dörfler geschrieben. Bösewicht-Werte und `FF`-Zahl ziehen mit der Zahl mit, **weil die Anleitung es sagt** (die Tableaus drucken die Spalten, `[DE S.23]` nennt die Zahl der Gelände). **Was sie nicht sagt, ist Hausregel** — für zwei, vier **und** fünf Dörfler, mit einem Spieler. Die betroffenen Stellen und die Entscheidung je Stelle:
+
+| Stelle | Regeltext | Heute | Entscheidung |
+|---|---|---|---|
+| **Heldentaten-Auslage** (Lage **solo**) | solo „6 offene, gemeinsame" (`[DE S.34]`), regulär 3 verdeckte **je Dörfler** (§4 Schritt 1, §7 Nr. 1) | `deal_to_zone count 6 … fill` (Aufbau 24, `dorfphase-beginnen` 19), die Zone `Heldentaten-Auslage` ist ein Raster mit `capacity` 6 | **nicht anfassen** (in der Lage solo; die Mehrspieler-Lagen behandelt Welle 2, M31.17) |
+| **Ladenerneuerung** | „pro Dörfler 2 Münzen" (`[DE S.12]`) — **das ist ein Regeltext**, gilt für jede Zahl | nirgends modelliert: keine Aktion zieht Münzen dafür ab, der Spieler zahlt am Zähler von Hand | **nicht anfassen** (siehe unten) |
+| **Geheime Dorf-Ereignisse** | gestrichen, weil ein Spieler mehrere Dörfler führt | keine Schrittabhängigkeit von der **Zahl** (M31.9) | **unverändert, richtig für solo 2–5**; der Normalmodus ist Welle 2 |
+| Die **fünf Werte „je Dörfler"** auf den Tableaus | Tableautext („per townsfolk") | nicht in den Daten, soweit bekannt (M31.1) | **ungeprüft**, nicht angefasst |
+
+**Heldentaten — die Begründung.** Zwei Fortschreibungen sind denkbar: das Solo-Verhältnis (2 je Dörfler: 4 / 6 / 8 / 10) oder das reguläre (3 je Dörfler: 6 / 9 / 12 / 15). **Kein Text wählt zwischen ihnen.** Bleibt es bei **6**, sind es bei zwei Dörflern 3 je Dörfler (das reguläre Verhältnis, eher **leichter** als solo), bei fünf **1,2 je Dörfler** (weniger Belohnung und weniger Heldenpunkte für die Sheriffwahl als in jeder gedruckten Regel: **schwerer**). **M31 fasst sie ausdrücklich nicht an**, aus drei Gründen: (1) jede Zahl wäre erfunden; (2) es ist **mehr als ein Schritt** — die Auslage ist ein Raster mit sechs Plätzen (`capacity` 6), für zehn bräuchte es eine Zonenänderung, und `deal_to_zone … count` ist kein Zählerwert (das Produkt aus M31.4 gilt dort **nicht**): eine zweite Stelle für dieselbe Rechnung oder eine Verallgemeinerung von `foldProduct`; (3) der Spieler kann die Karten **von Hand** nachlegen, wie er die Ladenerneuerung zahlt. **Das ist eine Entscheidung des Auftraggebers** (`EZ` Teil 2: „bleibt bei 6?"); **die Stellen, die sich dann ändern, sind benannt:** `sequence_data` Schritt 24 und `dorfphase-beginnen` Schritt 19 (`count`), die Zone `Heldentaten-Auslage` (`capacity`).
+
+**Ladenerneuerung.** `[DE S.12]`: „pro Dörfler 2 Münzen" abwerfen — mit zwei Dörflern 4, mit fünf 10 (mit drei 6). **Der Regeltext folgt der Zahl; der Tisch bildet ihn nicht ab.** Sie gehörte nur dazu, wenn M31 etwas **kaputt** machte, was heute funktioniert; das tut es nicht (es gibt nichts, was an der Zahl hängen könnte). Sie zu **bauen** hieße, eine neue Aktion „Laden erneuern" zu erfinden (Auslage abwerfen, zehn neue, `set_counter −2*$doerflerzahl`), ein Feature, das niemand bestellt hat. **Die Zutaten sind nach M31 da** (`$doerflerzahl`, Produkt im Wert); es wäre dann **eine** Aktion von wenigen Schritten. *Umkehr:* ein eigener Meilenstein.
+
+### M31.11 — Bewusst nicht Teil davon
+
+- **Die Spielerzahl** (mehrere Spieler, Doppel- und Normalmodus): **Welle 2** (M31.14–M31.21), nicht Teil von Welle 1.
+- **Ein sechster Dörfler.** Die Tableaus drucken die Spalten 2P–5P, die Leiste hat fünf Plätze; mehr gibt es nicht.
+- **Das Plus am Tisch** (nach dem Aufbau einen Dörfler an einen leeren Platz setzen). Der Auftrag nennt „die Start-Setup-Maske".
+- **Eine Prüfung der Untergrenze im Aufbau.** Der Dialog lässt Platz 1 und 2 nicht entfernen, und der erste Kampf hält laut bei einer Zahl ohne Werte (M31.6).
+- **Die fünf Werte „je Dörfler"** (M31.1) und **die zwölf Bösewichte ohne Endkampf-Messung** (M31.7); **Ms. Falls & Co.** (Gefolgschaft, nicht in den Daten).
+- **Gespeicherte Ansichten** (M31.8 Punkt 6) und **gespeicherte Partien**: kein Spielstand wird angefasst (`save_states`, `state_data`).
+- **Die Hausregeln aus M31.10**: Heldentaten, Ladenerneuerung.
+- **Ein Editor-Feld für `optional`, `baseCount`, `statsByCount`, `fromCount`, `showWithoutAnchor`.** Die Daten schreibt ein Skript; der Editor **zeigt und prüft** `onlySeated` und die Verneinung (`EP`) und lässt Felder, die er nicht kennt, beim Bearbeiten stehen. (Der **Zonen**-Editor schreibt beim Speichern die aufgelösten Zonen zurück — ein offener hält M31.12 auf, siehe dort.)
+- **Eine Messung der Kreise je Tableau.** Die Leisten der Plätze 4 und 5 sind Kopien (M31.8 Punkt 4); wer Judy an Platz 4 wählt, hat dieselbe Abweichung bis zu 8 Weltpunkte wie beim Tausch heute (M30.10).
+
+### M31.12 — Zielstand, Reihenfolge, Schreiben
+
+**Ausgang** (Stand nach M30, am 2026-11-09 **gerechnet** aus `server/test/fixtures/setupwahl-kurzpartie.json` durch die drei Schritte von `scripts/setupwahl-daten.mjs`, **ohne** Zugriff auf die Produktion — Länge und Hash stimmen mit den Zielzahlen von M30.9 überein): `scenario_data` 20 858 / `82592d1ac883`, `sequence_data` 2 621 / `e859bd457002`, `action_data` 5 803 / `33033dace238`. `zone_data` und `table_assets`: der Auszug in `auslagen-kurzpartie.json` (54 Zonen, 212 Assets); **ob die Produktion seitdem davon abweicht, lesen `EU` und `EV` Teil 2** (M28–M30 haben `zone_data` nicht geschrieben).
+
+**Zielstand: hier keine Zahlen.** Sie entstehen beim Bauen (`ES`–`EX`, Teil 1: auf der Fixture gerechnet; Teil 2: gegen die Produktion gelesen). **Zu messen ist dort, je Stück:** Länge und sha256 (12 Zeichen) jeder geänderten Spalte vor und nach dem Schritt, der Rückwärtsbeweis (Stück entfernen → der gelesene Text, Zeichen für Zeichen), der Fingerabdruck der übrigen Spalten und Tabellen. **Was** sich ändert:
+
+| Stück (Schritt im Baustein) | Spalte / Tabelle | Was sich ändert |
+|---|---|---|
+| `gelaende` (`ES`) | `scenario_data` | Deputy Waggums, Pepin Milkfrog, Samuel Strawman: `FF3` bekommt `"fromCount": 3`; **sechs neue** Einträge `FF4`/`FF5` (`fromCount` 4 / 5); alle anderen Bytes gleich |
+| `werte` (`ET`) | `scenario_data` | `statsByCount: { "2", "4", "5" }` an den **19** Bösewichten mit Zahlenwerten; Barry Bluff **unverändert**; `stats` byteweise gleich |
+| `zonen` (`EU`) | **`zone_data`** | **28** neue Zonen (Plätze 4 und 5, je 14); `showWithoutAnchor: false` an den 13 vorhandenen Zonen von Platz 3; `Hand Dörfler 3` relativ ausgedrückt (**dieselbe** absolute Box); alles andere Zeichen für Zeichen |
+| `assets` (`EV`) | **`table_assets`** | **acht** neue Zeilen `Marker 4/5: <Wert>`, geklont von `Marker 3: <Wert>`; keine vorhandene Zeile ändert sich |
+| `aktionen` (`EW`) | `action_data` | `onlySeated` an den Schritten der Plätze 3, 4, 5; **vier** Schritte kommen zu `dorfereignis`/`kampf-beginnen`, **zehn** zu `dorfphase-beginnen`; die Wache nennt fünf Leisten, der Text ist zahlfrei; Schritt 16 trägt das Produkt |
+| `optionen` (`EX`) | `scenario_data`, `sequence_data` | **der Schalter:** `options.doerfler3`–`5` (`optional`, `keiner`), `options.partie` bindet `MuenzenJeDoerfler` (15 / 10) statt `Muenzen`; `villagers.baseCount: 3`; `villagers.seats` + 2; Aufbau: zwei `seat_villager` mit Gates, Münzen nach (2000, 1040) mit dem Produkt |
+
+**Die Reihenfolge ist verbindlich: Code, Deploy beider Images, dann Daten — und `optionen` zuletzt.** Der Executor läuft **auch im Frontend-Bundle** (`docs/datenzugriff.md`, „Fallen"); `SetupChoiceFields` und `resolveZones` ändern sich nur dort (und im Server für Räume). Jeder Datenschritt **vor** `optionen` ist mit dem deployten Code **folgenlos**, und ein Test belegt es: der Aufbau mit den heutigen Optionen ist **derselbe**; **solange `baseCount` fehlt, hält `build_scenario` nie wegen der Zahl**; die neuen Zonen der Plätze 4 und 5 sind unsichtbar, weil ihr Anker nicht am Tisch liegt. **`zonen` darf erst nach dem Deploy** (der alte Client zeichnete sie als Geister), **`aktionen` ebenfalls** (`onlySeated` fehlt dem alten Executor, `"+6*$doerflerzahl"` legte nicht +18). `optionen` verlangt **alle fünf** davor geschriebenen Schritte (der Baustein prüft sie **vor** dem ersten Byte: `fromCount`, `statsByCount`, die 28 Zonen, die acht Assets, `onlySeated`; `validateVillagers` meldet die Seats sonst ohnehin).
+**Rückweg umgekehrt:** `optionen`, `aktionen`, `assets`, `zonen`, `werte`, `gelaende`. **Eine Ausnahme beim Zurückgehen:** sind nach dem Schalter Spielstände mit Plätzen 4/5 gespeichert worden, tragen sie Token mit den Ids der acht neuen Assets; `assets --zurueck` verweigert dann (der Baustein sucht die Ids in `save_states.state_data`).
+
+**Schreiben, ohne fremde Arbeit zu zerstören:** dieselbe Vorlage wie M28–M30 (`docs/datenzugriff.md`, „Regeln fürs Schreiben" Nr. 5): `scripts/doerflerzahl-daten.mjs` mit `--schritt gelaende|werte|zonen|assets|aktionen|optionen`, `--check`, `--write … --sicherung-sha`, `--zurueck`, **kein `--force`**; Vorbedingung **je Stück**; Rückwärtsbeweis; Sicherung vorher ins Scratchpad; Vergleich-und-Tausch in einer `IMMEDIATE`-Transaktion; Fingerabdruck der übrigen Tabellen und je Zeile von `save_states`; zweiter Lauf „schon geschrieben". **Bisher galt „nie `zone_data`":** hier schreibt **genau ein** Schritt (`zonen`) sie, und nur die genannten Stücke; `grid_data`, `state_data` und `save_states` bleiben **in jedem Schritt** unberührt. **Ein offener Setup-Editor kann jeden Schritt still zurücknehmen** (`docs/datenzugriff.md`, „Fallen") — am schmerzhaftesten `zonen`: der Zonen-Editor speichert die Zonenliste. Vor jedem Schreiben fragen, nach jedem und am Ende des Tages `--check` — **auch** die Skripte von M28, M29 und M30.
+
+### M31.13 — Abnahme (Welle 1), und was offen und riskant bleibt
+
+**Abnahme.**
+
+1. **Dialog** beim Laden und im Raum: **Spiellänge, Toller Trödel, Dörfler 1, Dörfler 2 und „+ Weiteren Dörfler hinzufügen"** — nicht mehr. „+" zeigt Dörfler 3 (Granny) mit „−" und wieder das Plus; so bis Dörfler 5; danach **kein** Plus; „−" sitzt nur am **letzten** eingeschalteten; Dörfler 1 und 2 tragen **keinen** Knopf. In der Adresse: `?opt=doerfler4:Blopsy`, `?opt=doerfler3:keiner`.
+2. **Die Folge der Vorgabe, ausdrücklich:** ohne Wahl entsteht **ein Tisch mit zwei Dörflern** (Henlo, Fridgette), Münzen **30** / **20**, 2P-Werte, `dorfereignis` teilt zwei Karten. **Wer ohne Änderung startet, spielt zu zweit gegen die 2P-Spalte** — der Auftraggeber weiß es (`EZ` Teil 2).
+3. **Der Tisch von vor M31** entsteht mit `doerfler3: Granny`, **Zeichen für Zeichen** (`deepEqual` gegen den Aufbau vor M31: Münzen 45, Kampf 1 mit BEW 6 / LEB 14, Dorfphase +18, Endkampf mit allen Plättchen) — **mit Ausnahme** des Münzzählers, der auf (2000, 1040) steht.
+4. **Je Zahl 2, 3, 4, 5:** so viele Tableaus (Plätze 1 bis n, an den Plätzen 3–5 auf ihrem Anker), Hände, Spielsteine auf den ersten n Plätzen der Leiste, je **zwölf** Marker auf den Startwerten (n · 4); Münzen **30 / 45 / 60 / 75** (kurz) und **20 / 30 / 40 / 50** (lang); **keine** Protokollzeile außer erwarteten `note`s.
+5. **Werte:** Deputy Waggums LEB **12 / 14 / 17 / 20**, BEW 6 / 6 / 7 / 7; Virginia Fitz LEB 12 / 15 / 18 / 21; The Bundits LEB 11 / 15 / 18 / 21 — gleich den gelesenen Tableaus. Die **sechs** zuvor ungeprüften Bösewichte sind gegen ihr Bild gelesen (`EQ`).
+6. **Münzen nach dem Kampf:** +12 / +18 / +24 / +30.
+7. **Endkampf je Zahl 2 / 3 / 4 / 5:** Deputy Waggums, Pepin Milkfrog, Samuel Strawman **2 / 3 / 4 / 5** Plättchen, auf `FF1…FFn`; Virginia **5**, Handsy **5**, Bundits, Tilda, Umbrello **1** — bei **jeder** Zahl; die Daten dieser fünf sind **byteweise gleich**.
+8. **Leere Plätze:** bei zwei Dörflern **keine** Zone von Platz 3–5 am Tisch (kein Schild, kein Rahmen, keine Geister in der Tischecke); der Zonen-Editor zeigt sie weiter. **Sichtprüfung.**
+9. **Die Wache:** alle Lebensmarker von den **Leisten aller** sitzenden Dörfler genommen → Rückfrage, Text **ohne Zahl**; liegt einer → läuft; ein Plättchen in der linken oberen Tischecke zählt **nicht**.
+10. **Doppelwahl** (Judy / Judy / keiner): ein Dörfler sitzt, **eine** Zeile je leeren Platz, der erste Kampf **hält laut** (`no values for 1 villager`) ohne ein Plättchen.
+11. **Spielstände:** `save_states` je Zeile gleich; ein alter Spielstand (drei Dörfler) lädt, die Dorfphase läuft mit +18.
+12. **Tests** `cd server && npm test` grün (Stand vorher **1 883**); `cd client && npx vite build` ohne **neue** Warnung; `sequence-require-counter.test.js`, `equipment-zones.test.js` und alle Tests von M30 **unverändert** grün.
+
+**Welle 1 ist damit fertig, wenn 1–12 gelten** — Welle 2 beginnt erst danach.
+
+**Offen und riskant** (Stand der Spec; beim Bauen fortzuschreiben):
+
+1. **Die Vorgabe zwei macht „einfach loslegen" zu einer Hausregel-Partie** (M31.5). Entschieden vom Auftraggeber; die Folge steht als Satz in seiner Liste.
+2. **Heldentaten (6), Ladenerneuerung** (M31.10): kein Regeltext, ausdrücklich nicht angefasst; bei **fünf** Dörflern sind 6 Heldentaten **schwerer** als jede gedruckte Regel. Frage an den Auftraggeber.
+3. **Die Leisten der Plätze 4 und 5 sind Kopien** der Vorlage ihrer Familie, innerhalb der Familie **nicht gemessen** (M31.8 Punkt 4). Sichtprüfung.
+4. **Ob die Produktion für verankerte Zonen ein gespeichertes `x`/`y` trägt**, sagt der Auszug nicht (`EU` Teil 2 liest es). Das ändert nichts an der Wirkung des Feldes `showWithoutAnchor`, wohl aber daran, **wie** die Geister ohne es aussähen.
+5. **Die gespeicherte Ansicht „Dörfler"** zeigt die Plätze 4 und 5 nicht (M31.8 Punkt 6).
+6. **Der Plus-Knopf wird von keinem Test gezeichnet** (der Client hat keine Testinfrastruktur): geprüft sind `ladderOf`, `validateOptions` und der Bau; die Zeichnung prüfen der Bau und die **Sichtprüfung** (`EZ`).
+7. **Das Produkt im Wert ist neue Syntax** in `shared/counters.js` (vier Leser, viele Tests); das Risiko ist die stille 0 aus `Number("15*3")`, sie ist der **erste** rote Test.
+8. **Die Zahl wird aus den Tableaus gelesen.** Wer ein Tableau von Hand wegnimmt, ändert die Zahl der nächsten Dorfphase. Gewollt (der Tisch ist die Wahrheit, M22).
+9. **Pepins `FF4`/`FF5`:** die Zuordnung der Bürger-Assets ist erschlossen (M31.7).
+10. **Der Schalter `optionen` und der Zonen-Editor:** ein offener Editor kann `zonen` und `optionen` zurücknehmen; `--check` am Ende des Tages.
+11. **Hände uneinheitlich:** 1–3 auf Abstand 410 und absolut (1, 2) bzw. relativ (3), 4–5 über ihrem Tableau (M31.8 Punkt 5). Kosmetisch.
+
+---
+
+## Welle 2 — die Spielerachse (M31.14–M31.21)
+
+**Auftrag (zweite Erweiterung, vom Auftraggeber entschieden):** der Grund für zwei bis fünf Dörfler ist Mehrspieler — wörtlich: „dafür mach ich es dann für den Multiplayer nutzbar mit 2 Spieler a 2 dörfler oder oder oder". Auf die Rückfrage, ob das in M31 oder in einen M32 gehört: **„Beides in M31."**
+**Zuschnitt: eine Spec, zwei Wellen.** Welle 1 (M31.1–M31.13, Aufgaben `EH`–`EZ`) ist die **Dörflerachse** und **für sich vollständig und abnehmbar**; Welle 2 (M31.14–M31.21, Aufgaben `FA`–`FJ`) kommt danach. **Welle 1 braucht von Welle 2 nichts. Welle 2 braucht von Welle 1** (die Zahl `$doerflerzahl`, das Gate `onlySeated`, die Verneinung in `onlyChoice`, die Plätze 4 und 5, die Münzen-Stelle) — und **greift in drei Daten ein, die Welle 1 schreibt**: die Münzschritte (Welle 2 setzt ihnen ein Gate **davor**, schreibt sie nicht um), die Hand-Zonen (Welle 2 ändert ihre `capacity`) und `dorfphase-beginnen` (Welle 2 gatet die Heldentaten-Auffüllung). Das sind **die einzigen Stellen**, an denen die Achsen ineinandergreifen (M31.20).
+
+### M31.14 — Der Befund: zwei Stellen sind hart solo, und der Doppel-Modus ist der Normalmodus
+
+**Wo der Aufbau heute solo ist — und warum die Dörflerzahl daran nichts ändert.** Gemessen an Daten und Code:
+
+1. **Die Heldentaten.** `Heldentaten-Auslage` ist `type: shared`, `capacity: 6`, `layout: grid` — die Solo-Auslage (`[DE S.34]`: „6 offene, gemeinsame"). Der Aufbau teilt sechs hinein (`deal_to_zone count 6`, Schritt 24), die Dorfphase füllt auf sechs auf (`dorfphase-beginnen` 19, `fill`). **Das hängt nicht an der Zahl der Dörfler, sondern daran, dass ein Spieler sie alle führt.**
+2. **Das Geld.** Ein Zähler `Münzen (gemeinsam)` (Aufbau 28, `dorfphase-beginnen` 16). Ein gemeinsamer Topf ist die Soloregel („auf die alle deine Dörfler jederzeit zugreifen können").
+3. **Die geheimen Dorf-Ereignisse.** Die Bibliothek trägt sie als **eigene Kategorie `Dorf-Ereignisse (geheim)`, 25 Karten** (gemessen); der Aufbau baut den Stapel aus `["Dorf-Ereignisse", "Dorf-Ereignisse (Neue Nachbarn)"]` (75 + 5). Die 25 sind **draußen**: wir spielen heute die Solo-/Doppel-Variante. Für den **Normalmodus** müssen sie hinein.
+
+Lieferten wir nur Welle 1, bekäme der Auftraggeber für zwei Spieler à zwei Dörfler einen Tisch mit **6 offenen gemeinsamen Heldentaten und einem gemeinsamen Topf** — solo, mit vier Dörflern: derselbe halbe Einbau, gegen den M31.1 bei den Bösewicht-Werten steht.
+
+**Der Regelstand, belegt** (`[DE S.34]`, `docs/regelabgleich.md` „Spielvarianten", `docs/tft-regeln.md` §1.2/§2.2): **Doppel-Modus** — „In diesem Modus zu zweit spielt ihr beide je 2 Dörfler. Es gelten die gleichen Regeln und Vorbereitungen wie im normalen Modus, bis auf folgende Abweichung: Entfernt beim Aufbau alle Geheimen Dorf-Ereignisse aus dem Dorf-Ereignis-Stapel." **Doppel ist also der Normalmodus minus geheime Ereignisse** — nicht die Soloregel mit mehr Dörflern. Der Normalmodus (§2.1 Nr. 3, 8; §4): jeder wählt **1 Dörfler**, nimmt **10 Münzen**, zieht **3 Heldentaten** (verdeckt, „jederzeit ansehen"), zieht in der Dorfphase **1 Dorf-Ereignis**; nach dem Kampf „Jeder: Nimm dir 6 Münzen".
+
+**Was der Doppel-Text nicht sagt — die Lesart, ausgeschrieben.** Er sagt „die gleichen Regeln", nicht, ob „jeder" im Normalmodus den **Spieler** oder den **Dörfler** meint (im Normalmodus sind es dieselben). **Wir lesen „je Dörfler"**: 10 Münzen, 3 Heldentaten, 1 Dorf-Ereignis und 6 Münzen nach dem Kampf **je Dörfler**. Gründe: (1) im Normalmodus ist es der Dörfler, der alles davon hat; (2) die Soloregel skaliert die Münzen ausdrücklich je Dörfler (30 = 3 × 10, `[DE S.34]`); (3) es braucht **keine Zuordnung Spieler → Dörfler** (M31.18). **Das ist die Lesart, nicht der Text** (M31.19).
+
+**Die Lage — drei Fälle aus zwei Zahlen** (Spieler `S`, Dörfler `D`, Nebenbedingung `S ≤ D`):
+
+| Lage | Bedingung | Heldentaten | geheime Dorf-Ereignisse | Geld |
+|---|---|---|---|---|
+| **solo** | `S = 1` | 6 offen, gemeinsam (Auslage) | draußen | **ein** Topf, 10 je Dörfler |
+| **mehrfach** (Doppel-Modus, verallgemeinert) | `1 < S < D` | 3 verdeckt **je Dörfler** | draußen | je Dörfler 10 |
+| **normal** | `S = D` | 3 verdeckt je Dörfler | **drin** | je Dörfler 10 |
+
+*Verallgemeinert* heißt: der Regeltext kennt nur 2 × 2. `S = 2, D = 3` oder `S = 3, D = 5` sind **Hausregel** (M31.19); die Lesart „je Dörfler" trägt sie, ohne zu wissen, wer wen führt.
+
+**Die Hand-Zone — gemessen, und die Vorarbeit hatte sie zu groß gelesen.** `Hand Dörfler 1–3` (`zone_data`): `type: "player"`, `capacity: 3`, `accepts: ["card"]`, `layout: "row"`, **absolut** (x 150 / 560 / 970, y 1140, 360 × 170) — und `color: null`, `exclusive: false`. Die Vorarbeit schloss: „als Spielerzone ist sie vor den Mitspielern verborgen". **Das stimmt für diese Zonen nicht.** Was `type: "player"` im Code bewirkt (gelesen: `server/src/routes/rooms.js`, `server/src/websocket/messageHandler.js`): (a) **`dealStartingHands`** teilt beim Raumstart in die Hand des Spielers, dessen `color` der Zonenfarbe gleicht — braucht `color` **und** `dealStackId` (eine Stapel-Id, die der Aufbau erst erzeugt); (b) **`isActionAllowed`** verwehrt Mitspielern Eingriffe in eine Zone mit `exclusive: true` und fremder `color`. **Beide Bedingungen fehlen** (`color: null`, `exclusive: false`): **die Zonen gehören niemandem und verbergen nichts.** Verborgen ist in dieser Engine nur die **private Hand** eines Clients (`handCards`, TTS-Art); der Executor kann in sie nicht austeilen. Die Folge für Heldentaten steht in M31.17.
+**Und `dorfereignis` benutzt dieselbe Zone:** es teilt `Dorf-Ereignisse` mit `count 1` in `Hand Dörfler n` aus. **Heldentaten und Dorf-Ereignisse konkurrieren also um dieselben drei Plätze** (`capacity 3`): liegen dort drei Heldentaten, kann das Dorf-Ereignis nicht hinein — `deal_to_zone` lässt die Karte im Stapel und meldet `1 of 1 cards stayed in the stack` (gelesen im Executor, `zoneRoom`/`shareOut`). **Ein Befund, nicht ein Detail** (M31.17).
+
+### M31.15 — Kein Modus-Feld: die Lage ist abgeleitet, und die Nebenbedingung gilt vor dem Aufbau
+
+**Übernommen: es braucht keine Modus-Option, sondern eine zweite Zahl.** Ein Feld „Modus" (solo / doppel / normal) wäre eine **zweite Quelle** für dieselbe Auskunft (M6) und könnte der Dörflerzahl **widersprechen** („normal" bei zwei Spielern und fünf Dörflern). Stattdessen eine **gewöhnliche Option `spieler`** (1 … 5, Vorgabe **1**; Auswahlfeld, **keine** Client-Änderung) und die **Lage als Rechnung**.
+
+**Die Rechnung, an einer Stelle: `lageOf(scenarioData, choices)`** (neu, `shared/villagers.js` — dort, wo das TFT-Wissen wohnt, M7; `shared/setupOptions.js` bleibt neutral). Die Daten nennen die Optionen: `scenario_data.villagers.lage = { players: "spieler", seats: ["doerfler1", "doerfler2", "doerfler3", "doerfler4", "doerfler5"] }`. `S` ist die gewählte Zahl, `D` die Zahl der `seats`-Optionen, die **nicht** auf ihrer `off`-Wahl stehen (Dörfler 1 und 2 zählen immer). Antwort: `{ players, villagers, kind: 'solo' | 'mehrfach' | 'normal', problems }`.
+
+**Wo die Nebenbedingung `S ≤ D` gilt — und warum dort.** Gewählt: **in `lageOf`, aufgerufen neben `resolveChoices` an denselben drei Stellen**: dem Dialog und dem Raum-Modal (zeigen das Problem und lassen „Start" nicht zu), dem Server beim Anlegen eines Raums (`rooms.js`, weist ab) und dem Executor als letzte Wache (baut **nichts**, eine Zeile `failed`, wie bei einer unbekannten Wahl). Gründe:
+- **Vor dem Aufbau.** Eine Prüfung **im** Aufbau hielte erst nach den Dörfler-Schritten (erst dann ist `D` am Tisch bekannt) — und ließe einen **halb gebauten** Tisch zurück (M9.3: der Halt gehört nach vorn, nicht in die Mitte).
+- **Dieselbe Frage an drei Stellen, eine Antwort** (M6) — genau die Rolle von `resolveChoices`; M30.10 hatte „eine Prüfung der Wahl vor dem Aufbau" schon als die Stelle `shared/` benannt.
+- **Nicht in der Zeichnung** (`SetupChoiceFields` rechnet nichts, M27.3): der Dialog **fragt** `lageOf` und zeigt, was es sagt.
+- **Nicht in `resolveChoices`**: die Funktion kennt keine Optionen untereinander und kennt kein TFT.
+- **`D` kommt aus der Wahl, nicht aus dem Tisch.** Die Doppelwahl (M30.4) kann einen Platz leer lassen; dann sitzen am Tisch weniger, als die Wahl sagt. Das fängt der **erste Kampf** (kein Wert für diese Zahl, M31.6), nicht `lageOf`.
+
+**Die Lage in Schritten — zwei Gates, weil es zwei Zeitpunkte gibt.**
+- **Aufbau: `onlyLage`.** `{ "onlyLage": "solo" }`, `"normal"` oder eine Liste (`["mehrfach", "normal"]`). Fail-loud wie `onlyChoice`; **in Aktionen verboten** (`validateOptions`), weil sie aus der **Wahl** folgt, die ein Spielstand nicht kennt. Der Executor bindet `ctx.lage` zu Beginn des Laufs (neben `ctx.optionVars`).
+- **Aktionen: `onlyCounter`.** `{ "onlyCounter": "Münzen (gemeinsam)" }` — der Schritt läuft **nur, wenn ein Zähler dieses Namens am Tisch liegt**; `"!Münzen (gemeinsam)"` heißt „nur, wenn **keiner** liegt" (dieselbe Verneinung wie bei `onlyChoice`, M31.3). Fail-loud bei Unverstandenem; **in Aktionen erlaubt**, weil es den **Tisch** liest (`state.counters`; `ctx` führt die Namen neben `ctx.seated`, eine Hilfe bindet beides).
+- **Warum ein Zählername die Lage trägt.** Ein Tisch kennt die **Spielerzahl nicht** (kein Token, keine Zone; ein Hotseat-Tisch kennt keinen Spieler) — er kennt die **Form des Geldes**. **Solo heißt: es gibt einen gemeinsamen Topf.** Der Aufbau **schreibt** den Tisch aus der Wahl, die Aktionen **lesen** den Tisch — dieselbe Teilung wie M31.2. Es sind darum **zwei Darstellungen derselben Auskunft zu zwei Zeitpunkten**, nicht zwei Quellen für einen Zeitpunkt. *Folge, gewollt (M22: der Tisch ist die Wahrheit):* wer den gemeinsamen Topf von Hand löscht, hat die Lage gewechselt.
+- **Wie der Aufbau die Lage nur einmal ausspricht.** Die Aufbauschritte der Heldentaten, des Geldes und des Ereignis-Stapels gaten mit `onlyLage`; die Aktionen mit `onlyCounter`. Beide Gates sagen dasselbe in der Sprache ihres Zeitpunkts, und ein Test (`FI`) lässt **jede** Lage durch Aufbau **und** Aktionen laufen und prüft, dass beide übereinstimmen.
+
+*Verworfen:* (a) **ein Modus-Feld** (oben); (b) **ein sichtbarer Zähler `Spieler`** am Tisch, aus dem Aufbau geschrieben und von den Aktionen gelesen: ein Zähler, den ein Mensch mit „+" verstellt und der die Lage mitten im Spiel kippt, ohne etwas Sichtbares zu ändern; (c) **eine Option `spieler` mit Wahlen „solo / doppel / normal"**: das Modus-Feld unter anderem Namen.
+
+### M31.16 — Das Geld je Dörfler
+
+**Entscheidung: in den Lagen `mehrfach` und `normal` hat jeder Dörfler seinen eigenen Topf `Münzen Dörfler n`; in der Lage `solo` bleibt es bei `Münzen (gemeinsam)`.** Die Vorarbeit schlug „je Spieler, bis zu fünf Zähler" vor. Das verlangt **die Zuordnung** (M31.18): wie viele Münzen ein Spieler zu Beginn bekommt, hängt davon ab, wie viele Dörfler er führt, und bei `S = 2, D = 5` (3 und 2) kennt der Aufbau die Aufteilung nicht. **Je Dörfler braucht sie nicht**: 10 Münzen (+5 im 3-Runden-Modus) und +6 nach jedem Kampf je Dörfler, **unabhängig davon, wer ihn führt** — und für `S = D` ist es **genau** die Regel (je Spieler = je Dörfler). Ein Spieler, der zwei Dörfler führt, hat zwei Töpfe und zahlt aus beiden; er darf sie von Hand umlegen, wie er es mit dem Zähler heute tut.
+- **Name und Ort.** `Münzen Dörfler 1` … `5`; **am Platz**, im freien Band unter dem Tableau (`y 1870`, das Band, das der Kommentar in `scripts/equipment-zones.mjs` für Zähler freihält: y 1808 … 2110; seit M30 leer), der Kasten (185 × 102, Versatz −70 / −40) **mittig unter dem Tableau** (`x` = Tableau-Mitte − 22: 278 / 858 / 1438 / 2018 / 2598). Gemessen **frei** gegen alle Zonen der fünf Plätze (Beine bis y 1794, Vorrat ab 2132); der Test in `FH` rechnet es nach, nicht diese Zeile.
+- **Aufbau (Lagen `mehrfach`, `normal`):** je Dörfler `place_counter "Münzen Dörfler n"` mit `value "$optMuenzenJeDoerfler"` (15 / 10, M31.4), Gates `onlyLage: ["mehrfach", "normal"]` **und** `onlySeated: n` (für n = 3, 4, 5; Platz 1 und 2 nur das Lagen-Gate). **Kein Produkt nötig.**
+- **Aufbau (Lage `solo`):** der Schritt aus Welle 1 (`place_counter "Münzen (gemeinsam)"`, `"$optMuenzenJeDoerfler*$doerflerzahl"`) bekommt **nur** `onlyLage: "solo"` — nicht umgeschrieben.
+- **Dorfphase:** je Dörfler `set_counter "Münzen Dörfler n"` mit `value "+6"`, Gate **`onlyCounter: "Münzen Dörfler n"`** (der Topf **ist** die Auskunft „diese Lage und dieser Platz sitzt"); der Schritt 16 aus Welle 1 (`"+6*$doerflerzahl"`) bekommt `onlyCounter: "Münzen (gemeinsam)"`. **Die 6 steht an sechs Stellen** (fünf Töpfe, ein gemeinsamer): der Baustein schreibt alle sechs aus **einer** Konstante, und ein Test hält ihre Gleichheit fest. Das ist ein bewusster Preis: M31.4 hatte „je Platz ein Schritt" verworfen, weil dort **das Produkt** dieselbe Rechnung in einem Schritt kann; hier hat jeder Topf seine Zahl, und das Schritt-je-Topf **ist** der Regeltext („Jeder: Nimm dir 6 Münzen").
+- **Was nicht gilt:** die **Ladenerneuerung** („pro Dörfler 2 Münzen") bleibt nicht modelliert (M31.10); ein Topf wird nicht auf einen Spieler gebucht; Übergabe von Münzen zwischen Töpfen ist Handarbeit.
+
+### M31.17 — Heldentaten, Dorf-Ereignisse und die eine Hand-Zone
+
+**Entscheidung 1: die `capacity` der Hand-Zonen wird 4** (`Hand Dörfler 1 … 5`; `zone_data`, Schritt `haende`, `FF`). Drei verdeckte Heldentaten **plus** das Dorf-Ereignis, das daneben liegt: vier Plätze. *Verworfen:* (a) **eine zweite Zone je Dörfler für die Ereignisse** (fünf neue Zonen, und `dorfereignis` müsste je Lage ein anderes Ziel nennen — dieselbe Schrittfolge zweimal); (b) **Ereignisse in den Hand-Zonen, Heldentaten woanders** (die Hand-Zone **ist** die Zone der drei Heldentaten laut Befund; ein Umzug der Heldentaten in eine neue Zone hieße dasselbe wie (a)). **Folgen:** (1) bei `capacity 4` rechnet `zoneSlots` vier Plätze in einer Reihe der Breite 360 — **90 Punkte Abstand**, die Karten (100 breit) überlappen um etwa 10 Punkte; **kosmetisch**, Sichtprüfung. (2) **Die Lage `solo` ändert sich in einem Zug:** das Dorf-Ereignis liegt auf Platz 1 von 4 statt von 3, etwa **15 Punkte** weiter links; der Gleichwertigkeitstest von Welle 2 vergleicht „bis auf die Lage der Ereigniskarten in den Hand-Zonen" (ausgenommen, benannt, nicht ausgespart).
+
+**Entscheidung 2: Heldentaten je Dörfler gehen verdeckt in `Hand Dörfler n`.**
+- **Aufbau (`mehrfach`, `normal`):** je Dörfler `deal_to_zone Heldentaten count 3 faceDown → Hand Dörfler n`, Gates `onlyLage: ["mehrfach", "normal"]` und für 3–5 `onlySeated: n`. Der Schritt 24 aus dem Aufbau (6 in die Auslage) bekommt `onlyLage: "solo"`.
+- **Dorfphase:** je Dörfler `deal_to_zone Heldentaten count 3 faceDown fill → Hand Dörfler n`, Gates `onlyCounter: "!Münzen (gemeinsam)"` und `onlySeated: n` (für 3–5); Schritt 19 (`fill 6` in die Auslage) bekommt `onlyCounter: "Münzen (gemeinsam)"`. **Die Reihenfolge trägt:** `clear_table` der Ereignisse (Schritt 2) läuft **vor** dem Auffüllen (Schritt 19 ff.), `fill` zählt also keine Ereigniskarte.
+- **`fill` zählt, was auf dem Tisch liegt** (`occupancy`, M11.2) — **nicht** die private Hand. Nimmt ein Spieler seine Heldentaten in die private Hand, füllt die Dorfphase **auf sechs auf**. Darum gilt für Welle 2: **Heldentaten bleiben verdeckt auf dem Tisch, in der Zone des Dörflers**. Wer eine ansehen will, dreht sie um und wieder zurück — **für alle sichtbar**. **Die Geheimhaltung der Heldentaten ist am Tisch nicht abgebildet** (nur private Hand oder Ehrenwort); das ist die Grenze der Engine (M31.14, Hand-Zone), keine Entscheidung dieser Spec, und es steht in der Liste für den Auftraggeber (`FJ`).
+- **Die Auslage `Heldentaten-Auslage`** (`capacity 6`) bleibt, wie sie ist; in `mehrfach` und `normal` liegt sie **leer** (die Zone ist unverändert, es wird nichts versteckt).
+- **Abgeschlossene Heldentaten** legt der Spieler in `Dörfler n: Erfüllte Heldentaten` (die Zone gibt es je Platz).
+
+**Entscheidung 3: die geheimen Dorf-Ereignisse hängen an der Lage `normal`.**
+- **Aufbau:** zwei `place_stack`-Schritte mit dem Etikett `Dorf-Ereignisse`: `["Dorf-Ereignisse", "Dorf-Ereignisse (Neue Nachbarn)"]` bei `onlyLage: ["solo", "mehrfach"]`, und **dieselbe Liste plus `"Dorf-Ereignisse (geheim)"`** bei `onlyLage: "normal"`. Die Liste steht damit zweimal; ein Test (`FH`) hält fest, dass die beiden sich in **genau einem** Eintrag unterscheiden. *Verworfen:* ein Platzhalter für den Eintrag (`place_stack` mit einer leeren Kategorie ist ungeprüftes Gelände), ein Schritt „Stapel zumischen" (gibt es nicht; eine neue Fähigkeit für einen Fall).
+- **`dorfphase-beginnen` Schritt 2** (`clear_table category [Dorf-Ereignisse, Dorf-Ereignisse (Neue Nachbarn)]`) bekommt die dritte Kategorie **immer** dazu: ein Aufräumen der Kategorie ohne Karten am Tisch ist ein No-op (Executor-Kommentar zu `clear_table`), ohne dritte Kategorie blieben die geheimen Ereignisse der Lage `normal` nach der ersten Runde liegen.
+- **Geheim heißt nicht vorgelesen.** Ein geheimes Ereignis liest nur der, der es zieht. Der Aufbau kann nicht wissen, welche Karte oben liegt — `dorfereignis` darf in den Lagen `mehrfach`/`normal` darum **verdeckt** austeilen (`faceDown: true`), sonst deckte der Tisch jedes geheime Ereignis für alle auf. **In `solo` bleibt es offen** (dort sind keine geheimen im Stapel). Die Schritte: **fünf offene** (Gate `onlyCounter: "Münzen (gemeinsam)"`) und **fünf verdeckte** (`onlyCounter: "!Münzen (gemeinsam)"`), je mit `onlySeated` für 3–5; Schritte 1–5 + 5 → 11 mit der Wache. In `mehrfach` ist das Verdecken **unnötig, aber folgenlos** (ein Klick, die Karte umzudrehen); die Aktion kennt `mehrfach` und `normal` nicht auseinander — **sie liest nur die Form des Geldes** (M31.15).
+
+### M31.18 — Die Zuordnung Spieler → Dörfler bleibt am Tisch
+
+**Entscheidung: der Aufbau steuert sie nicht.** Die Lesart „je Dörfler" (M31.14) macht **alles, was an Mengen hängt, unabhängig davon, wer wen führt**: Münzen (Topf je Dörfler), Heldentaten (Hand je Dörfler), Dorf-Ereignisse (eine je Dörfler). Von der Zuordnung hängt nur noch ab, **wessen Geld ein Spieler ausgibt**, **welche Hand er liest** und wer an der Reihe ist — und das sind Entscheidungen von Menschen am Tisch. **Die billigere Lesart trägt**, weil nichts im Bestand die Zuordnung **braucht**: weder `seat_villager`, `require_marker`, die Wache, das Tauschmenü noch eine Aktion. Eine **Zuordnung in den Daten** (je Dörfler ein Spieler 1 … 5 im Dialog, fünf Felder mehr) ergäbe: die Töpfe je Spieler statt je Dörfler, Hand-Zonen mit `color` und `exclusive` — **und** eine Farbe je Spieler, die erst beim Beitritt zum Raum gewählt wird (`rooms.js`; ein Aufbau ist statisch). Das ist **kein** Ausbau, sondern ein zweiter Meilenstein.
+**Was das kostet, ehrlich:** (1) **keine Eigentumsrechte** — jeder Spieler kann jede Hand bewegen (`exclusive: false`, `color: null`, M31.14); (2) **keine Geheimhaltung** (M31.17); (3) bei `S < D` weiß der Tisch nicht, wer wen führt — und braucht es nicht. **Die Spielerzahl selbst ist dem Tisch unbekannt** (M31.15); ihre Spur ist die Form des Geldes.
+
+### M31.19 — Hausregeln der Spielerachse
+
+Alles, was **kein Regeltext** sagt, und wie M31 damit umgeht — **benannt, nicht geglättet**:
+
+1. **4 und 5 Dörfler bei einem Spieler** (Lage `solo`, Welle 1): die Soloregel ist für **drei** geschrieben (`[DE S.34]`). Die Spalten 4P/5P und die `FF`-Zahlen folgen der Zahl, die Heldentaten (6 gemeinsam), das Geld (10 je Dörfler) und die geheimen Ereignisse (draußen) sind **nicht** gedruckt. Hausregel.
+2. **Der Doppel-Modus gilt nur für 2 Spieler à 2 Dörfler** (`[DE S.34]`); `1 < S < D` mit anderen Zahlen (`2 × 3`, `3` Spieler und `4` Dörfler) ist **Hausregel**, ebenso die **ungleiche Aufteilung** — die Lesart „je Dörfler" trägt sie, sie ist nicht bewiesen.
+3. **„Jeder" ist je Dörfler gelesen** (M31.14): bei `S < D` hat ein Spieler mehr Münzen, Heldentaten und Dorf-Ereignisse als im Normalmodus. Wer es als „je Spieler" liest, bekommt die Hälfte — und braucht die Zuordnung.
+4. **Die Heldentaten sind nicht geheim** (M31.17); **die Sieger-/Beuteregeln** („wer die meisten Heldentaten abgeschlossen hat", Sheriff nach Heldenpunkten) lesen **Menschen** am Tisch, je Spieler oder je Dörfler, wie sie es vereinbaren.
+5. **Heldentaten und Ereignisse in einer Zone** mit `capacity 4` (M31.17) ist eine Lösung für die Engine, keine Regel.
+6. **Aus Welle 1 weiter offen:** Ladenerneuerung („pro Dörfler 2 Münzen" gilt jetzt auch im Mehrspieler-Fall, bleibt von Hand), die fünf Werte „je Dörfler" auf den Tableaus.
+
+### M31.20 — Zielstand, Reihenfolge, Schreiben (Welle 2)
+
+**Welle 2 beginnt erst, wenn Welle 1 deployt, geschrieben und abgenommen ist** (`EZ` Teil 2). **Zielstand: hier keine Zahlen** — sie entstehen beim Bauen. Was sich ändert:
+
+| Stück | Spalte | Was sich ändert |
+|---|---|---|
+| `haende` (`FF`) | `zone_data` | `capacity` 3 → **4** an `Hand Dörfler 1 … 5`; sonst nichts |
+| `aktionen-spieler` (`FG`) | `action_data` | Gates `onlyCounter` an Welle-1-Schritten (Münzen, Heldentaten-Auslage); **neue** Schritte: fünf Töpfe `+6`, fünf `fill 3` in die Hände, fünf verdeckte Ereignis-Austeilungen; Schritt 2 mit der dritten Kategorie |
+| `aufbau-spieler` (`FH`) | `scenario_data`, `sequence_data` | **der Schalter:** Option `spieler` (1 … 5, Vorgabe `1`), `villagers.lage`; Aufbau: Gates `onlyLage`, fünf Töpfe, fünf Heldentaten-Austeilungen, zweiter Ereignis-Stapel |
+
+**Reihenfolge:** Welle 1 fertig → Code `FA`–`FD` → **Deploy** (`FE`) → `haende`, `aktionen-spieler` → `aufbau-spieler` **zuletzt**. **Jeder Datenschritt vor `aufbau-spieler` ist mit der Vorgabe `spieler = 1` folgenlos** — bis auf **eine** Ausnahme, die benannt ist: die Ereigniskarte in der Hand-Zone liegt auf Platz 1 von 4 statt 3 (M31.17). `aufbau-spieler` ist der **eine Schalter** der Welle: erst dann **gibt es** die Wahl `spieler`. Da die Vorgabe `1` ist, ändert **auch der Schalter** am Tisch von Welle 1 nichts. **Rückweg umgekehrt:** `aufbau-spieler`, `aktionen-spieler`, `haende`. **Schreiben, ohne fremde Arbeit zu zerstören:** dieselbe Vorlage wie Welle 1; derselbe Baustein `scripts/doerflerzahl-daten.mjs`, drei weitere Schritte; `zone_data` schreibt hier **genau** `haende`.
+**Wo die Achsen ineinandergreifen (die einzigen Stellen):** (1) die Münzschritte (Aufbau, `dorfphase-beginnen` 16): Welle 1 schreibt sie, Welle 2 setzt Gates **davor**; (2) `capacity` der Hand-Zonen (Welle 1 legt `Hand 4/5` an, Welle 2 ändert alle fünf); (3) `dorfphase-beginnen` 19 und `dorfereignis` (Welle 1 fügt die Schritte der Plätze 4/5 ein, Welle 2 gatet und verdoppelt sie). **Nichts davon zwingt Welle 1, auf Welle 2 zu warten** — es zwingt Welle 2, Welle 1 vorauszusetzen.
+
+### M31.21 — Abnahme (Welle 2), und was offen und riskant bleibt
+
+**Abnahme.**
+
+1. **Die Vorgabe `spieler = 1`:** der Tisch von Welle 1, Zeichen für Zeichen — **bis auf** die Lage der Ereigniskarten in den Hand-Zonen (M31.17). Alle Abnahmepunkte von Welle 1 gelten unverändert.
+2. **Dialog:** ein sechstes Feld **„Spieler"** (1 … 5); wählt jemand mehr Spieler als Dörfler, zeigt der Dialog das Problem und **lässt „Start" nicht zu**; der Raum weist ab; ein Aufruf mit der Wahl baut **nichts** und meldet es.
+3. **Lage `mehrfach`** (`spieler 2`, vier Dörfler): **keine** Karte in der Heldentaten-Auslage; in jeder der vier Hand-Zonen **drei verdeckte Heldentaten**; **vier Töpfe** `Münzen Dörfler 1 … 4` zu 15 (kurz) / 10 (lang), **kein** `Münzen (gemeinsam)`; der Ereignis-Stapel **ohne** die 25 geheimen (80 Karten); `dorfereignis` teilt vier **verdeckte** Karten in die Hände (vier Plätze reichen).
+4. **Lage `normal`** (`spieler 3`, drei Dörfler): wie 3., der Ereignis-Stapel **mit** den 25 (105 Karten); `dorfphase-beginnen` räumt auch die geheimen Ereignisse ab.
+5. **Dorfphase in `mehrfach` und `normal`:** je Topf +6; jede Hand wird **auf drei aufgefüllt** (nicht auf vier); **keine** `skipped`-Zeile; die Auslage bleibt leer.
+6. **Dorfphase in `solo`:** unverändert (+6 je Dörfler in den gemeinsamen Topf, Auslage auf sechs).
+7. **Spielstände:** `save_states` je Zeile gleich; ein alter Spielstand (solo, drei Dörfler) lädt, die Dorfphase läuft wie vor M31 (+18, Auslage), weil der gemeinsame Topf da ist.
+8. **Tests** `cd server && npm test` grün; `cd client && npx vite build` ohne **neue** Warnung.
+
+**Offen und riskant:**
+
+1. **Keine Geheimhaltung, keine Eigentumsrechte** (M31.17, M31.18): ein Mehrspieler-Tisch ohne Privatsphäre für Heldentaten. Der Auftraggeber entscheidet, ob das für seinen Gebrauch reicht (`FJ`).
+2. **„Jeder" je Dörfler gelesen** (M31.14, M31.19): bei `S < D` mehr Geld, Heldentaten und Ereignisse je Spieler als im Normalmodus. Hausregel.
+3. **`capacity 4` mit 90 Punkten Abstand** (M31.17): Überlappung der Karten. Sichtprüfung.
+4. **Die Lage hängt am gemeinsamen Topf** (M31.15): löscht jemand ihn von Hand, kippt die Lage der nächsten Dorfphase.
+5. **`lageOf` kennt `D` aus der Wahl**, nicht aus dem Tisch: eine Doppelwahl wird erst vom ersten Kampf gefangen (M31.15).
+6. **Die zwei Gates** (`onlyLage` am Aufbau, `onlyCounter` an den Aktionen) sagen dieselbe Auskunft zu verschiedenen Zeitpunkten; ein Test (`FI`) prüft, dass sie übereinstimmen.
+7. **Die 6 steht an sechs Stellen** (M31.16); der Baustein schreibt sie aus einer Konstante.
+8. **`fill` zählt, was auf dem Tisch liegt:** nimmt ein Spieler seine Heldentaten in die private Hand, füllt die Dorfphase auf sechs auf (M31.17). Dem Auftraggeber zu sagen.

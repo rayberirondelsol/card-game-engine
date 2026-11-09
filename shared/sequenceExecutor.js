@@ -111,17 +111,19 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // die Dörfler am Tisch (`$V1`, `$F1`, `$V1LEB` …). `reveal_next` setzt `vars`
   // bei jedem Aufdecken auf `{}` zurück - die Dörfler dürfen dabei nicht
   // verschwinden. Gebunden wird aus dem Zustand, den der Lauf **vorfindet**; nach
-  // einem `swap_villager` neu.
+  // einem `seat_villager`/`swap_villager` neu. `seated` (M31.3) ist die andere
+  // Hälfte desselben Tisches, welche Plätze besetzt sind; `bindTable` bindet beide.
   //
   // `optionVars` ist das sechste und steht aus demselben Grund **neben** `vars`
   // (M27.2/CT): die Werte, die die Wahl des Spielers trägt (`$optNachschub`,
   // `$optMuenzen`). `options`/`choices` sind das Gate dazu - `choices` ist
   // `undefined`, wenn der Aufruf keine Wahl mitbrachte (siehe oben).
   const ctx = {
-    vars: {}, seatVars: seatVars(state, assets, scenarioData?.villagers),
+    vars: {}, seatVars: {}, seated: null,
     optionVars: resolved.vars, options: scenarioOptions, choices: given ? resolved.choices : undefined,
     revealedLast: false, halted: false, finalFight: null,
   };
+  bindTable(ctx, state, assets, scenarioData?.villagers);
 
   for (let index = 0; index < sequenceData.length; index++) {
     const step = sequenceData[index];
@@ -181,12 +183,21 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
  *   laufen und ergibt eine `failed`-Zeile; „laufen lassen" hieße, Kurz- und
  *   Lang-Aufbau zugleich zu bauen (`checkGate`, `shared/setupOptions.js`).
  *
+ * - `onlySeated` (M31.3): **fail-loud** wie `onlyChoice` - der Schritt läuft nur,
+ *   wenn an diesem Platz (oder einem der Plätze der Liste) ein Tableau liegt. Anders
+ *   als `onlyChoice` liest es den **Tisch** und ist darum in Aktionen erlaubt.
+ *
  * `onlyChoice` wird zuerst gefragt: ein kaputtes Gate wird auch dann gemeldet,
  * wenn der Schritt aus anderem Grund nicht liefe.
  */
 function stepApplies(step, ctx) {
   if (step?.onlyChoice !== undefined) {
     const r = checkGate(step.onlyChoice, ctx.options, ctx.choices);
+    if (!r.ok) return { applies: false, problem: r.problem };
+    if (!r.applies) return { applies: false };
+  }
+  if (step?.onlySeated !== undefined) {
+    const r = seatedGate(step.onlySeated, ctx.seated);
     if (!r.ok) return { applies: false, problem: r.problem };
     if (!r.applies) return { applies: false };
   }
@@ -198,6 +209,37 @@ function stepApplies(step, ctx) {
   const gate = onlyFinalOf(step?.onlyFinal);
   if (gate !== null && gate !== Boolean(ctx.finalFight ?? ctx.revealedLast)) return { applies: false };
   return { applies: true };
+}
+
+/**
+ * Der Tisch, den die Schritte dahinter sehen (M26.2, M31.3): `ctx.seatVars` (wer
+ * sitzt, als Platzhalter) und `ctx.seated` (welche Plätze besetzt sind) - **eine**
+ * Hilfe für beide, damit sie nie auseinandergehen. Gerufen am Anfang des Laufs und
+ * nach jedem `seat_villager`/`swap_villager`.
+ *
+ * `seated` ist `null`, wenn es keine Dörferdaten gibt (dann kann `onlySeated`
+ * nichts beantworten), sonst `{ of: Zahl der Plätze, taken: [besetzte Plätze] }`.
+ */
+function bindTable(ctx, state, assets, villagers) {
+  ctx.seatVars = seatVars(state, assets, villagers);
+  ctx.seated = hasVillagers(villagers)
+    ? { of: villagers.seats.length, taken: seatedVillagers(state, assets, villagers).map(s => s.n) }
+    : null;
+}
+
+/**
+ * `onlySeated` gegen den Tisch: `{ ok, applies }` oder `{ ok: false, problem }`.
+ * Verstanden wird ein Platz (ganze Zahl 1 … `of`) oder eine nicht leere Liste
+ * davon; alles andere - auch ein Platz jenseits der Plätze und ein Lauf ohne
+ * Dörferdaten - ist ein Problem, kein stilles Ja oder Nein.
+ */
+function seatedGate(value, seated) {
+  if (!seated) return { ok: false, problem: 'onlySeated: no villager data - cannot tell who sits where' };
+  const list = Array.isArray(value) ? value : [value];
+  if (!list.length || !list.every(n => Number.isInteger(n) && n >= 1 && n <= seated.of)) {
+    return { ok: false, problem: `onlySeated: ${JSON.stringify(value) ?? String(value)} is not a seat (1 to ${seated.of}) or a list of seats` };
+  }
+  return { ok: true, applies: list.some(n => seated.taken.includes(n)) };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -2335,7 +2377,7 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
       if (r.skip) return skip(r.skip);
       if (r.fail) return fail(r.fail);
       // Wer jetzt wo sitzt, hat sich geaendert; die Schritte dahinter sehen es.
-      ctx.seatVars = seatVars(r.state, assets, scenarioData?.villagers);
+      bindTable(ctx, r.state, assets, scenarioData?.villagers);
       if (r.notes.length) { entry.status = 'note'; entry.reason = r.notes.join('; '); }
       return r.state;
     }

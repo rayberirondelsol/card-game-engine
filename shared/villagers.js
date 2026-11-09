@@ -170,14 +170,25 @@ export function seatedVillagers(state, assets, villagers) {
 }
 
 /**
+ * M31.4: wie viele Dörfler am Tisch sitzen - die Plätze, an denen ein Tableau
+ * liegt. Ein Tableau, dessen Dörfler die Daten nicht kennen, zählt mit (am Tisch
+ * sitzt jemand); ein Spielstein oder eine Figur ohne Tableau nicht. Die **eine**
+ * Zählung (M6): `seatVars` bindet sie als `$doerflerzahl`, sonst zählt keiner.
+ */
+export const villagerCount = (state, assets, villagers) => seatedVillagers(state, assets, villagers).length;
+
+/**
  * Die Platzhalter, die jeder Lauf bindet (CL): `$V<n>` der Kurzname, `$F<n>` der
- * volle Name, `$V<n>LEB`/`BEW`/`MUM`/`PRZ` die Startwerte – alles als Text, wie
- * jeder Platzhalter. Ein Platz ohne bekannten Dörfler bindet **nichts**: der
- * Schritt dahinter wird übersprungen und sagt „is not bound", statt Henlo zu
- * raten.
+ * volle Name, `$V<n>LEB`/`BEW`/`MUM`/`PRZ` die Startwerte, `$doerflerzahl` die
+ * Zahl der Dörfler (M31.4) – alles als Text, wie jeder Platzhalter. Ein Platz
+ * ohne bekannten Dörfler bindet **nichts**: der Schritt dahinter wird übersprungen
+ * und sagt „is not bound", statt Henlo zu raten. Dasselbe gilt für die Zahl: sitzt
+ * niemand, fehlt sie - „keiner sitzt" ist nicht „null dazuzählen".
  */
 export function seatVars(state, assets, villagers) {
   const vars = {};
+  const n = villagerCount(state, assets, villagers);
+  if (n > 0) vars.doerflerzahl = String(n);
   for (const s of seatedVillagers(state, assets, villagers)) {
     if (!s.data) continue;
     vars[`V${s.n}`] = s.data.short;
