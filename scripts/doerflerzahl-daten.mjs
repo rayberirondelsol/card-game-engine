@@ -2,7 +2,7 @@
 //
 // **Sechs Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// und **`werte`** (Aufgabe ET, Teil 1); die vier anderen stehen in `SCHRITTE` als `null` und melden „noch nicht gebaut“, **ohne die Datenbank
+// **`werte`** (Aufgabe ET, Teil 1) und **`zonen`** (Aufgabe EU, Teil 1); die drei anderen stehen in `SCHRITTE` als `null` und melden „noch nicht gebaut“, **ohne die Datenbank
 // zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nichts.
 //
@@ -15,6 +15,12 @@
 // es wird nichts geschrieben. **`villagers.baseCount` schreibt dieser Schritt nicht** — das ist der Schalter (Aufgabe EX); ohne ihn liest der
 // Aufbau `statsByCount` nicht, und das Schreiben ist folgenlos. Er ändert nur `scenario_data`, und darin nur dieses eine Stück: er ist zu
 // `gelaende` (`final.terrain`) disjunkt, beide Reihenfolgen ergeben denselben Text.
+//
+// **`zonen` (EU, M31.8):** in `zone_data` kommen **28 neue Zonen** dazu (Plätze 4 und 5, je sieben aus `equipmentZonesFor` und sieben
+// kopiert: vier Wertleisten nach Spaltenlage (4 wie 1, 5 wie 2), Heldentaten und Ausliegend von Platz 3, Hand); an den 14 Zonen von Platz 3
+// bis 5 steht `showWithoutAnchor: false`; `Hand Dörfler 3` wird relativ ausgedrückt (dieselbe Box). Geschrieben wird `zone_data`, sonst nichts.
+// Er setzt den **deployten** Code voraus (ein alter Client zeichnete die neuen Zonen als Geister, M31.12). Der Zielstand steht als Länge und
+// Hash in `SCHRITTE`; `patchZonen` rechnet ihn aus dem Ausgang, der Test prüft die Gleichheit.
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -37,8 +43,9 @@
 // Fingerabdruck je Tabelle und je Zeile von `save_states` vorher und nachher, Kontrollausgabe **neu gelesen**, Weg zurück — und **kein
 // `--force`**: ein Argument dieses Namens (oder eines anderen, das nicht aufgeführt ist) wird nicht erkannt, jede Abweichung vom
 // erwarteten Ausgangsstand ist ein Abbruch mit Pfad. Dieser Teil ist **rein**; `better-sqlite3` kommt erst in `main` (auf dem Server
-// liegt es neben der Datei, im Repo unter `server/`, der Test reicht es herein). Das Skript braucht nur `../shared/scenarioData.js`,
-// keine andere Skriptdatei — auf dem Server also **eine** Datei nach `/app/` (`docs/datenzugriff.md`).
+// liegt es neben der Datei, im Repo unter `server/`, der Test reicht es herein). Das Skript braucht `../shared/scenarioData.js` und
+// `../shared/anchoring.js` sowie **`equipment-zones.mjs`** (seit EU, für `zonen`) — auf dem Server also `/app/doerflerzahl-daten.mjs`
+// und `/app/equipment-zones.mjs` (`docs/datenzugriff.md`).
 //
 // Aufruf (im Backend-Container, wo `better-sqlite3` liegt; die Datei liegt dort als `/app/doerflerzahl-daten.mjs`, `../shared` ist dann `/shared`):
 //
@@ -68,6 +75,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
+import { relativeBox } from '../shared/anchoring.js';
+import { DOERFLER, equipmentZones, equipmentZonesFor } from './equipment-zones.mjs';
 
 export const GAME_ID = '072123c0-cd97-4ffb-a330-369630fab93f';
 export const SETUP_ID = 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b';
@@ -96,7 +105,12 @@ export const SCHRITTE = {
   gelaende,
   // `werte` läuft nach `gelaende` (Reihenfolge ES, ET): sein Ausgang ist dessen Ziel — **dieselbe** Zahl. Der Text ist in beiden Reihenfolgen derselbe.
   werte: { ausgang: gelaende.ziel, ziel: { scenario: { laenge: 23104, sha: '5613ccf1cd29' } } },
-  zonen: null,
+  // `zonen` (EU, M31.8): Ausgang gerechnet aus `auslagen-kurzpartie.json` (Länge und sha der Text von `zone_data`), Ziel aus `patchZonen` auf
+  // dem Ausgang gerechnet. Nur `zone` — die Spalte, die dieser Schritt schreibt.
+  zonen: {
+    ausgang: { zone: { laenge: 25586, sha: 'c574e646476d' } },
+    ziel: { zone: { laenge: 39886, sha: 'efe0b0743364' } },
+  },
   assets: null,
   aktionen: null,
   optionen: null,
@@ -501,6 +515,199 @@ function fingerabdruckZeilen(db, t) {
   console.log(`  save_states: ${Object.keys(jetzt).length} Zeilen (in der Transaktion ${Object.keys(t.saves).length})`);
 }
 
+// ── Die Zonen (EU, M31.8) ───────────────────────────────────────────────────
+
+/** Die Mitten der Tableaus bei y 1600 (300 × 400), Platz 1 bis 5 (M31.8 Punkt 6). Die Zonen hängen am Anker; die Mitte rechnet nur. */
+export const TISCH_Y = 1600;
+export const TISCH_X = { 1: 300, 2: 880, 3: 1460, 4: 2040, 5: 2620 };
+
+/**
+ * Die beiden neuen Plätze (M31.8 Punkt 2 und 4). `assetId` ist die Asset-Id des Tableaus (`Tableau: Blopsy Twins`, `Tableau: Yancy Plover`),
+ * `vorlage` der Platz, dessen vier Wertleisten sie kopieren (4 wie 1, 5 wie 2 — Spaltenlage). Ids neu; hier und nicht in `DOERFLER`.
+ */
+export const NEUE_PLAETZE = [
+  { n: 4, assetId: 'af3a4982-a0f5-4884-834f-221447ba5377', vorlage: 1, vorratId: 'zn7kq2wsd', leisten: ['zp5rw1ndq', 'zc9lk4tyb', 'zf2hm8xgj', 'zv6qe3ura'] },
+  { n: 5, assetId: 'dae61142-a596-46c9-acba-640f82e9433c', vorlage: 2, vorratId: 'zb3vp8hxt', leisten: ['zs4dj7bwo', 'zg8tn2fky', 'zu1xa5rpc', 'zm9wy6hie'] },
+];
+/**
+ * Der Münzkasten (`Münzen (gemeinsam)`, Schritt 50 der Aufbau-Folge): heute auf (2080, 1430), mitten im Tableau von Platz 4; `ziel` ist
+ * (2000, 1040), gemessen frei (M31.8 Punkt 6). Der Zähler selbst liegt in `sequence_data` und wandert in `EX`, nicht in `zone_data`.
+ */
+export const MUENZKASTEN = { alt: { x: 2080, y: 1430 }, ziel: { x: 2000, y: 1040 } };
+/** Heldentaten und Ausliegend kopieren beide Plätze von Platz 3 (M31.8 Punkt 4: an allen dreien gleich). */
+export const VORLAGE_HELDEN = 3;
+/** Hand 3, absolut, wie gemessen (x 970 … 1330, y 1140 … 1310). Sie wird relativ ausgedrückt; die Box bleibt dieselbe (M31.8 Punkt 5). */
+export const HAND3_ABS = { x: 970, y: 1140, width: 360, height: 170 };
+/** Die Plätze, an deren vierzehn Zonen `showWithoutAnchor: false` steht (M31.8 Punkt 7). Platz 1 und 2 nicht. */
+const FELD_PLAETZE = [3, 4, 5];
+const LEISTEN = ['Leben', 'Bewegung', 'Mumm', 'Präzision'];
+const TABLEAU = new Map([...DOERFLER.map(d => [d.assetId, d.n]), ...NEUE_PLAETZE.map(p => [p.assetId, p.n])]);
+const ASSET = Object.fromEntries([...DOERFLER.map(d => [d.n, d.assetId]), ...NEUE_PLAETZE.map(p => [p.n, p.assetId])]);
+const DOERFLER_ZONEN_IDS = (p) => equipmentZonesFor([{ n: p.n, assetId: p.assetId, vorratId: p.vorratId }]).map(z => z.id);
+/** Die achtundzwanzig Ids, die dieser Schritt neu anlegt: je Platz sieben aus dem Generator, vier Leisten, Heldentaten, Ausliegend, Hand. */
+const NEU_IDS = new Set(NEUE_PLAETZE.flatMap(p => [...DOERFLER_ZONEN_IDS(p), ...p.leisten, `zheldentaten${p.n}`, `zausliegend${p.n}`, `zhand${p.n}`]));
+const NEU_ALLE = 28;
+
+const ankerKasten = (n) => ({ x: TISCH_X[n] - 150, y: TISCH_Y - 200, width: 300, height: 400 });
+const platzVon = (z) => {
+  const m = /^zhand(\d)$/.exec(z?.id ?? '');
+  return m ? Number(m[1]) : (TABLEAU.get(z?.anchor?.assetId) ?? null);
+};
+
+/** Die Zonen ohne die Stücke dieses Schrittes: die achtundzwanzig weg, das Feld an Platz 3 weg, Hand 3 wieder absolut (in der gelesenen Form). */
+function ohneStueck(zonen) {
+  return zonen
+    .filter(z => !NEU_IDS.has(z?.id))
+    .map(z => {
+      if (z?.id === 'zhand3' && z.anchor) {
+        const { anchor: _a, showWithoutAnchor: _f, x: _x, y: _y, width: _w, height: _h, ...rest } = z;
+        return { ...rest, x: HAND3_ABS.x, y: HAND3_ABS.y, width: HAND3_ABS.width, height: HAND3_ABS.height };
+      }
+      if (platzVon(z) === 3 && hat(z, 'showWithoutAnchor')) {
+        const { showWithoutAnchor: _f, ...rest } = z;
+        return rest;
+      }
+      return z;
+    });
+}
+
+/** Eine Hand als Kopie der Vorlage Hand 3: die absolute Box fällt weg, der Anker kommt dahinter, das Feld zuletzt. */
+function handRelativ(vorlage, { n, abs }) {
+  const { x: _x, y: _y, width: _w, height: _h, ...rest } = vorlage;
+  return {
+    ...rest, id: `zhand${n}`, label: `Hand Dörfler ${n}`,
+    anchor: { assetId: ASSET[n], ...relativeBox(abs, ankerKasten(n)) },
+    showWithoutAnchor: false,
+  };
+}
+
+/** Eine Wertleiste oder die Heldentaten-Zonen als Kopie: Id, Label und Anker-Id neu, sonst Zeichen für Zeichen. */
+const kopie = (vorlage, { id, label, assetId }) => ({ ...vorlage, id, label, anchor: { ...vorlage.anchor, assetId }, showWithoutAnchor: false });
+
+/** Der Zielstand aus den Zonen ohne die Stücke. Verändert nichts. */
+function bauen(basis) {
+  const bestand = basis.map(z => {
+    if (z.id === 'zhand3') return handRelativ(z, { n: 3, abs: HAND3_ABS });
+    if (platzVon(z) === 3) return { ...z, showWithoutAnchor: false };
+    return z;
+  });
+  const finde = (label) => basis.find(z => z.label === label);
+  const neu = NEUE_PLAETZE.flatMap(p => {
+    const erzeugt = equipmentZonesFor([{ n: p.n, assetId: p.assetId, vorratId: p.vorratId }]).map(z => ({ ...z, showWithoutAnchor: false }));
+    const leisten = LEISTEN.map((l, i) => kopie(finde(`Dörfler ${p.vorlage}: ${l}`), { id: p.leisten[i], label: `Dörfler ${p.n}: ${l}`, assetId: p.assetId }));
+    const held = kopie(finde(`Dörfler ${VORLAGE_HELDEN}: Erfüllte Heldentaten`), { id: `zheldentaten${p.n}`, label: `Dörfler ${p.n}: Erfüllte Heldentaten`, assetId: p.assetId });
+    const ausl = kopie(finde(`Dörfler ${VORLAGE_HELDEN}: Ausliegend`), { id: `zausliegend${p.n}`, label: `Dörfler ${p.n}: Ausliegend`, assetId: p.assetId });
+    const hand = handRelativ(basis.find(z => z.id === 'zhand3'), { n: p.n, abs: { x: TISCH_X[p.n] - 150, y: 1140, width: 360, height: 170 } });
+    return [...erzeugt, ...leisten, held, ausl, hand];
+  });
+  return [...bestand, ...neu];
+}
+
+/** Die Zonen, die der Generator für die drei Plätze von heute liefert, und wo die Zonen abweichen (Pfad je Zone). */
+function abweichungVomErzeugten(basis) {
+  const ist = new Map(basis.map(z => [z?.id, z]));
+  const out = [];
+  for (const soll of equipmentZones()) {
+    const z = ist.get(soll.id);
+    if (!z) out.push(`zone_data „${soll.label}“ fehlt`);
+    else if (text(z) !== text(soll)) out.push(`zone_data „${soll.label}“ weicht ab`);
+  }
+  return out;
+}
+
+/** Teilstand oder Abweichung an den Stücken selbst: wie viele der Neuen da sind, das Feld, Hand 3, und je Zone, die vom Ziel abweicht. */
+function stueckProbleme(zonen, soll) {
+  const ziel = new Map(soll.map(z => [z.id, z]));
+  const neu = zonen.filter(z => NEU_IDS.has(z?.id));
+  const feld = zonen.filter(z => hat(z, 'showWithoutAnchor'));
+  const hand3 = zonen.find(z => z?.id === 'zhand3');
+  const h3 = !hand3 ? 'fehlt' : !hand3.anchor ? 'absolut' : text(hand3) === text(ziel.get('zhand3')) ? 'relativ, wie im Ziel' : 'relativ, nicht wie im Ziel';
+  const out = [`zone_data: ${neu.length} von ${NEU_ALLE} neuen Zonen da, Feld an ${feld.length} von 14 Zonen der Plätze 3–5, Hand 3 ${h3}${neu.length && neu.length < NEU_ALLE ? ' — teils geschrieben: Abbruch, nichts überschreiben' : ''}`];
+  for (const z of zonen) {
+    const s = ziel.get(z?.id);
+    if (!s) out.push(`zone_data „${z?.label}“ gehört nicht zum Ziel`);
+    else if (text(z) !== text(s)) out.push(`zone_data „${z.label}“ weicht vom Zielstand ab`);
+    else if (neu.length === 0 && hat(z, 'showWithoutAnchor')) out.push(`zone_data „${z.label}“ trägt das Feld schon vor dem Schreiben`);
+  }
+  return out;
+}
+
+/**
+ * Der Zielstand von `zone_data`, aus dem Ausgang: achtundzwanzig Zonen dazu, das Feld an den vierzehn Zonen von Platz 3 bis 5,
+ * Hand 3 relativ (dieselbe Box). Eine Frage, vier Antworten:
+ *
+ * - `zu-schreiben`: die 54 Zonen ohne die Stücke sind der gemessene Ausgang, und die Zonen sind genau das (keine Stücke da);
+ * - `schon-da`: die Zonen sind genau der Zielstand;
+ * - `abweichend`: der Rest ist nicht der gemessene Ausgang (Pfad je Zone, mit dem Generator verglichen), oder es gibt
+ *   einen Teilstand (`teils geschrieben`) oder eine Abweichung an einem der Stücke (Pfad je Zone).
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object[]} zonen  – `zone_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', zone?: object[], probleme?: string[] }}
+ */
+export function patchZonen(zonen) {
+  if (!Array.isArray(zonen)) return { art: 'abweichend', probleme: ['zone_data ist keine Liste von Zonen'] };
+  const basis = ohneStueck(zonen);
+  const bText = text(basis);
+  const aus = SCHRITTE.zonen.ausgang.zone;
+  if (bText.length !== aus.laenge || sha(bText) !== aus.sha) {
+    return {
+      art: 'abweichend',
+      probleme: [
+        `zone_data: die Zonen ohne die Stücke sind nicht der gemessene Ausgang (${basis.length} Zonen, ${kennzeichen(bText)}; erwartet 54 Zonen, ${aus.laenge} Zeichen, sha ${aus.sha})`,
+        ...abweichungVomErzeugten(basis),
+      ],
+    };
+  }
+  const soll = bauen(basis);
+  if (text(zonen) === text(soll)) return { art: 'schon-da', zone: copy(zonen) };
+  if (text(zonen) === bText) return { art: 'zu-schreiben', zone: soll };
+  return { art: 'abweichend', probleme: stueckProbleme(zonen, soll) };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und vor dem Schreiben: die achtundzwanzig Zonen, das Feld und die relative Hand 3 weg,
+ * Hand 3 wieder absolut — das muss den gelesenen Text ergeben, Zeichen für Zeichen. Dazu die **Vorwärtsprobe**: aus dem Gelesenen
+ * entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe eine falsche relX an Hand 3 nicht, weil er sie wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseZonen(before, after) {
+  if (!Array.isArray(after?.zone)) return ['Rückwärtsbeweis zone_data: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const zurueck = ohneStueck(after.zone);
+  if (text(zurueck) !== text(before?.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data: ohne die 28 Zonen, das Feld und die relative Hand 3 ist der Text nicht der gelesene — ${abwTeil(text(zurueck), text(before?.zone))}`);
+  }
+  const vor = bauen(zurueck);
+  if (text(vor) !== text(after.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor), text(after.zone))}`);
+  }
+  return meldungen;
+}
+
+/** Die Prüfer des Zielstands: Ids und Labels eindeutig, Anker mit Zahlen, das Feld genau an den Plätzen 3 bis 5. */
+export function pruefeZonen(zonen) {
+  const out = [];
+  const ids = new Set(), labels = new Set();
+  zonen.forEach((z, i) => {
+    const wo = `zone_data[${i}] „${z?.label}“`;
+    if (ids.has(z?.id)) out.push(`${wo}: Id ${z?.id} doppelt`);
+    ids.add(z?.id);
+    if (labels.has(z?.label)) out.push(`${wo}: Label doppelt`);
+    labels.add(z?.label);
+    if (z?.anchor) {
+      if (typeof z.anchor.assetId !== 'string') out.push(`${wo}: anchor.assetId fehlt`);
+      for (const k of ['relX', 'relY', 'relWidth', 'relHeight']) if (!Number.isFinite(z.anchor[k])) out.push(`${wo}: anchor.${k} ist keine Zahl`);
+    }
+    const platz = platzVon(z);
+    if (FELD_PLAETZE.includes(platz) && z.showWithoutAnchor !== false) out.push(`${wo}: Platz ${platz} ohne showWithoutAnchor: false`);
+    if (!FELD_PLAETZE.includes(platz) && hat(z, 'showWithoutAnchor')) out.push(`${wo}: showWithoutAnchor an Platz ${platz ?? '–'} (nur 3 bis 5)`);
+  });
+  return out;
+}
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -510,7 +717,7 @@ function fingerabdruckZeilen(db, t) {
  * - `spalten`: die Spalten, die der Schritt ändert (Name ohne `_data`) — nur diese werden gelesen und geschrieben;
  * - `patch(before)`: das Einordnen (`patchGelaende`); `before` trägt die gelesenen Spalten als Wert;
  * - `beweise(before, after)`: der Rückwärtsbeweis; `gelesen(before)`, `schonDa(before)`, `plan(before, next)`, `kontrolle(before, after)`: Ausgaben;
- * - `pruefer(scenario)`: die Prüfer des Schrittes auf dem Zielstand, `[{ titel, probleme }]`.
+ * - `pruefer(next)`: die Prüfer des Schrittes auf dem Zielstand (`next` trägt die geschriebenen Spalten), `[{ titel, probleme }]`.
  */
 const DEFS = {
   gelaende: {
@@ -527,7 +734,7 @@ const DEFS = {
       console.log(`  Hinweis: ${ERSCHLOSSEN} FF4/FF5 tragen ${GELAENDE[ERSCHLOSSEN].assets.slice(3).map(a => text(a)).join(' und ')} — die Zuordnung der Bürger-Assets ist erschlossen (Reihenfolge von Handsys fünf Plättchen), nicht gelesen`);
       console.log(`  unberührt: ${FESTE.join(', ')} (fest) und die zwölf Bösewichte ohne Endkampf-Plättchen`);
     },
-    pruefer: (sc) => [{ titel: 'validateScenarioData', probleme: validateScenarioData(sc) }],
+    pruefer: (n) => [{ titel: 'validateScenarioData', probleme: validateScenarioData(n.scenario) }],
     kontrolle: (before, after) => {
       for (const k of Object.keys(after.scenario).filter(x => x !== 'bosses')) {
         console.log(`  Schlüssel ${k.padEnd(18)} sha ${sha(text(before.scenario[k]))} → ${sha(text(after.scenario[k]))} ${text(before.scenario[k]) === text(after.scenario[k]) ? 'gleich' : 'GEÄNDERT'}`);
@@ -557,7 +764,7 @@ const DEFS = {
       }
       console.log(`  unberührt: ${BARRY} (Formeln statt Zahlen), stats aller ${Object.keys(b.scenario.bosses).length}, villagers.baseCount (der Schalter ist ein eigener Schritt)`);
     },
-    pruefer: (sc) => [{ titel: 'validateScenarioData', probleme: validateScenarioData(sc) }],
+    pruefer: (n) => [{ titel: 'validateScenarioData', probleme: validateScenarioData(n.scenario) }],
     kontrolle: (before, after) => {
       for (const k of Object.keys(after.scenario).filter(x => x !== 'bosses')) {
         console.log(`  Schlüssel ${k.padEnd(18)} sha ${sha(text(before.scenario[k]))} → ${sha(text(after.scenario[k]))} ${text(before.scenario[k]) === text(after.scenario[k]) ? 'gleich' : 'GEÄNDERT'}`);
@@ -569,6 +776,29 @@ const DEFS = {
       console.log(`  die ${namen.length} Bösewichte ohne statsByCount: ${namen.every(n => text(ohne(after.scenario.bosses[n])) === text(before.scenario.bosses[n])) ? 'alles andere gleich' : 'GEÄNDERT'}`);
       console.log(`  ${BARRY}: sha ${sha(text(before.scenario.bosses[BARRY]))} → ${sha(text(after.scenario.bosses[BARRY]))} ${text(before.scenario.bosses[BARRY]) === text(after.scenario.bosses[BARRY]) ? 'unverändert' : 'GEÄNDERT'}`);
       console.log(`  stats aller ${alle.length}: ${alle.every(n => text(before.scenario.bosses[n].stats) === text(after.scenario.bosses[n].stats)) ? 'alle gleich' : 'GEÄNDERT'}`);
+    },
+  },
+  zonen: {
+    spalten: ['zone'],
+    patch: (b) => patchZonen(b.zone),
+    beweise: beweiseZonen,
+    gelesen: (b) => `Zonen: ${Array.isArray(b.zone) ? b.zone.length : '?'}, davon ${Array.isArray(b.zone) ? b.zone.filter(z => NEU_IDS.has(z?.id)).length : '?'} der ${NEU_ALLE} neuen`,
+    schonDa: () => `schon geschrieben: ${NEU_ALLE} neue Zonen da, Feld an den 42 Zonen der Plätze 3 bis 5, Hand 3 relativ — nichts zu schreiben`,
+    plan: (b, n) => {
+      const alt = new Set(b.zone.map(z => z?.id));
+      const neu = n.zone.filter(z => !alt.has(z.id));
+      console.log(`  neu: ${neu.length} Zonen — Platz 4: ${neu.filter(z => z.anchor?.assetId === ASSET[4]).length}, Platz 5: ${neu.filter(z => z.anchor?.assetId === ASSET[5]).length}`);
+      console.log(`  Feld showWithoutAnchor: false an ${n.zone.filter(z => hat(z, 'showWithoutAnchor')).length} Zonen (Plätze 3 bis 5, Hand eingeschlossen)`);
+      const h3 = n.zone.find(z => z.id === 'zhand3');
+      console.log(`  Hand Dörfler 3: absolut ${text({ x: b.zone.find(z => z.id === 'zhand3').x, y: b.zone.find(z => z.id === 'zhand3').y, width: b.zone.find(z => z.id === 'zhand3').width, height: b.zone.find(z => z.id === 'zhand3').height })} → relativ ${text(h3.anchor)}`);
+      console.log('  unberührt: Platz 1 und 2, die gemeinsamen Zonen, die Reihenfolge der bestehenden Zonen');
+    },
+    pruefer: (n) => [{ titel: 'Zonen: Ids, Labels, Anker, Feld', probleme: pruefeZonen(n.zone) }],
+    kontrolle: (before, after) => {
+      const alt = new Set(before.zone.map(z => z.id));
+      const neu = after.zone.filter(z => !alt.has(z.id));
+      console.log(`  Zonen ${before.zone.length} → ${after.zone.length}; neu ${neu.length} (Platz 4 ${neu.filter(z => z.anchor?.assetId === ASSET[4]).length}, Platz 5 ${neu.filter(z => z.anchor?.assetId === ASSET[5]).length})`);
+      console.log(`  die ${before.zone.length} bestehenden Zonen ohne die Stücke: ${text(ohneStueck(after.zone)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'ABWEICHEND'}`);
     },
   },
 };
@@ -683,7 +913,7 @@ function vorpruefung(db, { titel, schritt, def }) {
   complaints.push(...b);
 
   // ── die Prüfer: ohne Bibliothek und Raster — dieser Schritt liest sie nicht (`table_assets`, `cards`, `grid_data`) ──
-  for (const { titel: t, probleme: pr } of def.pruefer(next.scenario)) {
+  for (const { titel: t, probleme: pr } of def.pruefer(next)) {
     console.log(`${t}: ${pr.length} Probleme (ohne Bibliothek und Raster — der Schritt liest sie nicht)`);
     for (const m of pr) complaints.push(`${t}: ${m}`);
   }
@@ -745,7 +975,7 @@ function schreiben(db, { sicherungSha, haken, ...opts }) {
   for (const k of spaltenNamen(def)) {
     console.log(`  Rückwärtsbeweis ${k} auf der gelesenen Spalte: ${bw.some(m => m.startsWith(`Rückwärtsbeweis ${k}`)) ? 'NEIN' : 'ja'}`);
   }
-  const weitere = def.pruefer(after.scenario);
+  const weitere = def.pruefer(after);
   for (const { titel: tt, probleme: pr } of weitere) console.log(`  ${tt} auf der gelesenen Spalte: ${pr.length} Probleme`);
   const { ziel } = SCHRITTE[schritt];
   const gleichZiel = def.spalten.every(k => gelesen[k].length === ziel[k].laenge && sha(gelesen[k]) === ziel[k].sha);

@@ -176,9 +176,15 @@ const base = (id, label, capacity, layout, color) => ({
  * 4,5 Bildschirmpunkte hoch und damit unlesbar. Was eine angelegte Karte von
  * einer weggepackten unterscheidet, sind Rahmen, Farbe und Abstand.
  */
-export function equipmentZones() {
+/**
+ * Die sieben Zonen je Platz (sechs Ausrüstungsplätze und der Vorrat), für **die übergebenen** Plätze.
+ * `seats` ist `[{ n, assetId, vorratId }]`: die Nummer des Dörflers, die Asset-Id seines Tableaus und die Id
+ * seines Vorrats (M31.8 Punkt 3). Die übrigen sieben je Platz (Hand, Wertleisten, Heldentaten, Ausliegend)
+ * baut dieser Generator nicht; `scripts/doerflerzahl-daten.mjs` kopiert sie aus den Vorlagen.
+ */
+export function equipmentZonesFor(seats) {
   const out = [];
-  for (const d of DOERFLER) {
+  for (const d of seats) {
     const anchor = (rel) => ({ assetId: d.assetId, ...rel });
     for (const s of SLOTS) {
       out.push({
@@ -187,11 +193,16 @@ export function equipmentZones() {
       });
     }
     out.push({
-      ...base(VORRAT_IDS[d.n], `Ausrüstung Dörfler ${d.n}`, null, 'stack', null),
+      ...base(d.vorratId, `Ausrüstung Dörfler ${d.n}`, null, 'stack', null),
       anchor: anchor({ relX: 0, relY: rowV, relWidth: relVW, relHeight: relVH }),
     });
   }
   return out;
+}
+
+/** Die einundzwanzig Zonen der drei Plätze von heute — `equipmentZonesFor` mit den drei Literalen. */
+export function equipmentZones() {
+  return equipmentZonesFor(DOERFLER.map(d => ({ n: d.n, assetId: d.assetId, vorratId: VORRAT_IDS[d.n] })));
 }
 
 /**

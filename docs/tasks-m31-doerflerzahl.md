@@ -313,6 +313,8 @@ Wie `ES` Teil 2 (Ausgang je Stück: `stats` der 19 gegen die Fixture; Sicherung 
 
 **Befund.** Siehe M31.8 Punkt 3–7. **Der Generator** `scripts/equipment-zones.mjs` ist auf **drei** Plätze verdrahtet und liefert **7 von 14** Zonen je Platz. **Zu schreiben (`zone_data`, nur diese Stücke):** **28 neue Zonen** (Platz 4 mit Anker `Tableau: Blopsy Twins`, Platz 5 mit `Tableau: Yancy Plover`, je 14); `showWithoutAnchor: false` an den **13** vorhandenen verankerten Zonen von Platz 3; `Hand Dörfler 3` **relativ ausgedrückt** (dieselbe absolute Box 970 … 1330 × 1140 … 1310, `relX −1,1333…`, `relY −0,65`, `relWidth 1,2`, `relHeight 0,425`, `showWithoutAnchor: false`); alles andere Zeichen für Zeichen.
 
+> **Berichtigt (`EU` Teil 1):** der **Münzkasten** stand hier unter dem Zielstand, liegt aber in **`sequence_data`** (Schritt 50), nicht in `zone_data` — die Verschiebung auf (2000, 1040) gehört deshalb zu **`EX`**. `EU` **belegt nur die Lage** (der Layouttest zeigt beide Positionen) und legt sie als Konstante `MUENZKASTEN` im Baustein ab. Ebenfalls berichtigt: der Rückwärtsbeweis aus Punkt 8 allein genügt nicht — er wirft die relative `Hand 3` weg und setzt sie absolut zurück, eine falsche `relX` bliebe unbemerkt; es braucht die **Vorwärtsprobe** (aus dem Gelesenen entsteht genau der Zielstand), die `EU` Teil 1 ergänzt hat.
+
 ### Teil 1 — Baustein, Tests, ohne Produktion
 
 **Test zuerst** (`server/test/doerflerzahl-zonen.test.js`; Zonen und Assets aus `auslagen-kurzpartie.json`). Rot, solange es fehlt:
