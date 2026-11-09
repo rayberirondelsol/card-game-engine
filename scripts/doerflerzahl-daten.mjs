@@ -1,8 +1,8 @@
-// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option (Spec M31.6, M31.7, M31.8, M31.12).
+// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option (Spec M31.4, M31.6, M31.7, M31.8, M31.9, M31.12).
 //
 // **Sechs Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1) und **`assets`** (Aufgabe EV, Teil 1); die zwei anderen stehen in `SCHRITTE` als `null` und melden „noch nicht gebaut“, **ohne die Datenbank
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1) und **`aktionen`** (Aufgabe EW, Teil 1); der andere steht in `SCHRITTE` als `null` und meldet „noch nicht gebaut“, **ohne die Datenbank
 // zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nichts.
 //
@@ -32,6 +32,14 @@
 // verweist: ein Spielstand, ein Raum, `setups.state_data` oder der Text des Aufbaus (`Marker 4`/`Marker 5`, `ASSET_IDS`) — gelöscht, stünde dort ein Stein ohne Bild.
 // Die Sicherung ist `{ table_assets, sha256, updated_at }` mit **allen** Zeilen des Spiels als Text. Der Schritt ist vor dem Deploy unschädlich (Zeilen, die niemand liest,
 // solange keine Zone und kein Aufbau sie nennt).
+//
+// **`aktionen` (EW, M31.4, M31.8 Punkt 8, M31.9):** in `action_data` lernen drei Aktionen die Dörflerzahl, und jedes Stück ersetzt **einen** Schritt des Ausgangs durch einen oder mehrere
+// (`AKTION_STUECKE`): `dorfereignis` (Hand Dörfler 5 und 4 **vor** 3, absteigend, je `onlySeated`), `kampf-beginnen` (`$F4`/`$F5` auf `$D4`/`$D5` hinter `$F3`) und `dorfphase-beginnen` (`clear_table`
+// für `$F4`/`$F5`, acht Marker-Schritte für Platz 4 und 5, die Münzen als `"+6*$doerflerzahl"`, die Wache mit **fünf** Lebensleisten und einem Satz ohne Zahl); jeder Schritt der Plätze 3 bis 5 trägt
+// `onlySeated`. Die Vorbedingung gilt **je Stück** und an der Zahl der Schritte; jede andere Zeile (auch Schritt 2 der Dorfphase, die dritte Kategorie ist Welle 2) bleibt, wie sie ist. Ein halber Stand
+// (ein Stück neu, ein anderes alt) ist ein Abbruch. Er setzt den **deployten Code** voraus (der alte Executor kennt `onlySeated` nicht, und `place_counter`/`set_counter` hielte bei dem Produkt), **und er ist
+// erst folgenlos, wenn `villagers.seats` fünf Plätze hat** (`EX`): ein Gate auf einen Platz jenseits der Plätze ist ein `failed` mit `is not a seat` (M31.3) — bei drei Plätzen in den Daten sind das zwei, zwei und
+// zehn Zeilen je Runde, ohne dass sich der Tisch ändert. Er schreibt `action_data`, sonst nichts. Der Rückwärtsbeweis wirft Gates, Wert, Text und Zonenliste weg; **die Vorwärtsprobe** fängt, was er dabei übersähe.
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -86,6 +94,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
+import { validateOptions } from '../shared/setupOptions.js';
 import { relativeBox } from '../shared/anchoring.js';
 import { DOERFLER, equipmentZones, equipmentZonesFor } from './equipment-zones.mjs';
 
@@ -125,7 +134,8 @@ export const SCHRITTE = {
   // `assets` (EV, M31.8 Punkt 1): eine Tabelle, keine Spalte — gezählt werden Zeilen (212 im Auszug `auslagen-kurzpartie.json`, acht dazu). Einen Hash über die Zeilen gibt es
   // hier nicht: der Auszug trägt nicht alle Spalten (`created_at`, `source_url`, `quantity`, `category_id`), die Produktion schon; die Teil-2-Lesung nennt ihn.
   assets: { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } },
-  aktionen: null,
+  // `aktionen` (EW, M31.4/M31.8/M31.9): `action_data`, vier Aktionen. Ausgang: der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchAktionen` gerechnet.
+  aktionen: { ausgang: { action: { laenge: 5803, sha: '33033dace238' } }, ziel: { action: { laenge: 7564, sha: '9f41211076a4' } } },
   optionen: null,
 };
 
@@ -1044,6 +1054,167 @@ function zurueckAssets(db, sicherungsdatei, { haken }) {
 /** Schritte, die **eine Tabelle** schreiben und nicht eine Spalte von `setups`: ihr eigenes Gerüst, dieselben Regeln. */
 const TABELLEN = { assets: { trockenlauf: trockenlaufAssets, schreiben: schreibenAssets, zurueck: zurueckAssets } };
 
+// ── Die Aktionen (EW, M31.4, M31.8 Punkt 8, M31.9) ──────────────────────────
+
+/** Die vier Aktionen in der Reihenfolge der Daten, und wie viele Schritte jede im Ausgang hat (gezählt an der Fixture, nicht geglaubt). */
+const AKTIONEN = ['kampf-beginnen', 'dorfereignis', 'laden-nachfuellen', 'dorfphase-beginnen'];
+const AKTION_SCHRITTE_ALT = { 'kampf-beginnen': 17, dorfereignis: 4, 'laden-nachfuellen': 1, 'dorfphase-beginnen': 33 };
+const WERT_TAG = ['LEB', 'BEW', 'MUM', 'PRZ'];                       // `$V<n>LEB` …, in der Reihenfolge von `LEISTEN`
+
+/** Die Schritte, wie sie heute stehen (der Ausgang). Eine Kopie je Aufruf: wer sie ändert, ändert nur seine. */
+const aHand = (n) => ({ type: 'deal_to_zone', stackLabel: 'Dorf-Ereignisse', count: 1, targetZoneLabel: `Hand Dörfler ${n}`, faceDown: false });
+const aFigur = (n) => ({ type: 'place_asset', assetName: `$F${n}`, gridLabel: 'Spielfeld A–S / 1–14', cell: `$D${n}`, faceDown: false });
+const aRaeumen = (n) => ({ type: 'clear_table', assetName: `$F${n}` });
+const aMarker = (n, i) => ({ type: 'place_asset', assetName: `Marker ${n}: ${LEISTEN[i]}`, targetZoneLabel: `Dörfler ${n}: ${LEISTEN[i]}`, slot: `$V${n}${WERT_TAG[i]}` });
+const aMuenzen = (value) => ({ type: 'set_counter', name: 'Münzen (gemeinsam)', value });
+const WACHE_ALT = 'Auf keiner Lebensleiste liegt noch ein Marker — alle drei Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.';
+const WACHE_NEU = 'Auf keiner Lebensleiste liegt noch ein Marker — alle Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.';
+const aWache = (plaetze, message) => ({ type: 'require_marker', zoneLabel: plaetze.map(n => `Dörfler ${n}: Leben`), above: 0, confirm: true, message });
+/** Das Gate steht **am Ende** des Schritts (wie `onlyChoice` in der Folge); ein Platz, nie eine Liste. */
+const mitGate = (step, n) => ({ ...step, onlySeated: n });
+
+/**
+ * **Die Stücke je Aktion** (M31.8 Punkt 8, M31.4, M31.9): jedes ersetzt **einen** Schritt des Ausgangs (`at`, 0-basiert im Ausgang, `alt` Zeichen für Zeichen) durch einen oder
+ * mehrere (`neu`). Was dazwischen liegt, wird nie gelesen und nie angefasst. Die Plätze 4 und 5 stehen **hinter** Platz 3 (der Aufbau legt sie so, `FIGUR`, `RAEUMEN`, die Marker);
+ * nur die Hände gehen **absteigend** (5, 4, 3 — die Reihenfolge der Austeilung bleibt, M31.8 Punkt 8). Jeder Schritt der Plätze 3 bis 5 trägt `onlySeated`.
+ * Schritt 2 der Dorfphase (`clear_table`, die dritte Kategorie) steht **nicht** hier: er ist Welle 2 (`FG`).
+ */
+const AKTION_STUECKE = {
+  'kampf-beginnen': [
+    { name: '$F3, $F4, $F5 auf $D3, $D4, $D5', at: 11, alt: aFigur(3), neu: [mitGate(aFigur(3), 3), mitGate(aFigur(4), 4), mitGate(aFigur(5), 5)] },
+  ],
+  dorfereignis: [
+    { name: 'Hand Dörfler 5, 4, 3', at: 1, alt: aHand(3), neu: [mitGate(aHand(5), 5), mitGate(aHand(4), 4), mitGate(aHand(3), 3)] },
+  ],
+  'laden-nachfuellen': [],
+  'dorfphase-beginnen': [
+    { name: 'die Wache (fünf Lebensleisten, ein Satz ohne Zahl)', at: 1, alt: aWache([1, 2, 3], WACHE_ALT), neu: [aWache([1, 2, 3, 4, 5], WACHE_NEU)] },
+    { name: 'clear_table $F3, $F4, $F5', at: 13, alt: aRaeumen(3), neu: [mitGate(aRaeumen(3), 3), mitGate(aRaeumen(4), 4), mitGate(aRaeumen(5), 5)] },
+    { name: 'die Münzen („+6*$doerflerzahl“)', at: 16, alt: aMuenzen('+18'), neu: [aMuenzen('+6*$doerflerzahl')] },
+    ...[0, 1, 2].map(i => ({ name: `Marker 3: ${LEISTEN[i]}`, at: 29 + i, alt: aMarker(3, i), neu: [mitGate(aMarker(3, i), 3)] })),
+    { name: 'Marker 3: Präzision, dazu die acht für Platz 4 und 5', at: 32, alt: aMarker(3, 3), neu: [mitGate(aMarker(3, 3), 3), ...[0, 1, 2, 3].map(i => mitGate(aMarker(4, i), 4)), ...[0, 1, 2, 3].map(i => mitGate(aMarker(5, i), 5))] },
+  ],
+};
+const aktionVon = (actions, id) => actions.filter(a => isObject(a) && a.id === id);
+const woA = (id, i) => `action_data[${text(id)}].steps[${i}]`;
+
+/**
+ * Eine Aktion einordnen: `alt` (jedes Stück steht noch wie im Ausgang), `neu` (jedes steht im Ziel) oder `null` (dann steht in `probleme`, was nicht stimmt, mit Aktion und Index; ein
+ * **halber** Stand — ein Stück neu, ein anderes alt — ist ein Problem). Die Schritte werden **der Reihe nach** abgelaufen: ein Stück, das schon im Ziel steht, hat die Positionen dahinter
+ * verschoben, und der Lauf weiß es.
+ */
+function einordnenAktion(id, steps, probleme) {
+  const stuecke = AKTION_STUECKE[id];
+  const stand = [];
+  let off = 0;
+  for (const s of stuecke) {
+    const i = s.at + off;
+    if (text(steps[i]) === text(s.alt)) { stand.push('alt'); continue; }
+    if (s.neu.every((n, k) => text(steps[i + k]) === text(n))) { stand.push('neu'); off += s.neu.length - 1; continue; }
+    probleme.push(`${woA(id, i)}: ist ${text(steps[i]) ?? 'kein Schritt'}, erwartet ${text(s.alt)} (oder schon ${s.neu.map(text).join(' ')}) — ${s.name}`);
+    return null;
+  }
+  const erwartet = AKTION_SCHRITTE_ALT[id] + off;
+  if (steps.length !== erwartet) {
+    probleme.push(`action_data[${text(id)}]: hat ${steps.length} Schritte, erwartet ${erwartet} (${AKTION_SCHRITTE_ALT[id]} im Ausgang${off ? `, ${off} dazu für die Stücke, die schon da sind` : ''})`);
+    return null;
+  }
+  if (stand.every(x => x === 'alt')) return 'alt';
+  if (stand.every(x => x === 'neu')) return 'neu';
+  probleme.push(`action_data[${text(id)}]: halber Stand — ${stuecke.map((s, k) => `${s.name} ${stand[k] === 'alt' ? 'noch alt' : 'schon geschrieben'}`).join('; ')}`);
+  return null;
+}
+
+/** Aus einer Aktion im Ausgang (jedes Stück `alt`) den Zielstand ihrer Schritte machen. */
+function vorwaerts(id, steps) {
+  const out = copy(steps);
+  let off = 0;
+  for (const s of AKTION_STUECKE[id]) { out.splice(s.at + off, 1, ...copy(s.neu)); off += s.neu.length - 1; }
+  return out;
+}
+
+/**
+ * Die Aktionen (`action_data`) einordnen — **eine** Frage mit drei Antworten:
+ *
+ * - `zu-schreiben`: jede der drei Aktionen mit Stücken (`kampf-beginnen`, `dorfereignis`, `dorfphase-beginnen`) hat die Zahl Schritte des Ausgangs, und jedes Stück steht
+ *   **genau** wie dort (`AKTION_STUECKE`). Der Zielstand ersetzt nur diese Schritte; **jede andere Zeile** — auch ein Schritt, den ein anderer Auftrag geändert hat, auch
+ *   `laden-nachfuellen` — bleibt, wie sie ist;
+ * - `schon-da`: jedes Stück steht im Ziel;
+ * - `abweichend`: alles andere, auch jeder halbe Stand (ein Stück neu, eins alt; eine Aktion fertig, die andere nicht). `probleme` nennt jede Abweichung mit Aktion und Index.
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object[]} actions  – `action_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', action?: object[], probleme?: string[] }}
+ */
+export function patchAktionen(actions) {
+  if (!Array.isArray(actions)) return { art: 'abweichend', probleme: ['action_data ist keine Liste von Aktionen'] };
+  const probleme = [];
+  const stand = {};
+  for (const id of AKTIONEN) {
+    const treffer = aktionVon(actions, id);
+    if (treffer.length !== 1) { probleme.push(`action_data: ${treffer.length} Aktionen mit der Id ${text(id)}, erwartet genau eine`); continue; }
+    if (!Array.isArray(treffer[0].steps)) { probleme.push(`action_data[${text(id)}].steps ist keine Liste von Schritten`); continue; }
+    if (AKTION_STUECKE[id].length) stand[id] = einordnenAktion(id, treffer[0].steps, probleme);
+  }
+  const ids = Object.keys(stand);
+  if (!probleme.length && !ids.every(id => stand[id] === 'alt') && !ids.every(id => stand[id] === 'neu')) {
+    probleme.push(`halber Stand: schon geschrieben ${ids.filter(id => stand[id] === 'neu').join(', ')}; noch alt ${ids.filter(id => stand[id] === 'alt').join(', ')}`);
+  }
+  if (probleme.length) return { art: 'abweichend', probleme };
+  if (ids.every(id => stand[id] === 'neu')) return { art: 'schon-da', action: copy(actions) };
+  return { art: 'zu-schreiben', action: actions.map(a => (ids.includes(a.id) ? { ...copy(a), steps: vorwaerts(a.id, a.steps) } : copy(a))) };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und **vor** dem Schreiben: jedes `onlySeated` weg, die Schritte für Platz 4 und 5 heraus, die Wache und die Münzen wieder wie im Ausgang —
+ * das muss den gelesenen Text ergeben, Zeichen für Zeichen. **Dazu die Vorwärtsprobe:** aus dem Zurückgerechneten entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe
+ * einen falschen Wert, ein falsches Gate oder eine falsche Zonenliste nicht, weil er sie wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseAktionen(before, after) {
+  if (!Array.isArray(after?.action)) return ['Rückwärtsbeweis action_data: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const zurueck = copy(after.action);
+  for (const a of zurueck) {
+    if (!Array.isArray(a?.steps)) continue;
+    a.steps = a.steps
+      .filter(s => !(isObject(s) && (s.onlySeated === 4 || s.onlySeated === 5)))
+      .map(s => {
+        if (!isObject(s)) return s;
+        const { onlySeated: _gate, ...rest } = s;
+        if (rest.type === 'require_marker') return aWache([1, 2, 3], WACHE_ALT);
+        if (rest.type === 'set_counter' && rest.name === 'Münzen (gemeinsam)') return aMuenzen('+18');
+        return rest;
+      });
+  }
+  const alt = text(before?.action);
+  if (text(zurueck) !== alt) meldungen.push(`Rückwärtsbeweis action_data: ohne die Gates, die zehn neuen Schritte und die zwei Stücke ist der Text nicht der gelesene — ${abwTeil(text(zurueck), alt)}`);
+  const vor = patchAktionen(zurueck);
+  if (vor.art !== 'zu-schreiben') meldungen.push(`Rückwärtsbeweis action_data (Vorwärtsprobe): das Zurückgerechnete ist kein Ausgang (${vor.art}: ${(vor.probleme ?? []).join('; ')})`);
+  else if (text(vor.action) !== text(after.action)) meldungen.push(`Rückwärtsbeweis action_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.action), text(after.action))}`);
+  return meldungen;
+}
+
+/** Ist das ein Gate `onlySeated`, das der Executor versteht (ein Platz ab 1 oder eine nicht leere Liste davon, höchstens fünf Plätze)? */
+const platzOk = (v) => (Array.isArray(v) ? v.length > 0 && v.every(platzOk) : Number.isInteger(v) && v >= 1 && v <= 5);
+
+/**
+ * Die Prüfer des Zielstands: **`validateOptions`** (in einer Aktion darf weder `onlyChoice` noch `$opt…` stehen — ein Spielstand kennt die Wahl nicht) und das Gate: jeder Wert von
+ * `onlySeated` ist ein Platz 1 … 5. `validateStep` (Editor) liegt im Client und im Container nicht; der Test fährt es auf jedem Schritt.
+ */
+export function pruefeAktionen(actions) {
+  const out = validateOptions({}, [], actions);
+  for (const a of Array.isArray(actions) ? actions : []) {
+    (Array.isArray(a?.steps) ? a.steps : []).forEach((s, i) => {
+      if (!isObject(s)) out.push(`${woA(a?.id, i)}: kein Schritt (Objekt)`);
+      else if (hat(s, 'onlySeated') && !platzOk(s.onlySeated)) out.push(`${woA(a.id, i)}: onlySeated ${text(s.onlySeated)} ist kein Platz (1 bis 5)`);
+    });
+  }
+  return out;
+}
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -1135,6 +1306,31 @@ const DEFS = {
       const neu = after.zone.filter(z => !alt.has(z.id));
       console.log(`  Zonen ${before.zone.length} → ${after.zone.length}; neu ${neu.length} (Platz 4 ${neu.filter(z => z.anchor?.assetId === ASSET[4]).length}, Platz 5 ${neu.filter(z => z.anchor?.assetId === ASSET[5]).length})`);
       console.log(`  die ${before.zone.length} bestehenden Zonen ohne die Stücke: ${text(ohneStueck(after.zone)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'ABWEICHEND'}`);
+    },
+  },
+  aktionen: {
+    spalten: ['action'],
+    patch: (b) => patchAktionen(b.action),
+    beweise: beweiseAktionen,
+    gelesen: (b) => `Schritte: ${AKTIONEN.map(id => `${id} ${aktionVon(Array.isArray(b.action) ? b.action : [], id)[0]?.steps?.length ?? '?'}`).join(', ')}`,
+    schonDa: () => `schon geschrieben: die Stücke von ${Object.keys(AKTION_STUECKE).filter(id => AKTION_STUECKE[id].length).join(', ')} stehen im Ziel (Gates, Schritte der Plätze 4 und 5, Münzen, Wache) — nichts zu schreiben`,
+    plan: (b, n) => {
+      for (const id of AKTIONEN.filter(x => AKTION_STUECKE[x].length)) {
+        const alt = aktionVon(b.action, id)[0].steps, neu = aktionVon(n.action, id)[0].steps;
+        console.log(`  ${id}: ${alt.length} → ${neu.length} Schritte — ${AKTION_STUECKE[id].map(s => s.name).join('; ')}`);
+      }
+      console.log(`  unberührt: ${AKTIONEN.filter(x => !AKTION_STUECKE[x].length).join(', ')}, Schritt 2 der Dorfphase (die dritte Kategorie ist Welle 2) und jeder Schritt, der in keinem Stück steht`);
+    },
+    pruefer: (n) => [{ titel: 'validateOptions (Aktionen) und Gates onlySeated', probleme: pruefeAktionen(n.action) }],
+    kontrolle: (before, after) => {
+      for (const id of AKTIONEN) {
+        const steps = aktionVon(after.action, id)[0].steps;
+        const gates = steps.filter(s => hat(s, 'onlySeated')).length;
+        console.log(`  ${id}: ${steps.length} Schritte, ${gates} mit onlySeated`);
+      }
+      const dp = aktionVon(after.action, 'dorfphase-beginnen')[0].steps;
+      console.log(`  Münzen: ${text(dp.find(s => s.type === 'set_counter' && s.name === 'Münzen (gemeinsam)')?.value)}; Wache: ${dp.find(s => s.type === 'require_marker')?.zoneLabel?.length} Lebensleisten`);
+      console.log(`  die Aktion laden-nachfuellen: ${text(aktionVon(before.action, 'laden-nachfuellen')[0]) === text(aktionVon(after.action, 'laden-nachfuellen')[0]) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
     },
   },
 };

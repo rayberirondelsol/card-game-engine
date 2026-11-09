@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { seatedVillagers } from '../../shared/villagers.js';
 import { validateScenarioData, terrainFor } from '../../shared/scenarioData.js';
 import { resolveZones, anchorBoxes } from '../../shared/anchoring.js';
-import { zoneContains } from '../../shared/zoneGeometry.js';
+import { zoneContains, objectsInZone, zoneSlots } from '../../shared/zoneGeometry.js';
 import { executeSequenceWithLog } from '../../shared/sequenceExecutor.js';
 import { bauen, ohneIds, seededRng } from '../../scripts/auslagen-daten.mjs';
 
@@ -506,14 +506,14 @@ test('ES 7: berührt nur `scenario_data` – der Zielstand trägt nichts anderes
 
 // ── 8. Das Gerüst ───────────────────────────────────────────────────────────
 
-test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, die noch nicht gebauten `null` (`werte` seit ET, `zonen` seit EU, `assets` seit EV gebaut, siehe dort)', () => {
+test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, die noch nicht gebauten `null` (`werte` seit ET, `zonen` seit EU, `assets` seit EV, `aktionen` seit EW gebaut, siehe dort)', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
   assert.deepEqual(Object.keys(SCHRITTE.gelaende), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) {
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k]), ['scenario'], k);
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k].scenario), ['laenge', 'sha'], k);
   }
-  for (const k of ['aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of ['optionen']) assert.equal(SCHRITTE[k], null, k);
   assert.equal(GAME_ID, '072123c0-cd97-4ffb-a330-369630fab93f');
   assert.equal(SETUP_ID, 'b1e10f4e-b8f2-4c2a-bb3e-54643944121b');
 });
@@ -963,10 +963,10 @@ test('ES main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst'
   } finally { weg(tmp); }
 });
 
-test('ES main: die noch nicht gebauten Schritte (seit EV: `aktionen`, `optionen`) melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1', async () => {
+test('ES main: die noch nicht gebauten Schritte (seit EW: nur noch `optionen`) melden „noch nicht gebaut“ – ohne die Datenbank zu öffnen (kein Treiber, keine Datei), Rückgabe 1', async () => {
   let geoeffnet = 0;
   class Spion { constructor() { geoeffnet++; throw new Error('die Datenbank darf nicht geöffnet werden'); } }
-  for (const schritt of ['aktionen', 'optionen']) {
+  for (const schritt of ['optionen']) {
     for (const modus of [['--check', 'gibt-es-nicht.db'], ['--write', 'gibt-es-nicht.db', '--sicherung-sha', 'abcdefabcdef'], ['--zurueck', 'sicherung.json', 'gibt-es-nicht.db']]) {
       const r = await lauf([...modus, '--schritt', schritt], { Db: Spion });
       assert.equal(r.code, 1, `${schritt} ${modus[0]}: ${r.out}`);
@@ -1537,13 +1537,961 @@ test('ET main: Vergleich-und-Tausch und Transaktion – ändert jemand `scenario
 
 // ── ET 8. Das Gerüst ────────────────────────────────────────────────────────
 
-test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }`, `aktionen`/`optionen` bleiben `null`; der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
+test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }`, `optionen` bleibt `null` (`aktionen` seit EW gebaut); der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
   assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
-  for (const k of ['aktionen', 'optionen']) assert.equal(SCHRITTE[k], null, k);
+  for (const k of ['optionen']) assert.equal(SCHRITTE[k], null, k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
   const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
   const { laenge, sha: h } = SCHRITTE.werte.ziel.scenario;
   assert.ok(!kopf.includes(h), `der Kopf nennt ${h}`);
   for (const l of [String(laenge), String(laenge).replace(/(\d)(\d{3})$/, '$1 $2'), String(laenge).replace(/(\d)(\d{3})$/, '$1.$2')]) assert.ok(!kopf.includes(l), `der Kopf nennt ${l}`);
   assert.match(kopf, /\*\*`werte`:\*\*/, 'der Kopf beschreibt den Schritt');
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EW Teil 1 / Spec M31.4, M31.8 Punkt 8, M31.9 — die Aktionen lernen die Dörflerzahl: Schritt `aktionen`
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Eingang ist der Ausgang aus `ES` (die Fixture: `action_data` 5 803 Zeichen, vier Aktionen). Die Tische kommen aus dem Aufbau (`bauen`), **mit** den Zonen aus `EU` und den Assets
+// aus `EV` (beide Bausteine, hier angewendet) und mit den Dörferdaten, wie `EX` sie schreiben wird (`SC_WB`: `baseCount`, `statsByCount`, fünf Plätze).
+//
+// **Der Zielstand steht hier ein zweites Mal, ausgeschrieben** (`HAND`, `FIGUR`, `RAEUME`, `ewMarker`, `WACHE_NEU`, `MUENZEN_NEU`) — aus dem Pflichtenheft, nicht aus dem Baustein gelesen.
+// Wer die Stücke aus dem Baustein holte, prüfte ihn gegen sich selbst. Die Länge und der Hash des Ziels stehen **einmal** im Skript (`SCHRITTE`).
+
+const EW = await import('../../scripts/doerflerzahl-daten.mjs');
+const { validateStep, assetNames: ewAssetNames, assetPools: ewAssetPools } = await import('../../client/src/utils/sequenceSteps.js');
+const { validateOptions } = await import('../../shared/setupOptions.js');
+const frost = (x) => { Object.values(x).forEach(v => { if (v && typeof v === 'object') frost(v); }); return Object.freeze(x); };
+
+const AKT = JSON.parse(dz.actions);
+const AKT_IDS = ['kampf-beginnen', 'dorfereignis', 'laden-nachfuellen', 'dorfphase-beginnen'];
+const stepsOf = (acts, id) => acts.find(a => a.id === id).steps;
+const EW_ALT = Object.fromEntries(AKT_IDS.map(id => [id, stepsOf(AKT, id).map(text)]));
+
+const WERT4 = [['Leben', 'LEB'], ['Bewegung', 'BEW'], ['Mumm', 'MUM'], ['Präzision', 'PRZ']];
+const gate = (n, g) => (g ? `,"onlySeated":${n}` : '');
+const HAND = (n, g = true) => `{"type":"deal_to_zone","stackLabel":"Dorf-Ereignisse","count":1,"targetZoneLabel":"Hand Dörfler ${n}","faceDown":false${gate(n, g)}}`;
+const FIGUR = (n, g = true) => `{"type":"place_asset","assetName":"$F${n}","gridLabel":"Spielfeld A–S / 1–14","cell":"$D${n}","faceDown":false${gate(n, g)}}`;
+const RAEUME = (n, g = true) => `{"type":"clear_table","assetName":"$F${n}"${gate(n, g)}}`;
+const ewMarker = (n, g = true) => WERT4.map(([w, t]) => `{"type":"place_asset","assetName":"Marker ${n}: ${w}","targetZoneLabel":"Dörfler ${n}: ${w}","slot":"$V${n}${t}"${gate(n, g)}}`);
+const WACHE_TEXT = 'Auf keiner Lebensleiste liegt noch ein Marker — alle Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.';
+const WACHE_NEU = `{"type":"require_marker","zoneLabel":["Dörfler 1: Leben","Dörfler 2: Leben","Dörfler 3: Leben","Dörfler 4: Leben","Dörfler 5: Leben"],"above":0,"confirm":true,"message":${text(WACHE_TEXT)}}`;
+const MUENZEN_NEU = '{"type":"set_counter","name":"Münzen (gemeinsam)","value":"+6*$doerflerzahl"}';
+const STUECKE = ['hand', 'figur', 'wache', 'raeume', 'muenzen', 'marker'];
+
+/** Eine Aktion als Texte ihrer Schritte; `neu` nennt die Stücke, die schon im Ziel stehen (Vorgabe: alle), die anderen stehen noch wie im Ausgang. */
+function ewStand(id, neu = STUECKE) {
+  const A = EW_ALT[id], n = (s) => neu.includes(s);
+  switch (id) {
+    case 'dorfereignis': return [A[0], ...(n('hand') ? [HAND(5), HAND(4), HAND(3)] : [A[1]]), A[2], A[3]];
+    case 'kampf-beginnen': return [...A.slice(0, 11), ...(n('figur') ? [FIGUR(3), FIGUR(4), FIGUR(5)] : [A[11]]), ...A.slice(12)];
+    case 'laden-nachfuellen': return [...A];
+    default: return [A[0], n('wache') ? WACHE_NEU : A[1], ...A.slice(2, 13), ...(n('raeume') ? [RAEUME(3), RAEUME(4), RAEUME(5)] : [A[13]]), A[14], A[15],
+      n('muenzen') ? MUENZEN_NEU : A[16], ...A.slice(17, 29), ...(n('marker') ? [...ewMarker(3), ...ewMarker(4), ...ewMarker(5)] : A.slice(29))];
+  }
+}
+const ewAktionen = (neu = STUECKE) => AKT.map(a => ({ ...a, steps: ewStand(a.id, neu).map(s => JSON.parse(s)) }));
+const ZIEL_AKT = ewAktionen();
+const EW_Z = SCHRITTE.aktionen?.ziel?.action;   // ohne Konstante: undefined, die Tests darunter sind rot
+
+const abweichendA = (acts) => {
+  const p = EW.patchAktionen(acts);
+  assert.equal(p.art, 'abweichend', `erwartet abweichend, ist ${p.art}`);
+  assert.equal(p.action, undefined, 'bei einer Abweichung gibt es keinen Zielstand');
+  return p.probleme.join('\n');
+};
+
+// ── EW 0. Die Messung: die Fixture ist, was der Befund erwartet ─────────────
+
+test('EW 0: **gezählt**, nicht geglaubt – die vier Aktionen der Fixture haben 17 / 4 / 1 / 33 Schritte, und jedes betroffene Stück steht dort, wo der Befund es sucht', () => {
+  assert.deepEqual(AKT.map(a => [a.id, a.steps.length]), [['kampf-beginnen', 17], ['dorfereignis', 4], ['laden-nachfuellen', 1], ['dorfphase-beginnen', 33]]);
+  assert.deepEqual(Object.keys(AKT[0]), ['id', 'label', 'steps']);
+  const k = stepsOf(AKT, 'kampf-beginnen'), d = stepsOf(AKT, 'dorfereignis'), p = stepsOf(AKT, 'dorfphase-beginnen');
+  assert.equal(text(k[11]), FIGUR(3, false), 'kampf-beginnen 11: `$F3` auf `$D3`');
+  assert.equal(text(k[10]), FIGUR(2, false));
+  assert.equal(k[12].assetName, 'Tableau: $revealedBase', '… und dahinter geht es mit dem Tableau weiter');
+  assert.equal(text(d[1]), HAND(3, false), 'dorfereignis 1: `Hand Dörfler 3`');
+  assert.equal(text(d[3]), HAND(1, false));
+  assert.equal(text(p[13]), RAEUME(3, false), 'dorfphase-beginnen 13: `clear_table $F3`');
+  assert.equal(text(p[16]), '{"type":"set_counter","name":"Münzen (gemeinsam)","value":"+18"}', 'Schritt 16: die Münzen');
+  assert.deepEqual(p.slice(29, 33).map(text), ewMarker(3, false), 'Schritt 29–32: die vier `Marker 3`');
+  assert.equal(p[1].type, 'require_marker', 'Schritt 1: die Wache');
+  assert.deepEqual(p[1].zoneLabel, ['Dörfler 1: Leben', 'Dörfler 2: Leben', 'Dörfler 3: Leben'], 'drei Lebensleisten');
+  assert.equal(p[1].message, 'Auf keiner Lebensleiste liegt noch ein Marker — alle drei Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.', 'der Text aus M30.9');
+  assert.equal(p[2].type, 'clear_table', 'Schritt 2 (die dritte Kategorie ist Welle 2, FG)');
+  // Die Zusammensetzung des Tests ist selbst richtig: ohne ein Stück neu ergibt sie genau die Fixture.
+  assert.equal(text(ewAktionen([])), dz.actions, 'der Ausgang, aus den Stücken zusammengesetzt, ist die Fixture');
+  assert.deepEqual(AKT.map(a => ewStand(a.id).length), [19, 6, 1, 43]);
+});
+
+// ── EW 1. Der Zielstand ─────────────────────────────────────────────────────
+
+test('EW 1: Zielstand – genau die Stücke des Befunds, **jede andere Zeile** byteweise gleich; 19 / 6 / 1 / 43 Schritte', () => {
+  const p = EW.patchAktionen(AKT);
+  assert.equal(p.art, 'zu-schreiben', (p.probleme ?? []).join('\n'));
+  assert.deepEqual(Object.keys(p), ['art', 'action'], 'der Zielstand trägt nur `action`');
+  assert.equal(text(p.action), text(ZIEL_AKT));
+  assert.deepEqual(p.action.map(a => [a.id, a.steps.length]), [['kampf-beginnen', 19], ['dorfereignis', 6], ['laden-nachfuellen', 1], ['dorfphase-beginnen', 43]]);
+  assert.deepEqual(p.action.map(a => [a.id, a.label]), AKT.map(a => [a.id, a.label]), 'dieselben Aktionen in derselben Reihenfolge');
+  // Jede andere Zeile: laden-nachfuellen ganz, und je Aktion die Schritte außerhalb der Stücke.
+  assert.equal(text(p.action[2]), text(AKT[2]));
+  const neuK = stepsOf(p.action, 'kampf-beginnen').map(text), altK = EW_ALT['kampf-beginnen'];
+  assert.deepEqual([...neuK.slice(0, 11), ...neuK.slice(14)], [...altK.slice(0, 11), ...altK.slice(12)]);
+  const neuP = stepsOf(p.action, 'dorfphase-beginnen').map(text), altP = EW_ALT['dorfphase-beginnen'];
+  assert.deepEqual([neuP[0], ...neuP.slice(2, 13), neuP[16], neuP[17], ...neuP.slice(19, 31)], [altP[0], ...altP.slice(2, 13), altP[14], altP[15], ...altP.slice(17, 29)]);
+  assert.equal(neuP[2], altP[2], 'Schritt 2 (`clear_table`, die dritte Kategorie ist Welle 2) unverändert');
+  const neuD = stepsOf(p.action, 'dorfereignis').map(text), altD = EW_ALT.dorfereignis;
+  assert.deepEqual([neuD[0], neuD[4], neuD[5]], [altD[0], altD[2], altD[3]]);
+});
+
+test('EW 1: Länge und Hash des Ziels und des Ausgangs – so, wie das Skript sie als Konstanten trägt; der Ausgang ist der Stand nach M30 (5 803 / 33033dace238)', () => {
+  assert.deepEqual(SCHRITTE.aktionen?.ausgang, { action: { laenge: 5803, sha: '33033dace238' } });
+  assert.deepEqual([dz.actions.length, sha(dz.actions)], [5803, '33033dace238']);
+  const z = text(EW.patchAktionen(AKT).action);
+  assert.deepEqual([z.length, sha(z)], [EW_Z.laenge, EW_Z.sha]);
+  assert.ok(z.length > dz.actions.length, 'der Text ist länger geworden');
+  assert.deepEqual(Object.keys(SCHRITTE.aktionen), ['ausgang', 'ziel']);
+});
+
+test('EW 1: die Gates – je Aktion und Platz gezählt; keine an Platz 1 und 2 (nicht entfernbar, M31.3), nie eine Liste', () => {
+  const z = EW.patchAktionen(AKT).action;
+  const zaehle = (id) => { const c = {}; for (const s of stepsOf(z, id)) if (s.onlySeated !== undefined) c[s.onlySeated] = (c[s.onlySeated] ?? 0) + 1; return c; };
+  assert.deepEqual(zaehle('dorfereignis'), { 3: 1, 4: 1, 5: 1 });
+  assert.deepEqual(zaehle('kampf-beginnen'), { 3: 1, 4: 1, 5: 1 });
+  assert.deepEqual(zaehle('laden-nachfuellen'), {});
+  assert.deepEqual(zaehle('dorfphase-beginnen'), { 3: 5, 4: 5, 5: 5 }, '`clear_table $F<n>` und vier Marker je Platz');
+  for (const a of z) for (const s of a.steps) if (s.onlySeated !== undefined) assert.ok([3, 4, 5].includes(s.onlySeated), `${a.id}: ${text(s)}`);
+  // Kein anderes Gate ist dazugekommen: `onlyChoice` darf in einer Aktion nie stehen, `onlyFinal` stand schon vorher.
+  for (const a of z) for (const s of a.steps) assert.ok(!('onlyChoice' in s), `${a.id}: ${text(s)}`);
+  assert.equal(z.flatMap(a => a.steps).filter(s => 'onlyFinal' in s).length, AKT.flatMap(a => a.steps).filter(s => 'onlyFinal' in s).length);
+});
+
+test('EW 1: `$doerflerzahl` steht **klein** (die Ersetzung unterscheidet Groß und Klein), die 6 steht **einmal**, und kein Schritt nennt mehr „drei“', () => {
+  const z = EW.patchAktionen(AKT).action;
+  const alle = z.flatMap(a => a.steps.map((s, i) => [a.id, i, text(s)]));
+  assert.deepEqual(alle.filter(([, , t]) => t.includes('$doerflerzahl')).map(([a, i]) => [a, i]), [['dorfphase-beginnen', 18]], 'genau ein Schritt, an Stelle 18');
+  assert.ok(!alle.some(([, , t]) => /\$Doerflerzahl|\$DOERFLERZAHL/.test(t)));
+  assert.equal(alle.filter(([, , t]) => t.includes('"+6')).length, 1);
+  assert.equal(stepsOf(z, 'dorfphase-beginnen')[18].value, '+6*$doerflerzahl');
+  assert.ok(!alle.some(([, , t]) => /\bdrei\b/i.test(t)), 'kein Schritt nennt „drei“ (die Wache war der eine)');
+});
+
+test('EW 1: Rückwärtsbeweis **und** Vorwärtsprobe – Gates, Wert, Text, Zonenliste zurück und die neuen Schritte heraus ergibt den gelesenen Text; aus dem Gelesenen entsteht genau der Zielstand', () => {
+  const p = EW.patchAktionen(AKT);
+  assert.deepEqual(EW.beweiseAktionen({ action: AKT }, { action: p.action }), []);
+  assert.deepEqual(EW.beweiseAktionen({ action: AKT }, { action: ZIEL_AKT }), [], 'auch gegen den ausgeschriebenen Zielstand dieses Tests');
+});
+
+test('EW 1: die Beweise fangen, was nicht stimmt – ein Gate fehlt, am falschen Schritt, ein falscher Platz; ein falscher Wert (die Vorwärtsprobe, nicht der Rückwärtsbeweis), ein falscher Text, vier Leisten, ein Schritt mehr', () => {
+  const mut = (fn) => { const c = copy(ZIEL_AKT); fn(c); return c; };
+  const st = (c, id) => stepsOf(c, id);
+  const FALL = {
+    'Gate an Hand 3 fehlt': (c) => { delete st(c, 'dorfereignis')[3].onlySeated; },
+    'Gate an Hand 5 fehlt': (c) => { delete st(c, 'dorfereignis')[1].onlySeated; },
+    'Gate von `$F3` fehlt': (c) => { delete st(c, 'kampf-beginnen')[11].onlySeated; },
+    'Gate am falschen Schritt (clear_zone, Schritt 3)': (c) => { st(c, 'dorfphase-beginnen')[3].onlySeated = 3; },
+    'Gate am Schritt 2 (die dritte Kategorie ist Welle 2)': (c) => { st(c, 'dorfphase-beginnen')[2].onlySeated = 3; },
+    'ein falscher Platz im Gate': (c) => { st(c, 'kampf-beginnen')[12].onlySeated = 5; },
+    'ein Gate als Liste': (c) => { st(c, 'kampf-beginnen')[13].onlySeated = [5]; },
+    'Marker 3 ohne Gate': (c) => { delete st(c, 'dorfphase-beginnen')[34].onlySeated; },
+    'nur vier statt acht Marker-Schritte': (c) => { st(c, 'dorfphase-beginnen').splice(35, 4); },
+    'ein Marker-Schritt mehr': (c) => { st(c, 'dorfphase-beginnen').push(JSON.parse(ewMarker(5)[0])); },
+    'Hand 4 und 5 hinter Hand 3': (c) => { const s = st(c, 'dorfereignis'); [s[1], s[3]] = [s[3], s[1]]; },
+    'Münzen: `$Doerflerzahl` groß': (c) => { st(c, 'dorfphase-beginnen')[18].value = '+6*$Doerflerzahl'; },
+    'Münzen: `*6+$doerflerzahl`': (c) => { st(c, 'dorfphase-beginnen')[18].value = '*6+$doerflerzahl'; },
+    'Münzen: ohne Vorzeichen': (c) => { st(c, 'dorfphase-beginnen')[18].value = '6*$doerflerzahl'; },
+    'Münzen: noch `+18`': (c) => { st(c, 'dorfphase-beginnen')[18].value = '+18'; },
+    'die Wache nennt nur vier Leisten': (c) => { st(c, 'dorfphase-beginnen')[1].zoneLabel.pop(); },
+    'die Wache nennt „drei“': (c) => { st(c, 'dorfphase-beginnen')[1].message = WACHE_TEXT.replace('alle Dörfler', 'alle drei Dörfler'); },
+    'die Wache hat einen anderen Satz': (c) => { st(c, 'dorfphase-beginnen')[1].message += ' '; },
+    'Schritt 2 (clear_table) verändert': (c) => { st(c, 'dorfphase-beginnen')[2].category = ['Dorf-Ereignisse']; },
+    'eine andere Zeile mitverändert': (c) => { st(c, 'dorfphase-beginnen')[17].faceDown = true; },
+    'laden-nachfuellen verändert': (c) => { st(c, 'laden-nachfuellen')[0].count = 11; },
+  };
+  for (const [wie, fn] of Object.entries(FALL)) {
+    const m = EW.beweiseAktionen({ action: AKT }, { action: mut(fn) });
+    assert.ok(m.length > 0, `nicht gefangen: ${wie}`);
+  }
+  // Der Fall, den der Rückwärtsbeweis allein übersähe (er wirft Wert und Text weg): die Vorwärtsprobe nennt ihn.
+  const falscherWert = EW.beweiseAktionen({ action: AKT }, { action: mut(c => { stepsOf(c, 'dorfphase-beginnen')[18].value = '+6*$Doerflerzahl'; }) });
+  assert.ok(falscherWert.some(m => /Vorwärtsprobe/.test(m)), falscherWert.join('\n'));
+  assert.deepEqual(EW.beweiseAktionen({ action: AKT }, { action: 'kein Feld' }).length, 1);
+});
+
+// ── EW 2. Die Vorbedingung je Stück ─────────────────────────────────────────
+
+const ewMit = (fn, acts = AKT) => { const c = copy(acts); fn(c); return c; };
+
+test('EW 2: die Fixture trägt genau die Stücke, die der Schritt erwartet – er schreibt, und der Ausgang ist `zu-schreiben`', () => {
+  assert.equal(EW.patchAktionen(frost(copy(AKT))).art, 'zu-schreiben', 'auch auf einer eingefrorenen Eingabe (sie wird nicht angefasst)');
+});
+
+test('EW 2: jedes betroffene Stück muss genau das sein – ein Feld anders, ein Wert anders, ein Schlüssel mehr: Abbruch mit Aktion und Index', () => {
+  const FALL = [
+    ['Hand 3: anderes Ziel', (c) => { stepsOf(c, 'dorfereignis')[1].targetZoneLabel = 'Hand Dörfler 2'; }, /dorfereignis[^\n]*1/],
+    ['Hand 3: count 2', (c) => { stepsOf(c, 'dorfereignis')[1].count = 2; }, /dorfereignis[^\n]*1/],
+    ['$F3: eine andere Zelle', (c) => { stepsOf(c, 'kampf-beginnen')[11].cell = '$D2'; }, /kampf-beginnen[^\n]*11/],
+    ['$F3: faceDown', (c) => { stepsOf(c, 'kampf-beginnen')[11].faceDown = true; }, /kampf-beginnen[^\n]*11/],
+    ['clear_table $F3: ein Feld mehr', (c) => { stepsOf(c, 'dorfphase-beginnen')[13].faceDown = true; }, /dorfphase-beginnen[^\n]*13/],
+    ['Münzen: +17', (c) => { stepsOf(c, 'dorfphase-beginnen')[16].value = '+17'; }, /dorfphase-beginnen[^\n]*16/],
+    ['Münzen: ein anderer Zähler', (c) => { stepsOf(c, 'dorfphase-beginnen')[16].name = 'Münzen'; }, /dorfphase-beginnen[^\n]*16/],
+    ['Münzen: eine Zahl statt Text', (c) => { stepsOf(c, 'dorfphase-beginnen')[16].value = 18; }, /dorfphase-beginnen[^\n]*16/],
+    ['Wache: ein anderer Text', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].message = 'Alle besiegt.'; }, /dorfphase-beginnen[^\n]*1\b/],
+    ['Wache: vier Leisten', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].zoneLabel.push('Dörfler 4: Leben'); }, /dorfphase-beginnen[^\n]*1\b/],
+    ['Wache: ohne confirm', (c) => { delete stepsOf(c, 'dorfphase-beginnen')[1].confirm; }, /dorfphase-beginnen[^\n]*1\b/],
+    ['Wache: ein anderer Typ', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].type = 'require_counter'; }, /dorfphase-beginnen[^\n]*1\b/],
+    ['Marker 3 Leben: eine andere Zone', (c) => { stepsOf(c, 'dorfphase-beginnen')[29].targetZoneLabel = 'Dörfler 3: Mumm'; }, /dorfphase-beginnen[^\n]*29/],
+    ['Marker 3 Bewegung: ein anderer Platzhalter', (c) => { stepsOf(c, 'dorfphase-beginnen')[30].slot = '$V3LEB'; }, /dorfphase-beginnen[^\n]*30/],
+    ['Marker 3 Mumm: ein Feld mehr', (c) => { stepsOf(c, 'dorfphase-beginnen')[31].faceDown = false; }, /dorfphase-beginnen[^\n]*31/],
+    ['Marker 3 Präzision: ein anderer Name', (c) => { stepsOf(c, 'dorfphase-beginnen')[32].assetName = 'Marker 3: Treffer'; }, /dorfphase-beginnen[^\n]*32/],
+  ];
+  for (const [wie, fn, pfad] of FALL) {
+    const m = abweichendA(ewMit(fn));
+    assert.match(m, pfad, `${wie}: die Meldung nennt Aktion und Index – ${m}`);
+  }
+});
+
+test('EW 2: die Zahl der Schritte ist Vorbedingung – ein Schritt mehr oder weniger in einer der drei Aktionen: Abbruch (die Positionen trügen sonst)', () => {
+  for (const id of ['kampf-beginnen', 'dorfereignis', 'dorfphase-beginnen']) {
+    const mehr = abweichendA(ewMit(c => { stepsOf(c, id).push({ type: 'shuffle', stackLabel: 'X' }); }));
+    assert.match(mehr, new RegExp(id), `${id} mit einem Schritt mehr`);
+    const weniger = abweichendA(ewMit(c => { stepsOf(c, id).pop(); }));
+    assert.match(weniger, new RegExp(id), `${id} mit einem Schritt weniger`);
+  }
+});
+
+test('EW 2: Form – keine Liste, eine Aktion fehlt, `steps` kein Feld, ein Schritt kein Objekt: Abbruch mit Pfad, kein Wurf', () => {
+  for (const [wie, eingabe] of [
+    ['kein Feld', 'text'], ['ein Objekt', {}], ['null', null], ['eine leere Liste', []],
+    ['eine Aktion fehlt', AKT.filter(a => a.id !== 'dorfereignis')],
+    ['steps ist kein Feld', ewMit(c => { c[1].steps = 'x'; })],
+    ['ein Schritt ist null', ewMit(c => { c[0].steps[11] = null; })],
+    ['eine Aktion doppelt', [...AKT, copy(AKT[1])]],
+  ]) {
+    const p = EW.patchAktionen(eingabe);
+    assert.equal(p.art, 'abweichend', wie);
+    assert.ok(p.probleme.length, wie);
+  }
+});
+
+test('EW 2: **jede andere Zeile** bleibt, wie sie ist – ein fremder Schritt, ein fremdes Feld, eine fremde Aktion kommen unverändert im Ziel an (der Schritt schreibt nur seine Stücke)', () => {
+  const fremd = ewMit(c => {
+    stepsOf(c, 'dorfphase-beginnen')[7].zoneLabel = 'Fremde Zone';
+    stepsOf(c, 'kampf-beginnen')[3].faceDown = true;
+    c[2].steps[0].count = 99;
+    c[1].label = 'Anders';
+  });
+  const p = EW.patchAktionen(fremd);
+  assert.equal(p.art, 'zu-schreiben', (p.probleme ?? []).join('\n'));
+  assert.equal(stepsOf(p.action, 'dorfphase-beginnen')[7 + 0].zoneLabel, 'Fremde Zone');
+  assert.equal(stepsOf(p.action, 'kampf-beginnen')[3].faceDown, true);
+  assert.equal(p.action[2].steps[0].count, 99);
+  assert.equal(p.action[1].label, 'Anders');
+  assert.equal(text(p.action[2]), text(fremd[2]));
+});
+
+test('EW 2: schon geschrieben – „schon-da“, die Eingabe kommt gleich zurück (als Kopie) und wird nicht verändert', () => {
+  const eingabe = frost(copy(ZIEL_AKT));
+  const p = EW.patchAktionen(eingabe);
+  assert.equal(p.art, 'schon-da', (p.probleme ?? []).join('\n'));
+  assert.equal(text(p.action), text(ZIEL_AKT));
+  assert.notEqual(p.action, eingabe, 'eine Kopie');
+});
+
+test('EW 2: ein **anderer** Wert am Ziel ist ein Abbruch – jedes Stück, das schon geschrieben aussieht, aber nicht genau das Ziel ist', () => {
+  const FALL = [
+    ['Münzen groß geschrieben', (c) => { stepsOf(c, 'dorfphase-beginnen')[18].value = '+6*$Doerflerzahl'; }],
+    ['Münzen mit anderer Reihenfolge', (c) => { stepsOf(c, 'dorfphase-beginnen')[18].value = '+$doerflerzahl*6'; }],
+    ['Wache mit „drei“', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].message = 'Auf keiner Lebensleiste liegt noch ein Marker — alle drei Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.'; }],
+    ['Wache mit vier Leisten', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].zoneLabel.pop(); }],
+    ['ein Gate mit falschem Platz', (c) => { stepsOf(c, 'kampf-beginnen')[12].onlySeated = 5; }],
+    ['ein Gate als Text', (c) => { stepsOf(c, 'kampf-beginnen')[13].onlySeated = '5'; }],
+    ['Hand 4 und 5 vertauscht', (c) => { const s = stepsOf(c, 'dorfereignis'); [s[1], s[2]] = [s[2], s[1]]; }],
+    ['ein Marker-Schritt fehlt', (c) => { stepsOf(c, 'dorfphase-beginnen').splice(36, 1); }],
+  ];
+  for (const [wie, fn] of FALL) {
+    const p = EW.patchAktionen(ewMit(fn, ZIEL_AKT));
+    assert.equal(p.art, 'abweichend', `${wie}: ${p.art}`);
+    assert.ok(p.probleme.length, wie);
+  }
+});
+
+test('EW 2: ein **teilweise** geschriebener Stand ist ein Abbruch – jedes Stück einzeln neu, die anderen alt; eine Aktion neu, die anderen alt; ein Gate ohne die neuen Schritte; die neuen Schritte ohne das Gate', () => {
+  for (const stueck of STUECKE) {
+    const m = abweichendA(ewAktionen([stueck]));
+    assert.match(m, /halber Stand|teils/i, `nur „${stueck}“ ist neu: ${m}`);
+    const umgekehrt = abweichendA(ewAktionen(STUECKE.filter(s => s !== stueck)));
+    assert.match(umgekehrt, /halber Stand|teils/i, `nur „${stueck}“ fehlt: ${umgekehrt}`);
+  }
+  for (const neu of [['hand'], ['figur'], ['wache', 'raeume', 'muenzen', 'marker']]) assert.match(abweichendA(ewAktionen(neu)), /halber Stand|teils/i, `Aktion(en) ${neu}`);
+  // Ein Stück **halb**: das Gate allein (kein Schritt für Platz 4 und 5) oder die Schritte ohne das Gate an Platz 3.
+  const nurGate = ewMit(c => { stepsOf(c, 'dorfereignis')[1].onlySeated = 3; });
+  assert.match(abweichendA(nurGate), /dorfereignis/);
+  const ohneGate = ewAktionen(); delete ohneGate[1].steps[3].onlySeated;
+  assert.match(abweichendA(ohneGate), /dorfereignis/);
+  const nurSchritte = ewMit(c => { stepsOf(c, 'kampf-beginnen').splice(12, 0, JSON.parse(FIGUR(4)), JSON.parse(FIGUR(5))); });
+  assert.match(abweichendA(nurSchritte), /kampf-beginnen/);
+});
+
+// ── EW 3. Der Tisch ─────────────────────────────────────────────────────────
+//
+// Der Aufbau (`bauen`) legt die Dörfler aus den Daten (`seat_villager`), mit den Zonen aus EU und den Assets aus EV. Für vier und fünf Dörfler stehen die Schritte für Platz 4
+// und 5 **hier** in der Folge (sie kommen erst mit EX in die Daten): hinter Platz 3, vor den Münzen. Eine Runde ist `kampf-beginnen`, `dorfphase-beginnen`, `dorfereignis` — die Reihenfolge,
+// in der ein Spieler sie fährt (ein Dorf-Ereignis gibt es nur, wenn kein Kampf mehr läuft).
+
+const NEU = (() => { let a; return () => (a ??= EW.patchAktionen(AKT).action); })();
+const EW_ZONEN = EW.patchZonen(zones).zone;
+const EW_ASSETS = EW.patchAssets(assets).assets;
+const SC_PROD = EW.patchWerte(ziel.scenario).scenario;           // so liegt `scenario_data` in der Produktion, wenn ES und ET geschrieben sind: **drei** Plätze, kein baseCount
+const SEAT45 = [[4, 'Blopsy Twins'], [5, 'Yancy Plover']];
+
+const ewTische = new Map();
+function ewAufbau(n, sc = SC_WB) {
+  const key = `${n}${sc === SC_WB ? 'B' : 'P'}`;
+  if (!ewTische.has(key)) {
+    const seq = copy(sequence).filter(s => !(n < 3 && s.type === 'seat_villager' && s.seat === 3));
+    const dazu = SEAT45.filter(([i]) => i <= n).map(([i, v]) => ({ type: 'seat_villager', seat: i, villager: v }));
+    seq.splice(seq.findIndex(s => s.type === 'place_counter'), 0, ...dazu);
+    const r = bauen({ state, sequence: seq, zones: EW_ZONEN, grids, assets: EW_ASSETS, cards, scenarioData: sc }, {}, 1);
+    assert.deepEqual(r.log.filter(e => e.status === 'failed' || e.status === 'skipped'), [], `der Aufbau für ${n} Dörfler: ${r.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | ')}`);
+    ewTische.set(key, r);
+  }
+  return ewTische.get(key);
+}
+const ewLauf = (acts, id, st, o = {}) => executeSequenceWithLog(st, stepsOf(acts, id), o.zonen ?? EW_ZONEN, { assets: o.assets ?? EW_ASSETS, cards, grids, scenarioData: o.sc ?? SC_WB, rng: seededRng(7) });
+function ewRunde(acts, st, o = {}) {
+  const kampf = ewLauf(acts, 'kampf-beginnen', st, o);
+  const phase = ewLauf(acts, 'dorfphase-beginnen', kampf.state, o);
+  const ereignis = ewLauf(acts, 'dorfereignis', phase.state, o);
+  return { kampf, phase, ereignis };
+}
+/**
+ * Die Zeilen des Protokolls ohne den Index. **Zwei Zeilen unterscheiden sich in den Daten selbst und werden hier gleichgesetzt** (beide stehen darunter in eigenen Tests):
+ * die der Wache nennt als `target` ihre Lebensleisten (fünf statt drei, nur die ersten drei zählen hier), und ein Halt trägt „(N further steps skipped)“ — die neuen Aktionen sind länger.
+ */
+const ewZeilen = (r) => r.log.map(e => [e.type, Array.isArray(e.target) ? e.target.filter(z => !/^Dörfler [45]: /.test(z)) : e.target, e.status, (e.reason ?? '').replace(/ \(\d+ further steps? skipped\)/, '')]);
+const ewMuenzen = (st) => st.counters.find(c => c.name === 'Münzen (gemeinsam)').value;
+const ewNamen = (st, sc = SC_WB) => seatedVillagers(st, EW_ASSETS, sc.villagers).map(s => s.name);
+const ewFiguren = (st, sc = SC_WB) => st.tokens.filter(t => t.gridId && ewNamen(st, sc).includes(t.label));
+const ewMarkerPlaetze = (st) => st.tokens.map(t => /^Marker (\d): /.exec(t.label ?? '')).filter(Boolean).map(m => Number(m[1]));
+const ewGleichGelaufen = (neu, alt, wo, acts = [NEU(), AKT]) => {
+  for (const stufe of ['kampf', 'phase', 'ereignis']) {
+    for (const feld of ['tokens', 'cards', 'counters', 'boards']) assert.deepEqual(ohneIds(neu[stufe].state[feld]), ohneIds(alt[stufe].state[feld]), `${wo} ${stufe}: ${feld}`);
+    assert.deepEqual(ohneIds(neu[stufe].state.stacks), ohneIds(alt[stufe].state.stacks), `${wo} ${stufe}: stacks`);
+    assert.deepEqual(ewZeilen(neu[stufe]), ewZeilen(alt[stufe]), `${wo} ${stufe}: Protokollzeilen (ohne den Index, den die neuen Schritte verschieben)`);
+  }
+};
+/** Jede Zeile des Protokolls zeigt auf einen Schritt desselben Typs — auch dann, wenn neue Schritte die Indizes verschoben haben. */
+const ewIndexStimmt = (r, acts, id) => r.log.every(e => e.index < 0 || stepsOf(acts, id)[e.index]?.type === e.type);
+
+test('EW 3: **folgenlos mit drei Dörflern** – die drei Aktionen mit den neuen und den alten Daten ergeben **denselben** Zustand (tokens, counters, cards, stacks, boards ohne die Ids) und **dieselben** Protokollzeilen; Münzen +18 (zwei Runden)', () => {
+  const s0 = ewAufbau(3).state;
+  assert.equal(ewMuenzen(s0), 45);
+  const alt = ewRunde(AKT, s0), neu = ewRunde(NEU(), s0);
+  ewGleichGelaufen(neu, alt, 'Runde 1');
+  assert.equal(ewMuenzen(alt.phase.state) - ewMuenzen(alt.kampf.state), 18);
+  assert.equal(ewMuenzen(neu.phase.state) - ewMuenzen(neu.kampf.state), 18, 'Münzen +18, wie vorher');
+  assert.equal(ewMuenzen(neu.ereignis.state), 63);
+  for (const [stufe, id] of [['kampf', 'kampf-beginnen'], ['phase', 'dorfphase-beginnen'], ['ereignis', 'dorfereignis']]) {
+    assert.ok(ewIndexStimmt(neu[stufe], NEU(), id), `${id}: jeder Index zeigt auf einen Schritt desselben Typs`);
+    assert.deepEqual(neu[stufe].log.filter(e => e.status === 'failed' || e.status === 'skipped'), [], `${id}: keine Beanstandung`);
+  }
+  // Nicht leer verglichen: es ist etwas geschehen (drei Figuren, drei Karten, drei Marker-Sätze).
+  assert.equal(ewFiguren(neu.kampf.state).length, 3);
+  assert.equal(neu.ereignis.state.cards.length - neu.phase.state.cards.length, 3);
+  assert.equal(ewMarkerPlaetze(neu.phase.state).length, 12);
+  // Die zweite Runde (Kampf 2, Virginia Fitz): auch sie ist dieselbe.
+  const alt2 = ewRunde(AKT, alt.ereignis.state), neu2 = ewRunde(NEU(), neu.ereignis.state);
+  ewGleichGelaufen(neu2, alt2, 'Runde 2');
+  assert.equal(ewMuenzen(neu2.ereignis.state), 81);
+});
+
+test('EW 3: die zwei Zeilen, die sich **mit Absicht** unterscheiden – die der Wache nennt fünf Lebensleisten statt drei als Ziel; ein Halt zählt zwei Schritte mehr (19 statt 17 Schritte)', () => {
+  const s0 = ewAufbau(3).state;
+  const alt = ewRunde(AKT, s0), neu = ewRunde(NEU(), s0);
+  const wache = (r) => r.phase.log.find(e => e.type === 'require_marker');
+  assert.deepEqual(wache(alt).target, [1, 2, 3].map(n => `Dörfler ${n}: Leben`));
+  assert.deepEqual(wache(neu).target, [1, 2, 3, 4, 5].map(n => `Dörfler ${n}: Leben`));
+  assert.deepEqual([wache(alt).status, wache(neu).status], ['ok', 'ok'], 'die Wache lässt durch');
+  // Ein Halt (der Kampf läuft noch): „(N further steps skipped)“ zählt die Schritte dahinter.
+  const halt = (acts) => ewLauf(acts, 'kampf-beginnen', alt.kampf.state).log[0].reason.match(/\((\d+) further steps skipped\)/)[1];
+  assert.deepEqual([Number(halt(AKT)), Number(halt(NEU()))], [16, 18]);
+});
+
+test('EW 3: **dieselbe Aussage auf dem Tisch von `villager-table.js`** (`build()`: drei Dörfler, keine Stapel) – Dorfphase, ereignis und Kampf mit den neuen und den alten Daten: derselbe Zustand, dieselben Zeilen', async () => {
+  const vt = await import('./villager-table.js');
+  const sc = copy(SC_WB);
+  const zonen = [...vt.ZONES, ...EW_ZONEN.filter(z => !vt.ZONES.some(v => v.label === z.label))];
+  const o = { zones: zonen, scenarioData: sc, assets: [...vt.fx.assets, ...EW_ASSETS.filter(a => /^Marker [45]/.test(a.name))] };
+  const imKampf = vt.imKampf(vt.build());
+  for (const [wo, st] of [['im Kampf', imKampf], ['ohne Kampf', vt.build()]]) {
+    for (const id of ['kampf-beginnen', 'dorfphase-beginnen', 'dorfereignis']) {
+      const alt = vt.run(copy(st), stepsOf(AKT, id), o), neu = vt.run(copy(st), stepsOf(NEU(), id), o);
+      for (const feld of ['tokens', 'cards', 'counters', 'boards', 'stacks']) assert.deepEqual(ohneIds(neu.state[feld]), ohneIds(alt.state[feld]), `${wo} ${id}: ${feld}`);
+      assert.deepEqual(ewZeilen(neu), ewZeilen(alt), `${wo} ${id}: Protokollzeilen`);
+    }
+  }
+});
+
+test('EW 3: **Befund** – solange `villagers.seats` nur **drei** Plätze hat (bis EX sie schreibt), lässt jeder Schritt mit `onlySeated: 4|5` eine Zeile `failed` zurück: 2 + 2 + 10 je Runde; der Zustand ist trotzdem derselbe', () => {
+  const s0 = ewAufbau(3, SC_PROD).state;
+  assert.equal(SC_PROD.villagers.seats.length, 3);
+  const alt = ewRunde(AKT, s0, { sc: SC_PROD }), neu = ewRunde(NEU(), s0, { sc: SC_PROD });
+  const gescheitert = (r) => r.log.filter(e => e.status === 'failed');
+  assert.deepEqual(gescheitert(alt.kampf).concat(gescheitert(alt.phase), gescheitert(alt.ereignis)), [], 'mit den alten Aktionen: keine');
+  assert.deepEqual([gescheitert(neu.ereignis).length, gescheitert(neu.kampf).length, gescheitert(neu.phase).length], [2, 2, 10]);
+  for (const e of [...gescheitert(neu.kampf), ...gescheitert(neu.phase), ...gescheitert(neu.ereignis)]) assert.match(e.reason, /^onlySeated: [45] is not a seat \(1 to 3\)/);
+  // Der Zustand ändert das nicht: nichts davon war für drei Dörfler gedacht.
+  for (const stufe of ['kampf', 'phase', 'ereignis']) {
+    for (const feld of ['tokens', 'cards', 'counters', 'boards']) assert.deepEqual(ohneIds(neu[stufe].state[feld]), ohneIds(alt[stufe].state[feld]), `${stufe}: ${feld}`);
+  }
+});
+
+// ── EW 4. Zwei, vier und fünf Dörfler ───────────────────────────────────────
+
+const MUENZ_JE = { 2: 12, 3: 18, 4: 24, 5: 30 };
+
+test('EW 4: mit **zwei, drei, vier und fünf** Dörflern – `dorfereignis` teilt n Karten, `kampf-beginnen` legt n Figuren ohne eine Zeile `$F<k> is not bound`, `dorfphase-beginnen` ohne `skipped`: Münzen +12 / +18 / +24 / +30, Marker nur an besetzten Plätzen', () => {
+  for (const n of [2, 3, 4, 5]) {
+    const s0 = ewAufbau(n).state;
+    assert.equal(ewNamen(s0).length, n, `am Tisch sitzen ${n}`);
+    const r = ewRunde(NEU(), s0);
+    for (const [stufe, id] of [['kampf', 'kampf-beginnen'], ['phase', 'dorfphase-beginnen'], ['ereignis', 'dorfereignis']]) {
+      const schlecht = r[stufe].log.filter(e => e.status === 'failed' || e.status === 'skipped');
+      assert.deepEqual(schlecht, [], `${id} bei ${n}: ${schlecht.map(e => `${e.type} ${e.target}: ${e.reason}`).join(' | ')}`);
+      assert.ok(!r[stufe].log.some(e => /is not bound/.test(e.reason ?? '')), `${id} bei ${n}: keine Zeile „is not bound“`);
+      assert.ok(ewIndexStimmt(r[stufe], NEU(), id), `${id} bei ${n}: die Indizes`);
+    }
+    assert.equal(ewFiguren(r.kampf.state).length - ewFiguren(s0).length, n, `kampf-beginnen legt ${n} Figuren`);
+    assert.equal(ewMuenzen(r.phase.state) - ewMuenzen(r.kampf.state), MUENZ_JE[n], `Münzen bei ${n}`);
+    const plaetze = ewMarkerPlaetze(r.phase.state);
+    assert.deepEqual([...new Set(plaetze)].sort(), [1, 2, 3, 4, 5].slice(0, n), `Marker nur an Plätzen 1 … ${n}`);
+    assert.equal(plaetze.length, 4 * n, `vier Marker je Platz bei ${n}`);
+    assert.equal(r.ereignis.state.cards.length - r.phase.state.cards.length, n, `dorfereignis teilt ${n} Karten`);
+  }
+});
+
+test('EW 4: **alle 20 Bösewichte** – bei zwei und bei fünf Dörflern legt `kampf-beginnen` n Figuren und keine Zeile „is not bound“, bei drei dieselben wie mit den alten Daten (die Startfelder `D` tragen bei jedem Bösewicht fünf Zellen)', () => {
+  let gelaufen = 0;
+  for (const name of Object.keys(scenario.bosses)) {
+    for (const n of [2, 3, 5]) {
+      const s0 = mitBoss(ewAufbau(n).state, name);
+      const r = ewLauf(NEU(), 'kampf-beginnen', s0);
+      assert.ok(!r.log.some(e => /is not bound/.test(e.reason ?? '')), `${name} bei ${n}: ${r.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | ')}`);
+      assert.deepEqual(r.log.filter(e => e.status === 'failed'), [], `${name} bei ${n}`);
+      assert.equal(ewFiguren(r.state).length - ewFiguren(s0).length, n, `${name} bei ${n} Dörflern: Figuren`);
+      if (n === 3) {
+        const alt = ewLauf(AKT, 'kampf-beginnen', s0);
+        for (const feld of ['tokens', 'cards', 'counters', 'boards']) assert.deepEqual(ohneIds(r.state[feld]), ohneIds(alt.state[feld]), `${name}: ${feld}`);
+        assert.deepEqual(ewZeilen(r), ewZeilen(alt), `${name}: Zeilen`);
+      }
+      gelaufen++;
+    }
+  }
+  assert.equal(gelaufen, 60);
+});
+
+test('EW 4: die Hände – jedes Dorf-Ereignis liegt in der Hand eines **besetzten** Platzes, in der Hand eines leeren keines', () => {
+  for (const n of [2, 3, 4, 5]) {
+    const r = ewRunde(NEU(), ewAufbau(n).state);
+    const gelöst = resolveZones(EW_ZONEN, anchorBoxes(r.ereignis.state.boards, r.ereignis.state.tokens));
+    const vorher = new Set(r.phase.state.cards.map(c => c.id));
+    const neu = r.ereignis.state.cards.filter(c => !vorher.has(c.id));
+    assert.equal(neu.length, n);
+    for (const k of [1, 2, 3, 4, 5]) {
+      const hand = gelöst.find(z => z.label === `Hand Dörfler ${k}`);
+      assert.equal(objectsInZone(hand, neu).length, k <= n ? 1 : 0, `Hand ${k} bei ${n} Dörflern`);
+    }
+  }
+});
+
+test('EW 4: die Austeilung geht **absteigend** – die oberste Karte an den höchsten besetzten Platz, die nächste an den nächsten: dieselben Karten in denselben Händen wie bei n Schritten `Hand n … 1`, im Test ausgeschrieben', () => {
+  for (const n of [2, 3, 4, 5]) {
+    const phase = ewRunde(NEU(), ewAufbau(n).state).phase.state;
+    const referenz = [{ type: 'require_zone', zoneLabel: 'Bösewicht-Tableau', expect: 'empty', message: 'x' },
+      ...[5, 4, 3, 2, 1].filter(k => k <= n).map(k => JSON.parse(HAND(k, false)))];
+    const soll = executeSequenceWithLog(phase, referenz, EW_ZONEN, { assets: EW_ASSETS, cards, grids, scenarioData: SC_WB, rng: seededRng(7) });
+    const ist = ewLauf(NEU(), 'dorfereignis', phase);
+    assert.deepEqual(soll.log.filter(e => e.status !== 'ok'), [], `die Referenz bei ${n}`);
+    assert.deepEqual(ohneIds(ist.state.cards), ohneIds(soll.state.cards), `bei ${n} Dörflern: dieselben Karten an denselben Plätzen, in derselben Reihenfolge`);
+    assert.equal(ist.state.cards.length - phase.cards.length, n);
+  }
+});
+
+test('EW 4: **mit den alten Daten** ist es heute falsch – bei zwei „is not bound“ und +18, bei fünf nur drei Figuren, drei Karten und +18 (der rote Befund, festgehalten)', () => {
+  const r2 = ewRunde(AKT, ewAufbau(2).state);
+  assert.ok(r2.kampf.log.some(e => e.status === 'skipped' && /\$F3 is not bound/.test(e.reason)), 'bei zwei: `$F3 is not bound`');
+  assert.ok(r2.phase.log.some(e => e.status === 'skipped' && /is not bound/.test(e.reason)), 'bei zwei: die Marker 3 und `$F3` in der Dorfphase');
+  assert.equal(ewMuenzen(r2.phase.state) - ewMuenzen(r2.kampf.state), 18, 'bei zwei: +18 statt +12');
+  const r5 = ewRunde(AKT, ewAufbau(5).state);
+  assert.equal(ewFiguren(r5.kampf.state).length, 3, 'bei fünf: drei Figuren statt fünf');
+  assert.equal(r5.ereignis.state.cards.length - r5.phase.state.cards.length, 3, 'bei fünf: drei Karten statt fünf');
+  assert.equal(ewMuenzen(r5.phase.state) - ewMuenzen(r5.kampf.state), 18, 'bei fünf: +18 statt +30');
+});
+
+test('EW 4: ein Dörfler an jedem Platz – derselbe Kreis mit anderen Dörflern an Platz 4 und 5 (Georgie meldet seinen Hinweis im Aufbau, nicht in den Aktionen)', () => {
+  const seq = copy(sequence);
+  seq.splice(seq.findIndex(s => s.type === 'place_counter'), 0, { type: 'seat_villager', seat: 4, villager: 'Georgie Irongut' }, { type: 'seat_villager', seat: 5, villager: 'Judy Marks' });
+  const b = bauen({ state, sequence: seq, zones: EW_ZONEN, grids, assets: EW_ASSETS, cards, scenarioData: SC_WB }, {}, 1);
+  assert.deepEqual(b.log.filter(e => e.status === 'failed' || e.status === 'skipped'), []);
+  const r = ewRunde(NEU(), b.state);
+  for (const stufe of ['kampf', 'phase', 'ereignis']) assert.deepEqual(r[stufe].log.filter(e => e.status === 'failed' || e.status === 'skipped'), [], stufe);
+  assert.equal(ewMuenzen(r.phase.state) - ewMuenzen(r.kampf.state), 30);
+  assert.equal(ewFiguren(r.kampf.state).length, 5);
+});
+
+// ── EW 5. Die Wache ─────────────────────────────────────────────────────────
+
+/** Der Tisch mitten im Kampf, der Lebensmarker der Plätze `ns` von den Leisten genommen. */
+const ewKampf = (n) => ewLauf(NEU(), 'kampf-beginnen', ewAufbau(n).state).state;
+const ewOhneLeben = (st, ns) => { const c = copy(st); c.tokens = c.tokens.filter(t => !ns.some(k => t.label === `Marker ${k}: Leben`)); return c; };
+const ewFrage = (r) => r.log.find(e => e.confirm);
+
+test('EW 5: bei **zwei** Dörflern hält die Wache, wenn **beide** Lebensmarker von den Leisten sind – mit `confirm` und einem Text **ohne „drei“**; der Tisch bleibt unberührt', () => {
+  const st = ewOhneLeben(ewKampf(2), [1, 2]);
+  assert.equal(st.tokens.filter(t => /^Marker \d: Leben$/.test(t.label ?? '')).length, 0, 'der Test hat die Marker wirklich genommen');
+  const r = ewLauf(NEU(), 'dorfphase-beginnen', st);
+  const e = ewFrage(r);
+  assert.ok(e, `die Wache hält: ${JSON.stringify(r.log.slice(0, 3))}`);
+  assert.equal(e.confirm, true);
+  assert.equal(e.status, 'skipped');
+  assert.equal(e.index, 1);
+  assert.equal(e.message, WACHE_TEXT);
+  assert.ok(!/drei/i.test(e.message) && !/drei/i.test(e.reason), `kein „drei“: ${e.reason}`);
+  assert.match(e.reason, /alle Dörfler sind besiegt/);
+  assert.deepEqual(r.state, st, 'nichts wurde abgeräumt');
+  for (const k of [1, 2, 3, 4, 5]) assert.ok(e.reason.includes(`Dörfler ${k}: Leben`), `die Wache liest die Leiste ${k}: ${e.reason}`);
+});
+
+test('EW 5: bei **fünf** hält sie erst, wenn **alle fünf** fehlen – liegt einer (jeder der fünf, einzeln), läuft sie durch', () => {
+  for (const n of [2, 3, 4, 5]) {
+    const plaetze = [1, 2, 3, 4, 5].slice(0, n);
+    const voll = ewLauf(NEU(), 'dorfphase-beginnen', ewKampf(n));
+    const alle = ewLauf(NEU(), 'dorfphase-beginnen', ewOhneLeben(ewKampf(n), plaetze));
+    assert.ok(ewFrage(alle), `bei ${n}: alle ${n} fehlen → sie hält`);
+    for (const bleibt of plaetze) {
+      const r = ewLauf(NEU(), 'dorfphase-beginnen', ewOhneLeben(ewKampf(n), plaetze.filter(k => k !== bleibt)));
+      assert.ok(!ewFrage(r), `bei ${n}: nur der Marker von Platz ${bleibt} liegt → sie läuft durch`);
+      assert.deepEqual(r.log.filter(e => e.status === 'failed' || e.status === 'skipped'), [], `bei ${n}, Platz ${bleibt}: ${r.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | ')}`);
+      assert.equal(r.log.length, voll.log.length, 'die Aktion lief bis zum Ende');
+    }
+  }
+});
+
+test('EW 5: **Leisten leerer Plätze zählen nicht** – ein Plättchen **auf einem Platz** der Standardbox (0 … 100 × 0 … 140, das Maß einer Zone ohne Anker) wird nicht als Marker einer Leiste 3, 4 oder 5 gelesen; ohne `showWithoutAnchor` würde es gelesen', () => {
+  const st = ewOhneLeben(ewKampf(2), [1, 2]);
+  const vorlage = st.tokens.find(t => t.label === 'Marker 1: Bewegung');
+  assert.ok(vorlage, 'ein Marker als Vorlage');
+  // Die Plätze der Leiste von Dörfler 4 in der Standardbox: dorthin geparkt, läse ihn eine Wache ohne das Feld als Marker (Platz 3 → Wert 3).
+  const leer = EW_ZONEN.find(z => z.label === 'Dörfler 4: Leben');
+  const platz = zoneSlots({ ...leer, anchor: undefined })[2];
+  assert.ok(Number.isFinite(platz.x) && platz.x < 100 && platz.y < 140, `der Platz liegt in der Ecke: ${text(platz)}`);
+  st.tokens.push({ ...copy(vorlage), id: 'park', label: 'Marker 4: Leben', x: platz.x, y: platz.y });
+  const r = ewLauf(NEU(), 'dorfphase-beginnen', st);
+  const e = ewFrage(r);
+  assert.ok(e, `die Wache hält trotzdem: ${JSON.stringify(r.log.slice(0, 3))}`);
+  assert.match(e.reason, /Dörfler 3: Leben: no marker, Dörfler 4: Leben: no marker, Dörfler 5: Leben: no marker/, 'die drei leeren Plätze lesen sich als „kein Marker“');
+  // Gegenprobe: **ohne** `showWithoutAnchor` liest die Wache dasselbe Plättchen als Marker und lässt durch — der Test ist also empfindlich für das Feld.
+  const ohneFeld = EW_ZONEN.map(z => { const { showWithoutAnchor: _s, ...rest } = z; return rest; });
+  const r2 = ewLauf(NEU(), 'dorfphase-beginnen', st, { zonen: ohneFeld });
+  assert.ok(!ewFrage(r2), 'ohne das Feld hält die Wache nicht: sie zählt die Ecke');
+  assert.deepEqual(r2.log.filter(x => x.status !== 'ok'), [], 'ohne das Feld läuft die ganze Dorfphase durch');
+  // Und auch ohne das Feld: ein Plättchen **neben** den Plätzen ist nur unlesbar (die Wache hält, aber ohne Rückfrage) — es zählt nicht als Marker.
+  const daneben = ewOhneLeben(ewKampf(2), [1, 2]);
+  daneben.tokens.push({ ...copy(vorlage), id: 'park2', label: 'Marker 4: Leben', x: 1, y: 1 });
+  const r3 = ewLauf(NEU(), 'dorfphase-beginnen', daneben, { zonen: ohneFeld });
+  assert.ok(!ewFrage(r3) && r3.log.some(x => /cannot be read/.test(x.reason ?? '')), 'unlesbar: ein Halt ohne Frage');
+});
+
+// ── EW 6. Ein alter Spielstand ──────────────────────────────────────────────
+
+test('EW 6: ein alter Spielstand (drei Dörfler, Zähler von vor M30) – die Dorfphase läuft, die Zähler bleiben, Münzen +18', () => {
+  const alterstand = copy(ewAufbau(3).state);
+  const alt = [['Henlo', 'Leben', 3, 6], ['Henlo', 'Bewegung', 4], ['Fridgette', 'Leben', 2, 5], ['Fridgette', 'Mumm', 5], ['Granny', 'Leben', 4, 7], ['Granny', 'Präzision', 0]];
+  alterstand.counters.push(...alt.map(([wer, was, v, max], i) => ({ id: `alt-${i}`, name: `${wer}: ${was}`, value: v, x: 100 + 40 * i, y: 100, locked: false, ...(max ? { max } : {}) })));
+  const kampf = ewLauf(NEU(), 'kampf-beginnen', alterstand);
+  const phase = ewLauf(NEU(), 'dorfphase-beginnen', kampf.state);
+  assert.deepEqual(phase.log.filter(e => e.status !== 'ok'), [], phase.log.filter(e => e.status !== 'ok').map(e => e.reason).join(' | '));
+  assert.equal(ewMuenzen(phase.state) - ewMuenzen(kampf.state), 18);
+  for (const c of alterstand.counters.filter(c => /^(Henlo|Fridgette|Granny): /.test(c.name))) {
+    assert.equal(text(phase.state.counters.find(x => x.id === c.id)), text(c), `Zähler ${c.name} bleibt`);
+  }
+  const alte = ewLauf(AKT, 'dorfphase-beginnen', kampf.state);
+  assert.deepEqual(ohneIds(phase.state.counters), ohneIds(alte.state.counters), 'wie mit den alten Daten');
+});
+
+// ── EW 7. Die Prüfer ────────────────────────────────────────────────────────
+
+test('EW 7: `validateOptions` auf dem neuen `action_data` → `[]`; `validateStep` auf **jedem** Schritt → keine Beanstandung (Editor, in einer Aktion)', () => {
+  const opts = JSON.parse(dz.scenario).options;
+  assert.deepEqual(validateOptions(opts, sequence, NEU()), []);
+  const ctx = {
+    stackLabels: ['Dorf-Ereignisse', 'Heldentaten', 'Nachschub (Tante Emma)', 'Verhaltensdeck'], zoneLabels: EW_ZONEN.map(z => z.label), pools: ewAssetPools(EW_ASSETS),
+    assetNames: ewAssetNames(EW_ASSETS), grids, cardCategories: [...new Set(cards.map(c => c.category).filter(Boolean))], cards, options: opts, inAction: true,
+  };
+  let gezaehlt = 0;
+  for (const a of NEU()) a.steps.forEach((s, i) => { assert.deepEqual(validateStep(s, ctx), [], `${a.id} Schritt ${i}: ${text(s)}`); gezaehlt++; });
+  assert.equal(gezaehlt, 19 + 6 + 1 + 43);
+  // Der Prüfer des Skripts sagt dasselbe.
+  assert.deepEqual(EW.pruefeAktionen(NEU()), []);
+  // … und er findet, was falsch ist: ein Gate mit Liste ist erlaubt, eines mit 0 nicht, `onlyChoice` nie.
+  assert.ok(EW.pruefeAktionen(ewMit(c => { stepsOf(c, 'kampf-beginnen')[12].onlySeated = 0; }, NEU())).length > 0);
+  assert.ok(EW.pruefeAktionen(ewMit(c => { stepsOf(c, 'kampf-beginnen')[12].onlyChoice = { doerfler4: '!keiner' }; }, NEU())).length > 0);
+  assert.ok(EW.pruefeAktionen(ewMit(c => { stepsOf(c, 'dorfphase-beginnen')[18].value = '+6*$optMuenzen'; }, NEU())).length > 0);
+});
+
+// ── EW 8. Disjunkt ──────────────────────────────────────────────────────────
+
+test('EW 8: berührt nur `action_data` – der Zielstand trägt nichts anderes, und die Reihenfolge zu `gelaende`, `werte`, `zonen`, `assets` ist gleichgültig (dieselben Spalten, derselbe Text)', () => {
+  assert.deepEqual(Object.keys(EW.patchAktionen(AKT)), ['art', 'action']);
+  // `patchAktionen` liest nur die Aktionen: gegen jede Stufe der anderen Spalten derselbe Zielstand.
+  assert.equal(text(EW.patchAktionen(AKT).action), text(EW.patchAktionen(copy(AKT)).action));
+  // Und die anderen Bausteine lesen `action_data` nicht: ihr Zielstand ist mit den neuen und den alten Aktionen derselbe.
+  const sz = text(patchGelaende(scenario).scenario), sw2 = text(EW.patchWerte(scenario).scenario), zo = text(EW.patchZonen(zones).zone), as = text(EW.patchAssets(assets).assets);
+  assert.equal(text(patchGelaende(JSON.parse(dz.scenario)).scenario), sz);
+  assert.equal(text(EW.patchWerte(JSON.parse(dz.scenario)).scenario), sw2);
+  assert.equal(text(EW.patchZonen(copy(zones)).zone), zo);
+  assert.equal(text(EW.patchAssets(copy(assets)).assets), as);
+});
+
+test('EW 8: `SCHRITTE` – `aktionen` ist gebaut (`{ ausgang, ziel }`), nur `optionen` bleibt `null`; der Kopf des Skripts nennt weder Länge noch Hash des Ziels und des Ausgangs', () => {
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
+  assert.equal(SCHRITTE.optionen, null);
+  assert.deepEqual(Object.keys(SCHRITTE.aktionen), ['ausgang', 'ziel']);
+  for (const k of ['ausgang', 'ziel']) assert.deepEqual(Object.keys(SCHRITTE.aktionen[k].action), ['laenge', 'sha'], k);
+  const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
+  const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
+  for (const z of [SCHRITTE.aktionen.ausgang.action, SCHRITTE.aktionen.ziel.action]) {
+    assert.ok(!kopf.includes(z.sha), `der Kopf nennt ${z.sha}`);
+    for (const l of [String(z.laenge), String(z.laenge).replace(/(\d)(\d{3})$/, '$1 $2'), String(z.laenge).replace(/(\d)(\d{3})$/, '$1.$2')]) assert.ok(!kopf.includes(l), `der Kopf nennt ${l}`);
+  }
+  assert.match(kopf, /\*\*`aktionen`/, 'der Kopf beschreibt den Schritt');
+});
+
+// ── EW main. Die Läufe gegen eine Wegwerf-Datenbank ─────────────────────────
+
+const EW_ZIELTEXT = () => text(EW.patchAktionen(AKT).action);
+const ewOhneSpalte = (a) => ({ ...a, setups: a.setups.map(r => ({ ...r, action_data: undefined })) });
+const ewSicherung = (tmp, act = dz.actions) => {
+  const datei = path.join(tmp, 'sicherung-aktionen.json');
+  const h = sicherungsHash(act);
+  fs.writeFileSync(datei, JSON.stringify({ action_data: act, sha256: h, updated_at: '2026-11-09 00:00:00' }));
+  return { datei, h };
+};
+const ewSchreiben = (file, h, extra = []) => ['--write', file, '--schritt', 'aktionen', '--sicherung-sha', h.slice(0, 16), ...extra];
+
+test('EW main: `--check` am Ausgangsstand – schreibgeschützt, „zu schreiben“, Plan, Beweis, Prüfer, Zielstand, Hash für die Sicherung', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = alles(file);
+    fs.chmodSync(file, 0o444);
+    const r = await lauf(['--check', file, '--schritt', 'aktionen']);
+    fs.chmodSync(file, 0o666);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, new RegExp(`gelesen: action_data ${dz.actions.length} Zeichen`));
+    assert.match(r.out, /Einordnung: zu schreiben/);
+    for (const id of ['kampf-beginnen', 'dorfereignis', 'dorfphase-beginnen']) assert.ok(r.out.includes(id), `der Plan nennt ${id}`);
+    assert.match(r.out, /17 → 19/); assert.match(r.out, /4 → 6/); assert.match(r.out, /33 → 43/);
+    assert.match(r.out, /Rückwärtsbeweis action_data: ja/);
+    assert.match(r.out, /Probleme/);
+    assert.ok(r.out.includes(`Zielstand: action_data ${EW_Z.laenge} Zeichen (sha ${EW_Z.sha})`), r.out);
+    assert.ok(r.out.includes(sicherungsHash(dz.actions)), 'der Hash, den --write als Sicherung verlangt, steht da');
+    assert.match(r.out, /würde schreiben/);
+    assert.doesNotMatch(r.out, /Beanstandungen:? [1-9]/);
+    assert.deepEqual(alles(file), vorher, '--check hat nichts geschrieben');
+  } finally { weg(tmp); }
+});
+
+test('EW main: `--check` öffnet schreibgeschützt, `--write` nicht; geschrieben wird mit **einem** UPDATE auf `action_data`, gelesen **nur** `action_data`', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const optionen = [], sql = [];
+    class Spion extends Database {
+      constructor(pfad, opt) { optionen.push(opt); super(pfad, opt); }
+      prepare(s) { sql.push(s); return super.prepare(s); }
+    }
+    assert.equal((await lauf(['--check', file, '--schritt', 'aktionen'], { Db: Spion })).code, 0);
+    assert.equal(optionen.at(-1).readonly, true);
+    const lesend = new Database(file, { readonly: true });
+    assert.throws(() => lesend.prepare('update setups set name = name').run(), /readonly/i);
+    lesend.close();
+
+    sql.length = 0;
+    const { h } = ewSicherung(tmp);
+    const w = await lauf(ewSchreiben(file, h), { Db: Spion });
+    assert.equal(w.code, 0, w.out);
+    assert.equal(optionen.at(-1).readonly, false);
+    const norm = (s) => s.replace(/\s+/g, ' ').trim();
+    const schreibend = sql.filter(s => /^\s*(update|insert|delete|replace|drop|alter|create)\b/i.test(s));
+    assert.equal(schreibend.length, 1, schreibend.join('\n'));
+    assert.match(norm(schreibend[0]), /^update setups set action_data = \? where id = \? and action_data = \?$/i);
+    // Was sonst gelesen wird: Fingerabdruck und Spaltenhashes (Hashes) – und **eine** Abfrage der Spalte.
+    const erlaubt = sql.filter(s => !/order by rowid|sqlite_master|^\s*pragma|^\s*update setups set action_data/i.test(s)).map(norm);
+    const gelesen = [...new Set(erlaubt)];
+    assert.deepEqual(gelesen.filter(s => !/^select \* from setups where id = \?$/i.test(s)), ['select game_id, action_data from setups where id = ?'], gelesen.join('\n'));
+    for (const s of gelesen) assert.doesNotMatch(s, /scenario_data|sequence_data|zone_data|grid_data|state_data|table_assets|from cards|save_states/i, s);
+  } finally { weg(tmp); }
+});
+
+test('EW main: `--write` mit Sicherung – `action_data` auf dem Zielstand, **nichts sonst** geändert (`scenario_data`, `sequence_data`, `zone_data`, `grid_data`, `state_data`, Assets, Spielstände), Kontrolle neu gelesen', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = alles(file);
+    const { h } = ewSicherung(tmp);
+    const r = await lauf(ewSchreiben(file, h));
+    assert.equal(r.code, 0, r.out);
+    const z = zeile(file);
+    assert.equal(z.action_data, EW_ZIELTEXT());
+    assert.deepEqual([z.action_data.length, sha(z.action_data)], [EW_Z.laenge, EW_Z.sha]);
+    assert.deepEqual(ewOhneSpalte(alles(file)), ewOhneSpalte(vorher), 'jede andere Spalte, Zeile und Tabelle (auch updated_at, save_states) ist gleich');
+    for (const k of ['scenario_data', 'sequence_data', 'zone_data', 'grid_data', 'state_data']) assert.equal(z[k], zeile(file)[k]);
+    assert.equal(z.scenario_data, dz.scenario);
+    assert.equal(z.sequence_data, dz.sequence);
+    assert.ok(r.out.includes(`${dz.actions.length} → ${EW_Z.laenge} Zeichen, sha ${sha(dz.actions)} → ${EW_Z.sha}`), r.out);
+    assert.match(r.out, /Rückwärtsbeweis action_data auf der gelesenen Spalte: ja/);
+    assert.match(r.out, /Zielstand aus den Konstanten \(.*\): erreicht/);
+    assert.match(r.out, /save_states Auto Save: sha \w+ → \w+ gleich/);
+    assert.match(r.out, /dorfphase-beginnen[^\n]*43/, 'die Kontrolle nennt die 43 Schritte der Dorfphase');
+    assert.match(r.out, /kampf-beginnen[^\n]*19/);
+    assert.match(r.out, /dorfereignis[^\n]*6\b/);
+  } finally { weg(tmp); }
+});
+
+test('EW main: der zweite Lauf – „schon geschrieben“, Rückgabe 0, nichts geschrieben, auch ohne Sicherung', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const { h } = ewSicherung(tmp);
+    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    const nach1 = alles(file);
+    const check = await lauf(['--check', file, '--schritt', 'aktionen']);
+    assert.equal(check.code, 0, check.out);
+    assert.match(check.out, /schon geschrieben/);
+    const r = await lauf(['--write', file, '--schritt', 'aktionen']);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /nichts zu schreiben/);
+    assert.deepEqual(alles(file), nach1);
+  } finally { weg(tmp); }
+});
+
+test('EW main: ohne Sicherung kein Schreiben – fehlender Hash, falsche Form, falscher Hash, der Hash einer anderen Spalte; nichts geändert', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = alles(file);
+    const ohne = await lauf(['--write', file, '--schritt', 'aktionen']);
+    assert.equal(ohne.code, 1); assert.match(ohne.out, /ohne Sicherung kein Schreiben/);
+    const kurz = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', 'abc']);
+    assert.equal(kurz.code, 1); assert.match(kurz.out, /12 Hex-Stellen/);
+    const falsch = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', 'deadbeefdead']);
+    assert.equal(falsch.code, 1); assert.match(falsch.out, /passt nicht zum gelesenen Text/);
+    for (const andere of [sha(dz.actions), sha(dz.scenario), sha(dz.sequence), sicherungsHash(dz.scenario)]) {
+      const r = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', andere]);
+      assert.equal(r.code, 1, andere);
+    }
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: ein anderer Stand ist ein Abbruch mit Pfad – Münzen anders, ein Gate, ein Schritt mehr: `--check` wie `--write`, nichts geschrieben, **kein** Schalter dagegen', async () => {
+  for (const [wie, mut, pfadTeil] of [
+    ['die Münzen', (c) => { stepsOf(c, 'dorfphase-beginnen')[16].value = '+17'; }, 'dorfphase-beginnen'],
+    ['die Wache', (c) => { stepsOf(c, 'dorfphase-beginnen')[1].message = 'Alle besiegt.'; }, 'dorfphase-beginnen'],
+    ['ein Schritt mehr', (c) => { stepsOf(c, 'dorfereignis').push({ type: 'shuffle', stackLabel: 'X' }); }, 'dorfereignis'],
+  ]) {
+    const { tmp, file } = frischeDatenbank({ act: text(ewMit(mut)) });
+    try {
+      const vorher = alles(file);
+      const c = await lauf(['--check', file, '--schritt', 'aktionen']);
+      assert.equal(c.code, 1, `${wie}: ${c.out}`);
+      assert.match(c.out, /ABWEICHEND/);
+      assert.ok(c.out.includes(pfadTeil), `${wie}: die Meldung nennt den Pfad`);
+      assert.match(c.out, /es wird nichts überschrieben/);
+      const w = await lauf(ewSchreiben(file, sicherungsHash(text(ewMit(mut)))));
+      assert.equal(w.code, 1, `${wie}: ${w.out}`);
+      assert.deepEqual(alles(file), vorher, `${wie}: nichts geschrieben`);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EW main: ein **halber** Stand ist ein Abbruch – jedes Stück einzeln neu, die anderen alt: nichts geschrieben', async () => {
+  for (const stueck of STUECKE) {
+    const halb = text(ewAktionen([stueck]));
+    const { tmp, file } = frischeDatenbank({ act: halb });
+    try {
+      const vorher = alles(file);
+      const c = await lauf(['--check', file, '--schritt', 'aktionen']);
+      assert.equal(c.code, 1, `${stueck}: ${c.out}`);
+      assert.match(c.out, /halber Stand|teils/i);
+      const w = await lauf(ewSchreiben(file, sicherungsHash(halb)));
+      assert.equal(w.code, 1, `${stueck}: ${w.out}`);
+      assert.deepEqual(alles(file), vorher, `${stueck}: nichts geschrieben`);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EW main: ein Stand, der nicht kompaktes JSON.stringify ist, wird nicht angefasst (der Text-Vergleich trüge nicht)', async () => {
+  const lose = JSON.stringify(AKT, null, 1);
+  const { tmp, file } = frischeDatenbank({ act: lose });
+  try {
+    const vorher = alles(file);
+    const r = await lauf(['--check', file, '--schritt', 'aktionen']);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /kompaktes JSON/);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: Vergleich-und-Tausch – ändert jemand `action_data` zwischen Lesen und Schreiben, wird nichts geschrieben, die fremde Änderung bleibt stehen', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const { h } = ewSicherung(tmp);
+    const fremd = text(ewMit(c => { c[2].steps[0].count = 11; }));
+    const r = await lauf(ewSchreiben(file, h), { haken: (stelle, db) => { if (stelle === 'nach-lesen') db.prepare('update setups set action_data = ? where id = ?').run(fremd, SETUP_ID); } });
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /hat sich seit dem Lesen geändert/);
+    assert.equal(zeile(file).action_data, fremd);
+  } finally { weg(tmp); }
+});
+
+test('EW main: ändert sich in der Transaktion eine andere Tabelle (Auto Save) oder eine andere Spalte des Aufbaus, rollt alles zurück', async () => {
+  for (const sql of [
+    "update save_states set state_data = '{\"a\":99}' where name = 'Auto Save'",
+    "update setups set scenario_data = '{}' where id = '" + SETUP_ID + "'",
+    "update setups set sequence_data = '[]' where id = '" + SETUP_ID + "'",
+    "update setups set zone_data = '[]' where id = '" + SETUP_ID + "'",
+    "update setups set name = 'anders' where id = '" + SETUP_ID + "'",
+  ]) {
+    const { tmp, file } = frischeDatenbank();
+    try {
+      const vorher = alles(file);
+      const { h } = ewSicherung(tmp);
+      const r = await lauf(ewSchreiben(file, h), { haken: (stelle, db) => { if (stelle === 'in-transaktion') db.prepare(sql).run(); } });
+      assert.equal(r.code, 1, `${sql}: ${r.out}`);
+      assert.match(r.out, /unerwartet geändert/);
+      assert.deepEqual(alles(file), vorher, `Rollback: ${sql}`);
+    } finally { weg(tmp); }
+  }
+});
+
+test('EW main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, Zeichen für Zeichen; ein zweites Mal ist „schon der Ausgangsstand“', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = alles(file);
+    const { datei, h } = ewSicherung(tmp);
+    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    assert.notDeepEqual(alles(file), vorher);
+    const r = await lauf(['--zurueck', datei, file, '--schritt', 'aktionen']);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /\(= die Sicherung, Zeichen für Zeichen\)/);
+    assert.deepEqual(alles(file), vorher, 'jede Tabelle, jede Spalte wie am Anfang');
+    const nochmal = await lauf(['--zurueck', datei, file, '--schritt', 'aktionen']);
+    assert.equal(nochmal.code, 0, nochmal.out);
+    assert.match(nochmal.out, /schon der Ausgangsstand/);
+  } finally { weg(tmp); }
+});
+
+test('EW main: `--zurueck` ersetzt nur den exakten Zielstand – hat jemand danach weitergearbeitet, bleibt alles stehen', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const { datei, h } = ewSicherung(tmp);
+    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    setze(file, 'action_data', zeile(file).action_data + ' ');
+    const vorher = alles(file);
+    const r = await lauf(['--zurueck', datei, file, '--schritt', 'aktionen']);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /nicht der Zielstand/);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: `--zurueck` prüft die Sicherung – beschädigt, nicht kompakt, schon der Zielstand, falsche Form: nichts wird überschrieben', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const { h } = ewSicherung(tmp);
+    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    const vorher = alles(file);
+    const schreibe = (name, o) => { const d = path.join(tmp, name); fs.writeFileSync(d, JSON.stringify(o)); return d; };
+    const gut = { action_data: dz.actions, sha256: sicherungsHash(dz.actions) };
+    const kaputt = await lauf(['--zurueck', schreibe('a.json', { ...gut, sha256: 'f'.repeat(64) }), file, '--schritt', 'aktionen']);
+    assert.equal(kaputt.code, 1); assert.match(kaputt.out, /beschädigt/);
+    const lose = JSON.stringify(AKT, null, 1);
+    const nk = await lauf(['--zurueck', schreibe('b.json', { action_data: lose, sha256: sicherungsHash(lose) }), file, '--schritt', 'aktionen']);
+    assert.equal(nk.code, 1); assert.match(nk.out, /kompaktes JSON/);
+    const zt = EW_ZIELTEXT();
+    const neu = await lauf(['--zurueck', schreibe('c.json', { action_data: zt, sha256: sicherungsHash(zt) }), file, '--schritt', 'aktionen']);
+    assert.equal(neu.code, 1); assert.match(neu.out, /nicht der Ausgangsstand/);
+    const form = await lauf(['--zurueck', schreibe('d.json', { scenario_data: dz.scenario }), file, '--schritt', 'aktionen']);
+    assert.equal(form.code, 1); assert.match(form.out, /nicht die Form/);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: es gibt kein `--force` und kein Wort dafür – jedes unbekannte Argument ist ein Benutzungsfehler, auch beim Rückweg; geschrieben wird nichts', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const vorher = alles(file);
+    const { datei, h } = ewSicherung(tmp);
+    for (const wort of ['--force', '--erzwingen', '--ueberschreiben', '--override', '--yes', '--ignore-precondition', '-f', 'force']) {
+      for (const modus of [['--check', file, '--schritt', 'aktionen'], ewSchreiben(file, h), ['--zurueck', datei, file, '--schritt', 'aktionen']]) {
+        const r = await lauf([...modus, wort]);
+        assert.equal(r.code, 2, `${modus[0]} ${wort}: ${r.out}`);
+        assert.match(r.out, /usage|unbekannt/);
+      }
+    }
+    const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8');
+    const code = quelle.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/['"]--(force|erzwingen|ueberschreiben|override)['"]/.test(code));
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: ein Prüfer, der etwas findet, hält den Lauf an – ein Stand, den der Prüfer beanstandet, wird nicht geschrieben (Rückwärtsbeweis und Vorwärtsprobe stehen vor dem ersten Byte)', async () => {
+  // Der Ausgang mit einem `onlyChoice` in einer Aktion: der Baustein ordnet ihn als Abweichung ein oder der Prüfer beanstandet den Zielstand — in beiden Fällen: nichts geschrieben.
+  const fremd = text(ewMit(c => { stepsOf(c, 'dorfphase-beginnen')[5].onlyChoice = { partie: 'kurz' }; }));
+  const { tmp, file } = frischeDatenbank({ act: fremd });
+  try {
+    const vorher = alles(file);
+    const c = await lauf(['--check', file, '--schritt', 'aktionen']);
+    assert.equal(c.code, 1, c.out);
+    assert.match(c.out, /onlyChoice/);
+    const w = await lauf(ewSchreiben(file, sicherungsHash(fremd)));
+    assert.equal(w.code, 1, w.out);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst', async () => {
+  const { tmp, file } = frischeDatenbank();
+  try {
+    const db = new Database(file);
+    db.pragma('foreign_keys = OFF');
+    db.prepare("insert into games (id, name) values ('anderes-spiel', 'X') on conflict do nothing").run();
+    db.prepare('update setups set game_id = ? where id = ?').run('anderes-spiel', SETUP_ID);
+    db.close();
+    const vorher = alles(file);
+    const r = await lauf(['--check', file, '--schritt', 'aktionen']);
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /gehört zu Spiel anderes-spiel/);
+    assert.deepEqual(alles(file), vorher);
+  } finally { weg(tmp); }
+});
+
+test('EW main: die Reihenfolge zu `gelaende` (ES) ist gleichgültig – erst `aktionen`, dann `gelaende`, und umgekehrt: dieselben zwei Spalten, derselbe Text', async () => {
+  const fertig = [];
+  for (const reihenfolge of [['aktionen', 'gelaende'], ['gelaende', 'aktionen']]) {
+    const { tmp, file } = frischeDatenbank();
+    try {
+      for (const schritt of reihenfolge) {
+        const spalte = schritt === 'aktionen' ? 'action' : 'scenario';
+        const roh = zeile(file)[`${spalte}_data`];
+        const r = await lauf(['--write', file, '--schritt', schritt, '--sicherung-sha', sicherungsHash(roh).slice(0, 16)]);
+        assert.equal(r.code, 0, `${reihenfolge}: ${schritt}: ${r.out}`);
+      }
+      const z = zeile(file);
+      fertig.push([z.action_data, z.scenario_data]);
+      assert.equal(z.action_data, EW_ZIELTEXT());
+      assert.equal(z.scenario_data, ZIELTEXT);
+    } finally { weg(tmp); }
+  }
+  assert.deepEqual(fertig[0], fertig[1]);
 });

@@ -422,10 +422,11 @@ test('EU 9: der Prüfer – Ids und Labels eindeutig, das Feld nur an den Plätz
   assert.ok(dz.pruefeZonen(AUSGANG.map(z => (z.id === 'zkopf1' ? { ...z, showWithoutAnchor: false } : z))).length > 0);
 });
 
-test('EU 9: der Kopf des Skripts und SCHRITTE – `zonen` ist gebaut, `aktionen` und `optionen` bleiben `null` (`assets` seit EV gebaut); die Kurzfassung „Befund“ nennt keine Zahl des Ziels', () => {
+test('EU 9: der Kopf des Skripts und SCHRITTE – `zonen` ist gebaut, `optionen` bleibt `null` (`assets` seit EV, `aktionen` seit EW gebaut); die Kurzfassung „Befund“ nennt keine Zahl des Ziels', () => {
   assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
-  for (const k of ['aktionen', 'optionen']) assert.equal(dz.SCHRITTE[k], null, k);
+  for (const k of ['optionen']) assert.equal(dz.SCHRITTE[k], null, k);
   assert.notEqual(dz.SCHRITTE.zonen, null);
+  assert.notEqual(dz.SCHRITTE.aktionen, null);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
