@@ -30,13 +30,20 @@
 
 import { SETUP_ID, GAME_ID, COMBINATIONS, SHERIFF_CATEGORIES, bauen, ohneIds } from './auslagen-daten.mjs';
 import { executeSequenceWithLog } from '../shared/sequenceExecutor.js';
-import { seatVars } from '../shared/villagers.js';
+import { seatVars, seatedVillagers } from '../shared/villagers.js';
 import { findCardByName } from '../shared/cardSearch.js';
 import { validateScenarioData } from '../shared/scenarioData.js';
+import { resolveZones, anchorBoxes } from '../shared/anchoring.js';
+import { objectsInZone, zoneSlotNumberAt } from '../shared/zoneGeometry.js';
 import { ZUORDNUNG } from './gelaendekarten-zuordnung.mjs';
+import { SPALTEN, MESSUNG, zahlBei } from './doerflerzahl-daten.mjs';
 
 const ACTIONS = ['kampf-beginnen', 'dorfphase-beginnen', 'laden-nachfuellen'];
 const LEISTE = 'Bösewicht-Leiste';
+/** M31 (EY): die Dörfler 3 bis 5 gewählt, wo der Abschnitt 1 und 2 sie braucht — so, wie es vor M31 der Tisch war. */
+const GRANNY = { doerfler3: 'Granny' };
+/** Granny, wo der Aufbau die Wahl kennt (M30 und später); der M27-Aufbau hat keine und Granny fest. */
+const grannyWenn = (env) => (env.scenarioData?.options?.doerfler3 ? GRANNY : {});
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Was nicht „ok" ist - ein `note` ist ein Hinweis, aber im Protokoll, und zählt hier mit. */
@@ -127,6 +134,211 @@ function fuerKampf(env, built, boss, endkampf) {
   return { state: r.state, log: schlecht(r.log) };
 }
 
+// ── M31 (Aufgabe EY): Abschnitt 4 — die Dörflerzahl ──────────────────────────────────────────────────────────
+//
+// Vier Fragen an den Zielstand, je mit der Erwartung der Spec: Münzen je Zahl (kurz 15 · n, lang 10 · n), die Zeilen
+// der Dorfphase (18 + 5·n, ohne Ausfall), die Münzen +6·n, das Ereignis (1 + n), die Figuren (n); alle Bösewichte mit
+// 2 bis 5 (BEW und LEB aus `SPALTEN`, Barry Bluff ohne Zahl); der Endkampf der acht gemessenen (`MESSUNG`); die Wache
+// mit zwei Dörflern; die Doppelwahl (die **erwarteten** Zeilen sind keine Beanstandung, jede andere ist eine); die
+// Leiste („Wer ist dran?") — n Steine auf den Plätzen 1 … n, nach der Dorfphase eine Stelle weiter.
+// Die Erwartungen stehen **hier**, nicht in den Daten: wer die Zahlen ändert, ändert sie an dieser Stelle und im Test.
+
+const WAHL_NACH_ZAHL = {
+  2: {},
+  3: { doerfler3: 'Granny' },
+  4: { doerfler3: 'Granny', doerfler4: 'Blopsy' },
+  5: { doerfler3: 'Granny', doerfler4: 'Blopsy', doerfler5: 'Yancy' },
+};
+const ZAHLEN = [2, 3, 4, 5];
+const MUENZEN = { kurz: { 2: 30, 3: 45, 4: 60, 5: 75 }, lang: { 2: 20, 3: 30, 4: 40, 5: 50 } };
+const DORF_ZEILEN = (n) => 18 + 5 * n;
+const DORF_PLUS = (n) => 6 * n;
+const EREIGNIS_ZEILEN = (n) => 1 + n;
+const LEISTE_RAIL = "Buyin'/Beatin'-Leiste";
+/** Die Doppelwahl: genau diese Zeilen (Index, Typ, Status) sind **erwartet** (M31.3, EX Befund 2–3). */
+const DOPPEL_ERWARTET = {
+  keiner: {
+    aufbau: [[26, 'seat_villager', 'skipped']],
+    kampf: [[5, 'build_scenario', 'failed'], [6, 'place_asset', 'skipped'], [7, 'place_asset', 'skipped'], [8, 'place_asset', 'skipped'], [9, 'place_asset', 'skipped'], [10, 'place_asset', 'skipped']],
+    dorf: [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']],
+    muenzen: 21,
+  },
+  granny: {
+    aufbau: [[26, 'seat_villager', 'skipped']],
+    kampf: [[10, 'place_asset', 'skipped']],
+    dorf: [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']],
+    muenzen: 42,
+  },
+};
+
+const nichtOk = (log) => log.filter(e => e.status !== 'ok').map(e => [e.index, e.type, e.status]);
+const muenzenVon = (st) => st.counters.find(c => c.name === 'Münzen (gemeinsam)')?.value;
+const sitzende = (env, st) => seatedVillagers(st, env.assets, env.scenarioData.villagers);
+const bauenVon = (env, choices, seed = 3) => bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, choices, seed);
+/** Die Plätze der Steine auf der Leiste: Vorname → Platz. Die Steine tragen den Vornamen, die Sitze den vollen Namen. */
+function platzVon(env, st) {
+  const zone = resolveZones(env.zones, anchorBoxes(st.boards, st.tokens)).find(z => z.label === LEISTE_RAIL);
+  if (!zone) return null;
+  const vornamen = new Map(sitzende(env, st).map(s => [s.name.split(' ')[0], s.name]));
+  const steine = objectsInZone(zone, st.cards, st.tokens).filter(o => vornamen.has(o.label));
+  return new Map(steine.map(o => [o.label, zoneSlotNumberAt(zone, o.x, o.y)]));
+}
+/** Ein Zahlenwert auf dem Tisch (BEW/LEB des Bösewichts): der Platz des Markers auf seiner Leiste, oder `null`. */
+function wertAm(env, st, label, zoneLabel) {
+  const t = st.tokens.find(x => x.label === label);
+  if (!t) return null;
+  const z = resolveZones(env.zones, anchorBoxes(st.boards, st.tokens)).find(x => x.label === zoneLabel);
+  return z ? zoneSlotNumberAt(z, t.x, t.y) : null;
+}
+/** Ein Tisch mit `choices`: Aufbau, Kampf, Dorfphase, Ereignis – mit allem, was die Zahlen brauchen. */
+function zeitlinie(env, choices) {
+  const r = bauenVon(env, choices, 3);
+  const k = aktion(env, 'kampf-beginnen', r.state);
+  const d = aktion(env, 'dorfphase-beginnen', k.state);
+  const e = aktion(env, 'dorfereignis', d.state);
+  const figuren = k.state.tokens.filter(t => t.gridId && sitzende(env, k.state).some(s => s.name === t.label)).length;
+  return {
+    aufbauNichtOk: nichtOk(r.log), muenzen0: muenzenVon(r.state),
+    kampfNichtOk: nichtOk(k.log), figuren,
+    dorfZeilen: d.log.length, dorfNichtOk: nichtOk(d.log), dorfPlus: muenzenVon(d.state) - muenzenVon(k.state), muenzenNach: muenzenVon(d.state),
+    ereignisZeilen: e.log.length, ereignisNichtOk: nichtOk(e.log),
+    leisteVor: platzVon(env, k.state), leisteNach: platzVon(env, d.state),
+  };
+}
+/** Die Wache mit zwei Dörflern: den Lebensmarker der genannten Plätze nehmen, dann die Dorfphase. */
+function wacheLauf(env, weg) {
+  const k = aktion(env, 'kampf-beginnen', bauenVon(env, { partie: 'kurz', troedel: 'mit' }, 3).state).state;
+  const st = structuredClone(k);
+  st.tokens = st.tokens.filter(t => !weg.includes(t.label));
+  const w = aktion(env, 'dorfphase-beginnen', st).log.find(e => e.type === 'require_marker');
+  return { gehalten: Boolean(w) && w.status !== 'ok', rueckfrage: Boolean(w?.confirm), ohneDrei: Boolean(w) && !/drei/.test(w.message ?? w.reason ?? '') };
+}
+
+/**
+ * Abschnitt 4 des Rauchtests (M31, EY). Liefert die Zeilen (`out`), die Beanstandungen (`problems`) und die
+ * gemessenen Werte selbst (`zahlen`, `bosse`, `endkampf`, `wache`, `doppel`, `leiste`), damit der Test sie noch einmal
+ * gegen eigene Zahlen prüft.
+ */
+export function dorflerFaelle(env) {
+  const out = ['\n4. Dörflerzahl (M31): Vorgabe, zwei bis fünf Dörfler, alle Bösewichte, Endkampf, Doppelwahl, Wache, Leiste'];
+  const problems = [];
+  const bad = (s) => { problems.push(s); out.push(`  !! ${s}`); };
+  // Der Schalter (EX) ist `villagers.baseCount`; davor gibt es nur drei Dörfler, und dieser Abschnitt gilt nicht.
+  // Ist er da, muss alles da sein – ein halber Schalter ist eine Beanstandung, kein Stillschweigen.
+  if (env.scenarioData?.villagers?.baseCount === undefined) {
+    out.push('  nicht anwendbar: der Schalter (villagers.baseCount, M31 EX) fehlt – die Daten kennen nur drei Dörfler');
+    return { out, problems, zahlen: null, bosse: null, endkampf: null, wache: null, doppel: null, leiste: null };
+  }
+  const opts = env.scenarioData?.options ?? {};
+  const fehlt = ['doerfler3', 'doerfler4', 'doerfler5'].filter(k => !opts[k]);
+  if (fehlt.length) {
+    bad(`Schalter halb da: options fehlen (${fehlt.join(', ')})`);
+    return { out, problems, zahlen: null, bosse: null, endkampf: null, wache: null, doppel: null, leiste: null };
+  }
+
+  // a–c, f, i: je Zahl ein Tisch mit der Wahl, dazu die Münzen des langen Aufbaus.
+  const zahlen = { n: {}, vorgabe: null };
+  const vorgabe = zeitlinie(env, { partie: 'kurz', troedel: 'mit' });
+  zahlen.vorgabe = { muenzen0: vorgabe.muenzen0, dorfZeilen: vorgabe.dorfZeilen };
+  if (vorgabe.muenzen0 !== MUENZEN.kurz[2]) bad(`Vorgabe: Münzen ${vorgabe.muenzen0}, erwartet ${MUENZEN.kurz[2]} (zwei Dörfler)`);
+  if (vorgabe.dorfZeilen !== DORF_ZEILEN(2)) bad(`Vorgabe: Dorfphase ${vorgabe.dorfZeilen} Zeilen, erwartet ${DORF_ZEILEN(2)}`);
+  for (const n of ZAHLEN) {
+    const z = zeitlinie(env, { partie: 'kurz', troedel: 'mit', ...WAHL_NACH_ZAHL[n] });
+    const lang = muenzenVon(bauenVon(env, { partie: 'lang', troedel: 'ohne', ...WAHL_NACH_ZAHL[n] }, 3).state);
+    zahlen.n[n] = { kurz: { muenzen0: z.muenzen0, dorfZeilen: z.dorfZeilen, dorfNichtOk: z.dorfNichtOk.length, dorfPlus: z.dorfPlus, ereignisZeilen: z.ereignisZeilen }, lang: { muenzen0: lang }, figuren: z.figuren };
+    const leisteVor = z.leisteVor ? [...z.leisteVor.values()].sort((a, b) => a - b) : [];
+    const leisteNach = z.leisteNach ? [...z.leisteNach.values()].sort((a, b) => a - b) : [];
+    zahlen.n[n].leiste = { vor: z.leisteVor, nach: z.leisteNach };
+    const alle = Array.from({ length: n }, (_, i) => i + 1);
+    if (z.aufbauNichtOk.length) bad(`${n} Dörfler, Aufbau: Zeilen ohne ok ${JSON.stringify(z.aufbauNichtOk)}`);
+    if (z.muenzen0 !== MUENZEN.kurz[n]) bad(`${n} Dörfler: Münzen im Aufbau ${z.muenzen0}, erwartet ${MUENZEN.kurz[n]}`);
+    if (lang !== MUENZEN.lang[n]) bad(`${n} Dörfler (lang): Münzen im Aufbau ${lang}, erwartet ${MUENZEN.lang[n]}`);
+    if (z.kampfNichtOk.length) bad(`${n} Dörfler, Kampf beginnen: Zeilen ohne ok ${JSON.stringify(z.kampfNichtOk)}`);
+    if (z.figuren !== n) bad(`${n} Dörfler: ${z.figuren} Figuren auf dem Feld, erwartet ${n}`);
+    if (z.dorfZeilen !== DORF_ZEILEN(n)) bad(`${n} Dörfler: Dorfphase ${z.dorfZeilen} Zeilen, erwartet ${DORF_ZEILEN(n)}`);
+    if (z.dorfNichtOk.length) bad(`${n} Dörfler, Dorfphase: Zeilen ohne ok ${JSON.stringify(z.dorfNichtOk)}`);
+    if (z.dorfPlus !== DORF_PLUS(n)) bad(`${n} Dörfler: Münzen +${z.dorfPlus} in der Dorfphase, erwartet +${DORF_PLUS(n)}`);
+    if (z.ereignisZeilen !== EREIGNIS_ZEILEN(n)) bad(`${n} Dörfler: Ereignis ${z.ereignisZeilen} Zeilen, erwartet ${EREIGNIS_ZEILEN(n)}`);
+    if (z.ereignisNichtOk.length) bad(`${n} Dörfler, Ereignis: Zeilen ohne ok ${JSON.stringify(z.ereignisNichtOk)}`);
+    // i: die Steine auf den Plätzen 1 … n, nach der Dorfphase eine Stelle weiter (zyklisch).
+    if (!z.leisteVor || !z.leisteNach) bad(`${n} Dörfler: die Leiste „${LEISTE_RAIL}“ ist nicht zu lesen`);
+    else {
+      if (JSON.stringify(leisteVor) !== JSON.stringify(alle)) bad(`${n} Dörfler: Steine vor der Dorfphase auf ${leisteVor}, erwartet ${alle}`);
+      if (JSON.stringify(leisteNach) !== JSON.stringify(alle)) bad(`${n} Dörfler: Steine nach der Dorfphase auf ${leisteNach}, erwartet ${alle}`);
+      for (const [name, p] of z.leisteVor) {
+        if (z.leisteNach.get(name) !== ((p - 2 + n) % n) + 1) bad(`${n} Dörfler: ${name} nicht eine Stelle weiter (${p} → ${z.leisteNach.get(name)})`);
+      }
+    }
+    out.push(`  ${n} Dörfler: Münzen ${z.muenzen0} (kurz) / ${lang} (lang); Dorfphase ${z.dorfZeilen} Zeilen, +${z.dorfPlus} → ${z.muenzenNach}; Ereignis ${z.ereignisZeilen} Zeilen; Figuren ${z.figuren}; Leiste ${leisteVor.join(',')} → ${leisteNach.join(',')}`);
+  }
+  out.push(`  Vorgabe (keine Wahl): ${vorgabe.muenzen0} Münzen, Dorfphase ${vorgabe.dorfZeilen} Zeilen`);
+
+  // d, e: alle Bösewichte mit 2 bis 5 (BEW/LEB), dazu der Endkampf der acht gemessenen.
+  const bosse = {}, endkampf = {};
+  let bossePruef = 0;
+  for (const n of ZAHLEN) {
+    const built = bauenVon(env, { partie: 'lang', troedel: 'ohne', ...WAHL_NACH_ZAHL[n] }, 5).state;
+    for (const boss of Object.keys(env.scenarioData.bosses)) {
+      bosse[boss] ??= {};
+      endkampf[boss] ??= {};
+      const t = fuerKampf(env, built, boss, false);
+      const a = aktion(env, 'kampf-beginnen', t.state);
+      for (const e of schlecht(a.log)) if (!bekannt(boss, e)) bad(`${boss}, ${n} Dörfler: ${zeile(e)}`);
+      const bew = wertAm(env, a.state, 'Marker: Bösewicht BEW', 'Bösewicht: Bewegung');
+      const leb = wertAm(env, a.state, 'Marker: Bösewicht LEB', 'Bösewicht: Leben');
+      if (boss === 'Barry Bluff') {
+        bosse[boss][n] = null;
+        if (bew !== null || leb !== null) bad(`${boss}, ${n} Dörfler: ein Marker liegt, obwohl der Wert eine Formel ist (BEW ${bew}, LEB ${leb})`);
+      } else if (!SPALTEN[boss]) {
+        bosse[boss][n] = { BEW: bew, LEB: leb };
+        bad(`${boss}: keine Messung in SPALTEN (scripts/doerflerzahl-daten.mjs)`);
+      } else {
+        bosse[boss][n] = { BEW: bew, LEB: leb };
+        bossePruef++;
+        if (bew !== SPALTEN[boss].BEW[n - 2] || leb !== SPALTEN[boss].LEB[n - 2]) {
+          bad(`${boss}, ${n} Dörfler: BEW ${bew} / LEB ${leb}, erwartet ${SPALTEN[boss].BEW[n - 2]} / ${SPALTEN[boss].LEB[n - 2]} (§5.5)`);
+        }
+      }
+    }
+  }
+  // e: die acht gemessenen – neue Plättchen mit dem Endkampf gegenüber ohne ihn.
+  let endPruef = 0;
+  for (const n of ZAHLEN) {
+    const built = bauenVon(env, { partie: 'lang', troedel: 'ohne', ...WAHL_NACH_ZAHL[n] }, 5).state;
+    const vorher = new Set(built.tokens.map(t => t.id));
+    const neue = (boss, end) => aktion(env, 'kampf-beginnen', fuerKampf(env, built, boss, end).state).state.tokens.filter(t => t.gridId && !vorher.has(t.id)).length;
+    for (const name of Object.keys(MESSUNG)) {
+      const plaettchen = neue(name, true) - neue(name, false);
+      endkampf[name][n] = plaettchen;
+      endPruef++;
+      if (plaettchen !== zahlBei(name, n)) bad(`${name}, Endkampf bei ${n} Dörflern: ${plaettchen} Plättchen, erwartet ${zahlBei(name, n)} (MESSUNG)`);
+    }
+  }
+  out.push(`  Bösewichte mit 2 / 3 / 4 / 5 Dörflern: ${bossePruef} Zahlenwerte gleich §5.5 (BEW und LEB); Barry Bluff: Formel, kein Marker`);
+  out.push(`  Endkampf der acht gemessenen: ${endPruef} Zahlen geprüft (Deputy, Pepin, Samuel 2 / 3 / 4 / 5; Virginia, Handsy 5; Bundits, Tilda, Umbrello 1)`);
+
+  // g: die Wache mit zwei Dörflern.
+  const wache = { zweiWeg: wacheLauf(env, ['Marker 1: Leben', 'Marker 2: Leben']), einerWeg: wacheLauf(env, ['Marker 1: Leben']) };
+  if (!(wache.zweiWeg.gehalten && wache.zweiWeg.rueckfrage && wache.zweiWeg.ohneDrei)) bad(`Wache, zwei Dörfler ohne Lebensmarker: ${JSON.stringify(wache.zweiWeg)} (erwartet: gehalten, Rückfrage, ohne „drei“)`);
+  if (wache.einerWeg.gehalten) bad('Wache, zwei Dörfler mit einem Lebensmarker: sie hält, obwohl ein Marker liegt');
+  out.push(`  Wache, zwei Dörfler: beide Lebensmarker weg → gehalten ${wache.zweiWeg.gehalten ? 'ja' : 'nein'}, Rückfrage ${wache.zweiWeg.rueckfrage ? 'ja' : 'nein'}, ohne „drei“ ${wache.zweiWeg.ohneDrei ? 'ja' : 'nein'}; einer liegt noch → gehalten ${wache.einerWeg.gehalten ? 'ja' : 'nein'}`);
+
+  // h: die Doppelwahl – genau die erwarteten Zeilen.
+  const doppel = {};
+  for (const [name, wahl] of [['keiner', { doerfler3: 'keiner' }], ['granny', { doerfler3: 'Granny' }]]) {
+    const r = bauenVon(env, { partie: 'kurz', troedel: 'mit', doerfler1: 'Judy', doerfler2: 'Judy', ...wahl }, 3);
+    const k = aktion(env, 'kampf-beginnen', r.state);
+    const d = aktion(env, 'dorfphase-beginnen', k.state);
+    doppel[name] = { aufbau: nichtOk(r.log), kampf: nichtOk(k.log), dorf: nichtOk(d.log), muenzen: muenzenVon(d.state) };
+    const soll = DOPPEL_ERWARTET[name];
+    const gleich = JSON.stringify(doppel[name]) === JSON.stringify(soll);
+    if (!gleich) bad(`Doppelwahl Judy/Judy/${name}: andere Zeilen als erwartet – ${JSON.stringify(doppel[name])}`);
+    out.push(`  Doppelwahl Judy/Judy/${name}: Aufbau ${doppel[name].aufbau.length}, Kampf ${doppel[name].kampf.length}, Dorfphase ${doppel[name].dorf.length} Zeilen ohne ok, Münzen ${doppel[name].muenzen}${gleich ? ' – erwartet, keine Beanstandung' : ''}`);
+  }
+
+  return { out, problems, zahlen, bosse, endkampf, wache, doppel, leiste: Object.fromEntries(ZAHLEN.map(n => [n, zahlen.n[n].leiste])) };
+}
+
 export function rauchtest(db) {
   const out = [];
   const problems = [];
@@ -150,7 +362,7 @@ export function rauchtest(db) {
   const stack = (s, l) => s.stacks.find(x => x.label === l);
   for (const choices of COMBINATIONS) {
     const key = `${choices.partie}/${choices.troedel}`;
-    const r = bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, choices, 3);
+    const r = bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, { ...choices, ...grannyWenn(env) }, 3);
     let s = r.state;
     const nachschub = stack(s, 'Nachschub (Tante Emma)')?.cards.length;
     const auslage = s.cards.filter(c => /^Nachschub|^Toller Trödel: Nachschub/.test(c.category ?? '')).length;
@@ -182,7 +394,7 @@ export function rauchtest(db) {
 
   // ── 2. Alle zwanzig Bösewichte, Vor- und Endkampf ──
   say('\n2. Alle Bösewichte: Kampf beginnen im Vorkampf und im Endkampf (Aufbau lang/ohne, 20 aus dem Pool)');
-  const built = bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, { partie: 'lang', troedel: 'ohne' }, 5).state;
+  const built = bauen({ state: env.row.state_data, sequence: env.sequence, zones: env.zones, grids: env.grids, assets: env.assets, cards: env.cards, scenarioData: env.scenarioData }, { partie: 'lang', troedel: 'ohne', ...grannyWenn(env) }, 5).state;
   let legen = 0, ohneKarte = [], sauber = 0, kaempfe = 0;
   for (const boss of Object.keys(env.scenarioData.bosses)) {
     const sheriff = env.scenarioData.bosses[boss].final?.stats?.SHERIFF;
@@ -263,6 +475,11 @@ export function rauchtest(db) {
     say(`  ${sv.name.slice(0, 48).padEnd(50)} Stapel ${labels.length}${fehlt.length ? ` (FEHLT ${fehlt.join(', ')})` : ''}; Dörfler ${seats.V1 ?? '?'}/${seats.V2 ?? '?'}/${seats.V3 ?? '?'}; ${teile.join(' → ')}`);
     if (fehlt.length) bad(`${sv.name}: Stapel fehlen: ${fehlt.join(', ')}`);
   }
+
+  // ── 4. (M31) Die Dörflerzahl ──
+  const vier = dorflerFaelle(env);
+  out.push(...vier.out);
+  problems.push(...vier.problems);
 
   say(`\nRauchtest: ${problems.length} Beanstandungen`);
   return { out, problems };

@@ -800,3 +800,270 @@ test('DX: `istWache` erkennt require_marker wie require_counter und require_zone
   assert.equal(istWache({ type: 'require_marker', status: 'skipped', reason: 'zone "X" not found' }), false);
   assert.equal(istWache({ type: 'require_marker', status: 'ok' }), false);
 });
+
+// ── EY / Spec M31.9, M31.13: der Rauchtest kennt die Dörflerzahl ─────────────────────────────────────────────
+//
+// Eingang: der Zielstand aus EX, **aus der Fixture** mit den Bausteinen aus `scripts/doerflerzahl-daten.mjs` gerechnet
+// (nicht aus der Produktion). Vorher-Stand: der Stand nach EV, vor EW und EX; er gibt die Abschnitte 0 bis 2 von
+// `EV-rauchtest-nachher.txt` (die Produktion vor EW/EX) wieder. Die Zahlen unten sind eine **unabhängige** Abschrift
+// der Spec; BEW/LEB und die Endkampf-Zahlen liest der Test aus `SPALTEN` und `MESSUNG` (dort steht die Messung einmal).
+
+import { createHash } from 'node:crypto';
+const { seededRng } = await import('../../scripts/auslagen-daten.mjs');
+
+const EYD = await import('../../scripts/doerflerzahl-daten.mjs');
+const { laden, dorflerFaelle } = await import('../../scripts/auslagen-rauchtest.mjs');
+const { SPALTEN, MESSUNG, zahlBei } = EYD;
+
+const eyDzFx = JSON.parse(fs.readFileSync(new URL('./fixtures/doerflerzahl-kurzpartie.json', import.meta.url), 'utf8'));
+const eyH12 = (t) => createHash('sha256').update(t).digest('hex').slice(0, 12);
+
+/** Vor EW und EX (nach EV): die Produktion, wie `EV-rauchtest-nachher.txt` sie zeigt. */
+const eyVor = {
+  scenario: EYD.patchWerte(EYD.patchGelaende(JSON.parse(eyDzFx.scenario)).scenario).scenario,
+  sequence: JSON.parse(eyDzFx.sequence),
+  action: JSON.parse(eyDzFx.actions),
+  zone: EYD.patchZonen(zones).zone,
+  assets: EYD.patchAssets(assets).assets,
+};
+/** Der Zielstand nach EX, aus demselben Vorher-Stand gerechnet. */
+const eyZiel = (() => {
+  const action = EYD.patchAktionen(eyVor.action).action;
+  const s = EYD.patchSchalter(eyVor.scenario, eyVor.sequence, { zone: eyVor.zone, assets: eyVor.assets, action });
+  assert.equal(s.art, 'zu-schreiben', (s.probleme ?? []).join(' | '));
+  return { scenario: s.scenario, sequence: s.sequence, action, zone: eyVor.zone, assets: eyVor.assets };
+})();
+
+/** Eine Wegwerf-Datenbank mit diesem Stand (das echte Schema); `fn(db)` läuft darauf, danach ist sie weg. */
+function eyDb(z, fn) {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'cge-ey-'));
+  const file = path.join(tmp, 'ey.db');
+  try {
+    execFileSync(process.execPath, ['--input-type=module', '-e',
+      'const { setupDatabase, closeDatabase } = await import("./src/database.js"); await setupDatabase(); closeDatabase();'],
+    { cwd: new URL('..', import.meta.url), env: { ...process.env, CGE_DB_PATH: file }, stdio: 'pipe' });
+    const db = new Database(file);
+    db.prepare("insert into games (id, name) values (?, 'TFT')").run(GAME_ID);
+    const cat = new Map();
+    const catId = (name) => {
+      if (!name) return null;
+      if (!cat.has(name)) { cat.set(name, randomUUID()); db.prepare('insert into categories (id, game_id, name) values (?, ?, ?)').run(cat.get(name), GAME_ID, name); }
+      return cat.get(name);
+    };
+    for (const a of z.assets) {
+      db.prepare('insert into table_assets (id, game_id, type, name, image_path, back_image_path, width, height, category_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(a.id, GAME_ID, a.type, a.name, a.image_path, a.back_image_path, a.width, a.height, catId(a.category));
+    }
+    for (const c of cards) {
+      db.prepare('insert into cards (id, game_id, category_id, name, image_path, width, height) values (?, ?, ?, ?, ?, ?, ?)')
+        .run(c.id, GAME_ID, catId(c.category), c.name, c.image_path, c.width, c.height);
+    }
+    db.prepare('insert into setups (id, game_id, name, state_data, zone_data, sequence_data, grid_data, action_data, scenario_data) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(SETUP_ID, GAME_ID, 'TFT Aufbau', JSON.stringify(state), JSON.stringify(z.zone), JSON.stringify(z.sequence),
+        JSON.stringify(grids), JSON.stringify(z.action), JSON.stringify(z.scenario));
+    try { return fn(db); } finally { db.close(); }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+/** Die Umgebung, die der Rauchtest selbst lädt (`laden`), je Stand zwischengespeichert. */
+const eyUmgebungen = new Map();
+const eyUmgebung = (z) => {
+  if (!eyUmgebungen.has(z)) eyUmgebungen.set(z, eyDb(z, (db) => laden(db)));
+  return eyUmgebungen.get(z);
+};
+const eyZielU = () => eyUmgebung(eyZiel);
+const eyVorU = () => eyUmgebung(eyVor);
+let eyFaelleCache;
+const eyFaelle = () => (eyFaelleCache ??= dorflerFaelle(eyZielU()));
+
+test('EY 0: der Zielstand aus der Fixture ist die Produktion nach EX – Länge und Hash aller vier Spalten', () => {
+  const t = (x) => JSON.stringify(x);
+  assert.deepEqual([t(eyZiel.scenario).length, eyH12(t(eyZiel.scenario))], [25284, '7368e504b85a']);
+  assert.deepEqual([t(eyZiel.sequence).length, eyH12(t(eyZiel.sequence))], [2878, '712f93e99e1a']);
+  assert.deepEqual([t(eyZiel.action).length, eyH12(t(eyZiel.action))], [7564, '9f41211076a4']);
+  assert.deepEqual([t(eyZiel.zone).length, eyH12(t(eyZiel.zone))], [39886, 'efe0b0743364']);
+});
+
+test('EY 1 (Prüfpunkt 1): ein Gate `onlySeated` auf einem leeren Platz hinterlässt keine Zeile – auf einem besetzten Platz läuft der Schritt', () => {
+  const u = eyZielU();
+  const aufbau = bauen({ state: u.row.state_data, sequence: u.sequence, zones: u.zones, grids: u.grids, assets: u.assets, cards: u.cards, scenarioData: u.scenarioData }, {}, 1);
+  const lauf = (gate) => executeSequenceWithLog(aufbau.state, [{ type: 'place_counter', name: 'Probe', value: '1', x: 10, y: 10, onlySeated: gate }],
+    u.zones, { assets: u.assets, cards: u.cards, grids: u.grids, scenarioData: u.scenarioData });
+  // Vorgabe zwei: Platz 3 ist leer. Kein Eintrag im Protokoll, kein Zähler – das ist richtig, kein Fehler.
+  const leer = lauf(3);
+  assert.deepEqual(leer.log, []);
+  assert.equal(leer.state.counters.some(c => c.name === 'Probe'), false);
+  // Platz 2 sitzt: der Schritt läuft.
+  const da = lauf(2);
+  assert.deepEqual(da.log.map(e => e.status), ['ok']);
+  assert.equal(da.state.counters.some(c => c.name === 'Probe'), true);
+});
+
+test('EY 2: der Rauchtest auf dem Zielstand meldet nichts – 0 Beanstandungen', () => {
+  const r = eyDb(eyZiel, (db) => rauchtest(db));
+  assert.deepEqual(r.problems, [], r.problems.join('\n'));
+  assert.match(r.out.join('\n'), /^Rauchtest: 0 Beanstandungen$/m);
+});
+
+test('EY 3: der Abschnitt 4 steht im Bericht – hinter Abschnitt 3, vor der Summe; fehlende Daten sind eine Beanstandung und zählen in der Summe', () => {
+  const r = eyDb(eyZiel, (db) => rauchtest(db));
+  const t = r.out.join('\n');
+  const i3 = t.indexOf('\n3. Spielstände'), i4 = t.indexOf('\n4. Dörflerzahl'), iS = t.indexOf('\nRauchtest: ');
+  assert.ok(i3 > 0 && i4 > i3 && iS > i4, `Reihenfolge 3 < 4 < Summe: ${i3} ${i4} ${iS}`);
+  // Ohne Dörfler 5 im Schalter ist das ein Befund, kein Schweigen.
+  const kaputt = { ...eyZiel, scenario: structuredClone(eyZiel.scenario) };
+  delete kaputt.scenario.options.doerfler5;
+  const r2 = eyDb(kaputt, (db) => rauchtest(db));
+  assert.ok(r2.problems.some(p => /doerfler5|Dörfler 5/.test(p)), r2.problems.join('\n'));
+  assert.match(r2.out.join('\n'), /^Rauchtest: [1-9]\d* Beanstandungen$/m);
+});
+
+test('EY 4 (a): Vorgabe zwei – zwei Dörfler, Münzen 30 (kurz) und 20 (lang), Dorfphase 28 Zeilen ohne Ausfall, Münzen +12', () => {
+  const z = eyFaelle().zahlen;
+  assert.equal(z.n[2].kurz.muenzen0, 30);
+  assert.equal(z.n[2].lang.muenzen0, 20);
+  assert.equal(z.n[2].kurz.dorfZeilen, 28);
+  assert.equal(z.n[2].kurz.dorfNichtOk, 0);
+  assert.equal(z.n[2].kurz.dorfPlus, 12);
+  // Die Vorgabe ohne jede Dörfler-Wahl ist dieselbe Partie wie „zwei“.
+  assert.equal(z.vorgabe.muenzen0, 30);
+  assert.equal(z.vorgabe.dorfZeilen, 28);
+});
+
+test('EY 5 (b): doerfler3 Granny – der Tisch von vor M31: 45 Münzen (kurz), 30 (lang), Dorfphase 33 Zeilen, +18', () => {
+  const z = eyFaelle().zahlen;
+  assert.equal(z.n[3].kurz.muenzen0, 45);
+  assert.equal(z.n[3].lang.muenzen0, 30);
+  assert.equal(z.n[3].kurz.dorfZeilen, 33);
+  assert.equal(z.n[3].kurz.dorfPlus, 18);
+  assert.equal(z.n[3].kurz.dorfNichtOk, 0);
+});
+
+test('EY 6 (c): vier und fünf Dörfler – Münzen 60 / 75 (kurz), 40 / 50 (lang); Dorfphase 38 / 43 Zeilen; Münzen +24 / +30; Ereignis 1 + n Zeilen; n Figuren', () => {
+  const z = eyFaelle().zahlen;
+  assert.equal(z.n[4].kurz.muenzen0, 60); assert.equal(z.n[5].kurz.muenzen0, 75);
+  assert.equal(z.n[4].lang.muenzen0, 40); assert.equal(z.n[5].lang.muenzen0, 50);
+  assert.equal(z.n[4].kurz.dorfZeilen, 38); assert.equal(z.n[5].kurz.dorfZeilen, 43);
+  assert.equal(z.n[4].kurz.dorfPlus, 24); assert.equal(z.n[5].kurz.dorfPlus, 30);
+  for (const n of [2, 3, 4, 5]) {
+    assert.equal(z.n[n].kurz.ereignisZeilen, 1 + n, `Dorf-Ereignis bei ${n}`);
+    assert.equal(z.n[n].kurz.dorfNichtOk, 0, `Dorfphase bei ${n}: keine Zeile als skipped`);
+    assert.equal(z.n[n].figuren, n, `Figuren auf dem Feld bei ${n}`);
+  }
+});
+
+test('EY 7 (d): alle Bösewichte mit 2 / 3 / 4 / 5 Dörflern – BEW und LEB gleich der Spalte aus §5.5; Barry Bluff legt keinen Zahlen-Marker', () => {
+  const z = eyFaelle().bosse;
+  for (const name of Object.keys(SPALTEN)) for (const n of [2, 3, 4, 5]) {
+    assert.deepEqual(z[name][n], { BEW: SPALTEN[name].BEW[n - 2], LEB: SPALTEN[name].LEB[n - 2] }, `${name} bei ${n}`);
+  }
+  // Barry Bluff trägt Formeln statt Zahlen: es gibt keinen Wert, den der Rauchtest messen könnte.
+  for (const n of [2, 3, 4, 5]) assert.equal(z['Barry Bluff'][n], null, `Barry Bluff bei ${n}`);
+  assert.equal(Object.keys(z).length, 20);
+});
+
+test('EY 8 (e): der Endkampf der acht gemessenen Bösewichte – 2 / 3 / 4 / 5 Plättchen bei Deputy, Pepin, Samuel; die festen Zahlen bei jeder Zahl', () => {
+  const z = eyFaelle().endkampf;
+  for (const name of Object.keys(MESSUNG)) for (const n of [2, 3, 4, 5]) {
+    assert.equal(z[name][n], zahlBei(name, n), `${name} Endkampf bei ${n}`);
+  }
+  assert.deepEqual(['Deputy Waggums', 'Pepin Milkfrog', 'Samuel Strawman'].map(k => [2, 3, 4, 5].map(n => z[k][n])), [[2, 3, 4, 5], [2, 3, 4, 5], [2, 3, 4, 5]]);
+  assert.deepEqual(['Virginia Fitz', 'Handsy', 'The Bundits', 'Tilda Fields', 'Umbrello'].map(k => z[k][5]), [5, 5, 1, 1, 1]);
+});
+
+test('EY 9 (g): die Wache mit zwei Dörflern – beide Lebensmarker weg hält mit Rückfrage ohne das Wort „drei“; einer liegt noch: sie läuft', () => {
+  const w = eyFaelle().wache;
+  assert.equal(w.zweiWeg.gehalten, true);
+  assert.equal(w.zweiWeg.rueckfrage, true);
+  assert.equal(w.zweiWeg.ohneDrei, true);
+  assert.equal(w.einerWeg.gehalten, false);
+});
+
+test('EY 10 (h): die Doppelwahl – Judy / Judy / keiner und Judy / Judy / Granny: genau die erwarteten Zeilen, nichts anderes', () => {
+  const d = eyFaelle().doppel;
+  assert.deepEqual(d.keiner.aufbau, [[26, 'seat_villager', 'skipped']]);
+  assert.deepEqual(d.keiner.kampf, [[5, 'build_scenario', 'failed'], [6, 'place_asset', 'skipped'], [7, 'place_asset', 'skipped'],
+    [8, 'place_asset', 'skipped'], [9, 'place_asset', 'skipped'], [10, 'place_asset', 'skipped']]);
+  assert.deepEqual(d.keiner.dorf, [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']]);
+  assert.equal(d.keiner.muenzen, 21);
+  assert.deepEqual(d.granny.aufbau, [[26, 'seat_villager', 'skipped']]);
+  assert.deepEqual(d.granny.kampf, [[10, 'place_asset', 'skipped']]);
+  assert.deepEqual(d.granny.dorf, [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']]);
+  assert.equal(d.granny.muenzen, 42);
+});
+
+test('EY 11 (i): die „Wer ist dran?"-Leiste – bei n Dörflern liegen die Steine auf den Plätzen 1 … n; die Dorfphase dreht sie um eine Stelle; fünf passen', () => {
+  const l = eyFaelle().leiste;
+  for (const n of [2, 3, 4, 5]) {
+    const { vor, nach } = l[n];
+    const plaetze = Array.from({ length: n }, (_, i) => i + 1);
+    assert.deepEqual([...nach.values()].sort((a, b) => a - b), plaetze, `Plätze nach der Dorfphase bei ${n}`);
+    assert.deepEqual([...vor.values()].sort((a, b) => a - b), plaetze, `Plätze davor bei ${n}`);
+    for (const [name, p] of vor) assert.equal(nach.get(name), ((p - 2 + n) % n) + 1, `${name}: eine Stelle weiter bei ${n}`);
+  }
+});
+
+test('EY 12 (Prüfpunkt 3): die Abschnitte 0 bis 2 – Zeile für Zeile wie vor M31 (drei Dörfler, Granny); nur die Kopfzeile ändert sich', () => {
+  const alt = eyDb(eyVor, (db) => rauchtest(db).out.join('\n'));
+  const neu = eyDb(eyZiel, (db) => rauchtest(db).out.join('\n'));
+  const abschnitte = (t) => t.slice(t.indexOf('\n0. '), t.indexOf('\n3. Spielstände'));
+  assert.equal(abschnitte(neu), abschnitte(alt));
+});
+
+test('EY 13 (b, Zeilenfolge): Aufbau, Kampf, Dorfphase und Ereignis mit Granny – dieselben Zeilen wie vor M31 (Index, Ziel der Wache und Zahl der übersprungenen Schritte ausgenommen)', () => {
+  const laufen = (u, choices) => {
+    const r = bauen({ state: u.row.state_data, sequence: u.sequence, zones: u.zones, grids: u.grids, assets: u.assets, cards: u.cards, scenarioData: u.scenarioData }, choices, 3);
+    const lauf = (id, st) => executeSequenceWithLog(st, u.actions.find(a => a.id === id).steps, u.zones, { assets: u.assets, cards: u.cards, grids: u.grids, scenarioData: u.scenarioData, rng: seededRng(7) });
+    const muenzen = (st) => st.counters.find(c => c.name === 'Münzen (gemeinsam)')?.value;
+    const zeilen = (log) => log.map(e => [e.type, e.status, e.type === 'require_marker' ? null : (e.reason ?? '').replace(/\s*\(\d+ further steps? skipped\)/, '')]);
+    const k = lauf('kampf-beginnen', r.state), d = lauf('dorfphase-beginnen', k.state), e = lauf('dorfereignis', d.state);
+    return { aufbau: zeilen(r.log), kampf: zeilen(k.log), dorf: zeilen(d.log), ereignis: zeilen(e.log), muenzen: [muenzen(r.state), muenzen(d.state)] };
+  };
+  const wahl = { partie: 'kurz', troedel: 'mit', doerfler3: 'Granny' };
+  const vorher = laufen(eyVorU(), wahl);
+  const nachher = laufen(eyZielU(), wahl);
+  assert.deepEqual(nachher.muenzen, [45, 63]);
+  assert.deepEqual(nachher.aufbau, vorher.aufbau);
+  assert.deepEqual(nachher.kampf, vorher.kampf);
+  assert.deepEqual(nachher.dorf, vorher.dorf);
+  assert.deepEqual(nachher.ereignis, vorher.ereignis);
+});
+
+test('EY 14: die Prüfung der Prüfung – fünf eingebaute Fehler im Zielstand, und der Abschnitt 4 nennt jeden beim Namen', () => {
+  const kopie = () => structuredClone(eyZiel);
+  const fehler = {
+    // A: die Münzen je Dörfler falsch (16 statt 15): der Aufbau mit zwei Dörflern hat 32 statt 30.
+    muenzen: (z) => { z.scenario.options.partie.choices.kurz.vars.MuenzenJeDoerfler = '16'; },
+    // B: ein Plättchen erscheint eine Dörflerzahl zu spät (FF3 ab vier statt drei): Deputy legt bei drei nur zwei.
+    endkampf: (z) => { z.scenario.bosses['Deputy Waggums'].final.terrain.find(t => t.fromCount === 3).fromCount = 4; },
+    // C: ein BEW-Wert im Spalten-Eintrag falsch: Virginia bei vier Dörflern.
+    werte: (z) => { z.scenario.bosses['Virginia Fitz'].statsByCount['4'].BEW = 99; },
+    // D: die Wache fragt nicht mehr zurück (kein `confirm`).
+    wache: (z) => {
+      const dorf = z.action.find(a => a.id === 'dorfphase-beginnen');
+      const w = dorf.steps.find(s => s.type === 'require_marker');
+      delete w.confirm;
+    },
+    // E: die Dorfphase hat einen Schritt zu viel, der nicht läuft: die Doppelwahl bekommt eine Zeile, die sie nicht erwartet.
+    doppel: (z) => {
+      const dorf = z.action.find(a => a.id === 'dorfphase-beginnen');
+      dorf.steps.push({ type: 'place_asset', assetName: 'Gibt es nicht', targetZoneLabel: 'Bösewicht-Tableau' });
+    },
+  };
+  const erwartet = {
+    muenzen: /Münzen im Aufbau 32, erwartet 30/,
+    endkampf: /Deputy Waggums, Endkampf bei 3 Dörflern: 2 Plättchen, erwartet 3/,
+    werte: /Virginia Fitz, 4 Dörfler: BEW null \/ LEB 18, erwartet 6 \/ 18/,
+    wache: /Wache, zwei Dörfler/,
+    doppel: /Doppelwahl Judy\/Judy\/keiner: andere Zeilen als erwartet/,
+  };
+  for (const [name, falsch] of Object.entries(fehler)) {
+    const z = kopie();
+    falsch(z);
+    const r = eyDb(z, (db) => rauchtest(db));
+    const treffer = r.problems.filter(p => erwartet[name].test(p));
+    assert.ok(treffer.length >= 1, `Fehler ${name}: der Abschnitt 4 nennt ihn nicht – Beanstandungen: ${r.problems.join(' | ').slice(0, 600)}`);
+    assert.match(r.out.join('\n'), /^Rauchtest: [1-9]\d* Beanstandungen$/m, `Fehler ${name}: die Summe zählt ihn nicht`);
+  }
+});
