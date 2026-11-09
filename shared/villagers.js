@@ -59,17 +59,28 @@ export const coordOf = (v) => (v === null || v === undefined || v === '' ? NaN :
 export const isSpot = (p) => Boolean(p) && Number.isFinite(coordOf(p.x)) && Number.isFinite(coordOf(p.y));
 
 /**
+ * M30.5: nennt der Platz Zähler? `counters` fehlt, ist `null` oder `{}` →
+ * nein, der Platz hat keine (und `seat_villager` legt keine). Alles andere ist
+ * eine Angabe, und dann muss sie vollständig sein (`seatGeometryProblems`).
+ * Die **eine** Stelle für die Frage - Prüfer, Aufbau und Tausch fragen sie (M6).
+ */
+export const seatHasCounters = (seat) =>
+  Boolean(seat?.counters) && typeof seat.counters === 'object' && Object.keys(seat.counters).length > 0;
+
+/**
  * Was an der **Geometrie** von Platz `n` (1-based) fehlt, eine Meldung je Stück:
- * das Tableau, ein Zähler je Wert. Eine Stelle für die Frage - die Prüfung der
- * Daten und `seat_villager` fragen dasselbe (M6): was die Daten nicht sagen,
- * stellt der Aufbau nicht halb hin.
+ * das Tableau, und - **wenn der Platz Zähler nennt** (M30.5) - ein Zähler je
+ * Wert. Eine Stelle für die Frage - die Prüfung der Daten und `seat_villager`
+ * fragen dasselbe (M6): was die Daten nicht sagen, stellt der Aufbau nicht halb
+ * hin. Ein Platz ganz ohne `counters` ist in Ordnung, eine Teil-Angabe nicht.
  */
 export function seatGeometryProblems(seat, n) {
   const who = `seat ${n}`;
   const problems = [];
   if (!isSpot(seat?.tableau)) problems.push(`${who}: no tableau position`);
+  if (!seatHasCounters(seat)) return problems;
   for (const st of STATS) {
-    if (!isSpot(seat?.counters?.[st.key])) problems.push(`${who}: no counter position for ${st.key}`);
+    if (!isSpot(seat.counters[st.key])) problems.push(`${who}: no counter position for ${st.key}`);
   }
   return problems;
 }
@@ -92,6 +103,25 @@ export function findVillager(villagers, name) {
   if (!wanted) return null;
   const key = Object.keys(villagers.roster).find(k => norm(k) === wanted);
   return key === undefined ? null : { name: key, ...villagers.roster[key] };
+}
+
+/**
+ * M30.7: der Startwert, auf dem der Marker einer Leiste beim Aufbau liegt -
+ * `roster[<Dörfler>].start[<Wert>]`, wobei der Wert der Teil nach dem **letzten**
+ * `": "` im Zonennamen ist (`Dörfler 1: Mumm` → `Mumm`) und einer von `STATS`
+ * sein muss. `require_marker … atStart` fragt hier statt im Executor: er weiß
+ * nichts über Townsfolk Tussle (M7).
+ *
+ * `undefined` heißt „weiß ich nicht" (unbekannter Dörfler, Zone ohne `": "`,
+ * ein Wert, den es nicht gibt) - **nie** geraten und nie 0: Präzision hat echte
+ * Startwerte von 0, der Aufrufer unterscheidet mit `=== undefined`.
+ */
+export function markerStart(villagers, name, zoneLabel) {
+  const label = String(zoneLabel ?? '');
+  const i = label.lastIndexOf(': ');
+  if (i < 0) return undefined;
+  const stat = STATS.find(st => st.key === label.slice(i + 2));
+  return stat ? findVillager(villagers, name)?.start?.[stat.key] ?? undefined : undefined;
 }
 
 /**

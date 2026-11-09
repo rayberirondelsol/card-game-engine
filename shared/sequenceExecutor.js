@@ -22,7 +22,7 @@
  *                                        rng: () => [0,1) }
  * @returns {object} – new (deep-cloned) game state with all steps applied
  */
-import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone, freeSlots, stackPoint } from './zoneGeometry.js';
+import { zoneSlots, zoneSlotFor, zoneSlotNumbered, zoneSlotNumberAt, zoneCenter, zoneRejects, zoneCapacity, zoneContains, countInZone, objectsInZone, freeSlots, stackPoint } from './zoneGeometry.js';
 import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
@@ -30,7 +30,7 @@ import { validateScenarioData } from './scenarioData.js';
 import { normalizeCounter, counterValue, counterMax } from './counters.js';
 import { findCardByName } from './cardSearch.js';
 import { resolveChoices, checkGate } from './setupOptions.js';
-import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, coordOf, STATS, TABLEAU_PREFIX } from './villagers.js';
+import { seatVars, seatedVillagers, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -387,6 +387,23 @@ function findZone(zones, label) {
   return zones.find(z => norm(z.label) === norm(label)) || null;
 }
 
+/**
+ * M30.7: was auf der Leiste `zone` als Marker liegt - `{ value, shown, unreadable? }`.
+ * `value` ist die Nummer seines Platzes, `null` heißt „kein Marker" (**nicht** 0:
+ * Präzision hat einen Platz 0, und `zoneSlotNumberAt` gibt ihn als Zahl zurück,
+ * darum wird mit `=== null` verglichen). **Genau ein** Plättchen auf einem Platz
+ * ist ein lesbarer Marker; zwei oder eines neben seinem Platz ist `unreadable` -
+ * die Wache rät nicht, welches der Marker ist (Spec M30.7). Das Ankerobjekt der
+ * Zone zählt nicht, Karten und Bretter auch nicht (`objectsInZone` über Tokens).
+ */
+function readMarker(zone, state) {
+  const here = objectsInZone(zone, state.tokens);
+  if (!here.length) return { value: null, shown: 'no marker' };
+  if (here.length > 1) return { value: null, shown: `${here.length} objects`, unreadable: true };
+  const nr = zoneSlotNumberAt(zone, here[0].x, here[0].y);
+  return nr === null ? { value: null, shown: 'has no place', unreadable: true } : { value: nr, shown: String(nr) };
+}
+
 /** The grid a step names, or null. No name is no address, not "the nameless one". */
 function findGrid(grids, label) {
   if (!label) return null;
@@ -477,7 +494,9 @@ export function onlyFinalOf(value) {
 // `hasPlaceholder` prueft nur Zeichenketten, und dort steht eine Zahl.
 // `slot` steht hier, weil die Werte des Boesewichts als `$BEW`/`$LEB` an die
 // Leisten kommen (M8.10, Nachtrag zu M7.5) - derselbe Weg wie `$B` bei `cell`.
-const NAME_FIELDS = ['assetName', 'cardName', 'cell', 'slot', 'category', 'label', 'name', 'value'];
+// `villager` steht hier, seit der Aufbau die Doerfler waehlen laesst (M30.3): ein
+// `seat_villager`/`swap_villager` nennt sie als `$optDoerfler1` oder `$F1`.
+const NAME_FIELDS = ['assetName', 'cardName', 'cell', 'slot', 'category', 'label', 'name', 'value', 'villager'];
 
 /** "Bösewicht: Patches" → "Patches"; a name without ": " is its own base. */
 function baseName(name) {
@@ -661,7 +680,7 @@ function fullZones(usable, free, kind) {
  *
  * `spots` sagt **wohin**: `tableau { x, y, rotation, anchorId?, locked }`, `stone`
  * (`{ x, y, rotation }` oder `{ zone }`, oder `null`: keiner), `counters` je Wert
- * (`{ x, y, locked? }` oder `null`). Fehlt ein Spielstein oder ein Zähler, sagen
+ * (`{ x, y, locked? }` oder `null`; `counters: null` im ganzen: der Platz hat keine, M30.5). Fehlt ein Spielstein oder ein Zähler, sagen
  * `noStone`/`noCounter(stat)` den Hinweis - er hängt am Alten, das der Tausch
  * kennt und der Aufbau nicht. Der Platzhalter-Kontext der Teilschritte ist leer:
  * sie tragen ihre Namen ausgeschrieben.
@@ -681,6 +700,14 @@ function placeVillager(work, n, wanted, spots, env) {
     }
     return e;
   };
+
+  // Der Startwert steht **vor** jedem Legen und vor beiden Schleifen (M30.5): er
+  // gehört nicht den Zählern - ohne ihn legte die Markerschleife mit `slot:
+  // undefined` den Marker still auf Platz 1. Fehlt einer, wird nichts gelegt.
+  for (const st of STATS) {
+    if (!Number.isFinite(wanted.start?.[st.key])) problems.push(`${wanted.name}: no start value for ${st.key}`);
+  }
+  if (problems.length) return { problems, notes };
 
   // Das Tableau zuerst, und mit `anchorId`: die Zonen des Platzes finden es erst
   // damit wieder, und Marker und Karten zielen auf diese Zonen.
@@ -705,10 +732,12 @@ function placeVillager(work, n, wanted, spots, env) {
     notes.push(spots.noStone);
   }
 
-  for (const st of STATS) {
+  // M30.5: Zähler gibt es nur, wo der Platz sie nennt (`spots.counters`); ohne sie
+  // wird nichts gelegt und nichts gesagt - kein `note` je Wert, das wären zwölf
+  // Zeilen Rauschen je Aufbau.
+  for (const st of spots.counters ? STATS : []) {
     const spot = spots.counters[st.key];
     const value = wanted.start?.[st.key];
-    if (!Number.isFinite(value)) { problems.push(`${wanted.name}: no start value for ${st.key}`); continue; }
     if (!spot) { notes.push(spots.noCounter(st)); continue; }
     // Leben traegt sein Maximum (= Startwert), die anderen drei ihren Ausgangswert.
     const e = sub({
@@ -771,7 +800,8 @@ function pickSeat(state, step, assets, villagers) {
  * Was dem Platz gehört, kommt aus dem Platz (`seat.tableau`, `seat.counters`,
  * `villagers.barZone`), was dem Dörfler gehört, aus dem Roster. Fehlt eine
  * Stelle, wird **nichts** gestellt: ein Tableau ohne seine Zähler ist ein halber
- * Dörfler.
+ * Dörfler - **es sei denn, der Platz nennt gar keine** (M30.5): dann legt er
+ * keine, und das ist ein ganzer Dörfler (die Marker zeigen die Werte).
  *
  * Das Tableau trägt `anchorId` nur, wenn es **nicht** das Asset des Platzes ist
  * (Judy an Platz 1): die Zonen des Platzes hängen an dessen Id. Henlo an Platz 1
@@ -802,7 +832,7 @@ function seatVillager(state, step, allZones, allGrids, assets, cards, scenarioDa
   const spots = {
     tableau: { ...spot(seat.tableau), rotation: 0, anchorId: own && own.id !== anchor.id ? anchor.id : undefined, locked: true },
     stone: { zone: villagers.barZone },
-    counters: Object.fromEntries(STATS.map(st => [st.key, spot(seat.counters[st.key])])),
+    counters: seatHasCounters(seat) ? Object.fromEntries(STATS.map(st => [st.key, spot(seat.counters[st.key])])) : null,
   };
   const placed = placeVillager(work, n, wanted, spots, { allZones, allGrids, assets, cards, scenarioData, rng });
   if (placed.fail) return { fail: placed.fail };
@@ -874,7 +904,11 @@ function swapVillager(state, step, allZones, allGrids, assets, cards, scenarioDa
       anchorId: oldTableau.anchorId || oldTableau.assetId, locked: oldTableau.locked === true },
     stone: stones.length ? { x: stones[0].x, y: stones[0].y, rotation: stones[0].rotation || 0 } : null,
     noStone: `no "${old.short}" on the table, so none was put down for "${wanted.short}"`,
-    counters: Object.fromEntries(oldCounters.map(({ st, c }) => [st.key, c ? { x: c.x, y: c.y, locked: c.locked === true } : null])),
+    // M30.5: nennt der Platz keine Zähler, legt der Tausch keine - die des Alten
+    // sind oben schon weggeräumt (ein alter Spielstand), ein Hinweis entfällt.
+    counters: seatHasCounters(villagers.seats[n - 1])
+      ? Object.fromEntries(oldCounters.map(({ st, c }) => [st.key, c ? { x: c.x, y: c.y, locked: c.locked === true } : null]))
+      : null,
     noCounter: (st) => `no counter "${counterName(old, st.key)}" to take the place of "${counterName(wanted, st.key)}"`,
   };
   const placed = placeVillager(work, n, wanted, spots, env);
@@ -1027,47 +1061,79 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
     // Meldung und laesst den Spieler entscheiden (`runSetupAction`). Der Tisch
     // behauptet nichts ueber den Ausgang der Partie - er nennt den Zaehlerstand
     // und fragt.
-    case 'require_counter': {
+    //
+    // M30.7/DW: `require_marker` ist **dieselbe Wache** mit einer anderen Quelle -
+    // der Handler bleibt einer, damit es keine zweite Haltelogik gibt (M6). Neu
+    // ist nur, woher die Liste `rows` kommt: Zaehler (wie bisher) oder Marker auf
+    // Leisten (`readMarker`). Gelesen, gehalten und gemeldet wird danach gleich.
+    // Eine **unlesbare** Zone haelt anders als ein fehlender Zaehler (Entscheidung
+    // 5): ein Marker liegt schief, weil am Tisch gespielt wird - „mindestens
+    // einer" ist dann trotzdem wahr, und nur wenn keiner besteht, ist ein Halt
+    // ohne `message` die ehrliche Antwort (der Satz „alle besiegt" stimmte nicht).
+    case 'require_counter':
+    case 'require_marker': {
       const halt = (reason) => { ctx.halted = true; return skip(reason); };
 
-      const names = categoryList(step.name);
-      if (!names.length) return halt('no counter name given');
+      const isMarker = step.type === 'require_marker';
+      const what = isMarker ? 'marker' : 'counter';
+      const names = categoryList(isMarker ? step.zoneLabel : step.name);
+      if (!names.length) return halt(isMarker ? 'no zone given' : 'no counter name given');
 
       const above = step.above === undefined || step.above === null || step.above === ''
         ? 0 : Number(step.above);
       if (!Number.isFinite(above)) return halt(`"${String(step.above)}" is not a number`);
 
-      const counters = Array.isArray(state.counters) ? state.counters : [];
-      const found = names.map(n => counters.find(c => norm(c.name) === norm(n)));
-      // Eine Bedingung, die sich nicht pruefen laesst, ist keine erfuellte:
-      // durchzulassen hiesse genau den Schaden zuzulassen, gegen den sie steht
-      // (dieselbe Entscheidung wie bei `require_zone`).
-      const missing = names.filter((n, i) => !found[i]);
-      if (missing.length) return halt(`no counter named ${missing.map(n => `"${n}"`).join(', ')}`);
+      // Die Quelle: je genanntem Zaehler / je genannter Leiste eine Zeile
+      // { label, value, shown, start, unreadable? }.
+      let rows;
+      if (isMarker) {
+        const found = names.map(n => findZone(zones, n));
+        // Eine Bedingung, die sich nicht pruefen laesst, ist keine erfuellte
+        // (wie bei `require_zone`): Zone weg oder ohne feste Plaetze haelt immer.
+        const gone = names.find((n, i) => !found[i]);
+        if (gone !== undefined) return halt(`zone "${gone}" not found`);
+        const bare = found.find(z => !zoneSlots(z)?.length);
+        if (bare) return halt(`zone "${bare.label}" has no places`);
+        rows = found.map(z => ({ label: z.label, start: markerStart(scenarioData?.villagers, step.villager, z.label), ...readMarker(z, state) }));
+      } else {
+        const counters = Array.isArray(state.counters) ? state.counters : [];
+        const found = names.map(n => counters.find(c => norm(c.name) === norm(n)));
+        // Eine Bedingung, die sich nicht pruefen laesst, ist keine erfuellte:
+        // durchzulassen hiesse genau den Schaden zuzulassen, gegen den sie steht
+        // (dieselbe Entscheidung wie bei `require_zone`).
+        const missing = names.filter((n, i) => !found[i]);
+        if (missing.length) return halt(`no counter named ${missing.map(n => `"${n}"`).join(', ')}`);
+        // Der Ausgangswert ist `base`, sonst `max` (Leben traegt nur das Maximum,
+        // Regel "Maximales LEBEN"); ein Zaehler ohne beides hat keinen.
+        rows = found.map(c => ({ label: c.name, value: Number(c.value), shown: c.value, start: counterMax(c.base) ?? counterMax(c.max) }));
+      }
+      const unreadable = rows.some(r => r.unreadable);
+      const listing = rows.map(r => `${r.label}: ${r.shown}`).join(', ');
 
-      // M26.2/CM: die zweite Lesart derselben Wache - **jeder** genannte Zaehler
-      // steht auf seinem Ausgangswert. Gefragt ist "hat dieser Doerfler schon
-      // gespielt?", und die Antwort steht an den Zaehlern: ein Tausch in Runde 3
-      // loeschte erspielte Werte. Der Ausgangswert ist `base`, sonst `max`
-      // (Leben traegt nur das Maximum, Regel "Maximales LEBEN"); ein Zaehler ohne
-      // beides hat keinen, und was sich nicht pruefen laesst, gilt nicht als
-      // erfuellt. `above` bleibt bei `atStart` unbeachtet - es ist die andere
-      // Lesart.
+      // M26.2/CM: die zweite Lesart derselben Wache - **jede** genannte Quelle
+      // steht auf ihrem Ausgangswert. Gefragt ist "hat dieser Doerfler schon
+      // gespielt?", und die Antwort steht an den Zaehlern bzw. Markern: ein
+      // Tausch in Runde 3 loeschte erspielte Werte. Was sich nicht pruefen
+      // laesst (kein Ausgangswert, nicht lesbar), gilt nicht als erfuellt.
+      // `above` bleibt bei `atStart` unbeachtet - es ist die andere Lesart.
       const atStart = step.atStart === true || step.atStart === 'true';
       let stand;
       let fallback;
       if (atStart) {
-        const starts = found.map(c => counterMax(c.base) ?? counterMax(c.max));
-        const unknown = found.filter((c, i) => starts[i] === undefined);
-        if (unknown.length) return halt(`no starting value: ${unknown.map(c => `"${c.name}"`).join(', ')}`);
-        const off = found.map((c, i) => ({ c, start: starts[i] })).filter(({ c, start }) => Number(c.value) !== start);
+        const unknown = rows.filter(r => r.start === undefined);
+        if (unknown.length) return halt(`no starting value: ${unknown.map(r => `"${r.label}"`).join(', ')}`);
+        if (unreadable) return halt(`a ${what} cannot be read [${listing}]`);
+        // `none` (value null) liegt auf keinem Startwert - auch nicht auf 0.
+        const off = rows.filter(r => r.value !== r.start);
         if (!off.length) return state;
-        stand = off.map(({ c, start }) => `${c.name}: ${c.value}, started at ${start}`).join('; ');
-        fallback = 'a counter has left its starting value';
+        stand = off.map(r => `${r.label}: ${r.shown}, started at ${r.start}`).join('; ');
+        fallback = `a ${what} has left its starting value`;
       } else {
-        if (found.some(c => Number(c.value) > above)) return state;
-        stand = found.map(c => `${c.name}: ${c.value}`).join(', ');
-        fallback = `no counter above ${above}`;
+        // Ein Marker, der fehlt, zaehlt als 0; ein unlesbarer zaehlt gar nicht.
+        if (rows.some(r => !r.unreadable && (r.value ?? 0) > above)) return state;
+        if (unreadable) return halt(`a ${what} cannot be read [${listing}]`);
+        stand = listing;
+        fallback = `no ${what} above ${above}`;
       }
 
       if (!step.message) return halt(`${fallback} [${stand}]`);

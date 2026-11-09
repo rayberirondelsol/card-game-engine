@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 
 import { resolveZones, anchorBoxes, assetBox } from '../../shared/anchoring.js';
 import { zoneSlotNumbered, zoneCenter } from '../../shared/zoneGeometry.js';
-import { seatedVillagers, seatVars, findVillager } from '../../shared/villagers.js';
+import { seatedVillagers, seatVars, findVillager, markerStart } from '../../shared/villagers.js';
 import { patchActions, VILLAGERS, ROSTER } from '../../scripts/doerfler-daten.mjs';
 import {
   fx, ZONES, scenarioData, run, swap, copy, build, imKampf,
@@ -470,4 +470,21 @@ test('CK: `findVillager` findet nach vollem Namen, egal wie geschrieben', () => 
   assert.equal(findVillager({}, 'Judy Marks'), null);
   assert.equal(Object.keys(ROSTER).length, 9);
   assert.equal(zoneCenter(zone('Dörfler 1: Kopf')).x > 0, true);
+});
+
+// ── markerStart (DW, M30.7) ─────────────────────────────────────────────────
+
+test('DW: `markerStart` nennt den Startwert aus dem Roster, nach Zonenname', () => {
+  assert.equal(markerStart(VILLAGERS, 'Henlo Bulwark', 'Dörfler 1: Mumm'), 2);
+  assert.equal(markerStart(VILLAGERS, 'Granny Melba', 'Dörfler 3: Präzision'), -2);
+  assert.equal(markerStart(VILLAGERS, 'henlo bulwark', 'Dörfler 1: Mumm'), 2, 'Groß-/Kleinschreibung egal (findVillager)');
+});
+
+test('DW: `markerStart` rät nicht - was fehlt, ist `undefined`', () => {
+  assert.equal(markerStart(VILLAGERS, 'Nobody Nowhere', 'Dörfler 1: Mumm'), undefined, 'unbekannter Dörfler');
+  assert.equal(markerStart(VILLAGERS, 'Henlo Bulwark', 'Mumm'), undefined, 'Zonenname ohne ": "');
+  assert.equal(markerStart(VILLAGERS, 'Henlo Bulwark', 'Dörfler 1: Foo'), undefined, 'kein Wert aus STATS');
+  assert.equal(markerStart({}, 'Henlo Bulwark', 'Dörfler 1: Mumm'), undefined, 'leere villagers');
+  assert.equal(markerStart(VILLAGERS, '', 'Dörfler 1: Mumm'), undefined);
+  assert.equal(markerStart(VILLAGERS, undefined, undefined), undefined);
 });

@@ -454,6 +454,9 @@ export function zoneSlots(zone) {
   return null; // unknown layout: treated like none
 }
 
+/** The number of the k-th place: the one written at it, else its position from 1. */
+const slotNumber = (slot, k) => (Number.isFinite(slot?.n) ? slot.n : k + 1);
+
 /**
  * The place that carries the number `n`, or null (M8.10).
  *
@@ -481,9 +484,33 @@ export function zoneSlotNumbered(zone, n) {
   if (!points || !points.length) return null;
   const explicit = explicitSlots(zone);
   const i = explicit
-    ? explicit.findIndex((s, k) => (Number.isFinite(s?.n) ? s.n : k + 1) === want)
+    ? explicit.findIndex((s, k) => slotNumber(s, k) === want)
     : want - 1;
   return i >= 0 && i < points.length ? points[i] : null;
+}
+
+/**
+ * The number of the place a point lies on, or null (M30.7) – `zoneSlotNumbered`
+ * the other way round, over the same table.
+ *
+ * One tolerance: `onSlot`, the one `freeSlots` and `snapPoint` already ask with.
+ * No "nearest place": what lies beside its place did not get the point, and
+ * that is the finding (M8.10) – guessing which place it meant would answer the
+ * cleaning-up question silently.
+ *
+ * **0 is a number.** The Accuracy bar runs from -4 to 5, so callers compare
+ * `=== null`; `if (nr)` would read place 0 as "no place". A point that is no
+ * number at all (`''`, `null`, text) is null as well, not 0 – `onSlot` would
+ * coerce it.
+ */
+export function zoneSlotNumberAt(zone, x, y) {
+  const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+  if (!isNum(x) || !isNum(y)) return null;
+  const points = zoneSlots(zone);
+  if (!points || !points.length) return null;
+  const explicit = explicitSlots(zone);
+  const k = points.findIndex(s => onSlot(s, { x, y }));
+  return k < 0 ? null : slotNumber(explicit?.[k], k);
 }
 
 /**

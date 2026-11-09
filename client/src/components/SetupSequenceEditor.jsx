@@ -96,9 +96,20 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     : [String(step.category ?? '')];
   const linesToCategory = (lines) => (lines.length > 1 ? lines : (lines[0] || ''));
   // M19.5/BM: dieselbe Zeilenlesart fuer die Zaehlerliste von `require_counter`.
-  const nameLines = Array.isArray(step.name)
-    ? step.name.map(n => String(n ?? ''))
-    : [String(step.name ?? '')];
+  // M30.7/DX: und fuer die Zonenliste von `require_marker` - **eine** Bauform fuer
+  // beide (`name` bzw. `zoneLabel` des Schritts, eine Zeile je Eintrag).
+  const listField = (label, key, placeholder, testId) => {
+    const lines = Array.isArray(step[key]) ? step[key].map(n => String(n ?? '')) : [String(step[key] ?? '')];
+    return field(label,
+      <textarea
+        rows={Math.max(2, lines.length)}
+        value={lines.join('\n')}
+        onChange={e => set({ [key]: linesToCategory(e.target.value.split('\n')) })}
+        placeholder={placeholder}
+        className={`flex-1 ${INPUT}`}
+        data-testid={testId}
+      />);
+  };
 
   const render = {
     stackLabel: () => field('Stack',
@@ -184,9 +195,14 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     //
     // Anders als bei `targetZoneLabel` gibt es keinen Leereintrag: „keine
     // Zone" ist hier keine gueltige Wahl, und `validateStep` sagt das auch.
-    zoneLabel: () => field(
-      step.type === 'require_zone' || step.type === 'rotate_zone' ? 'Zone' : 'From zone',
-      nameSelect(step.zoneLabel, ctx.zoneLabels, '— no zones in this setup —', v => set({ zoneLabel: v }), `step-${index}-from-zone`)),
+    //
+    // M30.7/DX: `require_marker` fragt **mehrere** Leisten ab (die drei
+    // Lebensleisten) - dieselbe Zeilenform wie die Zaehlerliste, kein zweites Feld.
+    zoneLabel: () => (step.type === 'require_marker'
+      ? listField('Zones', 'zoneLabel', 'one zone per line', `step-${index}-marker-zones`)
+      : field(
+        step.type === 'require_zone' || step.type === 'rotate_zone' ? 'Zone' : 'From zone',
+        nameSelect(step.zoneLabel, ctx.zoneLabels, '— no zones in this setup —', v => set({ zoneLabel: v }), `step-${index}-from-zone`))),
 
     // M9.3/P2: die zwei Antworten der Wache. Ein Haekchen koennte es auch,
     // aber „belegt/leer" liest sich in der Zeile wie die Regel, die es ist.
@@ -421,15 +437,7 @@ function StepRow({ step, index, total, ctx, onChange, onMoveUp, onMoveDown, onDe
     // `place_counter`/`set_counter` genau einen. Dieselbe Bauform wie bei
     // `category`, eine Zeile je Name - kein zweites Feld daneben.
     name: () => (step.type === 'require_counter'
-      ? field('Counters',
-        <textarea
-          rows={Math.max(2, nameLines.length)}
-          value={nameLines.join('\n')}
-          onChange={e => set({ name: linesToCategory(e.target.value.split('\n')) })}
-          placeholder="one counter name per line"
-          className={`flex-1 ${INPUT}`}
-          data-testid={`step-${index}-counter-names`}
-        />)
+      ? listField('Counters', 'name', 'one counter name per line', `step-${index}-counter-names`)
       : field('Name',
         <input
           type="text"

@@ -323,11 +323,15 @@ test('CO: ohne Tableau-Stelle meldet die Prüfung den Platz', () => {
   assert.ok(pruefe(v).includes('seat 1: no tableau position'), pruefe(v).join('\n'));
 });
 
-test('CO: ohne Zähler oder mit weniger als vier Werten meldet sie jeden fehlenden', () => {
+// M30.5/DY hat die erste Hälfte dieses Tests umgedreht: bis dahin war ein Platz
+// **ohne** `counters` ein Fehler (vier Meldungen), seitdem heißt es „der Platz hat
+// keine Zähler" - die Zähler der Dörfler sind durch die Marker auf den Leisten
+// ersetzt. Eine **Teil**-Angabe bleibt der Fehler, der sie immer war: wer drei von
+// vier Stellen nennt, hat eine vergessen, und das ist nicht dasselbe wie keine.
+test('CO/M30: ohne Zähler meldet sie nichts, bei einer Teil-Angabe jeden fehlenden', () => {
   const v = kopie();
   delete v.seats[1].counters;
-  const alle = pruefe(v).filter(p => p.startsWith('seat 2: no counter position'));
-  assert.deepEqual(alle.map(p => p.replace(/.*for /, '')), STATS.map(s => s.key));
+  assert.deepEqual(pruefe(v).filter(p => /^seat 2/.test(p)), []);
 
   const w = kopie();
   delete w.seats[2].counters['Mumm'];

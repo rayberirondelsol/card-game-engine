@@ -7333,3 +7333,314 @@ Wo dieser Abschnitt (und die Aufgaben) nicht trugen — Nummern fortlaufend nach
 
 **Offen geblieben:** `DT` (Auftraggeber: Tisch neu laden, Handsy / Lawman Dozy / Qing & Kween / Virginia / ein unveränderter Kampf); der **dritte `--check`** beider Skripte am Ende des Tages; „Offen und ungeprüft“ Nr. 1 (gibt es im gedruckten Spiel genau eine Waldkarte?), 5 (offene Tische, am Browser nicht probiert), 7, 8, 9, 10, 11 — unverändert gültig. Die 14 Plättchenarten ohne Karte (M29.10) bleiben ein eigener Auftrag.
 Rückweg, falls nötig: `node /app/gelaendekarten-zuordnung.mjs --zurueck <Sicherung> /app/data/card-game-engine.db` (die Sicherung liegt im Scratchpad dieses Laufs; `--zurueck` ersetzt nur den exakten Zielstand `914461d63f77`); zuerst M29, dann M28.
+
+
+---
+
+## M30 — Die Setup-Wahl: zwei Altlasten gehen, Dörfler werden gewählt, ein Wert hat einen Ort
+
+Auftrag vom **2026-11-09**, drei Sätze des Auftraggebers, wörtlich:
+
+> „TFT-Grundaufbau und TFT-Basisaufbau Setup können doch weg oder? Weil das TFT Kurzpartie Setup (müsste man ggf mal umbenennen) schon mehr kann als die anderen."
+
+> „Ich sehe aber noch nirgends die Möglichkeit im Setup die Dörfler zu wählen."
+
+> „Die ganzen Counter, für die man ja auch die Token auf den Leisten der Dörfler (zB Mumm) verschieben kann, können auch weg."
+
+Aufgaben `DU`–`EF` in `docs/tasks-m30-setupwahl.md`, dort auch **„Wo die Spec nicht stimmt“** und **„Entscheidungen“ — vor dem Bauen lesen**.
+Drei Wünsche, drei Eingriffe von sehr verschiedener Größe: der erste ist ein `DELETE` und ein `UPDATE` (M30.2), der zweite ein Wort im Code und
+drei Optionen in den Daten (M30.3, M30.4), der dritte ein neuer Schritt, eine neue Geometriefunktion und ein Datenschnitt durch drei Spalten (M30.5–M30.8). Am dritten hängt etwas,
+und er hat eine **Antwort, die der Auftrag so nicht erwartet hat** (M30.6).
+
+**Ergebnis in zehn Sätzen.**
+
+1. **Gemessen** (M30.1): beide alten Aufbauten sind unreferenziert (kein `save_states`, kein `game_rooms`), der eine hat **0** Schritte, der andere verdrahtet drei Dörfler hart und kennt weder Szenario noch Option.
+   **Entscheidung (M30.2): beide löschen**, die Kurzpartie umbenennen — der Name steht als **Vorschlag** da (`Townsfolk Tussle`), der Auftraggeber kann ihn überstimmen.
+2. **Die Dörferwahl ist der vorhandene Optionsmechanismus, kein neuer** (M30.3): drei Optionen `doerfler1`–`doerfler3` mit je neun Wahlen, Vorgabe Henlo / Fridgette / Granny (**das heutige Verhalten bleibt**), die Schritte
+   `seat_villager` bekommen `$optDoerfler<n>`. Im Code fehlt **ein Wort**: `'villager'` in `NAME_FIELDS`. Am Client ändert sich nichts — `SetupChoiceFields` zeichnet jede Option.
+3. **Es gibt am Tisch schon eine Dörferwahl,** die der Auftraggeber nie gefunden hat: das Kontextmenü am Tableau (`swapChoices`/`swapAction`). Die Wahl im Setup **ersetzt es nicht**, sie kommt davor — dreimal tauschen nach jedem Aufbau ist schlechter als drei Auswahlfelder (M30.3).
+4. **Wählt jemand zweimal denselben Dörfler, bleibt der spätere Platz leer, und eine Protokollzeile sagt es — Entscheidung (a), begründet in M30.4**: ein leerer Platz ist **sichtbar** (anders als der halbe Kampf, gegen den M7/M9.3 stehen), und ein Halt hinterließe dieselbe halbe Tischfläche mit weniger darauf.
+5. **An den Zählern hängt genau eine Datenquelle, die ohne sie fehlt** (M30.5): die Wache „alle drei Dörfler besiegt“ in `dorfphase-beginnen`. Dazu kommen Stellen, die den Auftrag **größer** machen als „zwölf Zähler weglassen“: das Tauschmenü (es **hielte** mit `no counter named …`),
+   die Geometrieprüfung der Dörferdaten, der Rauchtest und der Editor.
+6. **Die Lebensleiste hat keinen Platz 0** (M30.6, an den echten Zonendaten nachgelesen): `Dörfler 1–3: Leben` tragen die Nummern **1…10**; ein Platz 0 läge bei `relY` ≈ 1,04, **außerhalb des Rechtecks der Zone** — selbst eingetragen, sähe `objectsInZone` einen Marker dort nicht.
+   Gedruckt gibt es ihn auch nicht: LEB 0 heißt „besiegt, Figur vom Schlachtfeld“. **Die Wache fragt darum nicht „steht der Wert über 0“, sondern „liegt noch ein Marker auf einer der drei Lebensleisten“** — ein Marker auf einer Leiste ist immer ≥ 1.
+7. **Dafür ein neuer Schritt `require_marker` mit gemeinsamem Handler** (M30.7), kein zusätzliches Feld an `require_counter`; seine Umkehrung Punkt → Platznummer ist **eine** neue Funktion `zoneSlotNumberAt` neben `zoneSlotNumbered`. Die Lesart `atStart`
+   (Tauschmenü) liest den Startwert aus `roster[<Dörfler>].start`.
+8. **Zähler am Platz werden optional, nicht gelöscht** (M30.5): ein Platz **ohne** `counters` legt keine. So ist der Code **vor** den Daten deploybar, und das Schreiben der Daten ist der **eine** Schalter (wie M29.8).
+9. **Die Bösewicht-Zähler sind eine Erweiterung über das Gesagte hinaus** (M30.8): dieselbe Doppelung, dasselbe Kriterium des Auftraggebers, **eigene, einzeln widerrufbare Aufgabe** (`EE`). `Münzen (gemeinsam)` bleibt.
+10. **Der Zielstand steht als Text mit Hashes fest** (M30.9), je Schritt eine Aufgabe, **erst deployen, dann schreiben**; Spielstände werden nicht angefasst, jeder Schritt hat einen Rückweg.
+
+### M30.1 — Befund, gemessen
+
+**Wie gemessen wurde.** Der Auftraggeber hat die Produktion am 2026-11-09 gelesen (die Zahlen unten, übernommen). **Nachgelesen habe ich hier** an der Sicherung
+`…\scratchpad\bak\setups-2026-11-09-vor-CR.json` (drei Zeilen aus `setups`, sha256 `b877dbe20bc8`; ein Node-Einzeiler, nicht das Read-Werkzeug) und am Code des Repos. **In die Produktion wurde nichts geschrieben, es wurde nichts gefahren.** Gegenprobe, dass die Sicherung der
+Stand **nach M29** ist: `scenario_data` der Kurzpartie hat dort **19 106 Zeichen, sha `914461d63f77`** — genau der Zielstand von M29.6. Alle Texte sind kompaktes `JSON.stringify` (Hin- und Rückweg gleich), die Hashes unten sind also vergleichbar.
+
+| Aufbau | Id | Schritte | Zonen | Aktionen | `scenario_data` |
+|---|---|---|---|---|---|
+| TFT Basis-Aufbau | `c0f43ae6-f28c-40e5-a007-6f362f715b95` | **0** (`sequence_data` 2 Zeichen) | 3 | 0 | `{}` |
+| TFT Grundaufbau (Dorfphase) | `8bc238c0-3043-4afb-804d-432742e78e80` | 36 | 11 | 1 (`dorfereignis`) | `{}` |
+| TFT Kurzpartie (3 Bösewichte, beide Erweiterungen) | `b1e10f4e-b8f2-4c2a-bb3e-54643944121b` | 31 | **54** | 4 | 19 106 Zeichen, 6 Schlüssel |
+
+Keine `save_states`-Zeile und keine `game_rooms`-Zeile verweist auf die beiden alten (`save_states.setup_id` zeigt bei allen fünf gesetzten auf die Kurzpartie, `game_rooms` ist leer).
+
+**Die Dörferwahl.** `scenario_data.options` hat zwei Optionen (`partie`, `troedel`), `shared/setupOptions.js` löst sie auf, `SetupChoiceFields` zeichnet **jede** Option als `<select>`; der Roster hat **neun** Dörfler (Henlo Bulwark, Fridgette Jones, Granny Melba, Blopsy Twins, Georgie Irongut [`unverified`], Judy Marks,
+Norman Fishboy, Quintus Binch, Yancy Plover), zu jedem das Asset `Tableau: <voller Name>`, die Figur `<voller Name>` und den Spielstein `<Kurzname>`. Die Aufbauschritte **25–27** (0-basiert, wie in `docs/doerflerdaten.md`) sind `{"type":"seat_villager","seat":n,"villager":"<voller Name>"}` — hartverdrahtet.
+**Die Lücke:** `NAME_FIELDS` (`shared/sequenceExecutor.js`) kennt `villager` nicht, ein Platzhalter dort würde nie ersetzt.
+
+**Die Zähler.** `placeVillager` legt je Dörfler **beides**: vier `place_counter` (Leben mit `max`, die anderen mit `base`) und vier Marker `place_asset "<seat.markers>: <Wert>"` in die Zone `"<seat.zones>: <Wert>"` mit `slot: Startwert`. Dazu die Bösewicht-Seite: `kampf-beginnen` 6–9 legt `Marker: Bösewicht BEW`/`LEB` in
+die Leisten **und** setzt die Zähler `Bösewicht: Bewegung`/`Leben`; der Aufbau legt sie in 29–30 an, `dorfphase-beginnen` 14–15 setzt sie auf 0.
+
+### M30.2 — Die beiden alten Aufbauten gehen, die Kurzpartie heißt anders
+
+**Entscheidung: beide löschen.** Gründe, gemessen oder aus dem Code gelesen:
+
+1. **Sie sind unreferenziert** (M30.1) — kein Spielstand, kein Raum hängt daran. Es geht nichts verloren, was ein Spieler geladen hätte.
+2. **Nichts, was sie können, kann die Kurzpartie nicht.** *Basis-Aufbau* hat keinen einzigen Schritt. *Grundaufbau* setzt dieselben drei Dörfler mit `place_asset` + `place_counter` — **hartverdrahtet**; kein `seat_villager`, kein Szenario, keine Option. Seine eine Aktion (`dorfereignis`) steht, mit 4 Schritten, auch in der Kurzpartie.
+3. **Stehen gelassen, werden sie falsch.** Dieser Meilenstein ändert Dörfler und Zähler; ein Aufbau, den niemand pflegt, fällt beim nächsten solchen Schnitt still hinter den richtigen zurück und steht dabei in der Auswahl daneben. Zwei Aufbauten mehr sind zwei Stellen mehr, die dasselbe nachführen müssten (M6).
+
+Das Löschen verstößt nicht gegen `docs/datenzugriff.md` „Regeln fürs Schreiben“ Nr. 4 („nichts löschen, was der Auftrag nicht ausdrücklich nennt“): der Auftraggeber hat es ausdrücklich genannt.
+
+**Der Name — Vorschlag, nicht Gesetz.** `TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)` lügt: der Aufbau baut kurz **und** lang (`partie`), mit **und** ohne Toller Trödel (`troedel`). Vorschlag: **`Townsfolk Tussle`**. Der Auftraggeber kann
+überstimmen (etwa `TFT Solo`); der Name steht an **einer** Stelle (`setups.name`), und nichts in `client/`, `server/src`, `shared/` oder `scripts/` sucht nach ihm (gelesen: die Skripte adressieren über die **Id**; nur Kommentare sagen „Kurzpartie“).
+
+**Folgen, ehrlich:**
+
+- **Ein Lesezeichen mit `?setup=<id>` eines gelöschten Aufbaus lädt nicht** (`Failed to load setup`). Die Id der Kurzpartie bleibt; wer eines der beiden alten gespeichert hat, merkt es.
+- **Ältere Skripte hashen „die übrigen Zeilen“** von `setups` (`auslagen-daten.mjs`: „bei diesen drei nur die **übrigen** Zeilen (*Grundaufbau*, *Basis-Aufbau*)“). Nach dem Löschen melden ihre `--check` eine Abweichung, die **nicht** von ihnen kommt. Die `--check` von M28 und M29 laufen darum **vor** dem Löschen (Aufgabe `EB`) und danach nicht mehr.
+- **Rückweg:** die Sicherung (`b877dbe20bc8`) trägt beide Zeilen vollständig; `--zurueck` legt sie unverändert wieder an (gleiche Id, gleiche Spalten samt `created_at`/`updated_at`).
+
+**Was nicht gilt.** Das Spiel wird nicht gelöscht, die Kurzpartie nicht angefasst, **kein** Spielstand und **keine** Zone. Das Umbenennen ändert **nur** `setups.name`; `updated_at` bleibt (die Liste sortiert danach).
+
+### M30.3 — Dörfler im Setup wählen
+
+**Der Befund hinter „ich sehe nirgends die Möglichkeit“.** Sie war nie da: der Aufbau nennt Henlo, Fridgette und Granny beim Namen, und der Dialog beim „Load“ fragt nur Spiellänge und Toller Trödel. Dass das **Roster** neun Dörfler kennt und der Tisch sie tauschen kann, ändert daran nichts.
+**Und es gibt am Tisch schon eine Dörferwahl, die er nie gefunden hat:** das **Kontextmenü am Tableau** (`client/src/utils/swapVillager.js`, `swapChoices`/`swapAction`, in `GameTable.jsx` eingehängt) — es listet die **nicht** sitzenden Dörfler und tauscht über `swap_villager`, mit Sperre im Kampf und Rückfrage „hat schon gespielt?“ (M26.2).
+**Die Wahl im Setup ersetzt es nicht, sie kommt daneben:** das Menü ist für „ich habe mich in der ersten Dorfphase anders entschieden“, die Wahl für „so beginnen wir“. Dreimal tauschen nach jedem Aufbau (drei Durchgänge durch ein sechszeiliges Menü) ist schlechter als drei Auswahlfelder, die der Dialog ohnehin zeigt.
+
+**Entscheidung: der vorhandene Optionsmechanismus, drei Optionen.** Keine neue Art Feld, kein neuer Dialog, keine neue Regel in `shared/setupOptions.js`:
+
+```
+options: {
+  partie: …, troedel: …,                                  // unverändert, byteweise
+  doerfler1: { label: "Dörfler 1", default: "Henlo",
+               choices: { Henlo:     { label: "Henlo Bulwark",   vars: { Doerfler1: "Henlo Bulwark" } },
+                          Fridgette: { label: "Fridgette Jones", vars: { Doerfler1: "Fridgette Jones" } },
+                          … neun, Schlüssel = Kurzname, Label = voller Name } },
+  doerfler2: { … default: "Fridgette", vars: { Doerfler2: … } },
+  doerfler3: { … default: "Granny",    vars: { Doerfler3: … } }
+}
+```
+
+und die Schritte 25–27 werden `{ "type": "seat_villager", "seat": n, "villager": "$optDoerfler<n>" }`.
+
+Warum so:
+
+1. **Vorgabe = heute.** `default` ist Henlo / Fridgette / Granny: wer nichts wählt (Lesezeichen ohne `opt`, Dialog bestätigt), baut **den Tisch von heute**. Am Zielstand (M30.9) ändern drei Schritte der Folge ihr Feld `villager`, sonst nichts.
+2. **Schlüssel = Kurzname.** Ein Schlüssel reist in der Adresse (`?opt=doerfler1:Judy`) und darf nur Buchstaben, Ziffern, `_`, `-` tragen (`validateOptions`); alle neun Kurznamen sind ASCII. Das Label zeigt den vollen Namen, den der Spieler kennt.
+3. **Variablennamen `Doerfler1`–`Doerfler3`**: nur Buchstaben und Ziffern (ein Platzhalter kann kein `ü`), kein Anfang, den der Executor schon bindet (`V\d`, `F\d`, `revealed`), und jede Variable setzt **genau eine** Option (`validateOptions` verlangt es).
+4. **Raum und Tisch bekommen es umsonst:** `CreateRoomModal` und `SetupChoiceDialog` zeichnen beide `SetupChoiceFields`, `rooms.js` speichert die Wahl in `game_rooms.setup_choices` und gibt sie dem Executor mit. **Am Client ist keine Zeile zu schreiben** (gelesen: `SetupChoiceFields.jsx` iteriert `Object.entries(options)`).
+5. **Die Reihenfolge der Felder im Dialog ist die der Schlüssel:** die zwei vorhandenen zuerst, dann die drei Dörfler — angehängt, nicht dazwischen.
+
+**Die eine Lücke im Code** (`DU`): `NAME_FIELDS` ist `['assetName','cardName','cell','slot','category','label','name','value']`. `villager` steht nicht darin, also bliebe `"$optDoerfler1"` ein Text, und `seat_villager` meldete `"$optDoerfler1" is not in the roster`.
+Mit `'villager'` in der Liste ersetzt der Executor den Platzhalter **für alle Schritte** (auch `swap_villager` bekäme es — niemand braucht es, es schadet nicht, und die Liste kennt laut ihrem Kopfkommentar keine Sonderfälle je Schritt). Ein ungebundener Platzhalter bleibt laut:
+`"$optDoerfler1": $optDoerfler1 is not bound`.
+
+**Was nicht gilt.**
+
+- **Die Wahl sagt nichts über Karten oder Ausrüstung** — die stehen im Roster (`gear`), `seat_villager` stellt sie mit. Georgie Irongut trägt weiter `unverified`; der Aufbau meldet es als `note` im Protokoll, und der Dialog sagt es **nicht** vorher (ein Hinweis im Label wären Daten, die jemand pflegen müsste; wer ihn will, schreibt ihn ins `label` der Wahl).
+- **Keine Aktion trägt `$optDoerfler…`.** Ein Spielstand kennt die Wahl nicht (M22, M27.2); `validateOptions` verbietet jeden `$opt…` in einer Aktion und tut es weiter.
+- **Ein Aufruf ohne `choices` baut keine Dörfler** (drei ungebundene Platzhalter, drei `skipped`-Zeilen), genau wie er heute weder Nachschub noch Münzen bekommt. Der Tisch (Load) und der Raum rufen **mit** Wahl auf. Ob die Vorschau im Setup-Editor die Folge ausführt, habe ich nicht untersucht.
+- **Das Roster ist nicht erweitert.** Neun Dörfler, wie M26; Hookbox-Dörfler stehen nicht in der Bibliothek (`docs/doerflerdaten.md`, Ende).
+
+### M30.4 — Zweimal derselbe Dörfler: die Decke, und was sie kostet
+
+**Der Fall.** Wählt der Spieler für Platz 1 und 2 beide Judy, läuft `seat_villager` für Platz 1 (Judy sitzt) und für Platz 2 mit `skip` — `"Judy Marks" already sits at seat 1`. **Platz 2 bleibt leer, der Aufbau läuft weiter**, das Protokoll nennt die Zeile.
+Die Felder können einander nicht ausschließen, ohne dass `SetupChoiceFields` rechnet — und das soll es laut seinem Kopfkommentar nicht (`value` ist die Wahl, die der Aufrufer über `resolveChoices` vorbelegt; gerechnet wird in `shared/`, nicht in der Zeichnung).
+
+**Entscheidung: (a) so lassen.** Die Protokollzeile reicht; der Spieler stellt um und baut neu auf. Nicht (b) „Halt statt Skip“.
+
+Das Argument **gegen** (a) war: es widerspreche M7/M9.3, „ein halb aufgebauter Kampf ist schlimmer als keiner“. Es trägt nicht, aus drei Gründen:
+
+1. **Das Gesetz von M7/M9.3 schützt vor dem *unsichtbar* Halben.** Ein Kampf, der ohne seine Geländekarte läuft, sieht aus wie ein Kampf. Ein **leerer Platz** sieht aus wie ein leerer Platz — dasselbe sagt schon `swapVillager` („schlimmer als keiner, weil man den leeren Platz sieht und den halben nicht“, Kopfkommentar). Die Granularität stimmt: `seat_villager` ist alles-oder-nichts **je Platz**.
+2. **Ein Halt wäre nicht „nichts gebaut“.** `ctx.halted` bricht die Folge ab, **dort, wo der Schritt steht** — nach den Stapeln, den Plänen, den Auslagen, vor den Münzen. Das ist eine halbe Tischfläche wie bei (a), nur mit **weniger** darauf. Das einzige echte „nichts gebaut“ wäre eine Prüfung **vor** dem ersten Schritt, in `resolveChoices` (eine neue
+   Regel „diese Variablen müssen verschieden sein“ samt Prüfer und Dialog) — ein Feature, das niemand bestellt hat und das (a) um einen Fall verbessert, der einen Klick Aufwand kostet.
+3. **(a) ist billig, sichtbar, umkehrbar.** Es kostet keine Zeile; die Meldung steht in der Liste, die der Tisch nach dem Laden zeigt; und wer es satt hat, zieht später **eine** Regel in `shared/setupOptions.js` (die Stelle, die Dialog, Server und Executor ohnehin fragen) — nicht eine Rechnung in die Felder.
+
+**Was der Entscheid festhält** (ein Test in `DU`): zwei gleiche Wahlen → Platz 2 leer, **eine** `skipped`-Zeile mit dem Namen, der Rest des Aufbaus läuft, nichts wirft. **Dreimal derselbe:** zwei leere Plätze, zwei Zeilen.
+**Was nicht gilt:** der Dialog warnt nicht vorher, der Aufbau weigert sich nicht, und das Tauschmenü repariert den leeren Platz **nicht** (`swap_villager` verlangt, dass dort jemand sitzt: `nobody sits at seat n`). Reparatur heißt: neu laden und anders wählen.
+
+### M30.5 — Was an den Zählern hängt, und der Zuschnitt
+
+**Die Doppelung, die der Auftraggeber meint.** Ein Dörfler hat heute **zwei Anzeigen für denselben Wert**: einen Zähler (`Henlo: Mumm`, Kasten mit Plus/Minus unter dem Tableau) und einen Marker auf der Leiste des Tableaus. Beide stehen am Anfang auf dem Startwert, und der Spieler führt eines von beiden. Seit M8.10 tragen die Leisten **nummerierte Plätze**
+(`docs/tasks-marker.md`): der Zähler ist der zweite Weg zur selben Antwort (M6).
+
+**Wo etwas an den Zählern hängt** — sechs Stellen laut Vorarbeit, dazu drei, die ich beim Lesen gefunden habe (7–9):
+
+| # | Stelle | Was geschieht ohne Zähler | Wird |
+|---|---|---|---|
+| 1 | `shared/villagers.js` `seatGeometryProblems` (auch vom Prüfer der Szenariodaten gerufen) | **verlangt** vier Zählerstellen je Platz; ohne sie `no counter position for <Wert>` je Wert, und `seat_villager` **stellt nichts** (skip, vor jedem Legen) | ein Platz **ohne** `counters` ist in Ordnung; **teilweise** angegeben bleibt ein Problem |
+| 2 | `seatVillager` baut `spots.counters` aus `seat.counters[st.key]` | siehe 1: der Platz bleibt leer | legt nur Zähler, **wo der Platz eine Stelle nennt** |
+| 3 | `swapVillager` übernimmt die Stellen der alten Zähler, sonst `noCounter(st)` | je Wert ein Hinweis „no counter … to take the place“ | räumt die Zähler des Alten weg, **wenn sie da sind** (alter Spielstand), legt neue nur, wo der Platz Stellen nennt; **kein** Hinweis je Wert, wenn der Platz keine nennt |
+| 4 | Aktion `dorfphase-beginnen` Schritt **1** (0-basiert): `require_counter name:["$V1: Leben",…] above:0 confirm` | **hält** mit `no counter named "Henlo: Leben"` — die Aktion tut **nichts** | liest die **Marker** (`require_marker`, M30.7) |
+| 5 | Aktion `dorfphase-beginnen` Schritte **16–27**: zwölf `set_counter … "max"/"base"` | zwölf `skipped`-Zeilen (`no counter named …`) in der Meldeliste, jede Dorfphase | **entfallen** ersatzlos — die Rückstellung der Marker steht **daneben** (33–44, `place_asset … slot:"$V<n><KUERZEL>"`) und liest `seatVars`, nicht die Zähler |
+| 6 | `client/src/utils/swapVillager.js` `swapAction`: `require_counter … atStart confirm` über die vier Zähler des Alten | **hält** mit `no counter named …` — **das Tauschmenü ginge kaputt** (jedes Tauschen scheiterte an einer Rückfrage, die es nicht stellen kann) | `require_marker … atStart villager:<Alter>` über die vier Leisten des Platzes |
+| 7 | `scripts/auslagen-rauchtest.mjs` (die Zeile, die `require_counter`/`require_zone` als „Wache“ erkennt) | eine Wache `require_marker` bliebe unerkannt: der Rauchtest zählte den Halt als Beanstandung | erkennt `require_marker` |
+| 8 | Editor: `client/src/utils/sequenceSteps.js` (Vokabular, Zusammenfassung, Prüfung), `SetupSequenceEditor.jsx` (Listenfeld) | ein Schritt `require_marker` ist im Editor unbekannt, nicht bearbeitbar | kennt ihn (M30.7) |
+| 9 | Fixtures und Skripte der Geschichte: `server/test/fixtures/*.json`, `scripts/doerfler-daten.mjs` (`VILLAGERS` mit `counters`), `auslagen-daten.mjs` (`hardwiredSteps`, `--check` gegen `VILLAGERS`) | — | **bleiben, wie sie sind** (M30.9): sie sind der Stand von M26/M27 und tragen Gleichwertigkeitsbeweise |
+
+**Entscheidung: Zähler am Platz werden *optional*, der Code entfernt sie nicht.** Wer `seat.counters` nennt, bekommt sie wie bisher; wer es nicht tut, bekommt keine. Gründe:
+
+1. **Der Code ist vor den Daten deploybar und folgenlos** — wie M29.8. Entfernte der Executor die Zähler **jetzt**, bräche eine frisch gebaute Kurzpartie vor dem Datenschnitt an der Wache (Stelle 4; aus dem Code gelesen: `require_counter` hält bei einem Zähler, der fehlt, auch wenn die anderen da sind). So bleibt das Schreiben der Daten der **eine** Schalter
+   (`ED`), `--zurueck` der Rückweg.
+2. **Kein toter Zweig.** Der Weg mit Zählern wird von den bestehenden Tests (`villagers`, `swap-villager`, `seat-villager`) auf den Fixture-Daten weiter gefahren; der ohne Zähler kommt neu dazu und ist der, den die Produktion nach `ED` fährt. Ein Platz mit Zählern ist für ein **anderes Spiel** eine vernünftige Fähigkeit; sie zu streichen wäre ein Verlust ohne Gewinn.
+3. **Alte Spielstände:** sie tragen ihre Zähler im Zustand (`save_states`, fünf gesetzte). Mit dieser Regel bleiben sie stehen, werden von der Dorfphase **nicht** mehr zurückgesetzt (Stelle 5 entfällt) und verschwinden beim ersten Tausch an ihrem Platz (Stelle 3). **Ein Spielstand trägt seine Objekte mit eigenem Feld** (M28), ein Datenschnitt rührt sie nicht an. Folge: in einem alten Spielstand stehen
+   nach dem Schnitt **verwaiste** Zähler, die der Spieler von Hand entfernen kann. Wie viele der fünf Zustände Dörfler-Zähler tragen, habe ich **nicht** gemessen (`EF` liest es).
+
+**Was nicht gilt.** Ein Marker kann nur Werte zeigen, die die Leiste hat. Gemessen für die Dörfler: Leben / Bewegung / Mumm **1…10**, Präzision **−4…5**; jeder Startwert aller neun Dörfler liegt darin (`validateVillagers` prüft es, `STATS.range`), und das Maximum des Lebens ist **der Startwert**, nicht 10
+(`docs/doerflerdaten.md` Abschnitt 8, Nr. 3). **Max-LEB-Änderungen** (Katerstimmung u. ä.) trug der Zähler nie — `max` wurde beim Legen gesetzt und von keinem Schritt nachgeführt —, der Marker trägt sie auch nicht: **kein Verlust, keine Neuerung.** Die Rückstellung der Dorfphase setzt Leben auf den **Startwert** (`$V<n>LEB`), wie sie es mit den Markern schon tat.
+
+### M30.6 — Die Lebensleiste hat keinen Platz 0
+
+**Die wichtigste offene Frage des Auftrags, nachgelesen an den echten Zonendaten** (`zone_data` der Kurzpartie in der Sicherung, alle zwölf Zonen `Dörfler n: <Wert>`):
+
+| Zone | Plätze | Nummern | `relY` Nr. 1 | `relY` Nr. 2 | Schritt |
+|---|---|---|---|---|---|
+| `Dörfler 1: Leben` | 10 | 1, 2, … 10 | 0,943 | 0,8449 | −0,0981 |
+| `Dörfler 2: Leben` | 10 | 1, 2, … 10 | 0,9473 | 0,8478 | −0,0995 |
+| `Dörfler 3: Leben` | 10 | 1, 2, … 10 | 0,943 | 0,8449 | −0,0981 |
+| `Dörfler 1–3: Bewegung` und `: Mumm` | je 10 | 1 … 10 | | | |
+| `Dörfler 1–3: Präzision` | je 10 | **−4, −3, … 0, … 5** | | | |
+
+**Platz 0 gibt es nicht** — nicht für Leben, auch nicht für Bewegung und Mumm. Nur Präzision hat eine 0 (und reicht bis −4).
+
+Drei Dinge folgen, und das dritte verschiebt den Auftrag:
+
+1. **Es ist nicht zu beheben, indem man einen Platz einträgt.** Die Plätze sind Bruchteile **des eigenen Rechtecks** der Zone (`relX`, `relY`, M8.10). Setzte man die Zickzack-Reihe nach unten fort, läge Nr. 0 bei `relY` ≈ **1,04** (Zone 1 und 3: 0,943 + 0,0981; Zone 2: 0,9473 + 0,0995 = 1,047), **unter** dem Rechteck. Das ist eine Rechnung
+   aus zwei Messwerten, keine Messung — genau das, was M8.10 verbietet (die Nummern „stehen in den Zonendaten … gemessen und nie gerechnet“). Aus dem Code gelesen (nicht ausprobiert): `objectsInZone` fragt `zoneContains` gegen das Rechteck der Zone — ein Marker auf Nr. 0 wäre **in keiner Zone**, `freeSlots`, `occupancy` und die neue Wache sähen ihn nicht. Dort einen Platz zu schaffen hieße, die **Rechtecke**
+   der drei Zonen zu vergrößern und **alle zehn Plätze jeder Zone neu zu bemessen** (die Bruchteile hängen am Rechteck): drei Messungen an drei Tableaus für etwas, das nicht gedruckt ist.
+2. **Es gibt ihn auch nicht gedruckt.** `docs/doerflerdaten.md`: die Spalte reicht von 1 bis 10 (Minimum 1 für alle neun), `STATS.range` für Leben ist `[1, 10]`, `validateVillagers` weist einen Startwert < 1 ab. Regel `[DE S.22]` / `[DE S.35]`: LEB **0 oder weniger heißt besiegt, die Figur kommt vom Schlachtfeld** — es gibt keinen gespielten Zustand „Marker auf 0“, sondern ein **Ende**
+   (`docs/tft-regeln.md` 6.6).
+3. **Die Wache muss gar nicht „über 0“ fragen.** Jede Nummer auf der Lebensleiste ist ≥ 1; ein Marker, der auf einem Platz liegt, ist **immer** über 0. „Steht ein Lebenswert über 0“ ist **gleichbedeutend** mit „liegt noch ein Marker auf einer der drei Lebensleisten“ — **die Zahl wird nie gebraucht.** Die Wache fragt also etwas anderes als der Zähler: nicht den Wert, sondern die Anwesenheit.
+
+**Entscheidung: „besiegt“ heißt, der Marker liegt nicht mehr auf der Lebensleiste.** Das ist die getreue Übersetzung der Regel (die Figur geht vom Feld, der Marker von der Leiste) und die **kleinste** Änderung: kein Platz 0, keine Vermessung, keine neue Zone. Der Spieler nimmt den Lebensmarker eines besiegten Dörflers **von der Leiste** (irgendwohin außerhalb des Rechtecks der Zone —
+innerhalb schnappt er auf einen Platz, die Zone hat `snap`), und der **Aufbau holt ihn zurück**: `place_asset` findet einen vorhandenen Marker gleichen Namens **irgendwo am Tisch** (`findPlaced`) und setzt ihn um; die Dorfphase (33–44) stellt ihn also auf den Startwert, wo er auch liegt.
+
+**Die zweite Lesart bekommt dieselbe Antwort:** `atStart` (Tauschmenü, M30.7) fragt „liegt jeder Marker auf dem Startwert“. Ein Marker, der **fehlt**, liegt **nicht** auf dem Startwert → der Tausch fragt „hat schon gespielt?“ zurück — die richtige Richtung (im Zweifel fragt er).
+
+**Was nicht gilt.** Der Tisch **behauptet nichts** über den Ausgang der Partie (M19.5: „er nennt den Zählerstand und fragt“): die Wache meldet „auf keiner Lebensleiste liegt ein Marker“ und fragt (`confirm`). **Ein vergessener oder verlegter Marker sieht von außen aus wie ein besiegter Dörfler** — fehlen alle drei, fragt die Wache fälschlich; der Preis ist **ein
+Klick** („Trotzdem“), und die Wache war schon vorher eine Rückfrage, keine Sperre. Der Zustand „besiegt“ bleibt am Tisch **erfunden** (M19.5); nur seine Definition wandert von „Zähler 0“ nach „Marker weg“.
+
+### M30.7 — `require_marker`: dieselbe Wache, eine andere Quelle
+
+**Die Entscheidung, die der Auftrag verlangt: ein eigener Schritttyp mit **gemeinsamem** Handler.** Nicht ein zusätzliches Feld an `require_counter`.
+
+```
+case 'require_counter':
+case 'require_marker': { … ein Handler … }
+```
+
+Gründe:
+
+1. **Die Namen stoßen zusammen.** `require_counter.name` ist der Name eines **Zählers**; ein Zähler und eine Zone können **gleich** heißen — `Bösewicht: Leben` ist **beides** (Zähler in `sequence_data`, Leiste in `zone_data`). Ein Feld `source: "marker"` machte aus `name` je nach Nebenfeld zwei Dinge, und die Prüfung des Editors müsste innerhalb **eines** Typs verzweigen. Mit einem eigenen Typ ist ein Name
+   immer **eine** Sache; die Adresse ist die Zone (`zoneLabel`, wie bei `require_zone`).
+2. **Die Felder sind verschieden.** `require_counter` liest `base`/`max` **am Zähler**; `require_marker` braucht für `atStart` den **Dörfler**, dessen Startwert im Roster steht (`villager`). Felder, die nur der eine Typ braucht, gehören in sein Vokabular (`sequenceSteps.js`: `fieldsFor`, Zusammenfassung), nicht in eine bedingte Anzeige des anderen.
+3. **Es entsteht keine zweite Haltelogik** (M6). Der Handler bleibt **einer**: das Lesen der gemeinsamen Felder (`above`, `atStart`, `confirm`, `message`), das Halten (`ctx.halted`), `message`/`confirm` am Eintrag, der Satz „unprüfbar gilt nicht als erfüllt“. Neu ist **nur**, woher der Stand kommt: eine kleine Funktion je Quelle, die eine Liste `{ label, value, start }` liefert. Die **bestehenden**
+   `require_counter`-Tests laufen **unverändert** weiter (ein Test in `DW` hält es fest: `sequence-require-counter.test.js` wird nicht angefasst).
+
+*Verworfen auch:* `require_zone` auf eine Zonenliste verallgemeinern („mindestens eine belegt“). Es beantwortete die Wache (M30.6 Nr. 3), nicht `atStart`, das Zahlen lesen muss — zwei Wege statt einem.
+
+**Der Schritt:** `{ type: "require_marker", zoneLabel: <Zone | [Zone, …]>, above?, atStart?, villager?, confirm?, message? }`.
+
+**Was ein Marker ist, und wie sein Wert gelesen wird.** Je Zone, nach **einer** Regel:
+
+1. Zone nicht gefunden, oder ohne feste Plätze (`zoneSlots` ist `null`) → **Halt** mit Diagnose (`zone "…" not found` / `has no places`), keine `message` — eine Bedingung, die sich nicht prüfen lässt, ist keine erfüllte (wie `require_zone`, `require_counter`).
+2. Die **Plättchen** in der Zone: `objectsInZone(zone, state.tokens)`; das Ankerobjekt (das Tableau) zählt **nicht** (das steht in `objectsInZone`), Karten und Bretter zählen nicht. **Keines** → Stand `none`.
+3. **Genau eines** → seine Nummer, `zoneSlotNumberAt(zone, x, y)`. `null` (nicht auf einem Platz) → **unlesbar**.
+4. **Zwei oder mehr** → **unlesbar**. Die Wache rät nicht, welches der Marker ist: ein zweites Plättchen auf der Leiste (etwa ein Max-LEB-Stopper, `docs/tft-regeln.md` 2.1, eine Tischkonvention, im Aufbau nicht vorgesehen) macht sie ehrlich **unlesbar**, statt falsch zu sein. *Umkehr:* ein Feld `assetName`, das den Marker benennt — erst, wenn jemand den Stopper wirklich legt.
+
+**Die Umkehrung — eine neue Funktion, an einer Stelle (M6):** `zoneSlotNumberAt(zone, x, y)` in `shared/zoneGeometry.js`, neben `zoneSlotNumbered` (Nummer → Punkt) — die **Gegenrichtung derselben Tabelle**: gibt die **Nummer** des Platzes, dessen Punkt `onSlot` trifft, sonst `null`.
+
+- **Eine Toleranz.** Es ist `onSlot` — 0,5 Punkt —, mit der `freeSlots` und `snapPoint` schon fragen. Ihr Kommentar ist die Entscheidung: *was danebenliegt, hat den Punkt nicht bekommen, sondern liegt daneben — und das ist der Befund.* Eine „nächster Platz“-Regel wäre das Raten, das M8.10 verbietet.
+- **Die Nummer kommt aus denselben Daten** wie in `zoneSlotNumbered`: das geschriebene `n`, sonst die Stelle ab 1. Präzision hat `n: −4 … 5` — **die Funktion gibt `0` zurück, nicht `null`**, und kein Aufrufer darf `if (nr)` schreiben (der Test pinnt Präzision Platz 0).
+- **Rundreise-Eigenschaft** als Test: für jede Nummer `n` einer Zone gilt `zoneSlotNumberAt(zone, p.x, p.y) === n` mit `p = zoneSlotNumbered(zone, n)` — an den echten Zonen aus der Sicherung (Leben 1–10, Präzision −4–5, Bösewicht-Leisten 12 und 24).
+- **Wann ein Marker „daneben“ liegt:** wenn die **Zone** sich bewegt hat und der Marker nicht (die Tableaus liegen gesperrt, `seatVillager`: `locked: true`), oder wenn etwas von Hand ohne Schnappen gelegt wurde. Die Wache **meldet** es (`has no place`, Diagnose, Halt, **kein** `confirm`), und der Spieler legt den Marker zurecht.
+
+**Die zwei Lesarten.** Wie bei `require_counter`: `above` ist die eine, `atStart` die andere, und `atStart` liest `above` **nicht**.
+
+- **`above` (Vorgabe 0):** Wert = die Nummer, bei `none` **0**. Besteht, wenn **mindestens eine** Zone einen Wert **> above** hat. Ist keine > above: gab es **unlesbare** Zonen, **Halt mit Diagnose ohne `message`** (der Satz „alle besiegt“ stimmte dann nicht, die Wache **weiß** es nicht); sonst die `message` mit `confirm`. Eine unlesbare Zone neben einer **bestandenen** schadet nicht (die Bedingung „mindestens eine“ ist erfüllt) — das weicht bewusst von `require_counter` ab, das bei einem
+  fehlenden Zähler **immer** hält: ein Zähler fehlt, weil der Aufbau falsch ist; ein Marker liegt schief, weil am Tisch gespielt wird.
+- **`atStart`:** **jede** genannte Zone muss auf dem **Startwert** liegen. `villager` nennt den Dörfler (ein Platzhalter wie `$F1` geht, `villager` steht seit `DU` in `NAME_FIELDS`); der Startwert ist `roster[<Dörfler>].start[<Wert>]`, der Wert der **Teil nach dem letzten `": "`** im Zonennamen (`Dörfler 1: Mumm` → `Mumm`, derselbe Schnitt wie `baseName`) und muss einer von `STATS` sein.
+  Gefunden wird das in `shared/villagers.js` (`markerStart`), **nicht** im Executor: er weiß nichts über Townsfolk Tussle (M7), `villagers.js` ist die Stelle, die „wer sitzt wo und was ist sein Startwert“ beantwortet. Fehlt der Dörfler oder der Wert, oder ist `villager` leer: **Halt** `no starting value: "<Zone>"`. `none` und jede Nummer ≠ Startwert: **abgewichen** → die `message` mit `confirm`. Eine **unlesbare** Zone: **Halt mit Diagnose**
+  (ob ein Marker am Start liegt, lässt sich nicht beweisen). **Präzision-Startwert 0** (Quintus, Yancy): `none` ist **nicht** `0` — der Test pinnt, dass ein fehlender Marker dort **nicht** „am Start“ ist.
+
+**Das Tauschmenü** (`DZ`): `swapAction` schreibt statt `require_counter` einen `require_marker` über die vier Leisten des Platzes (`<seat.zones>: <Wert>`, aus `villagers.seats[seat-1]`), `atStart: true`, `villager: <der Alte>` (voller Name, steht in `swapChoices().current`), `confirm: true`, derselbe Satz. **Ehrlich:** Bewegung und Mumm werden nach den Regeln **im Kopf** mitgezählt (`docs/tft-regeln.md` 6.3, „Marker: wann verschieben“: die Marker nur anpassen,
+wenn ein Effekt den Wert verändert); die Rückfrage „hat schon gespielt“ trägt darum vor allem über **Leben** und **Präzision**. Der Zähler hatte dasselbe Loch, wo der Spieler ihn nicht führte.
+
+**Was nicht gilt.** Kein Schritt **schreibt** einen Marker (er liest nur); `require_counter` bleibt, wie es ist, und wird von `Münzen (gemeinsam)` und jedem Aufbau mit Zählern weiter gebraucht. Der Schritt kennt **keine Dörfler** außer über `atStart` + `villager`; für `above` ist er eine allgemeine Frage an eine Leiste mit Platznummern.
+
+### M30.8 — Die Bösewicht-Zähler (Erweiterung über das Gesagte hinaus)
+
+**Das Kriterium des Auftraggebers trifft sie wörtlich.** „Die ganzen Counter, für die man ja auch die Token auf den Leisten verschieben kann“: `kampf-beginnen` 6–9 legt `Marker: Bösewicht BEW` / `LEB` auf die Leisten `Bösewicht: Bewegung` (**12** Plätze) / `Bösewicht: Leben` (**24**) und setzt **dieselben Werte noch einmal** in die Zähler. Genannt hat der Auftraggeber die Bösewicht-Zähler **nicht** (er sprach von den Dörfler-Leisten, „zB Mumm“) — **dies ist eine
+Erweiterung**, darum eine **eigene Aufgabe (`EE`), einzeln widerrufbar**, die an **nichts** anderem hängt: wer sie nicht will, streicht sie, und M30.5–M30.7 gelten unverändert.
+
+**Gemessen:** der höchste Wert über **alle 20 Bösewichte** ist BEW **9**, LEB **18** (Vorarbeit) — beide innerhalb der Leisten (12 / 24 Plätze, Nummern 1…12 / 1…24, in der Sicherung nachgelesen). **Barry Bluff** trägt Formeltexte (`Summe aller Dörfler-LEB +3`), für **Marker und Zähler** gleich unbrauchbar: der Marker wird dort schon heute **nicht** gelegt (`place_asset … slot "$LEB"` findet keinen Platz), der Zähler bleibt auf 0
+(`sequence-set-counter.test.js`) — **kein Verlust**.
+
+**Was sich ändert (0-basiert):** Aufbau 29–30 (`place_counter Bösewicht: Bewegung`/`Leben`) und `kampf-beginnen` 8–9 (`set_counter … $BEW/$LEB`) **entfallen**. `dorfphase-beginnen` 14–15 setzten die Zähler auf **0** — das war das **Aufräumen**: nach dem Kampf stand nichts mehr auf dem Zähler. **Die Marker bleiben dabei stehen** (kein Schritt räumt sie), und
+nach dem Wegfall stünden zwischen den Kämpfen die Werte des letzten Bösewichts auf den Leisten. **Entscheidung:** die zwei Schritte werden `clear_table assetName "Marker: Bösewicht BEW"` / `"…LEB"` — der Tisch ist zwischen den Kämpfen wieder so leer, wie ihn der Aufbau hinterlässt (er legt **keinen** Bösewicht-Marker). `clear_table` auf nichts ist
+**gelungen**, nicht gescheitert (Kommentar im Executor), und das nächste `kampf-beginnen` legt einen **neuen** Marker (`place_asset` findet keinen vorhandenen).
+
+**Was nicht gilt.** **`Münzen (gemeinsam)` bleibt** — keine Leiste, kein Marker, kein Ersatz; sie ist das einzige Zählerobjekt, das übrig bleibt. Die Bösewicht-Zähler liest **keine** Wache (gemessen: kein `require_counter` nennt sie); aus dieser Erweiterung entsteht also kein Bedarf an `require_marker`.
+
+### M30.9 — Zielstand, Reihenfolge, Schreiben
+
+**Die Reihenfolge ist verbindlich: erst Code und Deploy, dann Daten.** Der Executor läuft **auch im Frontend-Bundle** (`docs/datenzugriff.md`, „Fallen“): beide Images ändern sich. Der Code (`DU`–`DZ`) ist folgenlos, solange kein Platz `counters` weglässt und keine Wahl `$optDoerfler…` nennt (M30.5, Entscheidung 1). Die Daten schreiben `EB`–`EE`;
+`EB` (löschen und umbenennen) hängt an **keinem** Code und darf jederzeit.
+
+**Zielstand der Kurzpartie `b1e10f4e…`, Text mit Hashes** (kompaktes `JSON.stringify`; gerechnet auf einer Kopie der Sicherung, Skript im Scratchpad `…\scratchpad\m30\proto2.js` — **nicht im Repo**, der Code wird nach den Tests neu geschrieben). Je Aufgabe wird **nur** das Genannte geändert; der Rest bleibt byteweise gleich.
+
+| Stand | `scenario_data` | `sequence_data` | `action_data` |
+|---|---|---|---|
+| **Ausgang** (nach M29) | 19 106, `914461d63f77` | 2 781, `33a42ffe0f71` (31 Schritte) | 6 611, `63abf4174038` (19 / 4 / 1 / 45 Schritte je Aktion) |
+| nach **`EC`** Dörfler-Optionen | **21 244**, `7e654774e019` (+2 138: drei Schlüssel an `options`) | **2 780**, `a63d57d7ea86` (31 Schritte; nur `villager` an 25–27) | unverändert |
+| nach **`ED`** Zähler der Dörfler | **20 858**, `82592d1ac883` (−386: `seats[].counters`) | unverändert | **5 937**, `526c17f0fdf6` (`dorfphase-beginnen` 45 → **33**: Wache 1 neu, 16–27 weg) |
+| nach **`EE`** Zähler des Bösewichts | unverändert | **2 621**, `e859bd457002` (31 → **29**) | **5 803**, `33033dace238` (`kampf-beginnen` 19 → **17**; Dorfphase bleibt 33, zwei Schritte getauscht) |
+
+**Die Daten im Wortlaut.** (`EC`): jede der drei Optionen hat `label` `Dörfler <n>`, `default` = Kurzname (`Henlo`, `Fridgette`, `Granny`), neun `choices` in der Reihenfolge des Rosters, Schlüssel = Kurzname, `label` = voller Name, `vars: { Doerfler<n>: "<voller Name>" }`; die Folge: `"villager": "$optDoerfler<n>"`. (`ED`): Schritt 1 von `dorfphase-beginnen` wird
+`{ "type": "require_marker", "zoneLabel": ["Dörfler 1: Leben", "Dörfler 2: Leben", "Dörfler 3: Leben"], "above": 0, "confirm": true, "message": "Auf keiner Lebensleiste liegt noch ein Marker — alle drei Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende." }`.
+(`EE`): `clear_table` mit `assetName` `Marker: Bösewicht BEW` / `Marker: Bösewicht LEB`. `zone_data`, `grid_data`, `state_data` und `save_states` bleiben **in jedem Schritt** unberührt.
+
+**Schreiben, ohne fremde Arbeit zu zerstören** — dieselbe Vorlage wie M28/M29 (`docs/datenzugriff.md`, „Regeln fürs Schreiben“ Nr. 5): `scripts/setupwahl-daten.mjs` mit `--schritt optionen|zaehler|boss`, `--check`, `--write … --sicherung-sha`, `--zurueck`, **kein `--force`**; Vorbedingung **je Stück** (nicht je Gesamthash: die drei Schritte ändern **disjunkte Stücke** und dürfen in
+jeder Reihenfolge laufen — die Hashes oben sind die der empfohlenen Reihenfolge `EC`, `ED`, `EE`); Rückwärtsbeweis; Sicherung vorher mit Hash; Vergleich-und-Tausch in einer `IMMEDIATE`-Transaktion; Fingerabdruck der übrigen Tabellen vorher/nachher; zweiter Lauf „schon geschrieben“. **Rückweg umgekehrt: zuerst `EE`, dann `ED`, dann `EC`**, dann (falls nötig) `EB` aus der Sicherung.
+**Ein offener Setup-Editor kann jeden Schritt still zurücknehmen** (`docs/datenzugriff.md`): vor jedem Schreiben fragen, nach jedem und am Ende des Tages `--check`.
+
+**Die älteren Skripte und Fixtures bleiben stehen** (M30.5 Nr. 9): `doerfler-daten.mjs` (`VILLAGERS` trägt `counters`), `auslagen-daten.mjs` (`hardwiredSteps`, die 39 Schritte, die M27 ersetzt hat) und ihre Tests sind der **Stand von M26/M27**; `server/test/fixtures/*.json` sind Auszüge der Produktion von damals. Sie nachzuziehen hieße, die Gleichwertigkeitsbeweise von M27 („der Tisch ist gleichwertig“) zu löschen. Ihr `--write` wird **nicht mehr** gefahren und trägt in
+seinem Kopf einen Satz dazu (`EF`). Der Test für `setupwahl-daten.mjs` bekommt eine **eigene Fixture** (`setupwahl-kurzpartie.json`: die drei Spalten der Sicherung, Hash-gebunden; Bibliothek und Zonen aus `auslagen-kurzpartie.json`).
+
+**Rauchtest (nur lesend):** `scripts/auslagen-rauchtest.mjs` bekommt (`DX`) die Erkennung von `require_marker` als Wache und (`EC`–`EE`) Fälle: Aufbau mit Vorgabe = heutiger Tisch; Aufbau mit einer **anderen** Wahl (Judy, Norman, Quintus) = drei Dörfler, zwölf Marker auf ihren Startwerten, **kein** Dörfler-Zähler; Doppelwahl (M30.4); `dorfphase-beginnen` mit allen drei Lebensmarkern entfernt → hält mit der Rückfrage; mit einem → läuft; Tausch mit bewegtem Marker → fragt.
+
+### M30.10 — Bewusst nicht Teil davon
+
+- **Eine Messung der Plätze je Tableau.** Die Leisten sind je **Platz** gemessen (M26: Plätze 1 und 3 wellig, 2 gerade). Wer Judy oder Georgie an Platz 1 wählt, bekommt die Marker bis zu 8 Weltpunkte neben den aufgedruckten Kreis — wie beim Tausch heute. Das ist **die offene Frage aus M26**, durch die Wahl weder neu noch gelöst; für die Wache (`onSlot`) liegt ein Marker auf dem **richtigen Platz der Leiste**
+  richtig, **ob er auf dem Kreis liegt, sieht sie nicht**.
+- **Max-LEB-Stopper, mehrere Plättchen auf einer Leiste.** `require_marker` meldet es als unlesbar (M30.7 Regel 4). Ein Marker für den Stopper ist ein eigener Auftrag.
+- **Eine Prüfung der Wahl vor dem Aufbau** (zwei gleiche Dörfler, M30.4). Die Stelle wäre `shared/setupOptions.js`, nicht die Felder; sie wird gebaut, wenn die Doppelwahl mehr als einen Klick kostet.
+- **Eine Zufallswahl der Dörfler** (`draw_assets` mit Pool). Der Auftraggeber hat „wählen“ gesagt, nicht „ziehen“; ein Pool der Dörfler-Tableaus ist nicht definiert.
+- **Dörferwahl je Spieler im Raum.** Der Raum führt `sequence_data` einmal mit der Wahl des Gastgebers aus (`rooms.js`).
+- **Alte Spielstände nachrüsten.** Sie behalten ihre Zähler und ihre Marker und laufen mit der neuen Wache (sie liest Marker, die dort immer lagen). Verwaiste Zähler entfernt der Spieler von Hand.
+- **Ein Editor-Feld für Dörferdaten und Optionen.** `scenario_data.villagers` hat keine Oberfläche (M26, M27.1), die Optionen auch nicht — beides schreiben die Skripte.
+- **`swap_villager` mit `$opt…`.** Es wird möglich (M30.3), niemand braucht es, und `validateOptions` erlaubt `$opt…` nur in der Folge.
+
+### M30.11 — Abnahme
+
+1. **Aufbauten:** in der Aufbauliste des Spiels steht **ein** TFT-Aufbau mit dem entschiedenen Namen; `c0f43ae6…` und `8bc238c0…` gibt es nicht; `scenario_data.bosses` der Kurzpartie ist unverändert (Hash gleich).
+2. **Dialog:** beim Laden fragt der Tisch **fünf** Felder (Spiellänge, Toller Trödel, Dörfler 1–3); ohne Änderung entsteht der Tisch von **vor M30** — Henlo, Fridgette, Granny, dieselben Marker, dieselben Karten.
+3. **Wahl:** mit `?opt=doerfler1:Judy&opt=doerfler2:Norman&opt=doerfler3:Quintus` sitzen Judy, Norman, Quintus an den Plätzen 1–3, mit Tableau, Spielstein, Startausrüstung (Judys drei Gemälde im Vorrat) und zwölf Markern auf ihren Startwerten; Protokoll ohne Beanstandung. Dasselbe im Raum (`setup_choices`).
+4. **Doppelwahl:** zweimal Judy → Platz 2 leer, **eine** Zeile `"Judy Marks" already sits at seat 1`, der Rest steht.
+5. **Keine Dörfler-Zähler:** nach `ED` liegen am Tisch **nur** `Münzen (gemeinsam)` (und, vor `EE`, die zwei Bösewicht-Zähler). `dorfphase-beginnen` läuft ohne eine `skipped`-Zeile, stellt zwölf Marker auf die Startwerte, und hält **mit Rückfrage**, wenn alle drei Lebensmarker **von der Leiste genommen** sind („Trotzdem“ läuft weiter) — nicht, wenn auch nur einer liegt.
+6. **Tauschmenü:** ein Tausch am unberührten Tisch läuft ohne Rückfrage; nach Verschieben des Lebensmarkers fragt es; „Abbrechen“ ändert nichts; nach dem Tausch stehen die Marker des Neuen auf **seinen** Startwerten.
+7. **Nach `EE`:** zwischen den Kämpfen liegen **keine** Bösewicht-Marker auf den Leisten; ein neuer Kampf legt sie auf die Werte des Bösewichts (außer bei Barry Bluff, wie bisher).
+8. **Spielstände:** `save_states` (alle Zeilen) vor und nach **gleich**; alte Spielstände laden, ihre Dörfler-Zähler stehen noch dort.
+9. **Tests:** `cd server && npm test` grün (Stand vorher **1 686**), die `require_counter`-Tests unverändert; `cd client && npx vite build` ohne neue Warnung.
+10. **Offen und beim Auftraggeber (`EF`):** Sichtprüfung am Tisch, der Namensentscheid, der `--check` am Ende des Tages.

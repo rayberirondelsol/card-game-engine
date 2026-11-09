@@ -103,6 +103,12 @@ export const STEP_TYPES = [
   // seinem Ausgangswert („hat dieser Doerfler schon gespielt?"). `above` gilt
   // dann nicht mehr und wird nicht angeboten (siehe `stepFields`).
   { value: 'require_counter', label: 'Require Counter', fields: ['name', 'above', 'atStart', 'confirm', 'message'] },
+  // M30.7/DX: dieselbe Wache ueber **Marker** - die Plaetze der genannten Leisten
+  // (Zonen mit Platznummern), nicht Zaehler. `zoneLabel` ist eine Liste (eine
+  // Zeile je Zone wie bei `name` oben); `above`/`atStart` sind dieselben zwei
+  // Lesarten, und `atStart` braucht den Doerfler, dessen Startwert im Roster
+  // steht (`villager`). Der Handler im Executor ist der von `require_counter`.
+  { value: 'require_marker', label: 'Require Marker', fields: ['zoneLabel', 'above', 'atStart', 'villager', 'confirm', 'message'] },
   // M26.2/CM: einen Doerfler gegen einen anderen tauschen. Der Platz ist eine
   // Nummer (der Aufbau nennt seine Plaetze `Doerfler 1` ...), der Doerfler sein
   // voller Name - was an ihm haengt, steht in den Doerferdaten des Setups
@@ -169,6 +175,11 @@ export function stepFields(step) {
   // Versprechen, das der Aufbau nicht haelt.
   if (spec.value === 'require_counter' && typeof step === 'object' && step?.atStart === true) {
     return spec.fields.filter(f => f !== 'above');
+  }
+  // M30.7/DX: dieselbe Regel fuer `require_marker`, dazu die Gegenrichtung: der
+  // Doerfler gehoert nur zu `atStart` (sein Startwert), sonst liest ihn niemand.
+  if (spec.value === 'require_marker' && typeof step === 'object') {
+    return spec.fields.filter(f => (step?.atStart === true ? f !== 'above' : f !== 'villager'));
   }
   return [...spec.fields];
 }
@@ -276,6 +287,10 @@ export function defaultStep(type, ctx = {}) {
       // weil eine Wache ueber einem handgefuehrten Zaehler im Zweifel fragen
       // soll statt zu sperren (M19.5).
       return { type, name: [], above: 0, confirm: true, message: '' };
+    case 'require_marker':
+      // Dasselbe in Marker: keine geratene Zone (wie `name` oben - nur der Autor
+      // weiss, welche Leisten gemeint sind), kein geratener Satz.
+      return { type, zoneLabel: [], above: 0, confirm: true, message: '' };
     case 'require_zone':
       // „leer" ist der haeufigere Fall (und der aus M9.3). Die Meldung bleibt
       // leer: sie ist die eine Entscheidung, die der Schritt nicht vorwegnehmen
@@ -448,6 +463,17 @@ function describeWork(step) {
       return `Require one of ${list}`
         + ` to be above ${Number(step?.above) || 0}, else ${ask}${say ? `: "${say}"` : ''}`;
     }
+    // M30.7/DX: wie `require_counter`, nur ueber Leisten; beide Lesarten stehen in der Zeile.
+    case 'require_marker': {
+      const zonen = categoryList(step?.zoneLabel);
+      const say = String(step?.message ?? '').trim();
+      const ask = step?.confirm ? 'ask before going on' : 'stop the sequence';
+      const list = zonen.length ? zonen.map(z => `"${z}"`).join(', ') : '(no zone)';
+      if (step?.atStart === true) {
+        return `Require every one of ${list} to carry the starting value of ${q(step?.villager)}, else ${ask}${say ? `: "${say}"` : ''}`;
+      }
+      return `Require one of ${list} to carry a marker above ${Number(step?.above) || 0}, else ${ask}${say ? `: "${say}"` : ''}`;
+    }
     case 'swap_villager':
       return `Swap the villager at seat ${Number.isFinite(Number(step?.seat)) && step?.seat !== '' ? Number(step.seat) : '(none)'}`
         + ` for ${q(step?.villager)}`;
@@ -549,7 +575,8 @@ export function validateStep(step, ctx = {}) {
   }
   // reveal_next liest die Zone, aus der aufgedeckt wird - anders als bei
   // targetZoneLabel ist "keine" hier keine gueltige Wahl.
-  if (fields.has('zoneLabel')) {
+  // `require_marker` fuehrt eine **Liste** und wird weiter unten geprueft.
+  if (fields.has('zoneLabel') && typeOf(step) !== 'require_marker') {
     if (!step?.zoneLabel) problems.push('no zone chosen');
     else if (!known(zoneLabels, step.zoneLabel)) problems.push(`zone "${step.zoneLabel}" not found`);
   }
@@ -729,6 +756,22 @@ export function validateStep(step, ctx = {}) {
       problems.push('seat must be a whole number from 1');
     }
     if (!String(step?.villager ?? '').trim()) problems.push('no villager named');
+  }
+  // M30.7/DX: `require_marker` - die Zonen sind eine Liste (jede einzeln gegen die
+  // Zonen des Setups, ein Platzhalter ist ein Name), der Doerfler gehoert zu
+  // `atStart`, und `above` ist eine Zahl wie bei `require_counter`: der Executor
+  // haelt sonst die ganze Folge an. Leer ist die Vorgabe (0).
+  if (typeOf(step) === 'require_marker') {
+    const zonen = categoryList(step?.zoneLabel);
+    if (!zonen.length) problems.push('no zone chosen');
+    for (const z of zonen) {
+      if (!hasPlaceholder(z) && !known(zoneLabels, z)) problems.push(`zone "${z}" not found`);
+    }
+    if (fields.has('villager') && !String(step?.villager ?? '').trim()) problems.push('no villager named');
+    if (fields.has('above') && step?.above !== undefined && step?.above !== null && step?.above !== ''
+      && !Number.isFinite(Number(step.above))) {
+      problems.push(`above must be a number, not "${String(step.above).trim()}"`);
+    }
   }
   if (fields.has('count')) {
     const min = step?.type === 'split' ? 2 : 1;

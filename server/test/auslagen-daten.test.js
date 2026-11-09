@@ -780,3 +780,23 @@ test('DO: eine fehlerhafte Tabelle – ein Ziel, das es nicht gibt – ist eine 
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+// ── DX / Spec M30.5 Nr. 7: der Rauchtest erkennt die Wache aus `require_marker` ─────────────────────────────
+//
+// Die Prüfung stand als Einzeiler in der Schleife über die Spielstände; sie ist eine Funktion, damit ein Test
+// sie hält. Eine Wache ist ein Schritt, der die Folge **angehalten** hat (`… further steps skipped`) - eine Auskunft
+// über den Stand, kein Fehler des Aufbaus.
+
+const { istWache } = await import('../../scripts/auslagen-rauchtest.mjs');
+
+test('DX: `istWache` erkennt require_marker wie require_counter und require_zone – und nichts sonst', () => {
+  const halt = 'Alle besiegt. [Dörfler 1: Leben: no marker] (2 further steps skipped)';
+  assert.equal(istWache({ type: 'require_marker', status: 'skipped', reason: halt }), true);
+  assert.equal(istWache({ type: 'require_counter', status: 'skipped', reason: halt }), true);
+  assert.equal(istWache({ type: 'require_zone', status: 'skipped', reason: halt }), true);
+  assert.equal(istWache({ type: 'require_marker', status: 'skipped', reason: 'a marker cannot be read (1 further step skipped)' }), true);
+  assert.equal(istWache({ type: 'place_asset', status: 'skipped', reason: halt }), false);
+  // Eine Wache ohne Halt (die Folge lief weiter) ist keine Auskunft über den Stand.
+  assert.equal(istWache({ type: 'require_marker', status: 'skipped', reason: 'zone "X" not found' }), false);
+  assert.equal(istWache({ type: 'require_marker', status: 'ok' }), false);
+});

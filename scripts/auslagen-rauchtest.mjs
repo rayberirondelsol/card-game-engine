@@ -49,6 +49,14 @@ const schlecht = (log) => log.filter(e => e.status !== 'ok');
  */
 export const wiederOhneKarte = (e) => [...(e.reason ?? '').matchAll(/"([^"]+)"/g)].map(m => m[1]).filter(n => Object.hasOwn(ZUORDNUNG, n));
 
+/**
+ * M30.5 Nr. 7/DX: ein Schritt, der die Folge **angehalten** hat (`… further steps skipped`) und eine Wache ist: über
+ * einen Zähler (`require_counter`), eine Zone (`require_zone`) oder die Marker auf den Leisten (`require_marker`). Eine
+ * Wache, die der Spielstand nicht erfüllt, ist eine Auskunft über den Stand, kein Fehler des Aufbaus. Die **eine** Stelle,
+ * die die Typen kennt: kommt ein vierter Wächter dazu, steht er hier.
+ */
+export const istWache = (e) => ['require_counter', 'require_marker', 'require_zone'].includes(e.type) && /further steps? skipped/.test(e.reason ?? '');
+
 const zeile = (e) => {
   const ohne = wiederOhneKarte(e);
   return `${e.index} ${e.type} ${e.status}: ${e.reason}${ohne.length ? ` — Plättchen ${ohne.map(n => `"${n}"`).join(', ')} steht wieder ohne Karte da, obwohl die Zuordnung es abdeckt` : ''}`;
@@ -247,7 +255,7 @@ export function rauchtest(db) {
       // Eine Wache, die der Spielstand nicht erfüllt (alle Dörfler besiegt, der Kampf läuft noch), ist eine
       // Auskunft über den Stand, kein Fehler des Aufbaus - und danach geht die Folge nicht weiter.
       for (const e of sl) {
-        if ((e.type === 'require_counter' || e.type === 'require_zone') && /further steps? skipped/.test(e.reason ?? '')) { say(`      Wache bei „${id}": ${e.reason}`); gehalten = true; }
+        if (istWache(e)) { say(`      Wache bei „${id}": ${e.reason}`); gehalten = true; }
         else bad(`${sv.name} ${id}: ${zeile(e)}`);
       }
       s = a.state;

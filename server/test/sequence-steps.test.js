@@ -805,3 +805,93 @@ test('CV: der Editor zeichnet die Gate-Zeile an jedem Schritt – eine Stelle, n
   assert.ok(/render\.onlyChoice\(\)/.test(src), 'der Renderer wird nirgends aufgerufen - die Zeile bliebe still unsichtbar');
   assert.equal((src.match(/render\.onlyChoice\(\)/g) || []).length, 1, 'genau eine Stelle');
 });
+
+// ── DX / Spec M30.7: der Editor kennt `require_marker` ───────────────────────
+//
+// Dieselbe Wache wie `require_counter`, aber über die **Leisten** (Zonen mit
+// Platznummern) statt über Zähler. Die Felder sind die, die der Handler liest
+// (`shared/sequenceExecutor.js`): `zoneLabel` (eine Zone oder eine Liste),
+// `above`, `atStart` + `villager`, `confirm`, `message`.
+
+const LEBEN = ['Dörfler 1: Leben', 'Dörfler 2: Leben', 'Dörfler 3: Leben'];
+const markerCtx = { zoneLabels: [...LEBEN, 'Dörfler 1: Mumm'] };
+const marker = (over = {}) => ({ type: 'require_marker', zoneLabel: LEBEN, above: 0, confirm: true, message: 'Alle besiegt.', ...over });
+
+test('DX: `require_marker` steht im Vokabular, mit den Feldern, die der Handler liest', () => {
+  const spec = STEP_TYPES.find(t => t.value === 'require_marker');
+  assert.ok(spec, 'require_marker fehlt in STEP_TYPES');
+  assert.deepEqual(spec.fields, ['zoneLabel', 'above', 'atStart', 'villager', 'confirm', 'message']);
+});
+
+test('DX: mit `atStart` entfällt `above` und kommt `villager` – ohne umgekehrt', () => {
+  const an = stepFields(marker({ atStart: true, villager: 'Henlo Bulwark' }));
+  assert.ok(!an.includes('above'), '`above` hat bei atStart keine Wirkung');
+  assert.ok(an.includes('villager') && an.includes('atStart'));
+  for (const aus of [marker(), marker({ atStart: false })]) {
+    const f = stepFields(aus);
+    assert.ok(f.includes('above'));
+    assert.ok(!f.includes('villager'), '`villager` hat ohne atStart keine Wirkung');
+  }
+  // `require_counter` bleibt, wie es ist: kein `villager`, `above` weg bei atStart.
+  assert.ok(!stepFields({ type: 'require_counter', atStart: true }).includes('above'));
+  assert.ok(!stepFields({ type: 'require_counter' }).includes('villager'));
+});
+
+test('DX: ein frischer `require_marker` rät weder Zone noch Satz', () => {
+  assert.deepEqual(defaultStep('require_marker', markerCtx), { type: 'require_marker', zoneLabel: [], above: 0, confirm: true, message: '' });
+});
+
+test('DX: die Zeile nennt beide Lesarten verschieden – Zonen, Halt/Rückfrage und Satz', () => {
+  const ab = describeStep(marker());
+  const am = describeStep(marker({ atStart: true, villager: 'Henlo Bulwark', confirm: false, message: 'Schon gespielt.' }));
+  assert.notEqual(ab, am);
+  for (const z of LEBEN) { assert.ok(ab.includes(`"${z}"`), ab); assert.ok(am.includes(`"${z}"`), am); }
+  assert.match(ab, /marker above 0/);
+  assert.match(ab, /ask before going on/);
+  assert.ok(ab.includes('"Alle besiegt."'));
+  assert.match(am, /starting value of "Henlo Bulwark"/);
+  assert.match(am, /stop the sequence/);
+  assert.ok(am.includes('"Schon gespielt."'));
+  assert.ok(!/above/.test(am), 'atStart liest `above` nicht, die Zeile sagt es auch nicht');
+  // Eine einzelne Zone (String) liest sich wie eine Liste mit einem Eintrag.
+  assert.ok(describeStep(marker({ zoneLabel: 'Dörfler 1: Leben' })).includes('"Dörfler 1: Leben"'));
+});
+
+test('DX: validateStep meldet fehlende Zone, fehlenden Dörfler und eine Schwelle, die keine Zahl ist', () => {
+  assert.deepEqual(validateStep(marker(), markerCtx), []);
+  assert.deepEqual(validateStep(marker({ zoneLabel: 'Dörfler 1: Leben' }), markerCtx), [], 'ein String genügt');
+  assert.deepEqual(validateStep(marker({ atStart: true, villager: 'Henlo Bulwark', zoneLabel: ['Dörfler 1: Mumm'] }), markerCtx), []);
+  assert.deepEqual(validateStep(marker({ atStart: true, villager: '$F1', zoneLabel: ['Dörfler 1: Mumm'] }), markerCtx), [], 'ein Platzhalter ist ein Name');
+
+  for (const leer of [[], '', undefined, ['', ' ']]) {
+    assert.ok(validateStep(marker({ zoneLabel: leer }), markerCtx).some(p => /zone/i.test(p)), JSON.stringify(leer));
+  }
+  const weg = validateStep(marker({ zoneLabel: ['Dörfler 1: Leben', 'Dörfler 9: Leben'] }), markerCtx);
+  assert.equal(weg.length, 1);
+  assert.ok(weg[0].includes('Dörfler 9: Leben') && !weg[0].includes('Dörfler 1: Leben'), weg[0]);
+
+  assert.ok(validateStep(marker({ atStart: true, villager: '' }), markerCtx).some(p => /villager/.test(p)));
+  assert.ok(validateStep(marker({ atStart: true }), markerCtx).some(p => /villager/.test(p)));
+  assert.deepEqual(validateStep(marker({ villager: '' }), markerCtx), [], 'ohne atStart ist `villager` kein Feld');
+
+  assert.ok(validateStep(marker({ above: 'x' }), markerCtx).some(p => /above/.test(p) && /number/.test(p)));
+  assert.deepEqual(validateStep(marker({ above: '' }), markerCtx), [], 'leer ist die Vorgabe (0)');
+  assert.deepEqual(validateStep(marker({ above: 3 }), markerCtx), []);
+  assert.deepEqual(validateStep(marker({ atStart: true, villager: 'Henlo Bulwark', above: 'x' }), markerCtx), [], 'bei atStart wird `above` nicht gelesen');
+});
+
+test('DX: ein `$opt…` in einer Aktion ist das bekannte Problem – nichts Neues', () => {
+  const p = validateStep(marker({ zoneLabel: ['$optZone'] }), { ...markerCtx, inAction: true });
+  assert.equal(p.length, 1, p.join('\n'));
+  assert.match(p[0], /\$optZone does not belong in an action/);
+});
+
+test('DX: der Editor führt die Zonenliste in derselben Bauform wie die Zählerliste – eine Listenform', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../../client/src/components/SetupSequenceEditor.jsx', import.meta.url), 'utf8');
+  // Zwei Textareas gab es schon vor DX (Kartenkategorien mit Auswahlliste, Zählerliste); die Zonenliste ist die
+  // Zählerliste, kein drittes Feld. Gelesen wird es am Platzhalter und an der Zahl.
+  assert.ok(src.includes('one zone per line'), 'require_marker hat keine Zonenliste im Editor');
+  assert.equal((src.match(/<textarea/g) || []).length, 2, 'ein Listenfeld, das beide Schritte benutzen – nicht zwei Bauformen');
+  assert.equal((src.match(/listField\(/g) || []).length, 2, 'Zähler- und Zonenliste, beide durch dieselbe Funktion');
+});
