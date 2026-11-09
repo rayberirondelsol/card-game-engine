@@ -487,6 +487,9 @@ auf den Startwert des Neuen. **Aber:** weil es nur drei Positionen gibt, hat ein
 vierter Dörfler gar keinen Marker — das betrifft die Kurzpartie nicht (drei
 Dörfler), wohl aber jeden Aufbau mit mehr.
 
+
+> **Nachtrag (M30).** Seit M30 hat ein Platz **keine Zähler** mehr (`seat.counters` ist optional, `placeVillager` legt keine). Die Startwerte stehen im Roster und an den Markern. Die Tabelle und der Befund hier sind der Stand von M26/M27 und bleiben als Befund stehen.
+
 ---
 
 ## 8. Vier Befunde, die den Auftrag berühren
@@ -518,6 +521,9 @@ Dörfler), wohl aber jeden Aufbau mit mehr.
    aus der Karte kommt; nur die Zuordnung *Karte → Dörfler* hängt an ihr. Im Repo
    liegt keine Liste „Dörfler → Startausrüstung"; wer sie absichern will, liest
    sie an der gedruckten Anleitung gegen.
+
+
+> **Nachtrag (M30).** Die Befunde 1 bis 4 gelten unverändert. Zu 3: mit den Zählern ist auch ihr `max` weggefallen (M30.5, „Was nicht gilt“). Das Maximum des Lebens ist der Startwert im Roster; die Leiste trägt die Plätze 1 bis 10 und hat keinen Platz 0 (M30.6).
 
 ---
 

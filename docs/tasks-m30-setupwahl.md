@@ -27,7 +27,7 @@ erst Trockenlauf, dann `db.transaction`, dann Kontrollausgabe, **vorher** eine S
 
 ## Wo die Spec nicht stimmt
 
-Der Auftrag (Vorarbeit vom 2026-11-09) war an Code und Produktion gemessen; beim Schreiben der Spec haben sich neun Stellen gezeigt, an denen er nicht ganz trägt. Die ersten drei ändern den Zuschnitt, 4 bis 6 ändern Aufgaben, 7 bis 9 sind Fallen.
+Der Auftrag (Vorarbeit vom 2026-11-09) war an Code und Produktion gemessen; beim Schreiben der Spec haben sich neun Stellen gezeigt, an denen er nicht ganz trägt. Die ersten drei ändern den Zuschnitt, 4 bis 6 ändern Aufgaben, 7 bis 9 sind Fallen. Nach dem Bauen kamen 10 bis 18 dazu (`EF`, „Stand nach DU–EF“).
 
 ### 1. Es gibt keinen Platz 0 auf der Lebensleiste — und die Wache braucht ihn nicht
 
@@ -72,6 +72,16 @@ eine **Entscheidung**, kein Versehen (unten, Nr. 5), und der Handler trägt beid
 
 `?setup=<id>` eines gelöschten Aufbaus bricht mit `Failed to load setup` ab (`GameTable.jsx`, `console.error`). Die Kurzpartie behält ihre Id; die beiden alten waren unreferenziert. Der Auftraggeber sagt, ob er eines gespeichert hat (`EB`, Teil 2, Frage).
 
+10. **M30.8 (`place_asset`) war falsch begründet.** Ein zweites `place_asset` mit demselben Namen setzt den vorhandenen Marker um und legt keinen zweiten an (`if (existing)` in `shared/sequenceExecutor.js`). Der Schaden ohne die zwei `clear_table` sind darum **stehenbleibende Werte** zwischen den Kämpfen (und vor Barry Bluff die des Vorgängers), nicht zwei Marker. Die `clear_table` bleiben richtig. Berichtigt im Text von M30.8 (Spec).
+11. **`EA` 5 (b): `zoneSlotNumberAt` ist kein Beleg.** Der Minifier benennt interne Funktionen um; der Treffer ist 0 und muss es sein. Belegbar sind nur Zeichenketten: `require_marker`, `cannot be read`, `has no place`. Berichtigt in `EA` 5 (b).
+12. **`DU`: nicht rot war der Test `validateOptions`** (Nummer 6). Die Folge mit `$optDoerfler<n>` bestand schon vorher, weil `validateOptions` `NAME_FIELDS` nicht liest. Rot war Nummer 7, der Quelltext-Test: vor `DU` stand in der Zeile `const NAME_FIELDS` kein `villager`. Nummer 6 bleibt als Pin, beweist aber nichts über die Änderung. Berichtigt in `DU`.
+13. **`EF` Teil 1 Nr. 5: „die drei, die der Rauchtest importiert“ stimmt nicht.** `auslagen-rauchtest.mjs` importiert direkt `auslagen-daten.mjs` und `gelaendekarten-zuordnung.mjs`; über deren Importe kommen `doerfler-daten.mjs`, `equipment-zones.mjs`, `szenariodaten-berichtigung.mjs` und `szenariodaten-grundspiel.mjs` hinzu: sieben Dateien für den Rauchtest. Mit `setupwahl-daten.mjs` und `setups-aufraeumen.mjs` sind es neun. Berichtigt in `EF` Teil 1 Nr. 5 und in `docs/datenzugriff.md`.
+14. **M30.2 gegen M30.9 und M30.11 — gemessen, nicht vermutet.** M30.2 sagte, die `--check` von M28 und M29 liefen nach `EB` nicht mehr. Am 2026-11-09, nach allen vier Schnitten, gefahren: `gelaendekarten-zuordnung.mjs` meldet „schon geschrieben: terrainCards 108 Zeichen, sha `aad39d745984`“, `szenariodaten-berichtigung.mjs` „22 Läufe sauber … alle sieben schon berichtigt“ mit Trockenlauf 0 Beanstandungen — auf dem **neuen** `scenario_data` (20 858, `82592d1ac883`), **ohne jede Abweichung**. Beide prüfen ihr eigenes Stück **am Inhalt**, nicht die Spalte am Gesamthash. Damit waren **zwei** Annahmen falsch: M30.2 („danach nicht mehr“) und die erste Fassung dieses Punktes („sie melden Abweichungen an den übrigen Zeilen“). Was bleibt: `auslagen-daten.mjs` und `doerfler-daten.mjs` sind Stand M26/M27 und dürfen nicht mehr mit `--write` fahren (Kopfkommentar dort).
+15. **Name:** M30.2 nennt `Townsfolk Tussle` als Vorschlag; entschieden ist **„TFT Aufbau“** (Auftraggeber). Der Rückweg `--zurueck` stellt den **alten** Namen wieder her, nicht den Vorschlag. `EF` Teil 2, Punkt 9 ist angepasst.
+16. **M30.5 Nr. 3 (Zahl der Spielstände) — geschlossen.** Von 17 `save_states` tragen **acht** je zwölf Dörfler-Zähler; **fünf** davon zeigen über `setup_id` auf den Aufbau, **drei** auf keinen, die neun übrigen sind TTS-Import-Stände vom Februar ohne Dörfler. Die Fünf aus M30.5 Nr. 3 und die Acht zählen Verschiedenes, es gibt keinen Widerspruch. Nachgemessen am 2026-11-09, lesend über `save_states.state_data`.
+17. **Kopf von `scripts/setupwahl-daten.mjs`:** der Satz „Das Skript braucht nur `../shared/scenarioData.js` und `../shared/setupOptions.js`“ stimmt nicht; die Datei importiert auch `../shared/villagers.js`. Nicht geändert (`EF` ändert keinen Code); offen.
+18. **`docs/datenzugriff.md`, Kopierliste:** seit M29 standen dort vier Dateien (`auslagen-daten`, `auslagen-rauchtest`, `doerfler-daten`, `equipment-zones`); M29 hatte die Liste nicht nachgezogen. Korrigiert auf neun Dateien.
+
 ---
 
 ## Entscheidungen
@@ -100,10 +110,12 @@ wo er kippen soll, ist der Satz **Umkehr** der Preis.
 
 ## DU — `villager` ist ein Namensfeld; die Doppelwahl wird festgehalten (M30.3, M30.4)
 
+**Stand: fertig** (`b2fc3ab`). `server/test/seat-villager-choice.test.js` mit acht Testfällen; `'villager'` steht in `NAME_FIELDS`. Nummer 6 war nicht rot (Nr. 12).
+
 **Befund.** `NAME_FIELDS` in `shared/sequenceExecutor.js` kennt `villager` nicht; ein `"$optDoerfler1"` in einem `seat_villager`-Schritt bliebe Text, und `pickSeat` meldete `"$optDoerfler1" is not in the roster`. Ist das behoben, fällt die Doppelwahl als Verhalten an, das niemand beschlossen hat — M30.4 beschließt es.
 
 **Test zuerst** (`server/test/seat-villager-choice.test.js`, die Datei gibt es nicht; Tisch und Helfer aus `server/test/villager-table.js` — `fx`, `ZONES`, `scenarioData`, `opts`, `copy`, `build`). Die Optionen des Tests baut der Test selbst aus dem Roster (`scenarioData.villagers.roster`): je `doerfler<n>` mit neun Wahlen, wie M30.3.
-Alle rot, solange `villager` kein Namensfeld ist:
+Rot, solange `villager` kein Namensfeld ist (Nummern 1–5 und 7; Nummer 6 war schon grün, „Wo die Spec nicht stimmt“ Nr. 12):
 
 1. **Die Wahl greift:** Folge `seat_villager seat 1/2/3 villager "$optDoerfler<n>"`, `choices { doerfler1: 'Judy', doerfler2: 'Norman', doerfler3: 'Quintus' }` → `seatedVillagers` nennt Judy Marks, Norman Fishboy, Quintus Binch; das Protokoll hat keinen Eintrag mit Status `failed` oder `skipped` (ein `note` ist erlaubt).
 2. **Die Vorgabe baut den Tisch von heute:** `choices: {}` (Vorgaben) → **derselbe Zustand** wie `build()` aus `villager-table.js` (`deepEqual` auf `tokens`, `counters`, `cards`; `build()` setzt die drei Dörfler mit festen Namen).
@@ -119,6 +131,8 @@ Alle rot, solange `villager` kein Namensfeld ist:
 **Fertig, wenn:** die sieben Tests grün sind, `seat-villager.test.js`, `sequence-villager-steps.test.js`, `swap-villager.test.js`, `setup-options.test.js` **unverändert** grün sind und `npm test` grün ist.
 
 ## DV — Die Umkehrung: Punkt → Platznummer (M30.7)
+
+**Stand: fertig** (`b2fc3ab`). `zoneSlotNumberAt` neben `zoneSlotNumbered` in `shared/zoneGeometry.js`; Tests in `server/test/zone-slot-number-at.test.js`.
 
 **Befund.** `zoneSlotNumbered(zone, n)` liefert den Punkt zu einer Nummer; die Gegenrichtung gibt es nicht. Gebraucht wird sie, um den **Wert** eines Markers zu lesen (`require_marker`). Die Nummernregel (das geschriebene `n`, sonst die Stelle ab 1) und die Toleranz (`onSlot`, 0,5 Punkt) stehen schon
 in `shared/zoneGeometry.js`; die Umkehrung nimmt **beide**, sie schreibt keine zweite.
@@ -138,6 +152,8 @@ M30.7 (eine Toleranz, kein „nächster Platz“; `0` ist gültig, Aufrufer verg
 **Fertig, wenn:** die sechs Tests grün sind, `zone-slot-number.test.js` und `zone-slots.test.js` **unverändert** grün sind, und `npm test` grün ist.
 
 ## DW — Der Schritt `require_marker` und der Startwert aus dem Roster (M30.7)
+
+**Stand: fertig** (`b2fc3ab`). `markerStart` in `shared/villagers.js`. `require_marker` teilt sich in `shared/sequenceExecutor.js` den Handler mit `require_counter` (`case 'require_counter':` und `case 'require_marker':` stehen untereinander).
 
 **Befund.** `require_counter` fragt Zähler. `dorfphase-beginnen` Schritt 1 und das Tauschmenü brauchen dieselbe Wache über **Marker**. M30.7 entscheidet: eigener Typ `require_marker`, **ein** Handler. Der Startwert für `atStart` kommt aus `roster[<Dörfler>].start[<Wert>]` und gehört nach `shared/villagers.js`
 (`markerStart`), nicht in den Executor (er weiß nichts über Townsfolk Tussle).
@@ -175,6 +191,8 @@ Wert, der keiner von `STATS` ist (`Dörfler 1: Foo`) → `undefined`; leere `vil
 
 ## DX — Der Editor kennt `require_marker` (M30.5 Nr. 8, M30.5 Nr. 7)
 
+**Stand: fertig** (`b2fc3ab`). Vokabular in `client/src/utils/sequenceSteps.js`, Tests in `server/test/sequence-steps.test.js`; Editor-Feld in `SetupSequenceEditor.jsx` (der Bau prüft es, kein Test).
+
 **Befund.** Ohne Eintrag im Schrittvokabular ist der Schritt im Editor ein unbekannter Typ: er lässt sich weder lesen noch bearbeiten. Das Vokabular steht in `client/src/utils/sequenceSteps.js` (Felder je Typ, `stepFields`, `defaultStep`, `describeStep`, `validateStep`); der Rauchtest (`scripts/auslagen-rauchtest.mjs`) erkennt eine Wache an `require_counter`/`require_zone`.
 
 **Test zuerst** (`server/test/sequence-steps.test.js`, am Ende; die Datei gibt es, ihr Muster gilt):
@@ -191,6 +209,8 @@ das Feld `villager` als Textfeld (schon da für `swap_villager`/`seat_villager`)
 **Fertig, wenn:** die Tests grün sind, `cd client && npx vite build` **ohne neue** Warnung läuft, und ein Blick in `SetupSequenceEditor.jsx` zeigt: **eine** Listenbauform, nicht zwei.
 
 ## DY — Zähler am Platz sind optional (M30.5, Wo die Spec nicht stimmt Nr. 3 und 4)
+
+**Stand: fertig** (`b2fc3ab`). `server/test/seat-counters-optional.test.js` neu. Entscheidung 14 (Code vor Daten folgenlos) belegt der Deploy-Rauchtest in `EA`.
 
 **Befund.** `seatGeometryProblems` **verlangt** vier Zählerstellen je Platz (`shared/villagers.js`); `seatVillager` baut `spots.counters` aus ihnen; `placeVillager` legt je Wert einen Zähler **und prüft darin den Startwert** (`no start value for <Wert>`); `swapVillager` übernimmt die Stellen der alten Zähler und meldet `noCounter(st)`.
 M30.5 macht die Zähler **optional**: ein Platz ohne `counters` legt keine — der Code wird vor den Daten deploybar, ohne dass sich etwas ändert.
@@ -215,6 +235,8 @@ M30.5 macht die Zähler **optional**: ein Platz ohne `counters` legt keine — d
 
 ## DZ — Das Tauschmenü liest Marker (M30.5 Nr. 6, M30.7)
 
+**Stand: fertig** (`b2fc3ab`). `swapAction` schreibt `require_marker`; die Rückfrage-Tests in `swap-villager.test.js` sind auf Marker umgeschrieben, nicht gestrichen.
+
 **Befund.** `swapAction` (`client/src/utils/swapVillager.js`) schreibt als Schritt 2 ein `require_counter … atStart confirm` über die vier Zähler des Alten. Ohne Zähler **hielte es mit `no counter named …`** — jeder Tausch scheiterte an einer Rückfrage, die es nicht stellen kann. Das Menü muss auf `require_marker` umgestellt sein,
 **bevor** die Daten die Zähler weglassen. Marker lagen und liegen immer (der Aufbau hat sie in jeder Fassung gelegt), das neue Menü läuft darum **auch mit den heutigen Daten**.
 
@@ -232,6 +254,8 @@ M30.5 macht die Zähler **optional**: ein Platz ohne `counters` legt keine — d
 
 ## EA — Deploy beider Images (M30.9)
 
+**Stand: erledigt** (CI-Deploy zu `b2fc3ab`, laut Bauprotokoll). Belege und Rauchtest-Vergleich: `docs/spec-setup-system.md`, „M30 — gebaut“. Schritt 5 (b) korrigiert (Nr. 11).
+
 **Befund.** Der Executor und `shared/villagers.js`/`zoneGeometry.js` liegen in **beiden** Images (`docs/datenzugriff.md`, „Fallen“). Ein Deploy ändert nach `DU`–`DZ` **nichts Sichtbares** (Entscheidung 14, `DY` Test 4); er ist die Voraussetzung, dass das Schreiben der Daten der **eine** Schalter ist. Nichts wird in die Spalten geschrieben.
 
 **Vorher fragen:** **spielt gerade jemand?** Der Deploy legt Container neu an (Datenbank und Uploads liegen in Named Volumes und bleiben). **Läuft CI?** `gh run list --limit 10` und `gh api repos/rayberirondelsol/card-game-engine/actions/runners` — ein Lauf in `queued` und ein fehlender Runner heißen, dass nichts deployt wird (CLAUDE.md).
@@ -240,15 +264,17 @@ M30.5 macht die Zähler **optional**: ein Platz ohne `counters` legt keine — d
 
 1. Alle Tests von `DU`–`DZ` grün, Bau grün; die Änderungen sind auf `origin/master` (der Auftraggeber committet und pusht; der Agent nicht).
 2. **Rauchtest `vorher`** (`auslagen-rauchtest.mjs`, **die Fassung, die jetzt auf der VM liegt**, gegen die Produktion): Ausgabe **und** Datei ins Scratchpad. Erwartet: 0 Beanstandungen.
-3. **M28/M29 `--check` jetzt**, vor jedem Löschen von Aufbauten: beide melden „schon berichtigt / schon geschrieben“ (M30.2: danach nicht mehr).
+3. **M28/M29 `--check`.** *Nachgetragen 2026-11-09: dieser Schritt wurde vor dem Löschen übersprungen und erst nach allen vier Schnitten gefahren. Ergebnis: `gelaendekarten-zuordnung.mjs` meldet „schon geschrieben: terrainCards 108 Zeichen, sha `aad39d745984`“ und `szenariodaten-berichtigung.mjs` „22 Läufe sauber … alle sieben schon berichtigt“, Trockenlauf 0 Beanstandungen — auf dem **neuen** `scenario_data` (20 858, `82592d1ac883`). Die Annahme aus M30.2 („danach nicht mehr“) war falsch: beide prüfen ihr eigenes Stück am Inhalt, nicht die Spalte am Gesamthash (Nr. 14).*
 4. **Deploy:** per CI (Push auf `master`) oder von Hand (`cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build`). **Beide** Images neu.
-5. **Belege:** (a) `sha256sum /shared/sequenceExecutor.js` im Backend = Hash der Datei im Repo (`zoneGeometry.js`, `villagers.js` ebenso); (b) **das Frontend-Bundle** enthält `require_marker` und `zoneSlotNumberAt` (`docker exec card-game-engine-frontend sh -c 'grep -o "require_marker" /usr/share/nginx/html/assets/*.js | sort | uniq -c'` — Pfad prüfen;
-   es ist ein Bündel, kein Quelltext); (c) `gh run list --workflow=deploy.yml --limit 1 --json headSha` = der gepushte Commit; (d) die Skripte **neu in den Container**, **derselbe alte Rauchtest wie in Schritt 2** → `diff` der beiden Ausgaben **leer**.
+5. **Belege:** (a) `sha256sum /shared/sequenceExecutor.js` im Backend = Hash der Datei im Repo (`zoneGeometry.js`, `villagers.js` ebenso); (b) **das Frontend-Bundle** enthält die Zeichenketten `require_marker`, `cannot be read` und `has no place` (`zoneSlotNumberAt` ist **kein** Beleg: der Minifier benennt interne Funktionen um, der Treffer ist 0 und muss es sein; „Wo die Spec nicht stimmt“ Nr. 11) (`docker exec card-game-engine-frontend sh -c 'grep -o "require_marker" /usr/share/nginx/html/assets/*.js | sort | uniq -c'` — Pfad prüfen;
+   es ist ein Bündel, kein Quelltext; für jede der drei Zeichenketten zählen); (c) `gh run list --workflow=deploy.yml --limit 1 --json headSha` = der gepushte Commit; (d) die Skripte **neu in den Container**, **derselbe alte Rauchtest wie in Schritt 2** → `diff` der beiden Ausgaben **leer**.
 6. Stimmt (d) nicht: **nicht weiter.** Den Deploy zurücknehmen (`git revert`, Rebuild) — die Spalten sind unberührt.
 
 **Fertig, wenn:** (a)–(d) belegt sind und die Ausgabe der Schritte im Scratchpad liegt. **Sagt der Auftraggeber „nicht jetzt“, bleibt `EA` offen** — `EB` (Teil 1), `EC`–`EE` (Teil 1) dürfen vorher laufen, **kein** Teil 2 von `EC`–`EE`.
 
 ## EB — Die beiden alten Aufbauten löschen, die Kurzpartie umbenennen (M30.2)
+
+**Stand: Teil 1 fertig** (`b2fc3ab`: `scripts/setups-aufraeumen.mjs`, `server/test/setups-aufraeumen.test.js`, `server/test/fixtures/setups-alt.json`). **Teil 2 erledigt** (Produktion): beide Zeilen gelöscht, Kurzpartie heißt **„TFT Aufbau“**; Sicherung sha `b877dbe20bc8`. Mutationstests: 4 Mutanten, 3 gefangen, 1 Test nachgetragen.
 
 **Befund.** Siehe M30.1 und M30.2: zwei unreferenzierte Aufbauten (`c0f43ae6-f28c-40e5-a007-6f362f715b95` mit 0 Schritten, `8bc238c0-3043-4afb-804d-432742e78e80` mit hartverdrahteten Dörflern), ein Name, der lügt. Das ist die einzige Daten-Aufgabe, die an **keinem** Code hängt.
 
@@ -278,6 +304,8 @@ M30.5 macht die Zähler **optional**: ein Platz ohne `counters` legt keine — d
 **Fertig, wenn:** Teil 1 grün ist, **Teil 2** belegt im Scratchpad liegt (Sicherung, `--check`, Kontrollausgabe).
 
 ## EC — Die Dörferwahl: drei Optionen und drei Platzhalter (M30.3, M30.9)
+
+**Stand: Teil 1 fertig** (`98935b6`), **Teil 2 erledigt**: `scenario_data` 19 106 → **21 244**, `sequence_data` 2 781 → **2 780**, Hashes wie in M30.9. Mutationstests: 27 Mutanten, 24 gefangen, drei Tests nachgetragen.
 
 **Befund.** `scenario_data.options` hat `partie` und `troedel`; die Dörfler stehen in `sequence_data` 25–27 hartverdrahtet. M30.3 legt die Daten im Wortlaut fest, M30.9 den Zielstand (`scenario_data` 19 106 → **21 244**, `7e654774e019`; `sequence_data` 2 781 → **2 780**, `a63d57d7ea86`; `action_data` unverändert).
 Hier entsteht auch das Gerüst für `ED` und `EE`: `scripts/setupwahl-daten.mjs`, die **Fixture** und der gemeinsame Testunterbau.
@@ -314,6 +342,8 @@ Fingerabdruck je Tabelle und je Zeile von `save_states` vorher/nachher, Rückwä
 
 ## ED — Die Zähler der Dörfler weg (M30.5, M30.6, M30.9)
 
+**Stand: Teil 1 fertig** (`98935b6`), **Teil 2 erledigt**: `scenario_data` 21 244 → **20 858**, `action_data` 6 611 → **5 937**, `dorfphase-beginnen` 45 → **33** Schritte. Mutationstests: 50 Mutanten, 42 gefangen, fünf Tests nachgetragen, danach 49 / 50.
+
 **Befund.** Siehe M30.5/M30.6. Ist der Code deployt (`DW`, `DY`, `DZ` in `EA`), werden **drei** Stücke geändert: `scenario_data.villagers.seats[].counters` fallen weg (−386 Zeichen); `dorfphase-beginnen` Schritt 1 (die Wache) wird `require_marker`; Schritte 16–27 (zwölf `set_counter`) entfallen. Zielstand: `scenario_data` **20 858**, `82592d1ac883`; `action_data` **5 937**, `526c17f0fdf6` (`dorfphase-beginnen` 45 → **33**).
 **Ändert** (nicht nur ergänzt) → `docs/datenzugriff.md` „Regeln fürs Schreiben“ **Nr. 5** gilt: Vorbedingung je Stück, Rückwärtsbeweis.
 
@@ -344,6 +374,8 @@ Fingerabdruck je Tabelle und je Zeile von `save_states` vorher/nachher, Rückwä
 
 ## EE — Die Zähler des Bösewichts weg (M30.8, Erweiterung über das Gesagte hinaus)
 
+**Stand: Teil 2 erledigt** (Produktion); **Teil 1 nicht committet** (`scripts/setupwahl-daten.mjs` und `server/test/setupwahl-daten.test.js` im Arbeitsbaum). `sequence_data` 2 780 → **2 621**, `action_data` 5 937 → **5 803**, `kampf-beginnen` 19 → **17**. Mutationstests: 36 Mutanten, 35 gefangen, drei Tests nachgetragen. Die Erweiterung ist mit `--zurueck … --schritt boss` einzeln zurücknehmbar.
+
 **Befund.** Siehe M30.8: **eine Erweiterung**, einzeln widerrufbar; sie hängt an nichts anderem als an `EA`. Wer sie nicht will, **streicht diese Aufgabe**, und `EB`–`ED` gelten unverändert. Geändert werden **zwei Spalten**: `sequence_data` (31 → **29** Schritte, `2 621`, `e859bd457002`) und `action_data`
 (`kampf-beginnen` 19 → **17**; in `dorfphase-beginnen` werden **zwei** `set_counter` zu `clear_table` — 33 Schritte bleiben; `5 803`, `33033dace238` nach `EC`, `ED`, `EE`). **`Münzen (gemeinsam)` bleibt.**
 
@@ -371,6 +403,8 @@ Lesen / Sicherung / `--check` / Editor-Frage / `--write … --sicherung-sha` / K
 
 ## EF — Dokumente nachziehen, Liste für den Auftraggeber (M30)
 
+**Stand: Teil 1 geschrieben** (diese Aufgabe; Code wurde nicht geändert, außer den Kopfkommentaren zweier Skripte). **Teil 2** ist die Liste für den Auftraggeber und offen.
+
 ### Teil 1 — Dokumente
 
 **Test:** keiner (Dokumente) — Prüfung ist das Lesen. **Zu ändern:**
@@ -380,7 +414,7 @@ Lesen / Sicherung / `--check` / Editor-Frage / `--write … --sicherung-sha` / K
 2. **`docs/spec-setup-system.md`:** am Ende von M30 ein Abschnitt **„M30 — gebaut, und was die Spec dabei berichtigt“** (Zahlen aus den Läufen; jede Abweichung der gebauten Fassung vom Entwurf, besonders: der gemessene Stand von `npm test`, ob `markerStart`/`zoneSlotNumberAt` an der Stelle stehen, die M30.7 nennt, und was die Rauchtests an der Produktion gesagt haben).
 3. **`docs/doerflerdaten.md`:** Abschnitt 7 und 8 je ein **Nachtrag** „Seit M30 ohne Zähler am Platz; die Startwerte stehen im Roster und an den Markern“ — nicht umschreiben, der Befund bleibt als Befund.
 4. **Kopf von `scripts/doerfler-daten.mjs` und `scripts/auslagen-daten.mjs`:** **ein** Satz je Datei: „Stand von M26 bzw. M27; **nicht mehr mit `--write` fahren**: der Aufbau trägt seit M30 weder Dörfler-Zähler noch hartverdrahtete Dörfler (`scripts/setupwahl-daten.mjs`); `--check` meldet danach Abweichungen, die von M30 kommen.“ Keine Zeile Code.
-5. **`docs/datenzugriff.md`:** unter dem Rezept die Liste der Dateien, die für `setupwahl-daten.mjs` nach `/app/` gehören (`setupwahl-daten.mjs`, `setups-aufraeumen.mjs`, `auslagen-rauchtest.mjs`, dazu die drei, die der Rauchtest importiert), und unter „Fallen“ **ein** Satz: der Rauchtest und `--check` von M27/M28/M29 melden nach `EB` Abweichungen an „den übrigen Zeilen“ von `setups`; das ist erwartet.
+5. **`docs/datenzugriff.md`:** unter dem Rezept die Liste der Dateien, die für `setupwahl-daten.mjs` nach `/app/` gehören (`setupwahl-daten.mjs`, `setups-aufraeumen.mjs`, `auslagen-rauchtest.mjs`, dazu die sechs, die der Rauchtest über seine Importe braucht: `auslagen-daten.mjs`, `doerfler-daten.mjs`, `equipment-zones.mjs`, `gelaendekarten-zuordnung.mjs`, `szenariodaten-berichtigung.mjs`, `szenariodaten-grundspiel.mjs`; neun Dateien insgesamt, Nr. 13), und unter „Fallen“ **ein** Satz: der Rauchtest und `--check` von M27/M28/M29 melden nach `EB` Abweichungen an „den übrigen Zeilen“ von `setups`; das ist erwartet.
 
 **Fertig, wenn:** ein Leser, der nur `CLAUDE.md` kennt, `docs/tasks-m30-setupwahl.md` und M30 findet, und in keinem Dokument mehr steht, die Dörfler seien hartverdrahtet oder jeder Dörfler habe vier Zähler, ohne dass M30 danebensteht.
 
@@ -392,11 +426,38 @@ Lesen / Sicherung / `--check` / Editor-Frage / `--write … --sicherung-sha` / K
 2. **Aufbauliste:** **ein** TFT-Aufbau mit dem neuen Namen; die beiden alten fehlen. Ein altes Lesezeichen lädt nicht — gewollt.
 3. **Dialog beim Laden:** **fünf** Felder (Spiellänge, Toller Trödel, Dörfler 1–3). Ohne Änderung bestätigt: Henlo, Fridgette, Granny, wie vorher.
 4. **Wahl:** drei andere Dörfler wählen (z. B. Judy, Norman, Quintus): Tableaus, Spielsteine, Startausrüstung, zwölf Marker auf den Startwerten; Georgie wählen → die Meldung „Werte ungeprüft“; **zweimal denselben** wählen → ein leerer Platz und **eine** Zeile in der Meldeliste (M30.4).
-5. **Zähler:** unter den Tableaus **keine** Kästen mehr; nur `Münzen (gemeinsam)` (und, falls `EE` nicht geschrieben ist, die zwei Bösewicht-Zähler).
-6. **Dorfphase:** Kampf beginnen, Dorfphase beginnen → ohne Meldung, zwölf Marker wieder auf den Startwerten, Bösewicht-Marker **weg** (falls `EE`). **Alle drei Lebensmarker von den Leisten nehmen**, Dorfphase beginnen → **Rückfrage**; „Abbrechen“ räumt nichts ab; „Trotzdem“ räumt ab. **Einen** Marker liegen lassen → keine Rückfrage.
+5. **Zähler:** unter den Tableaus **keine** Kästen mehr; nur `Münzen (gemeinsam)` (`EE` ist geschrieben: die zwei Bösewicht-Zähler sind weg.)
+6. **Dorfphase:** Kampf beginnen, Dorfphase beginnen → ohne Meldung, zwölf Marker wieder auf den Startwerten, Bösewicht-Marker **weg**. **Alle drei Lebensmarker von den Leisten nehmen**, Dorfphase beginnen → **Rückfrage**; „Abbrechen“ räumt nichts ab; „Trotzdem“ räumt ab. **Einen** Marker liegen lassen → keine Rückfrage.
 7. **Tauschmenü** (Rechtsklick am Tableau): am unberührten Tisch tauscht es ohne Rückfrage; nach Verschieben des Lebensmarkers fragt es.
 8. **Ein alter Spielstand** (benannt gespeichert): lädt, die Dörfler-Zähler stehen noch dort (verwaist, von Hand zu entfernen).
-9. **Der Name:** gefällt er? (`Townsfolk Tussle` war ein Vorschlag; `setups-aufraeumen.mjs --zurueck` setzt ihn zurück, ein Umbenennen ist ein `UPDATE`.)
+9. **Der Name:** „TFT Aufbau“ ist gesetzt (vom Auftraggeber gewählt; `Townsfolk Tussle` war nur ein Vorschlag). Gefällt er? `setups-aufraeumen.mjs --zurueck` stellt den alten Namen `TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)` wieder her, nicht den Vorschlag; ein anderer Name ist ein `UPDATE` auf `setups.name`.
 10. **Rückweg bekannt:** `--zurueck` je Schritt (zuerst `EE`, dann `ED`, dann `EC`, dann `EB` aus der Sicherung), falls etwas nicht stimmt; das Ergebnis dieser Liste geht an den Auftraggeber, nicht an einen Agenten.
 
 **Fertig, wenn:** der Auftraggeber 1–8 abgehakt oder einen Befund genannt hat und 9 beantwortet ist.
+
+## Stand nach DU–EF
+
+**Gebaut und deployt:** `DU`–`DZ` in `b2fc3ab`, `EC` und `ED` (Teil 1) in `98935b6`, `EA` (CI-Deploy zu `b2fc3ab`). Tests 1 686 → **1 883** (Angabe des Bauprotokolls; in `EF` nicht erneut gelaufen).
+
+**Geschrieben (Produktion, je mit Hash und Rückweg):** `EB`, `EC`, `ED`, `EE`. Die Zielzahlen aus M30.9 kamen byteweise heraus; die Schreibprotokolle liegen im Scratchpad (`EB-write.txt` bis `EE-write.txt`).
+
+| Spalte | Ausgang (nach M29) | nach `EC` | nach `ED` | nach `EE` |
+|---|---|---|---|---|
+| `scenario_data` | 19 106, `914461d63f77` | 21 244, `7e654774e019` | 20 858, `82592d1ac883` | unverändert |
+| `sequence_data` | 2 781, `33a42ffe0f71` | 2 780, `a63d57d7ea86` | unverändert | 2 621, `e859bd457002` |
+| `action_data` | 6 611, `63abf4174038` | unverändert | 5 937, `526c17f0fdf6` | 5 803, `33033dace238` |
+
+- `setups`: die zwei alten Zeilen (`c0f43ae6…`, `8bc238c0…`) sind gelöscht. Die Kurzpartie heißt **„TFT Aufbau“**, Id `b1e10f4e-b8f2-4c2a-bb3e-54643944121b` unverändert. Es gibt nur noch **einen** TFT-Aufbau.
+- Abnahme am Tisch und Rauchtest: Zahlen in `docs/spec-setup-system.md`, „M30 — gebaut“. Rauchtest nach allen drei Schnitten: 0 Beanstandungen.
+- **Acht** der 17 Spielstände tragen je zwölf verwaiste Dörfler-Zähler (fünf mit `setup_id`, drei ohne; Nr. 16). Sie bleiben stehen, und der Spieler entfernt sie von Hand.
+- **Nicht committet:** `EE` Teil 1 (`scripts/setupwahl-daten.mjs`, `server/test/setupwahl-daten.test.js`). Der Auftraggeber committet und pusht; der Agent hat nichts committet.
+
+**Offen beim Auftraggeber:**
+
+1. Die Sichtprüfung am Tisch (`EF` Teil 2, Punkte 1–8).
+2. Der Name „TFT Aufbau“ (`EF` Teil 2, Punkt 9).
+3. Die Vorfragen aus `EB` Teil 2 (Name, Lesezeichen auf einen alten Aufbau, offener Setup-Editor): die Antworten stehen in den Unterlagen nicht. Festgehalten ist nur der gewählte Name.
+4. Der `--check` aller Skripte (`EB`–`EE`) am Ende des Tages.
+5. Der Commit von `EE` Teil 1.
+
+**Offen im Code:** der Kopf von `scripts/setupwahl-daten.mjs` (Nr. 17).

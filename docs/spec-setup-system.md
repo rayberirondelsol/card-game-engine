@@ -7401,13 +7401,13 @@ die Leisten **und** setzt die Zähler `Bösewicht: Bewegung`/`Leben`; der Aufbau
 
 Das Löschen verstößt nicht gegen `docs/datenzugriff.md` „Regeln fürs Schreiben“ Nr. 4 („nichts löschen, was der Auftrag nicht ausdrücklich nennt“): der Auftraggeber hat es ausdrücklich genannt.
 
-**Der Name — Vorschlag, nicht Gesetz.** `TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)` lügt: der Aufbau baut kurz **und** lang (`partie`), mit **und** ohne Toller Trödel (`troedel`). Vorschlag: **`Townsfolk Tussle`**. Der Auftraggeber kann
+**Der Name — Vorschlag, nicht Gesetz.** `TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)` lügt: der Aufbau baut kurz **und** lang (`partie`), mit **und** ohne Toller Trödel (`troedel`). Vorschlag: **`Townsfolk Tussle`**. *Überholt:* entschieden ist **„TFT Aufbau“** (M30 — gebaut, Nr. 15). Der Auftraggeber kann
 überstimmen (etwa `TFT Solo`); der Name steht an **einer** Stelle (`setups.name`), und nichts in `client/`, `server/src`, `shared/` oder `scripts/` sucht nach ihm (gelesen: die Skripte adressieren über die **Id**; nur Kommentare sagen „Kurzpartie“).
 
 **Folgen, ehrlich:**
 
 - **Ein Lesezeichen mit `?setup=<id>` eines gelöschten Aufbaus lädt nicht** (`Failed to load setup`). Die Id der Kurzpartie bleibt; wer eines der beiden alten gespeichert hat, merkt es.
-- **Ältere Skripte hashen „die übrigen Zeilen“** von `setups` (`auslagen-daten.mjs`: „bei diesen drei nur die **übrigen** Zeilen (*Grundaufbau*, *Basis-Aufbau*)“). Nach dem Löschen melden ihre `--check` eine Abweichung, die **nicht** von ihnen kommt. Die `--check` von M28 und M29 laufen darum **vor** dem Löschen (Aufgabe `EB`) und danach nicht mehr.
+- **Ältere Skripte hashen „die übrigen Zeilen“** von `setups` (`auslagen-daten.mjs`: „bei diesen drei nur die **übrigen** Zeilen (*Grundaufbau*, *Basis-Aufbau*)“) — ihre `--check` könnten nach dem Löschen eine Abweichung melden, die **nicht** von ihnen kommt. *Berichtigt am 2026-11-09 (Nr. 14): gemessen melden die `--check` von M28 und M29 auch nach allen vier Schnitten **0 Beanstandungen**, weil sie ihr eigenes Stück am Inhalt prüfen. Die Warnung gilt für `auslagen-daten.mjs` und `doerfler-daten.mjs` (Stand M26/M27), die ohnehin nicht mehr mit `--write` gefahren werden dürfen.*
 - **Rückweg:** die Sicherung (`b877dbe20bc8`) trägt beide Zeilen vollständig; `--zurueck` legt sie unverändert wieder an (gleiche Id, gleiche Spalten samt `created_at`/`updated_at`).
 
 **Was nicht gilt.** Das Spiel wird nicht gelöscht, die Kurzpartie nicht angefasst, **kein** Spielstand und **keine** Zone. Das Umbenennen ändert **nur** `setups.name`; `updated_at` bleibt (die Liste sortiert danach).
@@ -7589,7 +7589,7 @@ Erweiterung**, darum eine **eigene Aufgabe (`EE`), einzeln widerrufbar**, die an
 
 **Was sich ändert (0-basiert):** Aufbau 29–30 (`place_counter Bösewicht: Bewegung`/`Leben`) und `kampf-beginnen` 8–9 (`set_counter … $BEW/$LEB`) **entfallen**. `dorfphase-beginnen` 14–15 setzten die Zähler auf **0** — das war das **Aufräumen**: nach dem Kampf stand nichts mehr auf dem Zähler. **Die Marker bleiben dabei stehen** (kein Schritt räumt sie), und
 nach dem Wegfall stünden zwischen den Kämpfen die Werte des letzten Bösewichts auf den Leisten. **Entscheidung:** die zwei Schritte werden `clear_table assetName "Marker: Bösewicht BEW"` / `"…LEB"` — der Tisch ist zwischen den Kämpfen wieder so leer, wie ihn der Aufbau hinterlässt (er legt **keinen** Bösewicht-Marker). `clear_table` auf nichts ist
-**gelungen**, nicht gescheitert (Kommentar im Executor), und das nächste `kampf-beginnen` legt einen **neuen** Marker (`place_asset` findet keinen vorhandenen).
+**gelungen**, nicht gescheitert (Kommentar im Executor), und das nächste `kampf-beginnen` legt einen **neuen** Marker, weil keiner mehr da ist. *Berichtigt (M30 — gebaut, Nr. 10):* die frühere Begründung „`place_asset` findet keinen vorhandenen Marker“ war falsch. `place_asset` findet einen vorhandenen Marker gleichen Namens und **setzt ihn um** (`if (existing)` in `shared/sequenceExecutor.js`); es legt keinen zweiten an. Ohne die zwei `clear_table` blieben darum die Werte stehen, nicht zwei Marker.
 
 **Was nicht gilt.** **`Münzen (gemeinsam)` bleibt** — keine Leiste, kein Marker, kein Ersatz; sie ist das einzige Zählerobjekt, das übrig bleibt. Die Bösewicht-Zähler liest **keine** Wache (gemessen: kein `require_counter` nennt sie); aus dieser Erweiterung entsteht also kein Bedarf an `require_marker`.
 
@@ -7644,3 +7644,49 @@ seinem Kopf einen Satz dazu (`EF`). Der Test für `setupwahl-daten.mjs` bekommt 
 8. **Spielstände:** `save_states` (alle Zeilen) vor und nach **gleich**; alte Spielstände laden, ihre Dörfler-Zähler stehen noch dort.
 9. **Tests:** `cd server && npm test` grün (Stand vorher **1 686**), die `require_counter`-Tests unverändert; `cd client && npx vite build` ohne neue Warnung.
 10. **Offen und beim Auftraggeber (`EF`):** Sichtprüfung am Tisch, der Namensentscheid, der `--check` am Ende des Tages.
+
+### M30 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `DU`–`EF` in `docs/tasks-m30-setupwahl.md`; dort steht je Aufgabe der Stand, und „Stand nach DU–EF“ fasst die Zahlen zusammen. **Beim Auftraggeber offen:** die Sichtprüfung am Tisch (`EF`, Teil 2), die Bestätigung des Namens **„TFT Aufbau“** und der `--check` am Ende des Tages.
+
+**Gebaut.** `DU`–`DZ` und `EB` Teil 1 in `b2fc3ab` (21 Dateien, +2 639 / −78 Zeilen laut `git show --stat`), `EC` und `ED` in `98935b6` (3 Dateien, +2 525: nur `scripts/setupwahl-daten.mjs`, `server/test/setupwahl-daten.test.js` und die Fixture — **kein** Laufzeitcode). `EE` Teil 1 (der Schritt `boss`) ist **nicht committet**: `scripts/setupwahl-daten.mjs` und `server/test/setupwahl-daten.test.js` sind im Arbeitsbaum geändert. Tests 1 686 → **1 883** (Angabe des Bauprotokolls; in `EF` nicht erneut gelaufen). Die Stellen stimmen mit M30.7 überein (am Quelltext geprüft): `markerStart` in `shared/villagers.js`, `zoneSlotNumberAt` neben `zoneSlotNumbered` in `shared/zoneGeometry.js`, und `case 'require_marker':` steht direkt unter `case 'require_counter':` in `shared/sequenceExecutor.js` (ein Handler).
+
+**Deploy (CI, Lauf zu `b2fc3ab`; laut Bauprotokoll).** `shared/sequenceExecutor.js`, `zoneGeometry.js`, `villagers.js` im Backend-Container byteweise gleich dem Repo. Frontend-Bundle: die Zeichenketten `require_marker` 10×, `cannot be read` 2×, `has no place` 3×. Rauchtest vorher und nachher mit **demselben** alten Skriptstand: `diff` leer, je 0 Beanstandungen. Der Beleg über `zoneSlotNumberAt` ist in `EA` 5 (b) gestrichen: der Minifier benennt interne Funktionen um (Nr. 11 unten).
+
+**Geschrieben** (je mit Rückwärtsbeweis, Fingerabdruck der übrigen Tabellen gleich, zweiter Lauf „schon geschrieben“):
+
+- `EB`: zwei Aufbauten gelöscht (`c0f43ae6…`, `8bc238c0…`), die Kurzpartie umbenannt in **„TFT Aufbau“** (vom Auftraggeber gewählt). `updated_at` der Kurzpartie unverändert (`2026-10-15 07:19:57`), 17 `save_states`-Zeilen je Hash gleich, keine verwaiste `setup_id`. Sicherung im Scratchpad, sha `b877dbe20bc8`.
+- `EC`: `scenario_data` 19 106 → **21 244** Zeichen (`914461d63f77` → `7e654774e019`), `sequence_data` 2 781 → **2 780** (`33a42ffe0f71` → `a63d57d7ea86`).
+- `ED`: `scenario_data` 21 244 → **20 858** (`82592d1ac883`), `action_data` 6 611 → **5 937** (`63abf4174038` → `526c17f0fdf6`), `dorfphase-beginnen` 45 → **33** Schritte.
+- `EE`: `sequence_data` 2 780 → **2 621** (`e859bd457002`), 31 → **29** Schritte; `action_data` 5 937 → **5 803** (`33033dace238`), `kampf-beginnen` 19 → **17**; in `dorfphase-beginnen` werden zwei `set_counter` zu `clear_table` (33 Schritte bleiben).
+- **Alle** in M30.9 berechneten Zielzahlen und Hashes kamen byteweise heraus, bei `EC`, `ED` und `EE`.
+
+**Abnahme am laufenden Tisch** (lesend, gegen die Produktion; laut Bauprotokoll). Aufbau: der einzige Zähler ist `Münzen (gemeinsam)` = 45; Dörfler-Lebensmarker auf 3 / 4 / 4. Dörflerwahl: Vorgabe Henlo / Fridgette / Granny ohne Beanstandung; Judy / Norman / Quintus ohne Beanstandung; Blopsy / Georgie / Yancy mit einem Hinweis (Georgies `unverified`). Doppelwahl Henlo / Henlo / Granny: Platz 2 leer, **eine** `skipped`-Zeile „already sits at seat 1“. Kampf 1 (Deputy Waggums): Leisten BEW 6 / LEB 14; die Dorfphase räumt die Bösewicht-Marker ab; Kampf 2 (Virginia Fitz): BEW 6 / LEB 15, also ihre Werte. Wache: alle drei Lebensmarker von der Leiste, `dorfphase-beginnen` hält nach zwei Zeilen mit `confirm`, nichts wird abgeräumt; liegt einer, läuft sie durch (33 Zeilen, 0 Beanstandungen). **Rauchtest nach allen drei Schnitten: 0 Beanstandungen**, alle 20 Bösewichte, alle fünf Spielstände (`dorfphase-beginnen` 33 Zeilen, 0 ohne `ok`). Der Spielstand *M22-Probe Neuladen* hatte vorher einen Fehlalarm der alten Wache („alle drei Lebenszähler stehen auf 0“ bei 3 / 4 / 4 Leben); mit der Markerlesart ist er weg.
+
+**Acht Spielstände mit verwaisten Zählern — die Grundgesamtheit, nachgemessen am 2026-11-09.** Von den **17** `save_states` tragen **acht** je zwölf Dörfler-Zähler. Davon zeigen **fünf** über `setup_id` auf den Aufbau (*Auto Save*, *M22-Probe Neuladen*, *Partie 13 – Kampf 1 Ende*, *Partie 13 – Endkampf*, *Partie 14 – Sieg gegen Virginia Fitz*) und **drei** auf keinen (*Partie 4 – Endkampf The Bundits*, *Partie 5 – R2 Kampf Viktoria Spitz*, *Partie 12 — Endstand*). **M30.5 Nr. 3 und die Acht widersprechen sich also nicht** — sie zählen Verschiedenes: die Fünf sind die Zustände **mit** `setup_id` (M30.1), die Acht die mit Zählern. Die neun übrigen sind die TTS-Import-Stände vom Februar, die nie Dörfler trugen. `state_data` wird nach eigener Regel nicht geschrieben; die Zähler bleiben stehen und der Spieler entfernt sie von Hand. Die Dorfphase läuft darauf trotzdem (eigens getestet, `ED` Teil 1 Nr. 5).
+
+**Mutationstests** (die Agenten haben nach grünen Erstläufen absichtlich Fehler eingebaut): `EB` 4 Mutanten, 3 gefangen, 1 Test nachgetragen. `EC` 27 Mutanten, 24 gefangen, drei Tests nachgetragen. `ED` 50, 42 gefangen, fünf nachgetragen, danach 49 / 50. `EE` 36, 35 gefangen, drei nachgetragen. Die Reste sind nach dem Bauprotokoll begründet redundant; nicht einzeln nachgerechnet.
+
+**Was die Spec berichtigt.** Nummern fortlaufend nach `docs/tasks-m30-setupwahl.md`, „Wo die Spec nicht stimmt“ (dort 10–18):
+
+10. **M30.8, `place_asset`:** die Begründung „`place_asset` findet keinen vorhandenen Marker“ war falsch. `place_asset` findet einen vorhandenen Marker gleichen Namens und **setzt ihn um** (`if (existing)` in `shared/sequenceExecutor.js`); es legt keinen zweiten an. Ohne die zwei `clear_table` wären darum die Werte zwischen den Kämpfen stehengeblieben (und vor Barry Bluff die des Vorgängers), nicht zwei Marker. Die `clear_table` bleiben richtig. Im Text von M30.8 berichtigt.
+11. **`EA` 5 (b):** `zoneSlotNumberAt` ist kein Beleg im Frontend-Bundle, der Minifier benennt sie um. Belegbar sind Zeichenketten (`require_marker`, `cannot be read`, `has no place`). Im Text berichtigt.
+12. **`DU`:** nicht rot war der Test `validateOptions` (in der Datei die Nummer 6), weil `validateOptions` `NAME_FIELDS` nicht liest. Rot war der Quelltext-Test (Nummer 7). Im Text berichtigt.
+13. **`EF` Teil 1 Nr. 5:** „die drei, die der Rauchtest importiert“ stimmt nicht. Der Rauchtest importiert direkt `auslagen-daten.mjs` und `gelaendekarten-zuordnung.mjs`; mit deren Importen braucht er sieben Dateien. Für das Schreiben der Skripte in `/app/` sind es neun (Liste in `docs/datenzugriff.md`).
+14. **M30.2 gegen M30.9 und M30.11 — gemessen, nicht vermutet.** M30.2 sagte, die `--check` von M28 und M29 liefen nach `EB` nicht mehr. Am 2026-11-09, nach allen vier Schnitten, gefahren: `gelaendekarten-zuordnung.mjs` meldet „schon geschrieben: terrainCards 108 Zeichen, sha `aad39d745984`“, `szenariodaten-berichtigung.mjs` „22 Läufe sauber … alle sieben schon berichtigt“ mit Trockenlauf 0 Beanstandungen — auf dem **neuen** `scenario_data` (20 858, `82592d1ac883`), **ohne jede Abweichung**. Beide prüfen ihr eigenes Stück **am Inhalt**, nicht die Spalte am Gesamthash. Damit waren **zwei** Annahmen falsch: M30.2 („danach nicht mehr“) und die erste Fassung dieses Punktes („sie melden Abweichungen an den übrigen Zeilen“). Was bleibt: `auslagen-daten.mjs` und `doerfler-daten.mjs` sind Stand M26/M27 und dürfen nicht mehr mit `--write` fahren (Kopfkommentar dort).
+15. **Name:** M30.2 nannte `Townsfolk Tussle` als Vorschlag. Der Auftraggeber hat **„TFT Aufbau“** gewählt. `--zurueck` stellt den **alten** Namen (`TFT Kurzpartie (3 Bösewichte, beide Erweiterungen)`) wieder her, nicht den Vorschlag.
+16. **M30.5 Nr. 3 — geschlossen, nicht offen:** die fünf gesetzten Zustände und die acht mit Zählern zählen Verschiedenes (oben). Kein Widerspruch.
+17. **Kopf von `scripts/setupwahl-daten.mjs`:** nennt als Shared-Importe nur `scenarioData.js` und `setupOptions.js`. Die Datei importiert auch `shared/villagers.js` (und darüber `cardSearch.js`). Der Kopf ist nicht geändert; offen.
+18. **`docs/datenzugriff.md`, Deploy-Rezept:** die Kopierliste stand seit M29 auf vier von sieben Dateien. Korrigiert auf die Liste von neun Dateien (Nr. 13).
+
+**Offen und ungeprüft.**
+
+1. Die Sichtprüfung am Tisch: `EF` Teil 2, Punkte 1–8.
+2. Der Name „TFT Aufbau“ (`EF` Teil 2, Punkt 9). Der Rückweg für den Namen ist `--zurueck`, und der stellt den alten Namen wieder her.
+3. Der `--check` aller Skripte am Ende des Tages (`EB`–`EE`); und jedes Mal, wenn ein Setup-Editor-Tab offen sein könnte (`docs/datenzugriff.md`, „Fallen“).
+5. `scripts/setupwahl-daten.mjs` mit dem Schritt `boss` und `server/test/setupwahl-daten.test.js` sind nicht committet (`EE`).
+6. Georgie Irongut ist `unverified`; der Tisch meldet es als Hinweis und hält nicht. Ob das am Tisch so gewollt ist, hat niemand entschieden.
+7. Die offene Frage aus M26 (die Plätze je Tableau sind je Platz gemessen, ob die Marker auf dem Kreis liegen) bleibt offen (M30.10 Nr. 1).
+8. Die verwaisten Zähler der acht Spielstände entfernt der Spieler von Hand; es gibt dafür keinen Schritt.
+
+**Rückweg, falls nötig:** zuerst `EE` (`setupwahl-daten.mjs --zurueck <Sicherung> <db> --schritt boss`), dann `ED`, dann `EC`, dann `EB` aus der Sicherung (M30.9). Jeder Schritt ändert nur seine Stücke.

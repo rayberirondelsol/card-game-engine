@@ -1,3 +1,6 @@
+// **Stand von M27 — nicht mehr mit `--write` fahren:** der Aufbau trägt seit M30 weder Dörfler-Zähler noch
+// hartverdrahtete Dörfler (`scripts/setupwahl-daten.mjs`); `--check` meldet danach Abweichungen, die von M30 kommen.
+//
 // CY / Spec M27.1–M27.2, M27.5 — die Daten zu „Die Auslage steht einmal im Setup,
 // und ein Aufbau hat Schalter".
 //

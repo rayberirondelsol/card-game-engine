@@ -1,3 +1,6 @@
+// **Stand von M26 — nicht mehr mit `--write` fahren:** der Aufbau trägt seit M30 weder Dörfler-Zähler noch
+// hartverdrahtete Dörfler (`scripts/setupwahl-daten.mjs`); `--check` meldet danach Abweichungen, die von M30 kommen.
+//
 // CI–CL / Spec M26 — die Datenänderungen für den Aufbau *TFT Kurzpartie*:
 // sechs Ausrüstungsplätze am Tableaurand, die Zähler aus der Lücke, die Daten
 // der neun Dörfler und Aktionen, die keinen Dörfler mehr beim Namen nennen.

@@ -2,8 +2,8 @@
 //
 // **Drei Schritte, ein Skript** (`--schritt optionen|zaehler|boss`, Entscheidung 13). Jeder ändert ein **eigenes Stück** der
 // Kurzpartie; die Vorbedingung gilt **je Stück**, nicht je Gesamthash, darum dürfen die drei in jeder Reihenfolge laufen (die Zahlen
-// in `SCHRITTE` sind die der empfohlenen Reihenfolge `optionen`, `zaehler`, `boss`). Gebaut sind **`optionen`** (Aufgabe EC) und
-// **`zaehler`** (ED); `boss` (EE) trägt seine `ausgang`/`ziel` selbst ein und meldet bis dahin „noch nicht gebaut“.
+// in `SCHRITTE` sind die der empfohlenen Reihenfolge `optionen`, `zaehler`, `boss`). Gebaut sind **`optionen`** (Aufgabe EC), **`zaehler`**
+// (ED) und **`boss`** (EE, eine Erweiterung über das Gesagte hinaus: **einzeln widerrufbar**, `--zurueck … --schritt boss` stellt nur dessen Stücke zurück).
 //
 // **`optionen`:** `scenario_data.options` bekommt hinten drei Schlüssel (`doerfler1`–`doerfler3`, M30.3), und die drei `seat_villager`
 // der Folge (`sequence_data`, Schritt 25–27, 0-basiert) nennen statt eines Namens den Platzhalter `$optDoerfler<n>`. Der Rest beider
@@ -21,6 +21,14 @@
 // der alte Schritt 1 und die zwölf Schritte im Wortlaut. Das Skript setzt voraus, dass der **Code** deployt ist (`require_marker`,
 // optionale Zähler am Platz: `DW`, `DY`, `DZ` in `EA`) — ohne ihn bliebe die Dorfphase an der Wache stehen.
 //
+// **`boss`:** die Zähler des Bösewichts entfallen, weil dieselben Werte schon als Marker auf den Leisten liegen (M30.8): Folge 29–30 (`place_counter`),
+// `kampf-beginnen` 8–9 (`set_counter … $BEW/$LEB`); `Münzen (gemeinsam)` bleibt. Die zwei `set_counter … 0` der Dorfphase (14–15) waren die **einzige**
+// Rückstellung — die Marker räumte kein Schritt —, darum werden sie zu zwei `clear_table` auf die Marker, nicht gestrichen. Die Spalten dieses Schrittes
+// sind `sequence_data` und `action_data`; `scenario_data` und `zone_data` werden weder gelesen noch geschrieben. Die Vorbedingung gilt je Stück
+// (die zwei Schritte der Folge, die zwei in `kampf-beginnen`, die zwei der Dorfphase), dazu die Stücke, auf die er sich stützt (die Münzen, die
+// `place_asset` der Marker), und **kein anderer Schritt** darf die zwei Zähler beim Namen nennen. Er ist von den anderen beiden unabhängig und
+// läuft vor oder nach ihnen; die Dorfphase hat vor `zaehler` 14–15 so gut wie danach.
+//
 // Was von M28/M29 (`szenariodaten-berichtigung.mjs`, `gelaendekarten-zuordnung.mjs`) gilt, gilt unverändert: Vorbedingung, Rückwärtsbeweis,
 // Sicherung vorher mit Hash als Argument, Vergleich-und-Tausch in einer `IMMEDIATE`-Transaktion, Fingerabdruck je Tabelle und je Zeile von
 // `save_states` vorher und nachher, Kontrollausgabe **neu gelesen**, Weg zurück — und **kein `--force`**: ein Argument dieses Namens (oder
@@ -28,7 +36,7 @@
 // Zwei Spalten je Schritt (`DEFS[…].spalten`): darum steht der Tausch hier selbst (`tausche`), er hängt die zweite Spalte an dieselbe Bedingung.
 //
 // Die Zahlen stehen **einmal** hier (`SCHRITTE`); der Test importiert sie (M6). Gelesen wird nur, was der Schritt und die Prüfer
-// brauchen (die zwei Spalten, `grid_data`, Assets und Karten der Bibliothek, bei `zaehler` dazu `zone_data`), geschrieben **nur** die zwei Spalten.
+// brauchen (die zwei Spalten, `grid_data`, Assets und Karten der Bibliothek, bei `zaehler` dazu `zone_data`; bei `boss` kein `scenario_data`), geschrieben **nur** die zwei Spalten.
 // Dieser Teil ist **rein** — `better-sqlite3` kommt erst in `main` (auf dem Server liegt es neben der Datei, im Repo unter `server/`,
 // der Test reicht es herein). Das Skript braucht nur `../shared/scenarioData.js` und `../shared/setupOptions.js`, keine andere Skriptdatei.
 //
@@ -39,10 +47,11 @@
 //   node setupwahl-daten.mjs --write <db> --schritt optionen --sicherung-sha <hex>            # eine IMMEDIATE-Transaktion
 //   node setupwahl-daten.mjs --zurueck <sicherungsdatei> <db> --schritt optionen              # der Weg zurück
 //
-// Dasselbe mit `--schritt zaehler`; seine Sicherung trägt `action_data` statt `sequence_data`.
+// Dasselbe mit `--schritt zaehler` und `--schritt boss`; die Sicherung trägt die zwei Spalten des Schrittes (`zaehler`: `scenario_data` und
+// `action_data`, `boss`: `sequence_data` und `action_data`).
 //
 // **Die Sicherung** legt dieses Skript nicht an. Sie ist eine JSON-Datei `{ scenario_data, sequence_data, sha256, updated_at }` mit den beiden
-// gelesenen Spalten als Text (bei `zaehler`: `scenario_data`, `action_data`); `sha256` ist `sicherungsHash(<erste Spalte>, <zweite Spalte>)`. `--check` nennt diesen Hash für den gelesenen
+// gelesenen Spalten als Text (bei `zaehler`: `scenario_data`, `action_data`; bei `boss`: `sequence_data`, `action_data`); `sha256` ist `sicherungsHash(<erste Spalte>, <zweite Spalte>)`. `--check` nennt diesen Hash für den gelesenen
 // Stand, `--write` verlangt ihn (`--sicherung-sha`, mindestens zwölf Hex-Stellen) und schreibt nur, wenn er zu den **gelesenen** Texten passt.
 //
 // **Die Absicherung beim Schreiben, in der Reihenfolge, in der sie läuft:**
@@ -84,20 +93,26 @@ const kennzeichen = (t) => `${t.length} Zeichen (sha ${sha(t)})`;
 /**
  * Je Schritt: der Stand vor und nach ihm, Länge und Hash des Textes **jeder Spalte, die er ändert**, in der Reihenfolge der empfohlenen
  * Läufe (M30.9) — die Spalten tragen die Namen `scenario`, `sequence`, `action`. `optionen` ändert `scenario` und `sequence`, `zaehler`
- * `scenario` und `action`. `null` heißt: noch nicht gebaut (EE trägt ein). Der Ausgang von `zaehler` ist in `scenario` der Zielstand
- * von `optionen`: **dieselbe** Zahl, nicht eine zweite (`SCENARIO_NACH_EC`); `action` ist von EC unberührt.
+ * `scenario` und `action`, `boss` `sequence` und `action`. Ein `null` hieße: noch nicht gebaut (`main` meldet es, ohne die Datenbank zu öffnen); alle drei sind gebaut. Der Ausgang eines Schrittes ist,
+ * wo er dieselbe Spalte wie ein früherer ändert, dessen Zielstand: **dieselbe** Zahl, nicht eine zweite (`SCENARIO_NACH_EC`, `SEQUENCE_NACH_EC`,
+ * `ACTION_NACH_ED`); `action` ist von EC unberührt.
  */
 const SCENARIO_NACH_EC = { laenge: 21244, sha: '7e654774e019' };
+const SEQUENCE_NACH_EC = { laenge: 2780, sha: 'a63d57d7ea86' };
+const ACTION_NACH_ED = { laenge: 5937, sha: '526c17f0fdf6' };
 export const SCHRITTE = {
   optionen: {
     ausgang: { scenario: { laenge: 19106, sha: '914461d63f77' }, sequence: { laenge: 2781, sha: '33a42ffe0f71' } },
-    ziel: { scenario: SCENARIO_NACH_EC, sequence: { laenge: 2780, sha: 'a63d57d7ea86' } },
+    ziel: { scenario: SCENARIO_NACH_EC, sequence: SEQUENCE_NACH_EC },
   },
   zaehler: {
     ausgang: { scenario: SCENARIO_NACH_EC, action: { laenge: 6611, sha: '63abf4174038' } },
-    ziel: { scenario: { laenge: 20858, sha: '82592d1ac883' }, action: { laenge: 5937, sha: '526c17f0fdf6' } },
+    ziel: { scenario: { laenge: 20858, sha: '82592d1ac883' }, action: ACTION_NACH_ED },
   },
-  boss: { ausgang: null, ziel: null },
+  boss: {
+    ausgang: { sequence: SEQUENCE_NACH_EC, action: ACTION_NACH_ED },
+    ziel: { sequence: { laenge: 2621, sha: 'e859bd457002' }, action: { laenge: 5803, sha: '33033dace238' } },
+  },
 };
 
 /** Die drei Plätze, die der Aufbau besetzt: der Index des Schritts in der Folge (0-basiert) und wer dort heute hartverdrahtet sitzt. */
@@ -417,6 +432,179 @@ export function beweiseZaehler(before, after) {
   return meldungen;
 }
 
+// ── Der Schritt `boss` ──────────────────────────────────────────────────────
+
+const KAMPF = 'kampf-beginnen';
+const MUENZEN = 'Münzen (gemeinsam)';
+const BOSS_ZAEHLER = ['Bösewicht: Bewegung', 'Bösewicht: Leben'];
+/** Die Bösewicht-Marker, die `kampf-beginnen` 6–7 auf die Leisten legt und die Dorfphase künftig wegräumt. */
+const BOSS_MARKER = ['Marker: Bösewicht BEW', 'Marker: Bösewicht LEB'];
+/** Die Lage der Stücke (0-basiert, `bis` ausgeschlossen) und die Länge der Folge/Aktion davor (`alt`) und danach (`neu`). */
+const B_FOLGE = { muenzen: 28, von: 29, bis: 31, alt: 31, neu: 29 };
+const B_KAMPF = { marker: 6, von: 8, bis: 10, alt: 19, neu: 17 };
+const B_RAEUMEN = { von: 14, bis: 16 };
+const woAktion = (id) => `action_data[${id}].steps`;
+/** Diese Felder nennen die **Leiste** (`Bösewicht: Leben` ist auch der Name einer Zone), nicht den Zähler. */
+const BOSS_ZONEN = ['targetZoneLabel', 'zoneLabel'];
+/** Die zwei Zähler als Schritt der Folge — Wortlaut und Koordinaten aus der Sicherung. */
+const FOLGE_BOSS = [{ type: 'place_counter', name: BOSS_ZAEHLER[0], value: 0, x: 1470, y: 903 }, { type: 'place_counter', name: BOSS_ZAEHLER[1], value: 0, x: 1470, y: 977 }];
+/** Was `kampf-beginnen` 8–9 setzt: die Werte, die der Bösewicht bindet (`$BEW`, `$LEB`). */
+const KAMPF_BOSS = [{ type: 'set_counter', name: BOSS_ZAEHLER[0], value: '$BEW' }, { type: 'set_counter', name: BOSS_ZAEHLER[1], value: '$LEB' }];
+/** Das Aufräumen heute: zurück auf 0. Es ist die **einzige** Rückstellung — die Marker auf den Leisten räumt kein Schritt (M30, „Wo die Spec nicht stimmt“ Nr. 6). */
+const RAEUMEN_ALT = BOSS_ZAEHLER.map(name => ({ type: 'set_counter', name, value: 0 }));
+/** Das Aufräumen künftig: die Marker vom Tisch. Schlüsselreihenfolge wie in M30.9 (sie ist Teil des Hashes). */
+const RAEUMEN_NEU = BOSS_MARKER.map(assetName => ({ type: 'clear_table', assetName }));
+
+/** Was ein Schritt an den zwei Zählern liest oder setzt, als `Feld „Name“`; leer, wenn er sie nur als Zone nennt. */
+function nenntZaehler(schritt) {
+  if (!isObject(schritt)) return [];
+  const p = [];
+  for (const [k, v] of Object.entries(schritt)) {
+    if (BOSS_ZONEN.includes(k)) continue;
+    for (const w of Array.isArray(v) ? v : [v]) if (BOSS_ZAEHLER.includes(w)) p.push(`${k} „${w}“`);
+  }
+  return p;
+}
+
+/**
+ * Die drei Stücke des Schrittes einordnen — **eine** Frage mit drei Antworten, wie bei `patchOptionen` und `patchZaehler`:
+ *
+ * - `zu-schreiben`: Folge 29–30 sind genau die zwei `place_counter`, `kampf-beginnen` 8–9 genau die zwei `set_counter` auf `$BEW`/`$LEB`,
+ *   Dorfphase 14–15 genau die zwei `set_counter … 0`.
+ * - `schon-da`: die Folge ohne die zwei, `kampf-beginnen` ohne die zwei, Dorfphase 14–15 genau die zwei `clear_table`.
+ * - `abweichend`: alles andere, auch jeder halbe Stand. `probleme` nennt jede Abweichung mit Pfad; Zielstand gibt es keinen.
+ *
+ * Dazu die Stücke, **auf die der Schnitt sich stützt** und die in beiden Ständen gleich sein müssen: `Münzen (gemeinsam)` an 28 (sie
+ * **bleibt**) und die `place_asset` der Marker an `kampf-beginnen` 6–7 (sie tragen nach dem Schnitt den Wert). Und: **kein anderer
+ * Schritt** liest die zwei Zähler — täte einer es (`require_counter`), hielte er nach dem Schnitt an einem Zähler, den es nicht mehr gibt.
+ * Die `set_counter` und `place_counter`, die er selbst entfernt, zählen dabei nicht mit.
+ *
+ * Kein `scenario_data`, keine Zonen: der Schnitt kennt weder Optionen noch Dörfler. Verändert die Eingabe nicht. Der Zielstand trägt
+ * beide Spalten unter `sequence` und `action`.
+ *
+ * @param {Array} sequence – `sequence_data` (gelesen)
+ * @param {Array} actions  – `action_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', sequence?: Array, action?: Array, probleme?: string[] }}
+ */
+export function patchBoss(sequence, actions) {
+  const probleme = [];
+  const stuecke = [];                       // [Pfad, 'alt' | 'neu' | 'gemischt'], solange das Stück eindeutig ist
+
+  // ── sequence_data: Münzen und die zwei Zähler ──
+  if (!Array.isArray(sequence)) probleme.push('sequence_data ist kein Feld von Schritten');
+  else {
+    const m = sequence[B_FOLGE.muenzen];
+    if (m?.type !== 'place_counter' || m?.name !== MUENZEN) probleme.push(`sequence[${B_FOLGE.muenzen}]: ist ${text(m)}, erwartet place_counter „${MUENZEN}“ (sie bleibt)`);
+    const bereich = `sequence[${B_FOLGE.von}–${B_FOLGE.bis - 1}]`;
+    if (sequence.length === B_FOLGE.alt && FOLGE_BOSS.every((z, k) => text(sequence[B_FOLGE.von + k]) === text(z))) stuecke.push([bereich, 'alt']);
+    else if (sequence.length === B_FOLGE.neu) stuecke.push([bereich, 'neu']);
+    else {
+      if (sequence.length !== B_FOLGE.alt) probleme.push(`sequence: ${sequence.length} Schritte, erwartet ${B_FOLGE.alt} (oder schon ${B_FOLGE.neu})`);
+      FOLGE_BOSS.forEach((z, k) => {
+        const i = B_FOLGE.von + k;
+        if (text(sequence[i]) !== text(z)) probleme.push(`sequence[${i}]: ist ${text(sequence[i])}, erwartet ${text(z)}`);
+      });
+    }
+  }
+
+  // ── action_data: die zwei Aktionen ──
+  if (!Array.isArray(actions)) probleme.push('action_data ist kein Feld von Aktionen');
+  const steps = (id) => {
+    if (!Array.isArray(actions)) return null;
+    const gefunden = actions.filter(a => a?.id === id);
+    if (gefunden.length !== 1) probleme.push(`action_data: ${gefunden.length} Aktionen mit der id „${id}“, erwartet genau eine`);
+    else if (!Array.isArray(gefunden[0].steps)) probleme.push(`${woAktion(id)} ist kein Feld von Schritten`);
+    else return gefunden[0].steps;
+    return null;
+  };
+  const kampf = steps(KAMPF);
+  if (kampf) {
+    BOSS_MARKER.forEach((name, k) => {
+      const i = B_KAMPF.marker + k;
+      if (kampf[i]?.type !== 'place_asset' || kampf[i]?.assetName !== name) probleme.push(`${woAktion(KAMPF)}[${i}]: ist ${text(kampf[i])}, erwartet place_asset „${name}“ (er trägt nach dem Schnitt den Wert)`);
+    });
+    const bereich = `${woAktion(KAMPF)}[${B_KAMPF.von}–${B_KAMPF.bis - 1}]`;
+    if (kampf.length === B_KAMPF.alt && KAMPF_BOSS.every((z, k) => text(kampf[B_KAMPF.von + k]) === text(z))) stuecke.push([bereich, 'alt']);
+    else if (kampf.length === B_KAMPF.neu) stuecke.push([bereich, 'neu']);
+    else {
+      if (kampf.length !== B_KAMPF.alt) probleme.push(`${woAktion(KAMPF)}: ${kampf.length} Schritte, erwartet ${B_KAMPF.alt} (oder schon ${B_KAMPF.neu})`);
+      KAMPF_BOSS.forEach((z, k) => {
+        const i = B_KAMPF.von + k;
+        if (text(kampf[i]) !== text(z)) probleme.push(`${woAktion(KAMPF)}[${i}]: ist ${text(kampf[i])}, erwartet ${text(z)}`);
+      });
+    }
+  }
+  const dorf = steps(DORFPHASE);
+  if (dorf) {
+    const stand = RAEUMEN_ALT.map((alt, k) => {
+      const i = B_RAEUMEN.von + k, t = text(dorf[i]);
+      if (t === text(alt)) return 'alt';
+      if (t === text(RAEUMEN_NEU[k])) return 'neu';
+      probleme.push(`${woAktion(DORFPHASE)}[${i}]: ist ${t}, erwartet ${text(alt)} (oder schon ${text(RAEUMEN_NEU[k])})`);
+      return null;
+    });
+    if (stand.every(s => s !== null)) stuecke.push([`${woAktion(DORFPHASE)}[${B_RAEUMEN.von}–${B_RAEUMEN.bis - 1}]`, stand[0] === stand[1] ? stand[0] : 'gemischt']);
+  }
+
+  // ── zusammen: alle alt, oder alle neu ──
+  if (!probleme.length && !stuecke.every(([, s]) => s === 'alt') && !stuecke.every(([, s]) => s === 'neu')) {
+    probleme.push(`halber Stand: ${stuecke.map(([pfad, s]) => `${pfad} ${s === 'alt' ? 'noch alt' : s === 'neu' ? 'schon geschrieben' : 'halb geschrieben'}`).join(', ')}`);
+  }
+  if (probleme.length) return { art: 'abweichend', probleme };
+
+  // ── wer liest die zwei Zähler noch? Alles außer den Stücken, die der Schnitt selbst entfernt (Pfade wie in der Eingabe) ──
+  const schon = stuecke.every(([, s]) => s === 'neu');
+  const faellt = (bereich, i) => !schon && i >= bereich.von && i < bereich.bis;
+  const leser = [];
+  sequence.forEach((s, i) => { if (!faellt(B_FOLGE, i)) for (const n of nenntZaehler(s)) leser.push(`sequence[${i}] nennt ${n}`); });
+  for (const a of actions) {
+    if (!Array.isArray(a?.steps)) continue;
+    a.steps.forEach((s, i) => {
+      if ((a.id === KAMPF && faellt(B_KAMPF, i)) || (a.id === DORFPHASE && faellt(B_RAEUMEN, i))) return;
+      for (const n of nenntZaehler(s)) leser.push(`${woAktion(a.id)}[${i}] nennt ${n}`);
+    });
+  }
+  if (leser.length) return { art: 'abweichend', probleme: leser.map(m => `${m} — nach dem Schnitt gäbe es diesen Zähler nicht mehr`) };
+
+  const nextSequence = copy(sequence);
+  const nextAction = copy(actions);
+  if (!schon) {
+    nextSequence.splice(B_FOLGE.von, B_FOLGE.bis - B_FOLGE.von);
+    nextAction.find(a => a.id === KAMPF).steps.splice(B_KAMPF.von, B_KAMPF.bis - B_KAMPF.von);
+    nextAction.find(a => a.id === DORFPHASE).steps.splice(B_RAEUMEN.von, B_RAEUMEN.bis - B_RAEUMEN.von, ...copy(RAEUMEN_NEU));
+  }
+  return { art: schon ? 'schon-da' : 'zu-schreiben', sequence: nextSequence, action: nextAction };
+}
+
+/**
+ * Der Rückwärtsbeweis des Schrittes, auf dem Zielstand und **vor** dem Schreiben: die zwei Schritte der Folge, die zwei in
+ * `kampf-beginnen` und die zwei Nullen der Dorfphase aus dem Gelesenen wieder einsetzen — das muss beide gelesenen Texte ergeben,
+ * Zeichen für Zeichen. Er zeigt zugleich, dass jeder andere Schritt, jede andere Aktion und die Reihenfolge unberührt sind. Verändert nichts.
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseBoss(before, after) {
+  const meldungen = [];
+  const sq = copy(after.sequence ?? []);
+  if (Array.isArray(sq) && Array.isArray(before.sequence)) sq.splice(B_FOLGE.von, 0, ...copy(before.sequence.slice(B_FOLGE.von, B_FOLGE.bis)));
+  const altSq = text(before.sequence);
+  if (text(sq) !== altSq) meldungen.push(`Rückwärtsbeweis sequence_data: mit den zwei Zählern ist der Text nicht der gelesene — ${abwTeil(text(sq), altSq)}`);
+
+  const ac = copy(after.action ?? []);
+  const von = (acts, id) => (Array.isArray(acts) ? acts.find(a => a?.id === id) : null);
+  const vorherKampf = von(before.action, KAMPF), vorherDorf = von(before.action, DORFPHASE);
+  const kampf = von(ac, KAMPF), dorf = von(ac, DORFPHASE);
+  if (Array.isArray(kampf?.steps) && Array.isArray(vorherKampf?.steps)) kampf.steps.splice(B_KAMPF.von, 0, ...copy(vorherKampf.steps.slice(B_KAMPF.von, B_KAMPF.bis)));
+  // Was an die Stelle der zwei Nullen tritt, ist selbst ein Stück des Schnitts — der Beweis unten ersetzt es, darum wird es vorher gelesen.
+  if (Array.isArray(dorf?.steps) && text(dorf.steps.slice(B_RAEUMEN.von, B_RAEUMEN.bis)) !== text(RAEUMEN_NEU)) {
+    meldungen.push(`Rückwärtsbeweis action_data: ${DORFPHASE}[${B_RAEUMEN.von}–${B_RAEUMEN.bis - 1}] sind nicht die zwei clear_table auf ${BOSS_MARKER.join(' / ')}`);
+  }
+  if (Array.isArray(dorf?.steps) && Array.isArray(vorherDorf?.steps)) dorf.steps.splice(B_RAEUMEN.von, B_RAEUMEN.bis - B_RAEUMEN.von, ...copy(vorherDorf.steps.slice(B_RAEUMEN.von, B_RAEUMEN.bis)));
+  const altAc = text(before.action);
+  if (text(ac) !== altAc) meldungen.push(`Rückwärtsbeweis action_data: mit den zwei set_counter in ${KAMPF} und den zwei Nullen der Dorfphase ist der Text nicht der gelesene — ${abwTeil(text(ac), altAc)}`);
+  return meldungen;
+}
+
 // ── Fingerabdruck ───────────────────────────────────────────────────────────
 
 /** SHA-256 je Tabelle; bei `setups` ohne die zwei Spalten, die sich ändern dürfen (`spalten`, z. B. `['scenario', 'sequence']`). */
@@ -552,10 +740,37 @@ const DEFS = {
       }
     },
   },
-  boss: null,
+  boss: {
+    spalten: ['sequence', 'action'],
+    extra: [],
+    patch: (b) => patchBoss(b.sequence, b.action),
+    beweise: beweiseBoss,
+    gelesen: (b) => `Folge: ${b.sequence.length} Schritte, ${KAMPF}: ${aktionSchritte(b.action, KAMPF)} Schritte, ${DORFPHASE}: ${dorfphaseSchritte(b.action)} Schritte`,
+    schonDa: () => `schon geschrieben: die Folge ohne die zwei Zähler, ${KAMPF} ohne die zwei set_counter, ${DORFPHASE}[${B_RAEUMEN.von}–${B_RAEUMEN.bis - 1}] sind clear_table — nichts zu schreiben`,
+    plan: (b, n) => {
+      console.log(`  sequence[${B_FOLGE.von}–${B_FOLGE.bis - 1}]: place_counter ${BOSS_ZAEHLER.join(' / ')} entfallen (${b.sequence.length} → ${n.sequence.length} Schritte; ${MUENZEN} bleibt)`);
+      console.log(`  ${KAMPF}[${B_KAMPF.von}–${B_KAMPF.bis - 1}]: set_counter ${BOSS_ZAEHLER.join(' / ')} entfallen (${aktionSchritte(b.action, KAMPF)} → ${aktionSchritte(n.action, KAMPF)} Schritte; die Marker liegen weiter)`);
+      console.log(`  ${DORFPHASE}[${B_RAEUMEN.von}–${B_RAEUMEN.bis - 1}]: set_counter … 0 → clear_table ${BOSS_MARKER.join(' / ')} (${dorfphaseSchritte(b.action)} Schritte bleiben)`);
+    },
+    // Kein `scenario_data` gelesen, kein Prüfer: was der Schnitt prüfen kann, prüft `patchBoss` (die Stücke, `Münzen`, die Leser).
+    pruefer: () => [],
+    kontrolle: (before, after) => {
+      console.log(`  Folge hat ${after.sequence.length} Schritte (vorher ${before.sequence.length}); ${MUENZEN} an ${B_FOLGE.muenzen}: ${text(after.sequence[B_FOLGE.muenzen]) === text(before.sequence[B_FOLGE.muenzen]) ? 'gleich' : 'GEÄNDERT'}`);
+      const ungleich = after.sequence.map((_, i) => i).filter(i => text(before.sequence[i]) !== text(after.sequence[i]));
+      console.log(`  Schritte der Folge, die sich geändert haben: ${ungleich.length ? ungleich.join(', ') : 'keiner'}`);
+      console.log(`  ${KAMPF} hat ${aktionSchritte(after.action, KAMPF)} Schritte`);
+      const d = after.action.find(a => a.id === DORFPHASE);
+      console.log(`  ${DORFPHASE} hat ${d.steps.length} Schritte, ${B_RAEUMEN.von}–${B_RAEUMEN.bis - 1} sind ${d.steps.slice(B_RAEUMEN.von, B_RAEUMEN.bis).map(x => x.type).join(', ')}`);
+      for (const a of before.action.filter(x => x.id !== KAMPF && x.id !== DORFPHASE)) {
+        const neu = after.action.find(x => x.id === a.id);
+        console.log(`  Aktion ${a.id.padEnd(18)} sha ${sha(text(a))} → ${sha(text(neu))} ${text(a) === text(neu) ? 'gleich' : 'GEÄNDERT'}`);
+      }
+    },
+  },
 };
 
-const dorfphaseSchritte = (actions) => (Array.isArray(actions) ? actions.find(a => a?.id === DORFPHASE)?.steps?.length : undefined);
+const aktionSchritte = (actions, id) => (Array.isArray(actions) ? actions.find(a => a?.id === id)?.steps?.length : undefined);
+const dorfphaseSchritte = (actions) => aktionSchritte(actions, DORFPHASE);
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
@@ -676,8 +891,11 @@ function vorpruefung(db, { titel, schritt, def }) {
   const assets = db.prepare('select id, name, type, image_path, back_image_path, width, height from table_assets where game_id = ?').all(row.game_id);
   const cards = db.prepare('select c.id, c.name, c.image_path, k.name as category from cards c left join categories k on k.id = c.category_id where c.game_id = ?').all(row.game_id);
   const grids = JSON.parse(row.grid_data);
-  const probleme = validateScenarioData(next.scenario ?? before.scenario, { assets, grids, cards });
-  console.log(`validateScenarioData: ${probleme.length} Probleme (${assets.length} Assets, ${cards.length} Karten, Raster „${grids[0]?.label}“)`);
+  // `boss` liest `scenario_data` nicht (es ändert nichts daran): ohne Szenario gibt es nichts gegen die Bibliothek zu prüfen.
+  const szenario = next.scenario ?? before.scenario;
+  const probleme = szenario ? validateScenarioData(szenario, { assets, grids, cards }) : [];
+  if (szenario) console.log(`validateScenarioData: ${probleme.length} Probleme (${assets.length} Assets, ${cards.length} Karten, Raster „${grids[0]?.label}“)`);
+  else console.log('validateScenarioData: entfällt (dieser Schritt liest scenario_data nicht)');
   for (const m of probleme) complaints.push(`validateScenarioData: ${m}`);
   // `action_data` liest `optionen` nicht; ein `$opt…` in einer Aktion prüft der Test gegen die Fixture (M30.3, „Was nicht gilt“).
   const ctx = { assets, cards, grids, zones, sequence: next.sequence ?? before.sequence };
@@ -746,8 +964,8 @@ function schreiben(db, { sicherungSha, haken, ...opts }) {
     console.log(`  Rückwärtsbeweis ${k} auf der gelesenen Spalte: ${bw.some(m => m.startsWith(`Rückwärtsbeweis ${k}`)) ? 'NEIN' : 'ja'}`);
   }
   const scenarioNachher = after.scenario ?? before.scenario;
-  const probleme = validateScenarioData(scenarioNachher, { assets, grids, cards });
-  console.log(`  validateScenarioData auf der gelesenen Spalte: ${probleme.length} Probleme`);
+  const probleme = scenarioNachher ? validateScenarioData(scenarioNachher, { assets, grids, cards }) : [];
+  if (scenarioNachher) console.log(`  validateScenarioData auf der gelesenen Spalte: ${probleme.length} Probleme`);
   const ctx = { assets, cards, grids, zones, sequence: after.sequence ?? before.sequence };
   const weitere = def.pruefer(scenarioNachher, ctx);
   for (const { titel: tt, probleme: pr } of weitere) console.log(`  ${tt} auf der gelesenen Spalte: ${pr.length} Probleme`);

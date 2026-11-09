@@ -174,7 +174,7 @@ geschrieben; `shared/villagers.js` beantwortet „wer sitzt wo" **aus dem Tisch*
 (Tableau-Token), nicht aus einem Gedächtnis. Zwei Dinge, die nicht auffallen: ein
 getauschtes Tableau trägt `anchorId` (die Asset-Id des Platzes — **die Zonen hängen an
 ihr**; das Feld gehört in beide Token-Feldlisten von `GameTable.jsx`), und die Aktionen
-nennen die Dörfler als Platzhalter (`$V1`, `$F1`, `$V1LEB`), nicht beim Namen.
+nennen die Dörfler als Platzhalter (`$V1`, `$F1`, `$V1LEB`), nicht beim Namen. Seit M30 hat ein Platz keine Zähler mehr; `placeVillager` legt Zähler nur, wo `seat.counters` Stellen nennt.
 
 **Aufbau-Optionen (M27):** `docs/tasks-auslagen.md` (Aufgaben `CO`–`CZ`, `DA`, mit „Wo die Spec nicht
 stimmt" und „Stand nachher"). Ein Aufbau hat **Schalter**: `setups.scenario_data.options` (Spiellänge
@@ -188,7 +188,7 @@ Problem **nichts**. Werte tragen Platzhalter (`$optNachschub`, `$optMuenzen`, dr
 `choices` ist eine Aktion. Die Dörfler stellt der Aufbau mit `seat_villager { seat, villager }` aus den Daten
 (`placeVillager` ist das „Hin" des Tauschs). `place_card` nimmt ein optionales `category`
 (`cardsInCategories`). Die Daten schreibt `scripts/auslagen-daten.mjs`, der Rauchtest lesend
-`scripts/auslagen-rauchtest.mjs` (beide im Container, siehe `docs/datenzugriff.md`).
+`scripts/auslagen-rauchtest.mjs` (beide im Container, siehe `docs/datenzugriff.md`). Seit M30 hat ein Platz keine Zähler mehr; `placeVillager` legt Zähler nur, wo `seat.counters` Stellen nennt.
 
 **Szenario-Berichtigung (M28):** `docs/tasks-szenarien.md` (Aufgaben `DB`–`DJ`, mit „Wo die Spec nicht stimmt“ und
 „Entscheidungen“) — sieben der elf ersten Einträge in `setups.scenario_data.bosses` stimmen an mehreren Stellen nicht mit dem
@@ -215,6 +215,8 @@ Schreiben um 14:31 UTC in einer `IMMEDIATE`-Transaktion: `scenario_data` 18 982 
 angehängt, die fünf alten Schlüssel und alle 20 Einträge byteweise gleich, `save_states` (17 Zeilen) gleich; zweiter Lauf „schon geschrieben“. Gemessen an der Produktion (40 Läufe, ausgelieferter Executor): `ok` 19 → **32**,
 `note` 21 → **8**, Vorkämpfe mit `note` 8 → **0**, Namensnennungen 50 → **18**. **Offen: `DT`** (Sichtprüfung am Tisch, Auftraggeber) — und der Tisch muss **neu geladen** werden (ein offener Tisch hält die alten
 Szenariodaten). Ein offener Setup-Editor kann M28 und M29 still zurücknehmen (`docs/datenzugriff.md`, „Fallen“); `--check` beider Skripte am Ende des Tages.
+
+**Setup-Wahl (M30, Stand 2026-11-09):** `docs/tasks-m30-setupwahl.md` (Aufgaben `DU`–`EF`, „Wo die Spec nicht stimmt“ 1–18, „Stand nach DU–EF“). Es gibt nur noch **einen** TFT-Aufbau: die Kurzpartie heißt jetzt **„TFT Aufbau“** (Id `b1e10f4e-…` unverändert); die zwei alten (*TFT Basis-Aufbau*, *TFT Grundaufbau (Dorfphase)*) sind gelöscht (`scripts/setups-aufraeumen.mjs`). Die Dörfler sind im Dialog wählbar: Optionen `doerfler1`–`doerfler3` (Adresse `?opt=doerfler1:Judy`, Vorgabe Henlo / Fridgette / Granny); `seat_villager` liest `$optDoerfler<n>`. Zweimal derselbe Dörfler lässt den Platz leer und schreibt eine Protokollzeile. **Zähler am Platz gibt es nicht mehr** (`seat.counters` ist optional); die Startwerte stehen im Roster und an den Markern. Die Wache „alle drei besiegt“ und das Tauschmenü lesen **Marker** (`require_marker`): „besiegt“ heißt, der Lebensmarker liegt nicht mehr auf seiner Leiste, weil die Leiste keinen Platz 0 hat. Die Bösewicht-Zähler sind weg (die Dorfphase räumt die Marker per `clear_table` ab); `Münzen (gemeinsam)` ist der einzige Zähler am Tisch. Die Daten schreibt `scripts/setupwahl-daten.mjs` (`--schritt optionen|zaehler|boss`). **Acht Spielstände** tragen noch verwaiste Dörfler-Zähler (gemessen; die Grundgesamtheit ist offen), sie bleiben stehen. Gebaut in `b2fc3ab` (Code) und `98935b6` (Daten-Skript, Tests); der Schritt `boss` ist **noch nicht committet**. Tests 1 686 → 1 883 (Bauprotokoll). **Offen:** die Sichtprüfung am Tisch und der Name (`EF` Teil 2).
 
 ## Produktionsdaten
 

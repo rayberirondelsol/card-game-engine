@@ -7,7 +7,7 @@ Die Anwendung läuft auf **Proxmox VM 101** (`docker`), die SQLite-Datei liegt
 > und der Fehler fällt erst auf, wenn eine Abfrage null Zeilen liefert.
 
 Spiel-id für Townsfolk Tussle: `072123c0-cd97-4ffb-a330-369630fab93f`
-Aufbau *TFT Kurzpartie*: `b1e10f4e-b8f2-4c2a-bb3e-54643944121b`
+Aufbau *TFT Aufbau* (vormals *TFT Kurzpartie*): `b1e10f4e-b8f2-4c2a-bb3e-54643944121b`
 
 *Dieses Dokument gibt es, weil Aufträge monatelang auf ein Rezept verwiesen
 haben, das nirgends stand — jeder Agent hat den Zugang neu herausgefunden.*
@@ -90,7 +90,7 @@ Sie gehören **neben** `/app`, damit `../shared/…` zu `/shared` wird:
 ```bash
 SP="<Scratchpad>"; SSH="ssh -o UserKnownHostsFile=$SP/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes root@192.168.178.96"
 $SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin/master -q \
-  && for f in auslagen-daten.mjs auslagen-rauchtest.mjs doerfler-daten.mjs equipment-zones.mjs; do \
+  && for f in setupwahl-daten.mjs setups-aufraeumen.mjs auslagen-daten.mjs auslagen-rauchtest.mjs doerfler-daten.mjs equipment-zones.mjs gelaendekarten-zuordnung.mjs szenariodaten-berichtigung.mjs szenariodaten-grundspiel.mjs; do \
        docker cp scripts/\$f card-game-engine-backend:/app/\$f; done \
   && docker exec -w /app card-game-engine-backend node /app/auslagen-daten.mjs --check /app/data/card-game-engine.db"
 ```
@@ -102,6 +102,8 @@ $SSH "cd /opt/card-game-engine && git fetch origin -q && git reset --hard origin
 **Für M29 (`gelaendekarten-zuordnung.mjs`, und der Rauchtest seit M29)** gehören **vier** Dateien nach `/app/`, nicht nur eine: `gelaendekarten-zuordnung.mjs`,
 `szenariodaten-berichtigung.mjs`, `szenariodaten-grundspiel.mjs` und `auslagen-rauchtest.mjs` (der Rauchtest liest `ZUORDNUNG` aus dem ersten, der importiert die beiden anderen);
 `auslagen-daten.mjs`, `doerfler-daten.mjs`, `equipment-zones.mjs` bleiben für `auslagen-daten.mjs` und den Rauchtest nötig. Der **alte** Rauchtest (vor M29) kommt mit den drei M27-Dateien aus.
+
+**Für M30 gehören neun Dateien nach `/app/`** (vollständig; die Abhängigkeiten sind aus den `import`-Zeilen gelesen, `docs/tasks-m30-setupwahl.md`, Nr. 13 und 18). `setupwahl-daten.mjs` braucht nur `/shared` (und keine andere Skriptdatei); `setups-aufraeumen.mjs` braucht nichts davon. Der Rauchtest `auslagen-rauchtest.mjs` importiert direkt `auslagen-daten.mjs` und `gelaendekarten-zuordnung.mjs`; darüber kommen `doerfler-daten.mjs`, `equipment-zones.mjs`, `szenariodaten-berichtigung.mjs` und `szenariodaten-grundspiel.mjs` hinzu. Allein der Rauchtest braucht also sieben Dateien. Die Liste im Befehl oben ist die vollständige.
 
 `--check` öffnet die Datei schreibgeschützt; `--write` ist **eine** `IMMEDIATE`-Transaktion. Der Rauchtest
 (`auslagen-rauchtest.mjs <db>`) schreibt nie. `doerfler-daten.mjs` und `equipment-zones.mjs` brauchen die
@@ -170,5 +172,7 @@ liest man vorher mit einem eigenen kleinen Skript (Rezept oben) und legt sie ins
   `executeSequence` wirft nie, die Schritte landen still als `skipped`. (M13.6)
 - **`table_assets` werden quadratisch gespeichert.** Das Seitenverhältnis steht
   nur im Bild; zum Unterscheiden den PNG-Kopf lesen, nicht `width`/`height`.
+- **Im Frontend-Bundle belegt man Zeichenketten und Eigenschaftsnamen, keine internen Funktionsnamen.** Der Minifier benennt `zoneSlotNumberAt` um; ein Treffer 0 ist dort kein Fehler. Belegbar sind `require_marker`, `cannot be read`, `has no place` (beim Deploy von `b2fc3ab` gemessen: 10, 2, 3 Treffer). (M30, `EA` 5 b)
+- **Nach `EB` prüfen die `--check` von M28 und M29 weiter sauber durch** — am 2026-11-09 nach allen vier Schnitten gemessen, 0 Beanstandungen: sie prüfen ihr eigenes Stück am Inhalt, nicht die Spalte am Gesamthash. `auslagen-daten.mjs` und `doerfler-daten.mjs` sind dagegen Stand M26/M27 und dürfen **nicht** mehr mit `--write` fahren. **Und: ein Funktionsname ist kein Beleg im Frontend-Bundle** — der Minifier benennt ihn um (`zoneSlotNumberAt` findet man mit 0 Treffern, und das ist richtig). Belegbar sind nur Zeichenketten, etwa `require_marker`, `cannot be read`, `has no place`. (M30)
 - **Was `validateScenarioData` sagt, gilt.** Gegen die echte Assetliste und das
   echte Raster laufen lassen, bevor etwas als fertig gemeldet wird.
