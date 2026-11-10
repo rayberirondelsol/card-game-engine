@@ -552,6 +552,13 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 **Fertig, wenn:** die Tests grün sind; die Gate-Tests aus `EH`/`EI`/`FA` unverändert grün sind; `npm test` grün ist.
 
+> **Erledigt am 2026-11-10** (`73fe91e`), test-zuerst durch einen Subagenten. **2300 → 2310 Tests**, alle grün; `sequence-only-seated`, `sequence-options`, `setup-options*` und `villager-lage` unverändert. `validateOptions` brauchte für Nr. 5 **keine Änderung** — es beanstandet nur `onlyChoice` und `onlyLage` in Aktionen; ein Test hält das fest.
+>
+> **Gebunden wird ein Stand, kein lebender Verweis** (`ctx.counters` als `Set` normalisierter Namen). Der lebende Verweis wäre veraltet, sobald `applyStep` `state.counters` neu anlegt oder `swapVillager` das Array ersetzt. **Jeder** Schritt, der Zähler anlegt oder wegnimmt, bindet darum neu; gemessen sind es **genau drei** (`place_counter`, `seat_villager`, `swap_villager`). Gegenprobe des Subagenten: ohne den neuen Ruf in `place_counter` werden zwei Tests rot, ohne den nach `swap_villager` einer. **Die Grenze steht im Kommentar an `bindTable`:** ein künftiger vierter Schritt, der Zähler legt, muss dort ebenfalls binden — **das fängt kein Test**.
+>
+> **Eigene Gegenprobe:** das Gate invertiert (`=== not` statt `!== not`) lässt **9 der 10** neuen Tests rot werden — sie prüfen also, was sie behaupten.
+>
+> **Hingenommen, mit Grund:** bei zwei Gates an einem Schritt **gewinnt das erste „nein"** — ein kaputtes `onlyCounter` hinter einem `onlySeated`, das schon „nein" sagt, wird im Lauf **nicht** gemeldet. Das ist das Verhalten aller Gates seit `EH` und wurde nicht geändert; Tippfehler in den Daten fängt `validateStep` (`FD`) **vor** dem Schreiben, nicht der Lauf.
 ## FC — Die Lage im Dialog, im Raum und im Executor (M31.15)
 
 **Befund.** Die Nebenbedingung `S ≤ D` gilt **vor dem Aufbau**, an den drei Stellen, die `resolveChoices` schon rufen: Dialog und Raum-Modal, Server, Executor.
