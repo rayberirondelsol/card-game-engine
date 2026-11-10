@@ -573,6 +573,16 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 **Fertig, wenn:** die Tests grün sind, `room-start-sequence.test.js` **unverändert** grün ist, der Bau ohne neue Warnung läuft, `git diff --stat` die vier Dateien (`SetupChoiceDialog.jsx`, `CreateRoomModal.jsx`, `rooms.js`, Executor-Kopf) nennt.
 
+> **Erledigt am 2026-11-10** (`1bab055`), test-zuerst durch einen Subagenten, zwei Durchgänge. **2310 → 2326 Tests**, alle grün; `room-start-sequence`, `sequence-only-seated`, `sequence-only-counter`, `sequence-options`, `setup-options*` unverändert; der Client-Bau läuft mit **nur den zwei alten** Warnungen (doppeltes `data-testid` in `GameTable.jsx`, Chunk-Größe). Im Diff stehen **fünf** Dateien statt vier — die vierte Wache kam dazu (siehe unten) und `villager-lage.test.js` zog nach.
+>
+> **Eine fünfte Stelle, weil meine Vorgabe falsch war.** Ich hatte „den Start-Weg nicht doppelt sichern" gesagt, der Executor halte dort selbst. **Gemessen ist das falsch:** `POST /api/rooms/:code/start` setzt `status = 'active'` **vor** dem Lauf und wertet nur eine Log-Warnung aus — die Messung des Subagenten (Daten nach dem Anlegen gekippt) ergab **`200`, `active`, leerer Tisch, der Host erfährt nichts**. Direkt daneben steht derselbe Fall für `resolveChoices` mit **409** und dem Kommentar „dann startet der Raum lieber gar nicht, als mit einem leeren Tisch zu laufen" — dieselbe Absicht, für die Lage vergessen. Jetzt **409 vor dem `active`**, mit drei Tests (gekippt → 409 und `waiting` in Datenbank **und** Live-Raum; zulässig → 200 und baut; ohne `villagers.lage` → wie heute). **Der Subagent hat den Schaden gemeldet statt behoben** — so beauftragt, und so hat er die Lücke gefunden, die meine Vorgabe hineingelegt hatte.
+>
+> **Der Wortlaut des Halts kommt aus der Sache, nicht aus dem alten Test.** Der erste Durchgang schrieb „no lage" in die Halt-Zeile, **damit** `villager-lage.test.js` grün blieb. Das ist die falsche Reihenfolge der Autorität: bei `S > D` ist die Lage nicht *abwesend*, sondern *ungültig*. Die Zeile heißt jetzt `choices: lage: … - nothing was built`, und **der `FA`-Test zog nach** — seine zweite Hälfte prüft seit `FC` den **Halt** (`index: -1`), weil `S > D` das Gate nicht mehr erreicht; die erste Hälfte (Daten ohne `villagers.lage`) prüft weiter das Gate.
+>
+> **Eigene Gegenproben:** beide neuen Wachen ausgeschaltet (`if (false)`) lassen den 409-Test, **vier** Tests des Halts und die nachgezogene `FA`-Hälfte rot werden. Ein Test zählt außerdem die `lageOf(`-Aufrufe im Quelltext des Executors — damit es **eine** Rechnung bleibt (M6).
+>
+> **Nicht angefasst, bewusst:** `GameTable.jsx` (um Zeile 4591) prüft die Wahl aus der Adresse mit `resolveChoices`, aber **nicht** mit `lageOf`. Eine Adresse `?opt=spieler:s3` bei zwei Dörflern hält darum erst der Executor — **laut**, mit der Zeile `index: -1` im Aufbauprotokoll des Tisches, nicht still. Der Executor ist die letzte Wache (M31.15); gehört in die Sichtprüfung (`FJ`), nicht in diesen Code.
+
 ## FD — Der Editor kennt `onlyLage` und `onlyCounter` (M31.15)
 
 **Befund.** Wie `EP`: `describeStep` und `validateStep` kennen die zwei neuen Gates nicht.
