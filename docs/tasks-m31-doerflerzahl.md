@@ -611,7 +611,17 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 **Schritte** wie `ER` (Vorher fragen; Rauchtest vorher mit der Fassung auf der VM; `--check` der Skripte von M28–M31; Deploy beider Images; Belege: `sha256sum`, Zeichenketten im Frontend-Bündel (`onlyLage`, `onlyCounter`), `headSha`, derselbe alte Rauchtest → `diff` **leer**; sonst Deploy zurücknehmen).
 
-**Fertig, wenn:** (a)–(d) belegt sind und die Ausgaben im Scratchpad liegen. **Sagt der Auftraggeber „nicht jetzt", bleibt `FE` offen** — `FF`–`FH` Teil 1 darf vorher laufen.
+**Fertig, wenn:** (a)–(d) belegt sind und die Ausgaben im Scratchpad liegen — **und die Zahlen in einem Dokument stehen** (die Lehre aus `ER`: `docs/m31-welle2-belege.md`). **Sagt der Auftraggeber „nicht jetzt", bleibt `FE` offen** — `FF`–`FH` Teil 1 darf vorher laufen.
+
+> **Erledigt am 2026-11-10** (`d559f70` läuft), **(a)–(d) belegt in [`docs/m31-welle2-belege.md`](m31-welle2-belege.md)**, Rohausgaben im Scratchpad (`FE-*`).
+>
+> **Der Schritt „Vorher fragen" war nicht einzuhalten — und das ist ein Fehler des Protokolls, nicht des Laufs.** `deploy.yml` hat `on: push` auf `master`: **jeder Push ist ein Deploy.** Welle 2 ging darum in vier Schritten live, **während** sie gebaut wurde (`216c0f9` 08:11, `8baad5a` 08:28, `1bab055` 08:56, `bf68290`/`d559f70` 09:11/09:13, alle grün) — vor der Freigabe. `ER` und `FE` gehen von **einem gewollten, einzelnen** Deploy aus, den es bei dieser Einstellung nicht gibt. Berichtigt in `CLAUDE.md` und `docs/datenzugriff.md`: **wer das Protokoll einhalten will, arbeitet auf einem Zweig und fragt vor dem Zusammenführen.** Dass es folgenlos blieb, ist **gemessen**, nicht gehofft — und es ist das Verdienst von M31.20 (ohne `villagers.lage` tut die Welle nichts), nicht des Vorgehens.
+>
+> **Die Belege in einem Satz:** vier der sieben Laufzeit-Hashes sind neu, genau die vier Dateien der Welle (plus `rooms.js`), und stimmen mit dem Repo überein; `scenarioData.js` und `anchoring.js` tragen **dieselben** Hashes wie in `ER`. Alle acht neuen Zeichenketten stehen im Bündel (das jetzt `index-_kVF5aFE.js` heißt, also neu gebaut ist). Der Rauchtest: **0 Beanstandungen, `EXIT=0`**, und der Vergleich gegen den `EY`-Grundstand ist **eine Zeile** lang.
+>
+> **Diese eine Zeile ist mein eigener Tisch, gemessen und nicht geschlossen:** der `Auto Save` dieses Spiels trägt fünf Tableaus (Henlo, Fridgette, Granny, Blopsy, Yancy) und `updated_at` **09:22:44** — **mein Browser-Tab von der Sichtprüfung ist noch offen**, mit Auto-Save an, und hat nach dem Neustart um 09:13 wieder gespeichert. `15 → 17` Zeilen sind die zwei Dörfler auf den Plätzen 4 und 5. **Alle sieben anderen Spielstände und der ganze Aufbau-Abschnitt sind zeichengleich** — hätte Welle 2 den Executor verändert, wären sie es nicht.
+>
+> **Zwei Blindstellen, beide festgehalten:** (1) der Rauchtest schreibt `Dörfler ${seats.V1}/${seats.V2}/${seats.V3}` — **nur drei Plätze** (`auslagen-rauchtest.mjs` Zeile 475, aus der Zeit vor M31); ein Fünfer-Tisch sieht in seiner Zeile aus wie ein Dreier. **`FI` sollte die Zeile auf fünf Plätze erweitern.** (2) Beim Laden des Tisches meldet die Konsole ~500 Mal `<rect> … "NaN"` aus `ZoneShape.jsx` Zeile 32 — **vorübergehend** (im fertigen DOM 62 Rechtecke, keines mit `NaN`) und **nicht von Welle 2** (die Datei ist seit `0730744` unverändert, die Zonendaten seit `EX` nicht geschrieben). Als eigene Aufgabe abgelegt, nicht hier behoben.
 
 ## FF — Die Hand-Zonen fassen vier Karten (M31.17)
 

@@ -71,6 +71,12 @@ proxmox`). Von Hand, wenn CI nicht kann:
 cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d --build
 ```
 
+> ⚠️ **Jeder Push auf `master` ist ein Deploy — auch ein Push, der nur Dokumente ändert.**
+> Gemessen am 2026-11-10 (Welle 2 von M31): acht Pushes an einem Morgen, acht grüne Läufe,
+> die Container danach vier Minuten alt. Eine Aufgabe, die „**vor dem Deploy fragen**" verlangt,
+> verlangt damit **vor dem Push fragen** — hinterher ist es schon draußen. Wer Code auf `master`
+> schiebt, ohne das zu wollen, arbeitet auf einem Zweig und fragt vor dem Zusammenführen.
+
 ### CI-Deploys fallen still aus, wenn der Runner fehlt
 
 Ohne registrierten Runner **schlägt kein Lauf fehl**. Er bleibt in `queued`
