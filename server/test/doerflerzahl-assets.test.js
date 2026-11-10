@@ -224,7 +224,7 @@ test('EV 4: die Prüfer – genau eine Zeile je Name `Marker 1…5: <Wert>`; Dop
 });
 
 test('EV 4: `SCHRITTE` – `assets` ist gebaut (Ausgang 212, Ziel 220 Zeilen), `aktionen` seit EW, `optionen` seit EX gebaut', () => {
-  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen']);
+  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende']);
   assert.deepEqual(dz.SCHRITTE.assets, { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } });
   for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, `${k} ist gebaut`);
 });

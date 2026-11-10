@@ -1,8 +1,8 @@
-// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12).
+// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.17).
 //
-// **Sechs Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen`, M31.12): jeder ändert ein **eigenes Stück**,
+// **Sieben Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — alle sechs. Ein Schritt, der in `SCHRITTE` `null` wäre,
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs — und **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter. Ein Schritt, der in `SCHRITTE` `null` wäre,
 // hielte laut an, **ohne die Datenbank zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nur, was ein Schritt **mehr** braucht (siehe `liest` bei `optionen`).
 //
@@ -49,6 +49,11 @@
 // **deployten Code** voraus (Gate `onlySeated`, Verneinung, Leiter, Produkt im Zählerwert). **Wer ihn schreibt, schaltet das Spiel auf die Vorgabe zwei um** (`default: "keiner"`): ein Aufbau ohne Wahl baut zwei Dörfler; der Tisch von vor
 // M31 entsteht mit `doerfler3: Granny`. Geschrieben werden `scenario_data` und `sequence_data`, sonst nichts. Rückwärtsbeweis **und** Vorwärtsprobe: der Rückwärtsbeweis wirft gerade die Werte weg, die falsch sein könnten (`on`, `addLabel`,
 // den Zähler), die Vorwärtsprobe fängt sie.
+//
+// **`haende` (FF, M31.14, M31.17):** in `zone_data` bekommen die fünf Zonen `Hand Dörfler 1` … `Hand Dörfler 5` die `capacity` **4** statt 3 — sonst nichts. Drei verdeckte Heldentaten **und** das Dorf-Ereignis teilen sich die Zone; bei 3 ließe `deal_to_zone` das Ereignis im Stapel
+// — **gemessen in `FF` meldet es `skipped: zone „Hand Dörfler 1" is full (3)`**, nicht `1 of 1 cards stayed in the stack`, wie M31.14 und die Aufgabe sagen (das kommt nur, wenn die Zone *während* des Schrittes voll wird; die Wirkung ist dieselbe). Ausgang ist der Zielstand von `zonen` (EU, dieselbe Zahl): `patchHaende` fragt `patchZonen` auf den Händen mit `capacity 3`, ob **alles andere** so ist, wie EU es geschrieben hat; ein halber Stand (ein bis vier von fünf Händen) ist
+// ein Abbruch. Rückwärtsbeweis (`capacity` wieder 3) und Vorwärtsprobe. **Folge am Tisch:** vier Plätze im Abstand 90 statt drei im Abstand 120; die Karten (100 breit) überlappen um 10 Punkte, ein Dorf-Ereignis allein liegt 15 Punkte weiter links.
+// **Nach dem Schreiben melden `--check --schritt zonen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen `zone_data` mit `capacity 3` ein) — der erwartete Stand, wie bei M30 nach `EX`.
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -152,6 +157,8 @@ export const SCHRITTE = {
     ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
     ziel: { scenario: { laenge: 25284, sha: '7368e504b85a' }, sequence: { laenge: 2878, sha: '712f93e99e1a' } },
   },
+  // `haende` (FF, M31.14/M31.17): `zone_data`, capacity 3 → 4 an fünf Zonen. Ausgang: der Zielstand von `zonen` (dieselbe Zahl); Ziel: aus `patchHaende` gerechnet.
+  haende: { ausgang: { zone: { laenge: 39886, sha: 'efe0b0743364' } }, ziel: { zone: { laenge: 39886, sha: 'e6bf6aeaf3d6' } } },
 };
 
 // ── Die Messung ─────────────────────────────────────────────────────────────
@@ -1480,6 +1487,86 @@ function leseVorgaenger(db) {
   return { zone: json(row?.zone_data), action: json(row?.action_data), assets: leseAssets(db) };
 }
 
+// ── Die Hände (FF, M31.14, M31.17) ──────────────────────────────────────────
+
+/**
+ * `Hand Dörfler 1` … `Hand Dörfler 5` fassen vier Karten statt drei: drei verdeckte Heldentaten **und** das Dorf-Ereignis teilen sich die Zone, und bei `capacity 3` ließe
+ * `deal_to_zone` die Ereigniskarte im Stapel (`1 of 1 cards stayed in the stack`, M31.14). Geschrieben wird **nur** `capacity` 3 → 4 an diesen fünf Zonen in `zone_data`.
+ * Der Ausgang ist der Zielstand von `zonen` (EU) — **dieselbe** Zahl; `patchZonen` auf den Händen mit `capacity 3` beantwortet „sind alle anderen Felder, wie EU sie geschrieben hat“.
+ */
+const HAENDE = [1, 2, 3, 4, 5].map(n => `Hand Dörfler ${n}`);
+const HAND_ALT = 3, HAND_NEU = 4;
+const mitKapazitaet = (zonen, c) => zonen.map(z => (HAENDE.includes(z?.label) ? { ...z, capacity: c } : z));
+const ohneHaende = (zonen) => zonen.filter(z => !HAENDE.includes(z?.label));
+
+/**
+ * Der Zielstand von `zone_data` aus dem Ausgang: `capacity` 3 → 4 an den fünf Händen, **jede andere Zone und jedes andere Feld** Zeichen für Zeichen gleich
+ * (`{ ...z, capacity }` lässt den Schlüssel an seiner Stelle). Eine Frage, drei Antworten:
+ *
+ * - `zu-schreiben`: jede der fünf Hände hat `capacity 3`, und die Zonen sind sonst der Zielstand von `zonen` (EU);
+ * - `schon-da`: jede der fünf hat `capacity 4`, sonst dasselbe;
+ * - `abweichend`: alles andere — eine Hand fehlt oder hat eine andere Zahl, **teils** (ein bis vier von fünf auf 4), EU noch nicht geschrieben, jede andere Abweichung.
+ *   `probleme` nennt jede mit Pfad.
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object[]} zonen  – `zone_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', zone?: object[], probleme?: string[] }}
+ */
+export function patchHaende(zonen) {
+  if (!Array.isArray(zonen)) return { art: 'abweichend', probleme: ['zone_data ist keine Liste von Zonen'] };
+  const probleme = [];
+  const neu = [];
+  for (const label of HAENDE) {
+    const da = zonen.filter(z => z?.label === label);
+    if (da.length !== 1) { probleme.push(`zone_data „${label}“: ${da.length ? `kommt ${da.length}-mal vor` : 'fehlt'}`); continue; }
+    const c = da[0].capacity;
+    if (c === HAND_NEU) neu.push(label);
+    else if (c !== HAND_ALT) probleme.push(`zone_data „${label}“: capacity ist ${text(c)}, erwartet ${HAND_ALT} (oder schon ${HAND_NEU})`);
+  }
+  if (!probleme.length && neu.length && neu.length < HAENDE.length) {
+    probleme.push(`zone_data: capacity ${HAND_NEU} an ${neu.length} von ${HAENDE.length} Händen (${neu.join(', ')}), an den anderen ${HAND_ALT} — teils geschrieben: Abbruch, nichts überschreiben`);
+  }
+  if (probleme.length) return { art: 'abweichend', probleme };
+
+  // Alles andere muss sein, wie EU es geschrieben hat: dieselbe Frage, die `patchZonen` stellt, auf den Händen mit `capacity 3`.
+  const eu = patchZonen(mitKapazitaet(zonen, HAND_ALT));
+  if (eu.art === 'zu-schreiben') return { art: 'abweichend', probleme: ['zone_data: die Zonen von EU (zonen) sind noch nicht geschrieben — FF setzt sie voraus'] };
+  if (eu.art === 'abweichend') return { art: 'abweichend', probleme: ['zone_data: außer capacity an den Händen sind die Zonen nicht der Stand nach EU (zonen)', ...eu.probleme] };
+  return neu.length ? { art: 'schon-da', zone: copy(zonen) } : { art: 'zu-schreiben', zone: mitKapazitaet(zonen, HAND_NEU) };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und vor dem Schreiben: `capacity` an den fünf Händen wieder 3 — das muss den gelesenen Text ergeben, Zeichen für Zeichen.
+ * Dazu die **Vorwärtsprobe**: aus dem Gelesenen entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe eine `capacity 5` an einer Hand nicht, weil er sie wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseHaende(before, after) {
+  if (!Array.isArray(after?.zone)) return ['Rückwärtsbeweis zone_data: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const zurueck = mitKapazitaet(after.zone, HAND_ALT);
+  if (text(zurueck) !== text(before?.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data: mit capacity ${HAND_ALT} an den fünf Händen ist der Text nicht der gelesene — ${abwTeil(text(zurueck), text(before?.zone))}`);
+  }
+  const vor = mitKapazitaet(zurueck, HAND_NEU);
+  if (text(vor) !== text(after.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor), text(after.zone))}`);
+  }
+  return meldungen;
+}
+
+/** Die Prüfer des Zielstands: die von `zonen` (Ids, Labels, Anker, Feld) und jede der fünf Hände genau einmal, mit `capacity 4`. */
+export function pruefeHaende(zonen) {
+  const out = pruefeZonen(zonen);
+  for (const label of HAENDE) {
+    const da = zonen.filter(z => z?.label === label);
+    if (da.length !== 1) out.push(`zone_data „${label}“: ${da.length ? `kommt ${da.length}-mal vor` : 'fehlt'}`);
+    else if (da[0].capacity !== HAND_NEU) out.push(`zone_data „${label}“: capacity ist ${text(da[0].capacity)}, erwartet ${HAND_NEU}`);
+  }
+  return out;
+}
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -1596,6 +1683,24 @@ const DEFS = {
       const dp = aktionVon(after.action, 'dorfphase-beginnen')[0].steps;
       console.log(`  Münzen: ${text(dp.find(s => s.type === 'set_counter' && s.name === 'Münzen (gemeinsam)')?.value)}; Wache: ${dp.find(s => s.type === 'require_marker')?.zoneLabel?.length} Lebensleisten`);
       console.log(`  die Aktion laden-nachfuellen: ${text(aktionVon(before.action, 'laden-nachfuellen')[0]) === text(aktionVon(after.action, 'laden-nachfuellen')[0]) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+    },
+  },
+  haende: {
+    spalten: ['zone'],
+    patch: (b) => patchHaende(b.zone),
+    beweise: beweiseHaende,
+    gelesen: (b) => `Hände: ${HAENDE.map(l => `${l.replace('Hand Dörfler ', '')}=${text(b.zone?.find?.(z => z?.label === l)?.capacity)}`).join(', ')} (capacity)`,
+    schonDa: () => `schon geschrieben: capacity ${HAND_NEU} an den fünf Händen Dörfler 1 bis 5 — nichts zu schreiben`,
+    plan: (b, n) => {
+      console.log(`  capacity ${HAND_ALT} → ${HAND_NEU} an ${HAENDE.length} Zonen: ${HAENDE.join(', ')} (Reihenfolge und Schlüssel der Zonen bleiben)`);
+      console.log(`  Zonen ${b.zone.length} → ${n.zone.length}; ${b.zone.length - HAENDE.length} andere Zonen unberührt`);
+      console.log('  Folge am Tisch: vier Plätze je Hand im Abstand 90 statt drei im Abstand 120 (Breite 360) — Karten 100 breit überlappen um 10 Punkte; ein Dorf-Ereignis allein liegt 15 Punkte weiter links (M31.17)');
+    },
+    pruefer: (n) => [{ titel: 'Zonen: Ids, Labels, Anker, Feld; capacity der Hände', probleme: pruefeHaende(n.zone) }],
+    kontrolle: (before, after) => {
+      console.log(`  Hände: capacity ${HAENDE.map(l => after.zone.find(z => z.label === l)?.capacity).join(', ')}`);
+      console.log(`  die ${before.zone.length - HAENDE.length} anderen Zonen: ${text(ohneHaende(after.zone)) === text(ohneHaende(before.zone)) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+      console.log(`  die Hände ohne capacity: ${text(mitKapazitaet(after.zone, HAND_ALT)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
     },
   },
   optionen: {
