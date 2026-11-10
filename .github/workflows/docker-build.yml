@@ -20,7 +20,9 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v6
         with:
-          context: ./server
+          # M6: Wurzelkontext, damit shared/ in beide Images kommt -
+          # dieselben Angaben wie in docker-compose.yml.
+          context: .
           file: ./server/Dockerfile
           push: false
           tags: card-game-engine-backend:latest
@@ -40,7 +42,9 @@ jobs:
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
-          context: ./client
+          # M6: Wurzelkontext, damit shared/ in beide Images kommt -
+          # dieselben Angaben wie in docker-compose.yml.
+          context: .
           file: ./client/Dockerfile
           push: false
           tags: card-game-engine-frontend:latest
