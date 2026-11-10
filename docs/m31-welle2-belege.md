@@ -160,3 +160,70 @@ offen** war und bei jedem Neuaufbau speichert — zuletzt durch den Auftraggeber
 angefasst**; die Fingerabdrücke der Läufe belegen es. Für künftige Belege: **ein offener
 Tisch-Tab macht diese Zeile zu einem wandernden Ziel** — vor dem Vergleich schließen oder
 die Zeile ausklammern.
+
+## Der NaN-Fix (`eb1d638`) — am laufenden Tisch geprüft
+
+Der Zettel aus `FE` („~500 `<rect> … NaN`-Meldungen je Tischaufruf") ist erledigt:
+`drawableSize` in `shared/zoneGeometry.js` entscheidet, ob es Maße zu zeichnen gibt;
+`ZoneShape` zeichnet ohne sie nichts, statt `Math.max(1, undefined)` = `NaN` zu schreiben.
+**Keine Vorgabemaße** (`0/0/100×140` wäre der Geisterrahmen aus `EO`).
+
+Übernommen wurde **nur der Fix-Commit** (cherry-pick); die zwei `ci:`-Commits derselben
+Sitzung (`docker-build.yml`) liegen weiter auf `zone-nan-render` — sie gehören nicht zum
+Fix und waren nicht angefordert. Suite **2398 → 2408** (zehn neue Tests), Client-Bau mit
+den zwei alten Warnungen, Deploy `eb1d638` grün.
+
+**Gemessen:** neues Bündel `index-C_DN9gtz.js` (vorher `index-_kVF5aFE.js`). In einem
+**frischen Tab**, nach einem Neuladen **mit schon laufender Aufzeichnung**: **keine einzige
+Konsolenmeldung** (vorher gut 500, bei 500 gekappt); 42 Rechtecke, keines mit `NaN`.
+*Warum zwei Läufe:* der erste Versuch im alten Tab zeigte noch NaN-Meldungen — der
+Konsolenpuffer enthielt die von **vor** dem Fix, und ein leerer Puffer in einem frischen
+Tab beweist nur dann etwas, wenn die Aufzeichnung beim Laden schon angehängt war.
+
+## `FG` Teil 2 — `action_data`: `dorfphase-beginnen` 43 → 53, `dorfereignis` 6 → 11
+
+**Freigabe:** ausdrücklich, mit der Antwort „alles zu" auf die Editor- und Tab-Frage.
+**Reihenfolge:** erst der NaN-Deploy, dann der Schreiblauf — der Deploy legt neue
+Container an und die von Hand kopierten Skripte verschwinden dabei (Anwesenheit geprüft,
+nicht nur Hash: die Container waren eine Minute alt).
+
+**Vorher gelesen:** `action_data` **7564/`9f41211076a4`**, `dorfereignis` 6,
+`dorfphase-beginnen` 43 — genau der Ausgang, den Teil 1 gerechnet hatte (= Ziel von
+`aktionen`). **Sicherung:** `action_data-M31-FG-vorher.json` im Scratchpad, 7 663 Bytes,
+**sha der Datei = `9f41211076a4`** (gegen die Lesung des Skripts geprüft).
+
+**Rückwärtsbeweis, wirklich gefahren:** auf einer `VACUUM INTO`-Kopie der Produktion
+schreiben → `33b4dc50051e`, `--zurueck` → `9f41211076a4` (= die Sicherung, Zeichen für
+Zeichen); Fingerabdrücke aller Tabellen in der Transaktion unverändert. Kopie entfernt.
+
+**Geschrieben:** 7564 → **9961 Zeichen**, `9f41211076a4` → **`33b4dc50051e`**;
+„Zielstand aus den Konstanten erreicht"; Fingerabdruck aller Tabellen vorher/nachher und
+nach dem Commit neu gelesen unverändert; alle 17 `save_states` gleich; die zehn nicht
+geschriebenen Spalten der Zeile gleich (`zone_data` trägt `e6bf6aeaf3d6` — das Ziel von
+`FF`, die beiden Schritte stören sich nicht). **Zweiter Lauf:** „schon geschrieben".
+
+**Der Rauchtest meldete zuerst 2 Beanstandungen — ein Befund, kein Rauschen.** Er nagelt
+für die Doppelwahl die Schrittnummern der Dorfphase fest (`place_asset` bei 27–30). Mit
+den zehn eingefügten Schritten sind es **37–40**. Gemessen, dass **nur** diese Nummern
+wandern: `clear_table` bei 12, die Kampf- und Aufbauzeilen und die Münzen 21/42 sind
+gleich. Die Beanstandung war also ein festgenagelter Index, kein verändertes Verhalten —
+aber **beide Stände müssen bestehen**: ein bestehender Test (`EY 2`) fährt den Rauchtest
+auf dem **Stand von Welle 1**, wo es weiter 27–30 sind. Mein erster Versuch (37–40 fest
+verdrahtet) machte genau diesen Test rot. Jetzt rechnet `dorfSoll` die Verschiebung aus
+der Zahl der Schritte (`schritte − 43`); beide Stände bestehen.
+
+**Danach: 0 Beanstandungen, `EXIT=0`, und der `diff` gegen den Grundstand von `EY`
+(vor Welle 2) ist die Kopfzeile allein** — `dorfereignis 6 → 11`,
+`dorfphase-beginnen 43 → 53`. **Alle Verhaltenszeilen** (Münzen +12/+18/…, die solo-Tische,
+die Spielstände) sind gleich: in der Lage solo tut `aktionen-spieler` nichts, genau wie
+gebaut. Die `Auto Save`-Zeile ist diesmal **nicht** gewandert (kein Tisch-Tab war offen).
+
+**Offen gelassen, ausdrücklich:** nach dem Schreiben melden `--check --schritt aktionen`
+und `--schritt optionen` `ABWEICHEND` (beide ordnen `action_data` als Stand von Welle 1
+ein) — erwartet, wie nach `FF`. **Wirksam wird `aktionen-spieler` erst mit `FH`**
+(die Option `spieler`); bis dahin gibt es keinen Tisch, dessen Gates „mehrfach" lesen.
+
+**Nachtrag: die NaN-Probe hat den Auto Save geschrieben** — erst nach allen Messungen,
+der Spielstand trägt jetzt den Tisch mit Granny (drei Tableaus). Ein späterer Rauchtest
+zeigt in der `Auto Save`-Zeile wieder einen anderen Wert; das ist dieser Aufruf, kein
+Schreiblauf.

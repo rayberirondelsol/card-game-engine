@@ -713,6 +713,14 @@ Wie `EW` Teil 2 (Ausgang: der Stand nach `EW`; Sicherung; `--check`; Frage nach 
 > **Nach dem Schreiben melden `--check --schritt aktionen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen `action_data` als Stand von Welle 1 ein) — erwartet, wie bei `haende`. Rückweg in umgekehrter Reihenfolge: erst `aktionen-spieler`, dann der Rest.
 >
 > **Grenze, bewusst wie bei `aktionen`:** eine fremde Änderung an einem Schritt, der in **keinem** Stück steht, fällt der Vorbedingung nicht auf (je Stück und Schrittzahl gilt der exakte Ausgang). Das ist beim Vorbild so und nicht strenger gebaut.
+>
+> **Teil 2 erledigt am 2026-11-10**, nach ausdrücklicher Freigabe und der Antwort „alles zu" auf die Editor-/Tab-Frage; **Belege in [`docs/m31-welle2-belege.md`](m31-welle2-belege.md)**. `action_data` **7564/`9f41211076a4` → 9961/`33b4dc50051e`**, `dorfphase-beginnen` 43 → **53**, `dorfereignis` 6 → **11**; Fingerabdruck aller Tabellen unverändert, alle 17 `save_states` gleich; Rückwärtsbeweis auf einer `VACUUM INTO`-Kopie der Produktion wirklich gefahren; zweiter Lauf „schon geschrieben".
+>
+> **Der Rauchtest meldete zuerst 2 Beanstandungen — und das war ein Fehler von `FG`, nicht der Produktion.** Er nagelt für die Doppelwahl die Schrittnummern der Dorfphase fest (`place_asset` bei 27–30); mit den zehn eingefügten Schritten sind es 37–40. Gemessen, dass **nur** diese Nummern wandern (`clear_table` bei 12, Kampf- und Aufbauzeilen, Münzen 21/42 gleich). **Beide Stände müssen bestehen** — `EY 2` fährt den Rauchtest auf dem Stand von Welle 1, und mein erster Versuch (37–40 fest) machte genau diesen Test rot. Jetzt rechnet `dorfSoll` die Verschiebung aus der Schrittzahl (`schritte − 43`). **Lehre für `FH`:** dieser Rauchtest nagelt Schrittnummern fest; jeder Schritt, der Schritte **einfügt**, verschiebt sie. `FH` fügt in `sequence_data` ein (Aufbau-Schritte) — vorher nachsehen, ob dort Ähnliches festgenagelt ist, statt es vom Rauchtest melden zu lassen.
+>
+> **Danach: 0 Beanstandungen, und der `diff` gegen den `EY`-Grundstand ist die Kopfzeile allein** (6 → 11, 43 → 53). In der Lage solo tut `aktionen-spieler` nichts — wie gebaut; **wirksam wird es erst mit `FH`**. Nach dem Schreiben melden `--check --schritt aktionen` und `optionen` `ABWEICHEND` (erwartet).
+>
+> **Außerdem erledigt, mit eigener Freigabe:** der NaN-Fix (`eb1d638`, cherry-pick von `eb1a38d` — **ohne** die zwei `ci:`-Commits derselben Sitzung, die auf `zone-nan-render` bleiben). Am laufenden Tisch geprüft: neues Bündel, **null Konsolenmeldungen** nach dem Neuladen (vorher gut 500). Der erste Versuch zeigte noch NaN, weil der Konsolenpuffer des alten Tabs Meldungen von **vor** dem Fix enthielt — ein frischer Tab mit schon laufender Aufzeichnung beweist es.
 
 ## FH — Die Option `spieler`: der Schalter der Welle (M31.15–M31.17)
 

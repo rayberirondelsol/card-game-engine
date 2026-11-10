@@ -155,7 +155,19 @@ const DORF_ZEILEN = (n) => 18 + 5 * n;
 const DORF_PLUS = (n) => 6 * n;
 const EREIGNIS_ZEILEN = (n) => 1 + n;
 const LEISTE_RAIL = "Buyin'/Beatin'-Leiste";
-/** Die Doppelwahl: genau diese Zeilen (Index, Typ, Status) sind **erwartet** (M31.3, EX Befund 2–3). */
+/** Die Doppelwahl: genau diese Zeilen (Index, Typ, Status) sind **erwartet** (M31.3, EX Befund 2–3).
+ *  Die Indizes der `place_asset`-Zeilen der Dorfphase gelten für den **Stand von Welle 1** (43 Schritte). Seit `FG`
+ *  (M31.16/M31.17) fügt `aktionen-spieler` davor zehn Schritte ein (fünf Töpfe, fünf Hand-Austeilungen); dann sind es
+ *  37–40. **Fest verdrahtet passte nur einer der beiden Stände** — `dorfSoll` rechnet die Verschiebung aus der Zahl der
+ *  Schritte (gemessen am 2026-11-10: nur diese Nummern verschieben sich, `clear_table` bei 12, die Kampf- und
+ *  Aufbauzeilen und die Münzen 21/42 bleiben). */
+const DORFPHASE_SCHRITTE_W1 = 43;
+/** Die erwartete Doppelwahl-Zeile mit den `place_asset`-Indizes der Dorfphase, verschoben um die Schritte, die `aktionen-spieler` davor einfügt. */
+const dorfSoll = (soll, env) => {
+  const schritte = env.actions.find(a => a.id === 'dorfphase-beginnen')?.steps?.length ?? DORFPHASE_SCHRITTE_W1;
+  const dazu = schritte - DORFPHASE_SCHRITTE_W1;
+  return { ...soll, dorf: soll.dorf.map(([i, typ, status]) => [typ === 'place_asset' ? i + dazu : i, typ, status]) };
+};
 const DOPPEL_ERWARTET = {
   keiner: {
     aufbau: [[26, 'seat_villager', 'skipped']],
@@ -330,7 +342,7 @@ export function dorflerFaelle(env) {
     const k = aktion(env, 'kampf-beginnen', r.state);
     const d = aktion(env, 'dorfphase-beginnen', k.state);
     doppel[name] = { aufbau: nichtOk(r.log), kampf: nichtOk(k.log), dorf: nichtOk(d.log), muenzen: muenzenVon(d.state) };
-    const soll = DOPPEL_ERWARTET[name];
+    const soll = dorfSoll(DOPPEL_ERWARTET[name], env);
     const gleich = JSON.stringify(doppel[name]) === JSON.stringify(soll);
     if (!gleich) bad(`Doppelwahl Judy/Judy/${name}: andere Zeilen als erwartet – ${JSON.stringify(doppel[name])}`);
     out.push(`  Doppelwahl Judy/Judy/${name}: Aufbau ${doppel[name].aufbau.length}, Kampf ${doppel[name].kampf.length}, Dorfphase ${doppel[name].dorf.length} Zeilen ohne ok, Münzen ${doppel[name].muenzen}${gleich ? ' – erwartet, keine Beanstandung' : ''}`);
