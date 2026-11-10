@@ -802,6 +802,20 @@ Das Skript in den Container, Ausgabe **und** Datei ins Scratchpad; erwartet **0 
 
 **Fertig, wenn:** Teil 1 grün ist und Teil 2 belegt im Scratchpad liegt.
 
+> **Erledigt am 2026-11-10.** **Teil 1** (`f290722`), test-zuerst durch einen Subagenten: **2446 → 2460 Tests**, alle grün; neue Testdatei `server/test/auslagen-lagen.test.js` (14 Tests). **Teil 2** lesend gegen die Produktion, belegt in [`docs/m31-welle2-belege.md`](m31-welle2-belege.md): **0 Beanstandungen, 105 Zeilen, gegenüber dem Lauf vor `FI` 19 hinzugefügte und 0 entfernte Zeilen** — der neue Abschnitt „5. Die Lagen", sonst nichts.
+>
+> **Was jetzt am echten Datenbestand gemessen wird:** `lageOf` für **40 Kombinationen** (12 mit mehr Spielern als Dörflern: genau ein Problem, der Aufbau baut nichts) und **14 zulässige Fälle** Aufbau → Ereignis → Kampf → Dorfphase mit **Lage, Form des Geldes und den Schritten der Aktionen** — die Probe „Gleiche Auskunft, zwei Zeitpunkte" (M31.15). Stichproben: solo/3 Dörfler Topf 45 → 63; mehrfach/3 Dörfler Töpfe 15 → 21 (+6 je Topf), Auslage 0, Hände 3/3/3; Stapel 80, in `normal` 105.
+>
+> **Gegenproben, 17 Mutationen:** fehlendes/vertauschtes `onlyCounter` 2–46 Beanstandungen, falsches `onlyLage` 1–52, Wahlen umbenannt 5, Stapel verfälscht 4–14. **Eine schlug nicht an, zu Recht:** Topf 1 auf den Namen von Topf 2 — Platz 1 und 2 sitzen immer. **Fünf `onlyLage`-Mutationen schlagen nur mit 1 an** (der Abschnitt bricht ab, wenn die Zuordnung der Lagen zerstört ist: Erkennung an der Form der Daten); die einzelne Hand mit 52 belegt die Erkennung im laufenden Aufbau.
+>
+> **Aus der Arbeit, ehrlich:** (1) Die Töpfe der Dorfphase tragen kein `onlySeated` — ihr `onlyCounter` **ist** die Platz-Auskunft (M31.16); die erste Erwartung des Subagenten („Topf 3 läuft bei D=2") war falsch und gab 10 falsche Beanstandungen — Fehler des Tests, nicht der Daten. (2) Die Dorfphase füllt nur auf, was fehlt: vor ihr nimmt der Abschnitt **eine** Heldentat aus Auslage bzw. Hand 1 und prüft, dass der Stapel um genau eine Karte schrumpft; ohne den Eingriff bliebe die Auffüll-Probe leer. (3) **Ein bestehender `FH`-Test musste geändert werden** („bis auf zwei Zeilen" verglich die Zeilenzahl beider Stände): er schneidet den neuen Abschnitt vor dem Vergleich ab **und prüft zusätzlich, dass der Abschnitt auf Welle 1 fehlt und auf dem Zielstand da ist** — strenger als vorher. (4) **Die Spielerzahl einer Wahl ist ihre Stelle in den Daten:** die i-te Wahl muss „i Spieler" heißen; wer die Reihenfolge umstellt, wird beanstandet (gewollt). (5) Zwei Zahlen stehen als Literal im Skript — Stapel 80/105 (M31.17, Quelle im Kommentar, **zusätzlich aus den Karten der Kategorien gerechnet**) und die Münzen je Zahl (die vorhandene Tabelle `MUENZEN`).
+>
+> **Die Blindstelle aus `FE` ist geschlossen:** die Spielstand-Zeile hängt `/V4/V5` an, wo gebunden — für jeden bestehenden Spielstand **zeichengleich** (belegt: diff 0 entfernte Zeilen).
+>
+> **Nr. 1 und Nr. 4:** (1) nichts zu ändern — ein Schritt, den `onlyLage`/`onlyCounter` nicht laufen lässt, hat **gar keine Protokollzeile**; ein Test belegt es für beide Gates im Aufbau und in der Dorfphase und zeigt, dass ein **unverständliches** Gate dagegen eine `failed`-Zeile ist. (4) schon abgedeckt, nicht dupliziert: `FH 11` und `room-lage.test.js`.
+>
+> **Grenze, ausdrücklich:** der Rauchtest läuft **im Speicher** und baut keinen Raum. **Ein ganzer Raum bis zum ersten Zug ist bisher von niemandem gespielt worden** — der Dialog ist gesehen (`FH`), die Kette ist gemessen (`FI`), der echte Tisch mit mehreren Spielern **nicht**. Das bleibt die Sichtprüfung in `FJ`.
+
 ## FJ — Dokumente nachziehen, Liste für den Auftraggeber (Welle 2)
 
 ### Teil 1 — Dokumente

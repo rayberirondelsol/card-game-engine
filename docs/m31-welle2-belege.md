@@ -285,3 +285,51 @@ villagers as players`, und „Create Room" ist **gesperrt** (`disabled`).
 `lageOf` formuliert wie `resolveChoices` seine Probleme (englisch, in `shared/`), der
 Client zeigt sie unverändert. Kosmetisch, Nutzer sehen es nur, wenn sie eine
 unzulässige Wahl treffen.
+
+## `FI` Teil 2 — der Rauchtest kennt die Lagen, lesend gegen die Produktion
+
+**Der Rauchtest hat jetzt einen Abschnitt „5. Die Lagen"** (`f290722`, Teil 1). Bis `FH` fuhr
+er mit der Vorgabe `s1` und sah nur, dass sich nichts geändert hat; **die Spielerachse war
+in der Produktion geschrieben, aber nur von Tests belegt.** Jetzt wird sie **am echten
+Datenbestand** gemessen. Der Lauf ist **lesend** (`auslagen-rauchtest.mjs` schreibt nie):
+keine Freigabe zum Schreiben nötig, keine Sicherung, kein Rückwärtsbeweis. Vorher die
+**Anwesenheit** beider gebrauchten Skripte im Container geprüft (`auslagen-rauchtest.mjs`
+**und** `doerflerzahl-daten.mjs`, das jener jetzt importiert) — der Deploy davor hatte neue
+Container angelegt.
+
+**Ergebnis: 0 Beanstandungen, `EXIT=0`, 105 Zeilen.** Gegenüber dem Lauf vor `FI` (86 Zeilen):
+**19 hinzugefügte, 0 entfernte Zeilen** — der neue Abschnitt, sonst nichts. Alles Bestehende
+ist zeichengleich; auch die `Auto Save`-Zeile (kein Tisch-Tab war offen).
+
+**Was der Abschnitt misst** (alle Zahlen aus der Ausgabe, nicht aus dem Test):
+- `lageOf` gegen die geschriebenen Daten: **40 Kombinationen** (5 Wahlen × 8 Platzbelegungen):
+  solo 8, mehrfach 12, normal 8, **12 mit mehr Spielern als Dörflern** — dort genau ein
+  Problem; für **6** dieser Kombinationen baut der Aufbau **nichts** (eine Zeile `failed`,
+  der Tisch bleibt). Die Wahlen kommen **aus den Daten**, nicht aus festen Schlüsseln.
+- **14 zulässige Fälle** (solo 4, mehrfach 6, normal 4): Aufbau → Ereignis → Kampf →
+  Dorfphase, jeweils mit **Lage, Form des Geldes und den Schritten der Aktionen** auf
+  Übereinstimmung geprüft — **die Probe „Gleiche Auskunft, zwei Zeitpunkte"**.
+
+**Stichproben, dass die Zahlen aufgehen:** solo, 3 Dörfler: Topf **45** (3 × 15), nach der
+Dorfphase **63** (+18), Auslage 6, Hände leer. Mehrfach, 3 Dörfler: Töpfe **15/15/15**, nach
+der Dorfphase **21/21/21** (+6 je Topf), Auslage **0**, Hände **3/3/3**. Ereignis-Stapel **80**
+in solo und mehrfach, **105** in normal (die 25 geheimen). Ereignis-Zeilen `1 + n`, in
+solo **offen**, in mehrfach/normal **verdeckt**. Normal 5/5: fünf Töpfe 15 → 21, fünf Hände
+mit je drei Karten.
+
+**Die Gegenproben des Teils 1** (17 Mutationen in Wegwerf-Kopien der Daten, alle schlugen
+an außer einer, die zu Recht nicht anschlug — Topf 1 auf den Namen von Topf 2, weil Platz 1
+und 2 immer sitzen): fehlendes oder vertauschtes `onlyCounter` 2 bis 46, falsches
+`onlyLage` 1 bis 52, Wahlen umbenannt 5, Stapel verfälscht 4 bis 14. **Zwei ehrliche
+Grenzen:** (1) Fünf `onlyLage`-Mutationen schlagen nur mit **1** Beanstandung an, weil sie
+die Zuordnung der Lagen zerstören und der Abschnitt dann abbricht — eine Erkennung an der
+**Form** der Daten, nicht am laufenden Aufbau; die einzelne Hand mit 52 belegt die
+Erkennung im laufenden Aufbau. (2) **Die Spielerzahl einer Wahl ist ihre Stelle in den
+Daten:** die i-te Wahl muss „i Spieler" heißen; `lageOf` liest die Ziffer am Schlüssel. Wer
+die Reihenfolge der Wahlen umstellt, wird beanstandet — gewollt, aber bekannt zu halten.
+
+**Nicht belegt, ausdrücklich:** der Rauchtest läuft **im Speicher** und baut keinen
+Raum. Der Raumstart steht in `doerflerzahl-aufbau-spieler.test.js` („FH 11") und
+`room-lage.test.js` (`FC`), **nicht** gegen die Produktionsdatenbank. Am Dialog gesehen ist
+er (siehe `FH` Teil 2); ein **ganzer Raum bis zum ersten Zug** ist bisher von **niemandem**
+gespielt worden — das bleibt die Sichtprüfung am Tisch in `FJ`.
