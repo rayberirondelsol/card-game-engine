@@ -227,3 +227,61 @@ ein) — erwartet, wie nach `FF`. **Wirksam wird `aktionen-spieler` erst mit `FH
 der Spielstand trägt jetzt den Tisch mit Granny (drei Tableaus). Ein späterer Rauchtest
 zeigt in der `Auto Save`-Zeile wieder einen anderen Wert; das ist dieser Aufruf, kein
 Schreiblauf.
+
+## `FH` Teil 2 — die Option `spieler` und der Aufbau der Spielerachse (Produktion)
+
+**Das ist der Schritt, der die Spielerzahl für den Menschen sichtbar macht.**
+**Freigabe:** ausdrücklich („FH Teil 2"); die Pflichtfrage zum offenen Editor / Tisch-Tab
+wurde gestellt und mit „alles zu" beantwortet. Die Doppelwahl-Grenze (Platz 2) blieb
+**wie dokumentiert**; Du hattest die Wahl, sie vorher beheben zu lassen, und hast
+geschrieben.
+
+**Vorher gelesen:** `scenario_data` **25284/`7368e504b85a`**, `sequence_data`
+**2878/`712f93e99e1a`**, 31 Schritte, sieben Optionen, `villagers.lage` fehlt — **genau
+der Ausgang, den Teil 1 gerechnet hatte**. Das Skript hat die Vorgänger **selbst
+mitgelesen und geprüft**: `zone_data` 82 Zonen, Hände `capacity 4, 4, 4, 4, 4` (`FF`),
+`action_data` 4 Aktionen, `dorfphase-beginnen` 53 Schritte (`FG`), `table_assets` 220
+Zeilen. `--check`: Trockenlauf **0 Beanstandungen**; `validateOptions`,
+`validateScenarioData`, `validateVillagers`, `lageOf` für jede Kombination und die Form
+der Schritte alle 0 Probleme. `--sicherung-sha`: `d61927e4…700a`.
+
+**Sicherung:** `scenario_data-M31-FH-vorher.json` (25 452 Bytes) und
+`sequence_data-M31-FH-vorher.json` (2 890 Bytes) im Scratchpad; die **Datei-Hashes sind
+`7368e504b85a` und `712f93e99e1a`** — also gegen die Lesung des Skripts geprüft, nicht nur
+abgelegt.
+
+**Rückwärtsbeweis, wirklich gefahren:** auf einer `VACUUM INTO`-Kopie der Produktion
+schreiben → `377a3ba650fc` / `7ce4574774bd`, `--zurueck` → `7368e504b85a` /
+`712f93e99e1a` („= die Sicherung, Zeichen für Zeichen", für **beide** Spalten);
+Fingerabdrücke aller Tabellen unverändert. Der Hash der Kopie stimmt mit dem aus
+`--check` überein. Kopie danach entfernt.
+
+**Geschrieben:** `scenario_data` 25284 → **25582**, `377a3ba650fc`; `sequence_data`
+2878 → **4622**, `7ce4574774bd`, **42 Schritte**; „Zielstand aus den Konstanten
+erreicht"; Fingerabdruck aller Tabellen in der Transaktion und nach dem Commit neu
+gelesen **unverändert**; **alle 17 `save_states` gleich**; die geschriebenen Spalten sind
+die einzigen, die sich ändern (`zone_data` `e6bf6aeaf3d6` und `action_data`
+`33b4dc50051e` tragen die Ziele von `FF` und `FG`). **Zweiter Lauf:** „schon geschrieben".
+
+**Rauchtest: 0 Beanstandungen, `EXIT=0`, und der `diff` gegen den Grundstand von `EY`
+(vor Welle 2) besteht aus genau zwei Zeilen** — der Kopfzeile (31 → **42** Schritte,
+`dorfereignis` 6 → 11, `dorfphase-beginnen` 43 → 53) und der Optionenzeile (`spieler`
+dazu). **Alle Verhaltenszeilen sind gleich:** mit der Vorgabe `s1` baut und läuft die
+Produktion wie vor Welle 2. Das ist die Zusage von M31.20, am echten Datenbestand
+gemessen. Die `Auto Save`-Zeile ist **nicht** gewandert (kein Tisch-Tab war offen).
+
+**Nach dem Schreiben melden `--check --schritt optionen`, `--schritt aktionen` und
+`--schritt zonen` `ABWEICHEND`** — erwartet, jeder ordnet seine Spalte als Stand von
+Welle 1 ein; der Tages-Check darf es nicht als Fehler lesen (steht in `datenzugriff.md`).
+
+**Am Dialog gesehen** (Multiplayer → Create Room → „TFT Aufbau"; **kein Raum angelegt**,
+**kein Tisch geöffnet**, der Tab danach geschlossen): das Feld **„Spieler"** steht
+zwischen „Toller Trödel" und „Dörfler 1", mit den fünf Wahlen „1 Spieler (Solo)" …
+„5 Spieler" und der Vorgabe **„1 Spieler (Solo)"**. Die Wache aus `FC` greift **am echten
+Dialog**: bei „3 Spieler" mit nur zwei Dörflern steht rot unter den Feldern
+`option "spieler": 3 players but only 2 villagers - there must be at least as many
+villagers as players`, und „Create Room" ist **gesperrt** (`disabled`).
+*Gefunden beim Hinsehen, für `FJ`:* der **Problemtext ist englisch**, der Dialog deutsch —
+`lageOf` formuliert wie `resolveChoices` seine Probleme (englisch, in `shared/`), der
+Client zeigt sie unverändert. Kosmetisch, Nutzer sehen es nur, wenn sie eine
+unzulässige Wahl treffen.
