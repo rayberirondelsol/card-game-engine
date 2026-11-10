@@ -18,19 +18,37 @@ Ein Lesezeichen ohne Wahl und ein Raum ohne Wahl bauen **zwei** Dörfler, gegen 
 
 ---
 
+## Sichtprüfung — am 2026-11-10 im Browser durchgeführt
+
+> **Auf Wunsch des Auftraggebers habe ich die Punkte 1–6 selbst am laufenden Tisch geprüft** (`gaming.benjathi.de`, angemeldete Sitzung im Browser der App). **Fünf von sechs Punkten stimmen; Punkt 6 war zu scharf formuliert.** Was ich gemessen habe, steht je Punkt unten als eingerückter Absatz. Die alten Sätze bleiben stehen.
+>
+> **Was mein Prüfen hinterlassen hat:** der Tisch wurde mehrfach neu aufgebaut (zwei, drei, fünf Dörfler), Auto-Save war an, also trägt der Spielstand **`Auto Save`** jetzt meinen Fünfer-Testtisch (Zeitstempel 2026-11-10 05:45). **Alle benannten Spielstände sind unberührt** — nachgesehen: 17 Zeilen, alle anderen tragen weiter ihre Daten aus September und Oktober. Die Setup-Spalten sind unverändert (`scenario_data` 25 284, `sequence_data` 2 878, `action_data` 7 564, `zone_data` 39 886). Einen Raum habe ich **nicht** angelegt, den Editor **nicht** geöffnet.
+
 ## Sichtprüfung — das deckt kein Test ab
 
 **1. Der Dialog, beim Laden und im Raum.** Spiellänge, Toller Trödel, Dörfler 1, Dörfler 2 und **„Weiteren Dörfler hinzufügen"**. Das Plus bringt Dörfler 3 (Granny) mit einem Minus und wieder einem Plus; so bis Dörfler 5, dort **kein** Plus mehr; das Minus steht **nur** am letzten; Dörfler 1 und 2 haben **keinen** Knopf.
 
+> **Geprüft — stimmt genau.** Im Raum-Dialog stehen Spiellänge („Kurz (3-Runden-Modus)"), Toller Trödel („mit Toller Trödel"), Dörfler 1 (Henlo Bulwark) und Dörfler 2 (Fridgette Jones) **ohne Knopf**, darunter „+ Weiteren Dörfler hinzufügen" — mehr nicht. Das Plus bringt Granny Melba, dann Blopsy Twins, dann Yancy Plover; das **Minus wandert mit** und steht immer nur am letzten; **bei fünf ist das Plus weg** (kein Treffer mehr im Seitenquelltext), und es gibt genau **ein** Minus. **Eine Beobachtung dazu:** eine Adresse mit `setupId` zeigt den Dialog **gar nicht**, sie baut sofort mit den Vorgaben. Genau so entsteht der Zweier-Tisch aus einem alten Lesezeichen — die Meldung sagt es dann wörtlich: „Henlo Bulwark, Fridgette Jones, **kein dritter Dörfler, kein vierter Dörfler, kein fünfter Dörfler**".
+
 **2. Mit drei** (Dörfler 3 = Granny): Henlo, Fridgette, Granny, **45** Münzen, erster Kampf BEW 6 / LEB 14, Dorfphase **+18**. Das ist der Tisch von früher — **mit einer Ausnahme:** der Münzzähler steht jetzt auf (2000, 1040), also über den Tableaus rechts neben den Heldentaten, nicht mehr unten. Das war nötig, weil er an der alten Stelle das Tableau von Platz 4 überdeckt hätte (gerechnet, nicht geschätzt).
+
+> **Geprüft.** Münzen **45**, Granny Melba mit ihren vier Markern, die Zonen von Platz 3 da, von 4 und 5 keine. Zum Münzzähler habe ich die Probe aufs Exempel gemacht: bei **fünf** Dörflern überdeckt er **nichts** — weder einen von 36 Spielsteinen noch eines von 52 Zonenschildern. Die Verschiebung auf (2000, 1040) trägt.
 
 **3. Mit zwei:** nur Tableau 1 und 2, keine Figur und kein Marker für 3–5, und **keine Zonen** für die leeren Plätze — **kein Schild, kein Rahmen, keine Schilder in der Tischecke.** Münzen 30 / 20, Dorf-Ereignis **zwei** Karten, erster Kampf BEW 6 / **LEB 12**, Dorfphase **+12**.
 
+> **Geprüft, und zwar hart.** Im ganzen Tisch kommen „Dörfler 1" und „Dörfler 2" je **zehnmal** vor (ihre beschrifteten Zonen), „Dörfler 3", „Dörfler 4", „Dörfler 5", „Granny", „Blopsy" und „Yancy" **kein einziges Mal**. Keine Geister, kein Schild in der Tischecke. Münzen **30**, nur Henlo und Fridgette mit je vier Markern.
+
 **4. Mit vier und fünf:** vier bzw. fünf Tableaus in einer Reihe (bis x 2770), die Hände über den Tableaus 4 und 5, die Spielsteine auf der „Wer ist dran?"-Leiste — **alle fünf passen**, der Bösewicht hat seinen eigenen Platz. Münzen 60 / 75, erster Kampf LEB 17 / 20.
+
+> **Geprüft.** Fünf Tableaus in einer Reihe, gleichmäßig auf Abstand (383 Bildpunkte je Schritt), jedes gleich groß; **20 Marker** (5 × 4); die Hände über den Tableaus 4 und 5 da; **fünf Spielsteine** auf der Leiste — Henlo, Fridgette, Granny, Blopsy, Yancy. Münzen **75**.
 
 **5. Die Wertleisten der Plätze 4 und 5 sind Kopien** — Blopsy von Henlo/Granny, Yancy von Fridgette. Das ist die Stelle, an der ich am meisten auf Dein Auge angewiesen bin: **liegen die Marker auf den aufgedruckten Kreisen?** Ein Rest von bis zu 8 Weltpunkten ist die seit M26 offene Frage, kein neuer Fehler — aber ob er bei diesen beiden Tableaus auffällt, sieht man nur am Bild.
 
-**6. Die gespeicherte Ansicht „Dörfler"** zeigt die Plätze 4 und 5 nicht. Bitte eine neue anlegen.
+> **Geprüft — sie liegen drauf.** Bei 125 % Tischzoom angesehen: auf **Blopsy Twins** sitzen alle vier Marker mittig in ihren Kreisen (rot und blau in derselben Reihe ihrer Spalte, gelb eine Reihe tiefer, grün in der Genauigkeitsspalte mit deren eigener Skala); auf **Yancy Plover** ebenso. Keiner sitzt zwischen zwei Kreisen, keiner halb daneben. Dazu gerechnet: die x-Versätze der Marker im Tableau stimmen zwischen Platz 1 und 4 auf 1–4 Punkte überein (112/109, 130/127, 144/148, 162/162) und zwischen Platz 2 und 5 ebenso (103/104, 125/125, 146/147, 167/168) — die Höhe unterscheidet sich, weil sie den Wert trägt. **Ein Fehler von 8 Weltpunkten wäre hier etwa eine halbe Reihe und damit sichtbar gewesen.** Er ist es nicht.
+
+**6. Die gespeicherte Ansicht „Dörfler"** ~~zeigt die Plätze 4 und 5 nicht.~~ Bitte eine neue anlegen.
+
+> **Geprüft — zu scharf formuliert.** Es fehlt **nur Platz 5**, und es hängt an der Fensterbreite. Bei 1 024 px (die Breite des Browser-Panels) liegen Henlo, Fridgette, Granny und **Blopsy ganz im Bild** (Blopsys rechter Rand bei 939), **Yancy beginnt erst bei 1 054** — komplett draußen. Bei 1 600 px passen **alle fünf**. Die Ansicht ist also nicht kaputt, sie wurde nur für drei Dörfler gespeichert; eine neue anzulegen lohnt trotzdem, sonst ist es Glückssache, ob der fünfte Platz mitkommt.
 
 ---
 
@@ -90,4 +108,8 @@ Das ist genau die Mischung, gegen die die ganze Reihenfolge „erst deployen, da
 
 ## Fertig, wenn
 
-Du die Sichtprüfung 1–6 abgehakt oder einen Befund genannt hast. ~~**und** die Frage oben beantwortet ist~~ — die Frage ist am 2026-11-10 beantwortet (die Vorgabe bleibt zwei). **Dann beginnt Welle 2** — die Spielerzahl, `FA`–`FJ`: mehrere Spieler, Lagen solo / mehrfach / normal, Geld je Dörfler, Heldentaten verdeckt in den Händen, geheime Dorf-Ereignisse.
+~~Du die Sichtprüfung 1–6 abgehakt oder einen Befund genannt hast **und** die Frage oben beantwortet ist.~~
+
+**Beides ist am 2026-11-10 erledigt:** die Vorgabe bleibt zwei, und die Sichtprüfung 1–6 ist am laufenden Tisch durchgeführt — fünf Punkte bestätigt, Punkt 6 berichtigt (es fehlt nur Platz 5, und nur bei schmalem Fenster). **Kein Befund, der Welle 1 aufhält.** Es bleibt Dir überlassen, ob Du selbst noch einmal hinsiehst.
+
+**Damit kann Welle 2 beginnen** — die Spielerzahl, `FA`–`FJ`: mehrere Spieler, Lagen solo / mehrfach / normal, Geld je Dörfler, Heldentaten verdeckt in den Händen, geheime Dorf-Ereignisse.
