@@ -1,4 +1,8 @@
 import React from 'react';
+// M31: ob es überhaupt Maße zu zeichnen gibt, entscheidet `shared/` – der
+// Client hat kein Testgerüst, eine Bedingung hier wäre ungeprüft
+// (`server/test/zone-draw-size.test.js`).
+import { drawableSize } from '../../../shared/zoneGeometry.js';
 
 /**
  * Draws a zone's outline: rectangle, circle or hexagon, inscribed in the
@@ -12,8 +16,16 @@ import React from 'react';
  * Positioning is the caller's job – this fills its parent.
  */
 export default function ZoneShape({ shape = 'rect', width, height, hex = '#94a3b8', fill = '0C', dashed = false }) {
-  const w = Math.max(1, width);
-  const h = Math.max(1, height);
+  // Eine Zone ohne auflösbare Maße zeichnet **nicht**. Eine verankerte Zone
+  // trägt ihre Maße nicht selbst; sie bekommt sie in `resolveZones` aus dem
+  // Ankerkasten, und beim ersten Rendern liegt der Anker noch nicht auf dem
+  // Tisch. Bis dahin wäre jedes Rechteck hier entweder ungültig (das waren die
+  // gut 500 `width="NaN"`-Meldungen) oder geraten (der Geisterrahmen aus EO).
+  // Die nächste Runde hat die Maße und zeichnet.
+  const size = drawableSize(width, height);
+  if (!size) return null;
+  const { w, h } = size;
+
   const skin = {
     fill: `${hex}${fill}`,
     stroke: hex,

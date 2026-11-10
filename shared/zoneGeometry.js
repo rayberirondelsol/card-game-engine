@@ -27,6 +27,36 @@ function box(zone) {
   return { x: num(zone?.x, 0), y: num(zone?.y, 0), w, h, cx: num(zone?.x, 0) + w / 2, cy: num(zone?.y, 0) + h / 2 };
 }
 
+/**
+ * Die Maße, mit denen die Form einer Zone gezeichnet wird — oder `null`, wenn
+ * es keine gibt (M31 EU/EO, der NaN-Befund).
+ *
+ * Eine verankerte Zone trägt kein gespeichertes `width`/`height`; ihre Maße
+ * entstehen in `resolveZones` aus dem Ankerkasten. Beim **ersten** Rendern
+ * liegt noch nichts auf dem Tisch, es gibt also keinen Anker, und die Zone
+ * kommt ohne Geometrie zurück — gewollt, denn eine Zone zu verwerfen würde ein
+ * fehlendes Asset verstecken. `ZoneShape` rechnete daraus `Math.max(1,
+ * undefined)` = NaN und schrieb das in ein SVG-Attribut: gut 500
+ * Konsolenfehler je Seitenaufruf, eine Runde lang, danach richtig.
+ *
+ * **`null` heißt „nicht zeichnen", nicht „mit Vorgabemaßen zeichnen".** `box()`
+ * darüber setzt 0/0/100×140, weil das Treffen und Legen eine Antwort braucht;
+ * als Rahmen wäre dieselbe Zahl eine Behauptung über einen Ort, an dem keine
+ * Zone liegt — der Geisterrahmen aus EO. Sobald die Maße da sind, zeichnet die
+ * nächste Runde sie, ohne dass hier etwas nachhilft.
+ *
+ * Eine Zone ohne Fläche ist ohnehin nicht da: `zoneContains` weist `w <= 0`
+ * schon ab, sie nimmt nichts und fängt keinen Ablegevorgang. Das Aufrunden auf
+ * 1 bleibt für die Zonen **mit** Fläche, damit eine 0,4 Punkte breite
+ * Markerspur ihren Strich behält.
+ */
+export function drawableSize(width, height) {
+  const w = num(width, 0);
+  const h = num(height, 0);
+  if (w <= 0 || h <= 0) return null;
+  return { w: Math.max(1, w), h: Math.max(1, h) };
+}
+
 /** Centre of a zone – where objects go when nothing finer is configured. */
 export function zoneCenter(zone) {
   const b = box(zone);
