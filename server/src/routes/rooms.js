@@ -24,6 +24,7 @@ import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveGrids, placeOnGrids } from '../../../shared/gridGeometry.js';
 import { anchorBoxes } from '../../../shared/anchoring.js';
 import { resolveChoices, describeChoices } from '../../../shared/setupOptions.js';
+import { lageOf } from '../../../shared/villagers.js';
 
 const VALID_COLORS = ['red', 'blue', 'green', 'purple', 'orange', 'yellow'];
 
@@ -100,10 +101,17 @@ export async function roomsRoutes(fastify) {
         return reply.code(400).send({ error: 'Ungültige Wahl für diesen Aufbau: den Aufbau gibt es nicht' });
       }
       if (setup) {
-        const options = scenarioOf(setup).options;
-        const resolved = resolveChoices(options, setup_choices);
+        const scenario = scenarioOf(setup);
+        const resolved = resolveChoices(scenario.options, setup_choices);
         if (resolved.problems.length) {
           return reply.code(400).send({ error: `Ungültige Wahl für diesen Aufbau: ${resolved.problems.join('; ')}` });
+        }
+        // M31.15/FC: die Nebenbedingung `S ≤ D`, gleich daneben und in derselben Form (`lageOf` ist
+        // `null`, wo die Daten keine Lage nennen: dann keine Prüfung). Der Raum startet sonst
+        // und der Executor hält - ohne dass der Host es erfährt.
+        const lage = lageOf(scenario, resolved.choices);
+        if (lage?.problems.length) {
+          return reply.code(400).send({ error: `Ungültige Wahl für diesen Aufbau: ${lage.problems.join('; ')}` });
         }
         if (Object.keys(resolved.choices).length) choices = resolved.choices;
       }
@@ -279,9 +287,16 @@ export async function roomsRoutes(fastify) {
     const choices = storedChoices(room) ?? {};
     if (room.setup_id) {
       const setupRow = db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id);
-      const resolved = resolveChoices(scenarioOf(setupRow).options, choices);
+      const scenario = scenarioOf(setupRow);
+      const resolved = resolveChoices(scenario.options, choices);
       if (resolved.problems.length) {
         return reply.code(409).send({ error: `Die Wahl für diesen Aufbau gilt nicht mehr: ${resolved.problems.join('; ')}` });
+      }
+      // M31.15/FC: dasselbe für die Lage (`S ≤ D`): kippt sie nach dem Anlegen (die Daten haben sich
+      // geändert), hielte der Executor erst **nach** dem `active` unten - der Raum liefe mit leerem Tisch.
+      const lage = lageOf(scenario, resolved.choices);
+      if (lage?.problems.length) {
+        return reply.code(409).send({ error: `Die Wahl für diesen Aufbau gilt nicht mehr: ${lage.problems.join('; ')}` });
       }
     }
 

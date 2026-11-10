@@ -3,6 +3,16 @@ import { apiFetch } from '../utils/api';
 import SetupChoiceFields from './SetupChoiceFields';
 import { optionsOfSetup } from '../utils/setupChoices.js';
 import { resolveChoices } from '../../../shared/setupOptions.js';
+import { lageOf } from '../../../shared/villagers.js';
+
+/** M31.15/FC: was `lageOf` zur aktuellen Wahl sagt - die Probleme, oder `[]` (auch ohne `villagers.lage`). */
+function lageProblems(setup, choices) {
+  let data = setup?.scenario_data;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { return []; }
+  }
+  return lageOf(data, choices)?.problems ?? [];
+}
 
 const PLAYER_COLORS = [
   { value: 'red',    hex: '#ef4444', label: 'Red' },
@@ -21,6 +31,8 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
   // (die beiden anderen Aufbauten), gibt es keine Felder und keine Wahl im Body.
   const [choices, setChoices] = useState({});
   const options = optionsOfSetup(setups.find(s => s.id === setupId));
+  // M31.15/FC: die Probleme der Lage (`S ≤ D`) - nur, wo es Optionen gibt, denn nur dann geht eine Wahl mit.
+  const problems = options ? lageProblems(setups.find(s => s.id === setupId), choices) : [];
 
   function pickSetup(id) {
     setSetupId(id);
@@ -32,6 +44,7 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
   async function handleSubmit(e) {
     e.preventDefault();
     if (!displayName.trim()) return setError('Please enter a name');
+    if (problems.length) return;
     setLoading(true);
     setError('');
     try {
@@ -109,6 +122,11 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
           {options && (
             <SetupChoiceFields options={options} value={choices} onChange={setChoices} testIdPrefix="room-choice" />
           )}
+          {problems.length > 0 && (
+            <ul className="text-red-500 text-sm space-y-1" data-testid="room-choice-problems">
+              {problems.map(p => <li key={p}>{p}</li>)}
+            </ul>
+          )}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-gray-100 rounded-lg transition-colors">
@@ -116,7 +134,7 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
             </button>
             <button
               type="submit"
-              disabled={loading || displayName.trim().length < 2}
+              disabled={loading || displayName.trim().length < 2 || problems.length > 0}
               className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating…' : 'Create Room'}

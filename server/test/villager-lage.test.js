@@ -221,19 +221,25 @@ test('onlyLage fail-loud: Unverstandenes läuft nicht und meldet failed mit only
   }
 });
 
-test('onlyLage ohne Lage: failed mit "no lage", der Schritt läuft nicht', () => {
-  // keine villagers.lage in den Daten
+test('onlyLage ohne villagers.lage: das Gate meldet "no lage"; bei S > D hält schon der Executor (FC)', () => {
+  // keine villagers.lage in den Daten: das Gate antwortet
   const a = go([probe('solo')], {}, { options: copy(OPTIONS) });
   assert.equal(a.log.length, 1);
   assert.equal(a.log[0].status, 'failed');
   assert.match(a.log[0].reason, /no lage/);
   assert.equal(counterNamed(a.state, 'Probe'), undefined);
 
-  // lage da, aber ohne gültige Lage (S > D)
+  // S > D: seit FC (M31.15) erreicht diese Wahl das Gate nicht mehr - die Lage ist hier nicht
+  // abwesend, sondern ungültig, und der Executor hält vor dem ersten Schritt: eine Zeile
+  // `index: -1`, nichts gebaut. Diese Hälfte prüft darum den Halt, nicht das Gate.
   const b = go([probe('solo')], choose(3, 2));
   assert.equal(b.log.length, 1);
+  assert.equal(b.log[0].index, -1);
   assert.equal(b.log[0].status, 'failed');
-  assert.match(b.log[0].reason, /no lage/);
+  assert.match(b.log[0].reason, /lage:/);
+  assert.match(b.log[0].reason, /\b3\b/);
+  assert.match(b.log[0].reason, /\b2\b/);
+  assert.match(b.log[0].reason, /nothing was built/);
   assert.equal(counterNamed(b.state, 'Probe'), undefined);
 });
 

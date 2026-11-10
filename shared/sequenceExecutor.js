@@ -81,6 +81,18 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
       log: [{ index: -1, type: '(sequence)', target: null, status: 'failed', reason: `choices: ${resolved.problems.join('; ')} - nothing was built` }],
     };
   }
+  // M31.15/FC: die Lage - **dieselbe Frage an derselben Stelle** wie `resolveChoices`, und vor dem
+  // ersten Schritt: ein Halt mitten im Lauf ließe einen halb gebauten Tisch zurück (M9.3). Bei
+  // `S > D` (oder kaputten `villagers.lage`-Daten) wird **nichts** gebaut, genau wie oben. Einmal
+  // gerechnet; `ctx.lage` bekommt denselben Wert (M6). Ohne `villagers.lage` ist sie `null`:
+  // kein Halt, keine Zeile. Eine Aktion (ohne Wahl) hält nie - ihre Lage liest der Tisch (`onlyCounter`).
+  const lage = given ? lageOf(options?.scenarioData, resolved.choices) : null;
+  if (lage?.problems.length) {
+    return {
+      state,
+      log: [{ index: -1, type: '(sequence)', target: null, status: 'failed', reason: `choices: lage: ${lage.problems.join('; ')} - nothing was built` }],
+    };
+  }
   if (!Array.isArray(sequenceData) || sequenceData.length === 0) {
     return { state, log, choices: resolved.choices };
   }
@@ -121,7 +133,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   const ctx = {
     vars: {}, seatVars: {}, seated: null, counters: new Set(),
     optionVars: resolved.vars, options: scenarioOptions, choices: given ? resolved.choices : undefined,
-    lage: given ? lageOf(options?.scenarioData, resolved.choices) : null,
+    lage,
     revealedLast: false, halted: false, finalFight: null,
   };
   bindTable(ctx, state, assets, scenarioData?.villagers);
