@@ -119,7 +119,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   // `$optMuenzen`). `options`/`choices` sind das Gate dazu - `choices` ist
   // `undefined`, wenn der Aufruf keine Wahl mitbrachte (siehe oben).
   const ctx = {
-    vars: {}, seatVars: {}, seated: null,
+    vars: {}, seatVars: {}, seated: null, counters: new Set(),
     optionVars: resolved.vars, options: scenarioOptions, choices: given ? resolved.choices : undefined,
     lage: given ? lageOf(options?.scenarioData, resolved.choices) : null,
     revealedLast: false, halted: false, finalFight: null,
@@ -192,6 +192,12 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
  *   normal) zu einem der Wörter passt. Die Lage folgt aus der **Wahl**; darum in Aktionen
  *   verboten (`validateOptions`) und ohne Wahl ein Problem, nie ein stilles Nein.
  *
+ * - `onlyCounter` (M31.15): **fail-loud**; der Schritt läuft nur, wenn am Tisch ein Zähler
+ *   dieses Namens liegt, `"!Name"` nur, wenn keiner liegt. Die Aktionen kennen die Lage
+ *   nicht, sie lesen den Tisch - und der trägt die Form des Geldes (solo: `Münzen
+ *   (gemeinsam)`). Wie `onlySeated` in Aktionen erlaubt. Ein Name, der nicht am Tisch
+ *   liegt, ist **kein** Problem - das ist die Frage, die das Gate stellt.
+ *
  * `onlyChoice` wird zuerst gefragt: ein kaputtes Gate wird auch dann gemeldet,
  * wenn der Schritt aus anderem Grund nicht liefe.
  */
@@ -208,6 +214,11 @@ function stepApplies(step, ctx) {
   }
   if (step?.onlyLage !== undefined) {
     const r = lageGate(step.onlyLage, ctx.lage);
+    if (!r.ok) return { applies: false, problem: r.problem };
+    if (!r.applies) return { applies: false };
+  }
+  if (step?.onlyCounter !== undefined) {
+    const r = counterGate(step.onlyCounter, ctx.counters);
     if (!r.ok) return { applies: false, problem: r.problem };
     if (!r.applies) return { applies: false };
   }
@@ -229,8 +240,17 @@ function stepApplies(step, ctx) {
  *
  * `seated` ist `null`, wenn es keine Dörferdaten gibt (dann kann `onlySeated`
  * nichts beantworten), sonst `{ of: Zahl der Plätze, taken: [besetzte Plätze] }`.
+ *
+ * `counters` (M31.15) ist die dritte Hälfte: die Namen der Zähler am Tisch (über `norm`),
+ * die `onlyCounter` fragt. **Gebunden wird ein Stand, kein lebender Verweis**: `applyStep`
+ * legt `state.counters` neu an, wenn es fehlt, und `swapVillager` ersetzt das Array -
+ * ein gebundenes Array wäre dann genau das veraltete. Darum ändert **jeder** Schritt,
+ * der Zähler anlegt oder wegnimmt, den Stand durch einen Ruf dieser Hilfe: es sind
+ * heute drei (`place_counter`, `seat_villager`, `swap_villager`; gemessen in `FB`).
+ * Ein neuer Schritt, der Zähler legt, muss hier ebenfalls neu binden.
  */
 function bindTable(ctx, state, assets, villagers) {
+  ctx.counters = new Set((Array.isArray(state?.counters) ? state.counters : []).map(c => norm(c?.name)));
   ctx.seatVars = seatVars(state, assets, villagers);
   ctx.seated = hasVillagers(villagers)
     ? { of: villagers.seats.length, taken: seatedVillagers(state, assets, villagers).map(s => s.n) }
@@ -265,6 +285,21 @@ function lageGate(value, lage) {
   const want = lageValuesOf(value);
   if (!want) return { ok: false, problem: `onlyLage: ${JSON.stringify(value) ?? String(value)} is not one of ${LAGEN.join(', ')} or a list of them` };
   return { ok: true, applies: want.includes(lage.kind) };
+}
+
+/**
+ * `onlyCounter` gegen die Zähler am Tisch: `{ ok, applies }` oder `{ ok: false, problem }`.
+ * Verstanden wird ein nicht leerer Text, höchstens mit **einem** `!` davor; alles andere
+ * (Zahl, Liste, Objekt, leer, `"!"`, `"!!x"`) ist ein Problem. Verglichen wird über `norm`
+ * wie bei `set_counter` und `swap_villager`.
+ */
+function counterGate(value, counters) {
+  const bad = () => ({ ok: false, problem: `onlyCounter: ${JSON.stringify(value) ?? String(value)} is not a counter name (or "!" and a counter name)` });
+  if (typeof value !== 'string') return bad();
+  const not = value.startsWith('!');
+  const name = norm(not ? value.slice(1) : value);
+  if (!name || name.startsWith('!')) return bad();
+  return { ok: true, applies: counters.has(name) !== not };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -2394,6 +2429,8 @@ function applyStep(state, step, allZones, allGrids, assets, cards, scenarioData,
         return skip(`counter "${name}": "${String(step.value).trim()}" is not a value it can take`);
       }
       state.counters.push(normalizeCounter({ name, value: foldProduct(step.value), max: step.max, base: step.base, x, y }));
+      // M31.15: ein Zähler mehr am Tisch - die Schritte dahinter (`onlyCounter`) sehen ihn.
+      bindTable(ctx, state, assets, scenarioData?.villagers);
       return state;
     }
 
