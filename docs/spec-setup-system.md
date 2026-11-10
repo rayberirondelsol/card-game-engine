@@ -8222,3 +8222,51 @@ Alles, was **kein Regeltext** sagt, und wie M31 damit umgeht — **benannt, nich
 6. **Die zwei Gates** (`onlyLage` am Aufbau, `onlyCounter` an den Aktionen) sagen dieselbe Auskunft zu verschiedenen Zeitpunkten; ein Test (`FI`) prüft, dass sie übereinstimmen.
 7. **Die 6 steht an sechs Stellen** (M31.16); der Baustein schreibt sie aus einer Konstante.
 8. **`fill` zählt, was auf dem Tisch liegt:** nimmt ein Spieler seine Heldentaten in die private Hand, füllt die Dorfphase auf sechs auf (M31.17). Dem Auftraggeber zu sagen.
+
+### M31, Welle 2 — gebaut, und was die Spec dabei berichtigt
+
+Aufgaben `FA`–`FI` in `docs/tasks-m31-doerflerzahl.md`; dort steht je Aufgabe der Stand, und die Kästen „Erledigt" und „Berichtigt" sind die **Quelle** der Berichtigungen unten. **Woher die Zahlen sind:** aus den Commit-Texten, aus `scripts/doerflerzahl-daten.mjs` (`SCHRITTE`), aus `docs/m31-welle2-belege.md` (die Produktionsläufe) und aus einer Messung am 2026-11-10 (`cd server && npm test`, 2 460).
+
+**Stand (2026-11-10).** Alles gebaut, deployt und **in die Produktion geschrieben**: `FF` (`zone_data`), `FG` (`action_data`), `FH` (`scenario_data` und `sequence_data`). `FI` fährt den Rauchtest mit dem neuen Abschnitt „5. Die Lagen" gegen die Produktion (**0 Beanstandungen**, nur lesend). **Tests: gemessen 2 460, alle grün** (Stand vor Welle 2: 2 278). **Die Vorgabe der Option `spieler` ist `s1` (Solo):** wer ohne Wahl startet, bekommt den Tisch von Welle 1; am echten Datenbestand gemessen (der Rauchtest-`diff` gegen den Stand vor Welle 2 besteht aus den Kopfzeilen).
+
+**Gebaut** (Commit; Teststand laut Lauf):
+
+| Commit | Aufgaben | Tests danach |
+|---|---|---|
+| `8821269` | `FA`: `lageOf`, das Gate `onlyLage` | 2 300 |
+| `73fe91e` | `FB`: das Gate `onlyCounter` (`parseCounterGate` seit `FD` in `shared/counters.js`) | 2 310 |
+| `1bab055` | `FC`: die Lage hält vor dem Aufbau (Executor, `POST /api/rooms`, **Start**, Dialog, Modal) | 2 326 |
+| `bf68290` | `FD`: der Editor kennt beide Gates | 2 341 |
+| `27c1cae` | `FF` Teil 1: `haende` | 2 367 |
+| `291ff5f` | `FG` Teil 1: `aktionen-spieler` | 2 398 |
+| `eb1d638` | der NaN-Fix (`drawableSize`; kein Teil der Welle, am Rande gefunden) | 2 408 |
+| `cbafb09` | `FH` Teil 1: `aufbau-spieler` | 2 446 |
+| `f290722` | `FI` Teil 1: der Rauchtest kennt die Lagen | 2 460 |
+
+**Geschrieben** (Länge in Zeichen / sha256, 12 Zeichen; aus `SCHRITTE` und den Läufen; Rückwärtsbeweis je Schritt **auf einer `VACUUM INTO`-Kopie der Produktion wirklich gefahren**, nicht nur gerechnet):
+
+| Spalte | Schritt | Ausgang → Ziel |
+|---|---|---|
+| `zone_data` | `haende` (`FF`) | 39 886 / `efe0b0743364` → 39 886 / `e6bf6aeaf3d6` (eine Ziffer an fünf Zonen) |
+| `action_data` | `aktionen-spieler` (`FG`) | 7 564 / `9f41211076a4` → 9 961 / `33b4dc50051e` (`dorfphase-beginnen` 43 → 53, `dorfereignis` 6 → 11) |
+| `scenario_data` | `aufbau-spieler` (`FH`) | 25 284 / `7368e504b85a` → 25 582 / `377a3ba650fc` |
+| `sequence_data` | `aufbau-spieler` (`FH`) | 2 878 / `712f93e99e1a` → 4 622 / `7ce4574774bd` (31 → 42 Schritte) |
+
+**Was die Spec dabei berichtigt** (jede Zeile ein gemessener Befund, die Quelle steht im Kasten der Aufgabe):
+
+1. **Die Wahlen der Option `spieler` heißen `s1` … `s5`, nicht `1` … `5`** (M31.15; `FA`). Ein Schlüssel reist in der Adresse und braucht einen Buchstaben am Anfang (`validateOptions`); mit `1` … `5` scheiterte die Option dort, mit `s1` … `s5` an `lageOf`, das den Schlüssel als Zahl las — **es gab keine Form, die beides besteht**. `KEY` blieb, `lageOf` liest die Ziffern am Ende. Der Roundtrip heißt `?opt=spieler:s2`.
+2. **Es sind vier Wachen, nicht drei** (M31.15; `FC`): `POST /api/rooms/:code/start` setzt `status = 'active'` **vor** dem Lauf, der Executor hielte also erst danach — gemessen kam `200` mit leerem Tisch. Der Start prüft jetzt selbst (409). **Der Executor ist die letzte Wache, aber nicht überall die letzte rechtzeitige.**
+3. **`deal_to_zone` meldet bei einer vollen Hand-Zone `skipped: zone „…" is full (3)`**, nicht `1 of 1 cards stayed in the stack` (M31.14; `FF`). Die Wirkung ist dieselbe; der zitierte Satz war falsch gelesen.
+4. **`fill` zählt Karten genau auf einem Platzpunkt** (Toleranz 0,5 Punkt, `countInZone`/`onSlot`, M11.8, absichtlich so eng), nicht alle im Rechteck (M31.17; `FG`). Eine Heldentat, die ein Mensch neben den Platz legt, zählt nicht.
+5. **Die Aufgabenliste hatte einen Ringschluss** (`FG`/`FH`): die Probe „Gleiche Auskunft, zwei Zeitpunkte" brauchte den Aufbau von `FH`, `FH` setzte `FG` voraus. Sie steht in **`FI`** (dort war sie schon), nicht in `FG`.
+6. **Schritte einfügen verschiebt, was der Rauchtest festnagelt** (`FG`, `FH`): die Dorfphase-Indizes (27–30 → 37–40) und der `seat_villager`-Index der Doppelwahl (26 → 27). **Eine Längendifferenz taugt nur für Schritte, die davor eingefügt werden und alle verschieben; angehängte verschieben nichts** — der Index kommt jetzt aus dem **Inhalt** (zweiter `seat_villager`), und der Rauchtest besteht gegen **beide** Stände.
+7. **`deploy.yml` hat `on: push`: jeder Push auf `master` ist ein Deploy** (`FE`). „Vor dem Deploy fragen" heißt „vor dem Push fragen"; Welle 2 ging in Schritten live, während sie gebaut wurde. Folgenlos nur, weil M31.20 gilt (ohne `villagers.lage` tut die Welle nichts).
+8. **Platz 1 und 2 tragen kein `onlySeated`** (M31.3), und das hat eine Folge in der Doppelwahl (M31.15, M31.16; `FH`): bei `s2` mit Judy / Judy / Granny / Blopsy gibt es **vier** Töpfe und vier befüllte Hände, obwohl nur drei Dörfler sitzen; die Dorfphase zahlt in den Topf von Platz 2. **Dokumentiert, nicht behoben** — die Behebung hieße, Topf und Hand von Platz 2 zu gaten, auch in dem schon geschriebenen `aktionen-spieler`.
+9. **Die Hand-Zonen mit `capacity 4`** (M31.17; `FF`), gemessen: vier Plätze im Abstand 90, die Karten (100 breit) **überlappen um 10 Punkte**; **die äußeren Karten ragen je 5 Punkte über den Zonenrand** (bei drei lagen alle 10 Punkte innerhalb) — die Spec kannte nur die Überlappung; das Dorf-Ereignis allein liegt genau **15 Punkte** weiter links (x 210 → 195). Kosmetisch, Sichtprüfung.
+10. **Die Beträge stehen an sechs Stellen und kommen aus einer Konstante** (`MUENZEN_NACH_KAMPF = 6`; M31.16; `FG`); ein Test verlangt, dass im Quelltext außerhalb von Kommentaren kein Literal `+6` steht.
+11. **Die Schrittnummern der Aufgabe** („16, 19, 2") waren 0-basierte Positionen des Stands **vor** Welle 1 (M31.16, M31.17); im Stand nach Welle 1 liegen die Münzen an 18, die Auslage an 21.
+12. **Die Probleme von `lageOf` sind englisch** (M31.15; `FH` Teil 2, am Dialog gesehen): der Dialog ist deutsch, die Meldung kommt unverändert aus `shared/`. Kosmetisch.
+
+**Was die Rauchtests sagten:** der Rauchtest meldete nach `FG` zuerst **2 Beanstandungen** — ein festgenagelter Index, kein verändertes Verhalten (Berichtigung 6); danach nach jedem Schreiblauf **0 Beanstandungen**, und der `diff` gegen den Stand vor Welle 2 bestand aus den Kopfzeilen allein. **Mit der Vorgabe `s1` verhält sich die Produktion wie vor Welle 2.** `FI` misst jetzt `lageOf` für **40 Kombinationen** und **14 zulässige Fälle** Aufbau → Ereignis → Kampf → Dorfphase mit Lage, Form des Geldes und den Schritten der Aktionen (solo/3 Dörfler: Topf 45 → 63; mehrfach/3: Töpfe 15 → 21, Auslage 0, Hände 3/3/3; Stapel 80, `normal` 105). **Nicht belegt:** ein ganzer Raum bis zum ersten Zug — der Rauchtest läuft im Speicher.
+
+**Was offen bleibt** (die Liste unter „Offen und riskant" oben gilt weiter; dazu): ein **ganzer Raum mit mehreren Spielern** ist von niemandem gespielt (`docs/m31-welle2-abnahme.md`); die **Doppelwahl auf Platz 2** (Berichtigung 8); **`zone-nan-render`** trägt zwei `ci:`-Commits (`docker-build.yml`), die nicht übernommen sind; der **offene Tisch-Tab macht die `Auto Save`-Zeile des Rauchtests zu einem wandernden Ziel** (vor einem Beleglauf schließen).

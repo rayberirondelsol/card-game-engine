@@ -218,7 +218,9 @@ auf keiner der 36 Anleitungsseiten vor, „Krawall" neunmal `[DE S.16–18, 35]`
   Dörflern; geheime Dorf-Ereignisse aussortieren) und **Tausch-Modus**
   (Ausrüstung außer Startausrüstung in der Dorfphase frei tauschen und
   verschenken; „Das macht das Spiel leichter!"). Beide sind mit jedem anderen
-  Modus kombinierbar.
+  Modus kombinierbar. **Die Engine liest „jeder" im Doppel-Modus als „je
+  Dörfler"** — das ist **Hausregel, nicht Text**, siehe §13 Punkt 13 und
+  `docs/spec-setup-system.md` M31.14.
 
 ### 1.3 Welche Regelfassung gilt?
 
@@ -2638,6 +2640,18 @@ RUNDE r = 1..4
     sind inzwischen belegt `[NN S.15]`; **offen bleibt nur, welcher Platz 2 und
     welcher Platz 3 ist** (§5.2) — das steht auf dem Spielbrett. Ebenso offen: die
     Bezeichnungen der Leistenplätze.
+13. **Doppel-Modus: „Jeder" meint Spieler oder Dörfler?** **OFFEN, nicht
+    belegt.** Der Text `[DE S.34]` sagt „die gleichen Regeln und Vorbereitungen
+    wie im normalen Modus, bis auf" das Aussortieren der geheimen Dorf-Ereignisse.
+    Im Normalmodus meint „jeder" (10 Münzen, 3 Heldentaten, 1 Dorf-Ereignis, nach
+    dem Kampf 6 Münzen) Spieler und Dörfler zugleich — beide sind dieselbe
+    Person. Ob es im Doppel-Modus (zwei Spieler à zwei Dörfler) den **Spieler**
+    oder den **Dörfler** meint, sagt der Text nicht. **Die Engine liest es „je
+    Dörfler"** (Hausregel, nicht Text, `docs/spec-setup-system.md` M31.14,
+    M31.19): ein Spieler mit zwei Dörflern hat dann doppelt so viel Geld,
+    Heldentaten und Ereignisse wie im Normalmodus. Für `S = 2, D = 3` oder
+    `S = 3, D = 5` gibt es gar keinen Regeltext; die Engine rechnet es mit
+    derselben Lesart durch.
 
 ## 5.10 Grundflächen: Bösewicht 2×2, Dörfler 1×1
 

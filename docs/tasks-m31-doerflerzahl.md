@@ -841,3 +841,9 @@ Eine Prüfliste von Hand, **nach** `FH`:
 8. **Rückweg bekannt:** `--zurueck` je Schritt, **zuerst `aufbau-spieler`**, dann `aktionen-spieler`, `haende`.
 
 **Fertig, wenn:** der Auftraggeber 1–5 abgehakt oder einen Befund genannt hat und 6 beantwortet ist.
+
+> **Teil 1 erledigt am 2026-11-10.** `CLAUDE.md` trägt den Absatz „Spielerzahl (M31, Welle 2)" (und der Satz „Offen: `EZ` Teil 2 … Welle 2 nicht begonnen" im Absatz zu Welle 1 ist berichtigt); `docs/spec-setup-system.md` endet mit „M31, Welle 2 — gebaut, und was die Spec dabei berichtigt" (Tabelle der Commits mit Teststand, Tabelle der vier geschriebenen Spalten, **zwölf Berichtigungen**, was die Rauchtests sagten, was offen bleibt); `docs/tft-regeln.md` §1.2 und neu §13 Punkt 13 (Doppel-Modus: „Jeder" meint Spieler oder Dörfler? — **offen, nicht belegt**, die Engine liest es „je Dörfler"); `docs/datenzugriff.md` — `zone_data` von **`zonen` und `haende`**, die neun Schritte in der „Falle des offenen Editors", der Rückweg, die erwarteten `ABWEICHEND`, **der Rauchtest nagelt Schrittnummern fest**, **der offene Tisch-Tab macht die Auto-Save-Zeile wandernd**, die Konsolenprobe.
+>
+> **Teil 2 geschrieben als [`docs/m31-welle2-abnahme.md`](m31-welle2-abnahme.md)** — nicht die Fassung der Aufgabe, sondern die, die der Auftraggeber liest: sieben Punkte zum Ansehen, **vier Fragen**, die etwas ändern (Eigentumsrechte/Geheimhaltung; die Doppelwahl auf Platz 2; der englische Problemtext; die zwei `ci:`-Commits), Offenes zur Kenntnis, Rückweg. **Gegenüber der Aufgabe geändert:** Punkt 6 der Aufgabe (der Raum) ist jetzt Punkt 7 und ausdrücklich **„von niemandem gespielt"**; die Punkte „Dialog" und „NaN" stehen als **bereits gesehen** vorn.
+>
+> **Offen für den Auftraggeber:** Punkte 1–7 der Liste und die Fragen 1–4. **Nichts davon hält die Produktion auf** — mit der Vorgabe 1 verhält sie sich wie vor Welle 2, am echten Datenbestand gemessen.
