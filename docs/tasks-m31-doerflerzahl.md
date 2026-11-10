@@ -759,6 +759,24 @@ Wie `EW` Teil 2 (Ausgang: der Stand nach `EW`; Sicherung; `--check`; Frage nach 
 
 **Fertig, wenn:** Teil 1 grün ist und Teil 2 belegt im Scratchpad liegt.
 
+> **Teil 1 erledigt am 2026-11-10** (Commit „M31 FH Teil 1"), test-zuerst durch einen Subagenten. **2408 → 2446 Tests**, alle grün; neue Testdatei `server/test/doerflerzahl-aufbau-spieler.test.js` (38 Tests) — nicht in `doerflerzahl-daten.test.js`, wie die Aufgabe sagte. **Teil 2 (Produktion) steht aus.**
+>
+> **Die Zahlen für Teil 2 (beide Spalten):** `scenario_data` Ausgang **25284/`7368e504b85a`** (= Ziel von `optionen`, keine zweite Abschrift) → Ziel **25582/`377a3ba650fc`**; `sequence_data` Ausgang **2878/`712f93e99e1a`**, 31 Schritte → Ziel **4622/`7ce4574774bd`**, **42 Schritte**.
+>
+> **Wo die Schritte stehen (die Aufgabe hatte es offen gelassen):** der zweite `place_stack` (mit `Dorf-Ereignisse (geheim)`) **unmittelbar hinter Schritt 1** — er muss vor dem Mischen bei 17 stehen —, **das schiebt alle folgenden Schritte um +1**, auch die fünf `seat_villager` (25–29 → 26–30). Die fünf Hände und die fünf Töpfe **am Ende, hinter den Dörflern**, damit `onlySeated n` stimmt. Die Wahlen der neuen Option heißen `s1`…`s5` (Berichtigung aus `FA`), Vorgabe `s1`.
+>
+> **Der wichtigste Test (Nr. 5): die Vorgabe `s1` baut denselben Tisch wie Welle 1** — `deepEqual` ohne Ids für 2 bis 5 Dörfler, kurz/mit und lang/ohne, mit `choices: {}` wie mit `spieler: s1`; Kartenreihenfolge im Stapel und Protokollzeilen gleich. Die benannte Ausnahme (Ereigniskarte −15 in x) tritt **nicht im Aufbau** auf — dort liegt keine Ereigniskarte in einer Hand —, sondern erst in der Kette Aufbau → `dorfereignis` → Kampf → Dorfphase, genau −15. Der Test misst beides getrennt. **Das ist die Zusage an die Produktion.**
+>
+> **Eigene Gegenproben** (zusätzlich zu den sieben des Agenten): Vorgabe `s2` statt `s1` → **16** Tests rot; Hand-Gate nur auf `normal` → **10** rot; Topf-`y` um 1 verschoben → **10** rot. *(Meine erste Probe B war ungültig — ein zweizeiliges Suchmuster traf nichts, der Test lief auf unverändertem Code und zeigte „38 grün". Wiederholt mit einem einzeiligen Muster.)*
+>
+> **Gemessen:** Ereignis-Stapel **80** (solo/mehrfach) bzw. **105** (normal, 25 geheime); Heldentaten-Stapel 69 solo (6 in der Auslage), sonst 75 − 3·D; die Töpfe `Münzen Dörfler n` zu 15 / 10 bei x 278 / 858 / 1438 / 2018 / 2598, y 1870, **nichts überschneidend** (aus den Zonen gerechnet, samt Schild, Tableaus, Ereignis-Stapel und untereinander); `lageOf` ist für alle 5 × 8 Kombinationen bestimmt — nie `null`, bei `S > D` ein Problem und der Aufbau baut nichts. Der Raum-Test läuft mit echten Fixture-Daten (220 Assets, 1087 Karten) durch `POST /api/rooms` und `…/start`.
+>
+> **Der Rauchtest, die Falle aus `FG`, diesmal vorher nachgesehen:** festgenagelt war genau **eine** Stelle, `aufbau: [[26, 'seat_villager', 'skipped']]` in beiden Einträgen von `DOPPEL_ERWARTET`; durch den eingefügten Schritt wird es **27**. Eine Längendifferenz taugt hier nicht (nur der **eingefügte** Schritt verschiebt, die angehängten nicht) — der Index kommt jetzt **aus dem Inhalt**: die Position des zweiten `seat_villager` der Folge. Gegen **beide** Stände grün (Welle 1: 26, Zielstand: 27); die beiden Ausgaben unterscheiden sich in genau zwei Zeilen — Kopfzeile (31 → 42 Schritte, 6 → 11, 43 → 53) und Optionenzeile (`spieler` dazu). Sonst nichts Festes gefunden.
+>
+> **Bekannte Grenze, nicht behoben — Platz 2 in der Doppelwahl:** Platz 1 und 2 tragen kein `onlySeated` (M31.3, gewollt: sie zählen immer). Bei `s2` mit Judy/Judy/Granny/Blopsy gibt es darum **vier** Töpfe und vier befüllte Hände, obwohl nur drei Dörfler sitzen; Platz 2 hat Topf und Hand ohne Dörfler, und die Dorfphase zahlt in seinen Topf 6. `lageOf` zählt aus der **Wahl** (`mehrfach` bei 4), der Kampf hält nicht (drei Werte da, nur die bekannte `skipped`-Zeile `$F2 is not bound`). Das ist die Folge von M31.3 und M31.15 („`D` kommt aus der Wahl, nicht aus dem Tisch"), **keine Beanstandung des Bausteins**; der Test hält es fest. Wer es anders will, muss Topf **und** Hand von Platz 2 mit `onlySeated 2` gaten — **und** in `aktionen-spieler` (schon geschrieben) die Hand-Austeilung von Platz 2; das hieße, dass Platz 1 und 2 nicht mehr gleich behandelt werden. **Dem Auftraggeber zu sagen** (`FJ`), nicht ungefragt zu ändern.
+>
+> **Nach dem Schreiben meldet `--check --schritt optionen` `ABWEICHEND`** (`patchSchalter` auf den neuen Stand ergibt `abweichend`) — erwartet, wie bei `aktionen` nach `FG`; im Test festgehalten.
+
 ## FI — Der Rauchtest kennt die Lagen (M31.21)
 
 **Befund.** Der Rauchtest (`EY`) kennt die Dörflerzahl; die Lagen kennt er nicht. **Teil 1 (Skript und Test)** erweitert `scripts/auslagen-rauchtest.mjs`; **Teil 2** fährt ihn lesend gegen die Produktion.

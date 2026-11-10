@@ -570,7 +570,7 @@ test('FG 7: `validateOptions` auf dem neuen `action_data` → `[]`; `validateSte
 });
 
 test('FG 7: der Kopf des Skripts und SCHRITTE – `aktionen-spieler` ist gebaut, jetzt acht Schritte; der Eintrag trägt FG', () => {
-  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler']);
+  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
   for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, k);
   const kopf = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').split('\n').slice(0, 14).join('\n');
   assert.match(kopf, /aktionen-spieler/, 'der Kopf nennt den Schritt');

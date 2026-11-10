@@ -404,7 +404,7 @@ test('FF 5: **disjunkt zu EU** – alle anderen Felder der Hände bleiben, wie E
 });
 
 test('FF 5: der Kopf des Skripts und SCHRITTE – `haende` ist gebaut, jetzt sieben Schritte; der Eintrag in `DEFS` kennt nur die Spalte `zone`', () => {
-  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler']);
+  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
   for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, k);
   const kopf = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').split('\n').slice(0, 12).join('\n');
   assert.match(kopf, /haende/, 'der Kopf nennt den Schritt');

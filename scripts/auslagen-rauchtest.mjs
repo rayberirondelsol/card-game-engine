@@ -160,23 +160,32 @@ const LEISTE_RAIL = "Buyin'/Beatin'-Leiste";
  *  (M31.16/M31.17) fügt `aktionen-spieler` davor zehn Schritte ein (fünf Töpfe, fünf Hand-Austeilungen); dann sind es
  *  37–40. **Fest verdrahtet passte nur einer der beiden Stände** — `dorfSoll` rechnet die Verschiebung aus der Zahl der
  *  Schritte (gemessen am 2026-11-10: nur diese Nummern verschieben sich, `clear_table` bei 12, die Kampf- und
- *  Aufbauzeilen und die Münzen 21/42 bleiben). */
+ *  Aufbauzeilen und die Münzen 21/42 bleiben). **Der `aufbau`-Index steht hier als `null`:** `dorfSoll` setzt den Index des zweiten `seat_villager` der Folge ein (`FH`). */
 const DORFPHASE_SCHRITTE_W1 = 43;
-/** Die erwartete Doppelwahl-Zeile mit den `place_asset`-Indizes der Dorfphase, verschoben um die Schritte, die `aktionen-spieler` davor einfügt. */
+/** Die erwartete Doppelwahl-Zeile mit den Indizes, die die Daten verschieben — beide **aus dem Inhalt** abgeleitet, nicht aus einer festen Zahl:
+ *  die `place_asset`-Indizes der Dorfphase, verschoben um die Schritte, die `aktionen-spieler` davor einfügt (`FG`), und der `seat_villager`-Index des **Aufbaus**
+ *  (`null` in `DOPPEL_ERWARTET`): das ist der **zweite** `seat_villager` der Folge (Platz 2, der zweite Judy bleibt draußen) — 26 im Stand von Welle 1, 27 seit
+ *  `aufbau-spieler` (`FH`), das einen zweiten `place_stack` hinter Schritt 1 einfügt. **Eine Längendifferenz taugt hier nicht:** die angehängten Hände und Töpfe
+ *  verschieben nichts, nur der eine eingefügte Schritt. Fehlt der zweite `seat_villager`, steht `undefined` da — und die Beanstandung folgt. */
 const dorfSoll = (soll, env) => {
   const schritte = env.actions.find(a => a.id === 'dorfphase-beginnen')?.steps?.length ?? DORFPHASE_SCHRITTE_W1;
   const dazu = schritte - DORFPHASE_SCHRITTE_W1;
-  return { ...soll, dorf: soll.dorf.map(([i, typ, status]) => [typ === 'place_asset' ? i + dazu : i, typ, status]) };
+  const sitze = env.sequence.flatMap((st, i) => (st?.type === 'seat_villager' ? [i] : []));
+  return {
+    ...soll,
+    aufbau: soll.aufbau.map(([i, typ, status]) => [typ === 'seat_villager' ? sitze[1] : i, typ, status]),
+    dorf: soll.dorf.map(([i, typ, status]) => [typ === 'place_asset' ? i + dazu : i, typ, status]),
+  };
 };
 const DOPPEL_ERWARTET = {
   keiner: {
-    aufbau: [[26, 'seat_villager', 'skipped']],
+    aufbau: [[null, 'seat_villager', 'skipped']],
     kampf: [[5, 'build_scenario', 'failed'], [6, 'place_asset', 'skipped'], [7, 'place_asset', 'skipped'], [8, 'place_asset', 'skipped'], [9, 'place_asset', 'skipped'], [10, 'place_asset', 'skipped']],
     dorf: [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']],
     muenzen: 21,
   },
   granny: {
-    aufbau: [[26, 'seat_villager', 'skipped']],
+    aufbau: [[null, 'seat_villager', 'skipped']],
     kampf: [[10, 'place_asset', 'skipped']],
     dorf: [[12, 'clear_table', 'skipped'], [27, 'place_asset', 'skipped'], [28, 'place_asset', 'skipped'], [29, 'place_asset', 'skipped'], [30, 'place_asset', 'skipped']],
     muenzen: 42,

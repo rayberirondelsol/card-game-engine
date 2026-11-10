@@ -1,8 +1,8 @@
-// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände, die Aktionen der Spielerachse (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.16, M31.17).
+// Die Dörflerzahl und die Spielerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände, die Aktionen der Spielerachse, der Aufbau der Spielerachse (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.15, M31.16, M31.17).
 //
-// **Acht Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende|aktionen-spieler`, M31.12): jeder ändert ein **eigenes Stück**,
+// **Neun Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende|aktionen-spieler|aufbau-spieler`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs —, **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter und **`aktionen-spieler`** (Aufgabe FG, Teil 1, Welle 2) als achter. Ein Schritt, der in `SCHRITTE` `null` wäre,
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs —, **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter **`aktionen-spieler`** (Aufgabe FG, Teil 1, Welle 2) als achter und **`aufbau-spieler`** (Aufgabe FH, Teil 1, Welle 2 — der Schalter der Spielerachse) als neunter. Ein Schritt, der in `SCHRITTE` `null` wäre,
 // hielte laut an, **ohne die Datenbank zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nur, was ein Schritt **mehr** braucht (siehe `liest` bei `optionen`).
 //
@@ -64,6 +64,13 @@
 // (`aufbau-spieler`, `FH`) ist ein eigener Schritt. Rückwärtsbeweis (Gates weg, die 15 neuen Schritte heraus, zwei Kategorien) und Vorwärtsprobe. **Nach dem Schreiben melden `--check --schritt aktionen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen
 // `action_data` als Stand von Welle 1 ein) — der erwartete Stand, wie bei `haende`.
 //
+// **`aufbau-spieler` (FH, M31.15–M31.17) — der Schalter der Spielerachse, der letzte Schritt:** er macht die Spielerzahl wählbar und ist der einzige, der den Dialog um `spieler` erweitert. Er schreibt **zwei** Spalten in **einer** `IMMEDIATE`-Transaktion:
+// in `scenario_data` bekommt `options` die Option `spieler` (hinter `troedel`, vor `doerfler1`; Wahlen `s1` … `s5`, Vorgabe `s1` — der Roundtrip heißt `?opt=spieler:s2`) und `villagers` die `lage`; in `sequence_data` wachsen die 31 Schritte auf 42: der Ereignis-Stapel mit `onlyLage ["solo","mehrfach"]`,
+// **direkt dahinter** der zweite mit der dritten Kategorie (`onlyLage "normal"`) — **das schiebt alle folgenden Schritte um eins**, auch die fünf `seat_villager` (25–29 → 26–30) —, die Auslage und der gemeinsame Topf mit `onlyLage "solo"`, **ans Ende** fünf Hand-Austeilungen und fünf Töpfe `Münzen Dörfler n`.
+// **Er verlangt Welle 1, `haende` (FF) und `aktionen-spieler` (FG)** und prüft sie **vor dem ersten Byte** (`patchSpieler` bekommt `zone_data`, die Zeilen von `table_assets` und `action_data` als dritten Parameter; `liest` holt sie, **nur lesend**) — ohne FG liefe die Lage ohne ihre Aktionen. Er setzt den **deployten Code** voraus
+// (`onlyLage`, `lageOf` an den vier Stellen, `FA`–`FD`). **Mit der Vorgabe `spieler = s1` ändert er den Tisch von Welle 1 nicht** (gemessen, `doerflerzahl-aufbau-spieler.test.js` Nr. 5). Rückwärtsbeweis **und** Vorwärtsprobe, wie bei `optionen`. **Nach dem Schreiben meldet `--check --schritt optionen` `ABWEICHEND`** (es ordnet beide Spalten als Stand von Welle 1 ein) — der erwartete Stand.
+// **Der Rauchtest** (`auslagen-rauchtest.mjs`) leitet die Schrittnummer der Doppelwahl aus dem Inhalt ab (der zweite `seat_villager`), nicht aus einer Zahl: 26 vor, 27 nach diesem Schritt.
+//
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
 // `fromCount: 3`, dahinter kommen zwei neue Einträge (`FF4` mit `fromCount: 4`, `FF5` mit `5`): **drei Schlüssel und sechs neue Einträge**,
@@ -118,7 +125,7 @@ import crypto from 'node:crypto';
 
 import { validateScenarioData } from '../shared/scenarioData.js';
 import { validateOptions, optionalOf } from '../shared/setupOptions.js';
-import { validateVillagers, TABLEAU_PREFIX } from '../shared/villagers.js';
+import { validateVillagers, lageOf, TABLEAU_PREFIX } from '../shared/villagers.js';
 import { relativeBox } from '../shared/anchoring.js';
 import { DOERFLER, equipmentZones, equipmentZonesFor } from './equipment-zones.mjs';
 
@@ -149,6 +156,11 @@ const gelaende = {
 const werte = { ausgang: gelaende.ziel, ziel: { scenario: { laenge: 23104, sha: '5613ccf1cd29' } } };
 // `aktionen` (EW) trägt seine Zahlen als Konstante, weil der Ausgang von `aktionen-spieler` (FG) **dieselbe** Zahl ist (der Zielstand von `aktionen`), nicht eine zweite.
 const aktionenW1 = { ausgang: { action: { laenge: 5803, sha: '33033dace238' } }, ziel: { action: { laenge: 7564, sha: '9f41211076a4' } } };
+// `optionen` (EX) trägt seine Zahlen als Konstante, weil der Ausgang von `aufbau-spieler` (FH) **dieselbe** Zahl ist (der Zielstand von `optionen`, beide Spalten), nicht eine zweite.
+const optionenW1 = {
+  ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
+  ziel: { scenario: { laenge: 25284, sha: '7368e504b85a' }, sequence: { laenge: 2878, sha: '712f93e99e1a' } },
+};
 export const SCHRITTE = {
   gelaende,
   werte,
@@ -164,14 +176,13 @@ export const SCHRITTE = {
   // `aktionen` (EW, M31.4/M31.8/M31.9): `action_data`, vier Aktionen. Ausgang: der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchAktionen` gerechnet.
   aktionen: aktionenW1,
   // `optionen` (EX, M31.5/M31.8/M31.12): **zwei** Spalten. Ausgang: `scenario` ist das Ziel von `werte` (dieselbe Zahl), `sequence` der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchSchalter` gerechnet.
-  optionen: {
-    ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
-    ziel: { scenario: { laenge: 25284, sha: '7368e504b85a' }, sequence: { laenge: 2878, sha: '712f93e99e1a' } },
-  },
+  optionen: optionenW1,
   // `haende` (FF, M31.14/M31.17): `zone_data`, capacity 3 → 4 an fünf Zonen. Ausgang: der Zielstand von `zonen` (dieselbe Zahl); Ziel: aus `patchHaende` gerechnet.
   haende: { ausgang: { zone: { laenge: 39886, sha: 'efe0b0743364' } }, ziel: { zone: { laenge: 39886, sha: 'e6bf6aeaf3d6' } } },
   // `aktionen-spieler` (FG, M31.16/M31.17): `action_data`, zwei Aktionen (43 → 53 und 6 → 11 Schritte). Ausgang: der Zielstand von `aktionen` (dieselbe Zahl); Ziel: aus `patchAktionenSpieler` gerechnet.
   'aktionen-spieler': { ausgang: aktionenW1.ziel, ziel: { action: { laenge: 9961, sha: '33b4dc50051e' } } },
+  // `aufbau-spieler` (FH, M31.15–M31.17): **zwei** Spalten, `scenario_data` und `sequence_data` (31 → 42 Schritte). Ausgang: der Zielstand von `optionen` (dieselbe Zahl, beide Spalten); Ziel: aus `patchSpieler` gerechnet.
+  'aufbau-spieler': { ausgang: optionenW1.ziel, ziel: { scenario: { laenge: 25582, sha: '377a3ba650fc' }, sequence: { laenge: 4622, sha: '7ce4574774bd' } } },
 };
 
 // ── Die Messung ─────────────────────────────────────────────────────────────
@@ -1462,21 +1473,27 @@ function vorgaengerProbleme(scenario, v) {
 }
 
 /**
+ * Ein Stück einordnen (`optionen` und `aufbau-spieler`: **eine** Stelle): `ist` steht genau im Wortlaut des Ausgangs (`alt`, ein Text oder `undefined` = „nicht da“) → `stand[pfad] = 'alt'`,
+ * genau im Wortlaut des Ziels (`neu`) → `'neu'`, sonst ein Problem mit Pfad, das beide Abweichungen nennt.
+ */
+const stueckVon = (stand, probleme) => (pfad, ist, alt, neu) => {
+  const i = ist === undefined ? undefined : text(ist);
+  if (i === alt) stand[pfad] = 'alt';
+  else if (i === neu) stand[pfad] = 'neu';
+  else {
+    const gegen = (soll) => (soll === undefined ? 'nicht da' : abwTeil(soll, i ?? ''));
+    probleme.push(`${pfad}: ${i === undefined ? 'fehlt' : 'ist weder der Ausgang noch das Ziel'} — gegen den Ausgang: ${gegen(alt)}; gegen das Ziel: ${gegen(neu)}`);
+  }
+};
+
+/**
  * Die Stücke des Schrittes `optionen` einordnen. **Zehn Stücke**, jedes `alt` oder `neu`: `options.partie.choices.kurz.vars`, `….lang.vars`, `options.doerfler3` (mit `optional`, Vorgabe `keiner`),
  * `options.doerfler4`, `options.doerfler5`, `villagers.seats` (die zwei neuen), `villagers.baseCount`; in der Folge der Schritt an 27 (Platz 3, mit Gate), die zwei Schritte für Platz 4 und 5 und die Münzen.
  * Jedes Stück steht **genau** im Wortlaut des Ausgangs oder des Ziels; alles andere — auch ein Stück, das nur halb stimmt — ist ein Problem mit Pfad; stehen Stücke in **beiden** Ständen, ist es ein halber.
  */
 function einordnenSchalter(scenario, sequence, probleme) {
   const stand = {};
-  const stueck = (pfad, ist, alt, neu) => {
-    const i = ist === undefined ? undefined : text(ist);
-    if (i === alt) stand[pfad] = 'alt';
-    else if (i === neu) stand[pfad] = 'neu';
-    else {
-      const gegen = (soll) => (soll === undefined ? 'nicht da' : abwTeil(soll, i ?? ''));
-      probleme.push(`${pfad}: ${i === undefined ? 'fehlt' : 'ist weder der Ausgang noch das Ziel'} — gegen den Ausgang: ${gegen(alt)}; gegen das Ziel: ${gegen(neu)}`);
-    }
-  };
+  const stueck = stueckVon(stand, probleme);
   const o = scenario?.options, v = scenario?.villagers;
   if (!isObject(o)) probleme.push('scenario_data.options fehlt oder ist kein Objekt');
   if (!isObject(v)) probleme.push('scenario_data.villagers fehlt oder ist kein Objekt');
@@ -1726,6 +1743,244 @@ export function pruefeHaende(zonen) {
   return out;
 }
 
+// ── Der Aufbau der Spielerachse (FH, M31.15–M31.17) ─────────────────────────
+
+/**
+ * `aufbau-spieler` — der **Schalter der Welle**: erst mit ihm **gibt es** die Wahl `spieler`. Er schreibt `scenario_data` und `sequence_data`, auf dem Stand von Welle 1 (Ausgang = Zielstand von
+ * `optionen`, **dieselbe** Zahl):
+ *
+ * - `options.spieler` (hinter `troedel`, vor `doerfler1`): `label` „Spieler“, Wahlen **`s1` … `s5`** (Labels „1 Spieler (Solo)“ … „5 Spieler“), Vorgabe `s1`, **keine** `vars`. Die Schlüssel tragen einen Buchstaben am Anfang
+ *   (`validateOptions`, M30 — ein Schlüssel reist in der Adresse), `lageOf` liest die Ziffern am Ende (Berichtigung aus `FA`). **Der Roundtrip heißt `?opt=spieler:s2`.**
+ * - `villagers.lage = { players: "spieler", seats: [doerfler1 … doerfler5] }` (hinter `baseCount`);
+ * - die Folge, **31 → 42 Schritte**: der Ereignis-Stapel (Nr. 1) bekommt `onlyLage ["solo","mehrfach"]`, **unmittelbar dahinter** (neu, Nr. 2 — er muss vor dem Mischen stehen) derselbe `place_stack` mit der dritten Kategorie
+ *   `Dorf-Ereignisse (geheim)` und `onlyLage "normal"`; das schiebt **alle folgenden Schritte um eins**, auch die fünf `seat_villager` (25–29 → 26–30). Die Auslage (`deal_to_zone Heldentaten count 6`, vorher Nr. 24) und der gemeinsame
+ *   Topf (vorher Nr. 30) bekommen **nur** `onlyLage "solo"`. **Ans Ende** (hinter die Dörfler, damit `onlySeated n` stimmt): zuerst fünf `deal_to_zone Heldentaten count 3 faceDown → Hand Dörfler n`, dann fünf
+ *   `place_counter "Münzen Dörfler n"` mit `value "$optMuenzenJeDoerfler"` (kein Produkt) am Platz (`x` = Tableau-Mitte − 22, `y` 1870); beide mit `onlyLage ["mehrfach","normal"]` und für 3 bis 5 `onlySeated n`.
+ *
+ * **Er verlangt Welle 1, `haende` (FF) und `aktionen-spieler` (FG)** — und prüft sie **vor dem ersten Byte** (ohne FG liefe die Lage ohne ihre Aktionen, ohne FF ließe `dorfereignis` die verdeckte Karte im Stapel): Welle 1 ist der Stand nach
+ * `patchSchalter` (ohne die Stücke dieses Schrittes gerechnet, gegen **Welle-1-Zonen und -Aktionen**), FF und FG sind `schon-da`. Ein halber Stand (ein Stück neu, ein anderes alt) ist ein Abbruch.
+ */
+const SPIELER_OPTION = {
+  label: 'Spieler',
+  default: 's1',
+  choices: Object.fromEntries([1, 2, 3, 4, 5].map(n => [`s${n}`, { label: n === 1 ? '1 Spieler (Solo)' : `${n} Spieler` }])),
+};
+const LAGE_DATEN = { players: 'spieler', seats: [1, 2, 3, 4, 5].map(n => `doerfler${n}`) };
+const OPT_SPIELER = ['partie', 'troedel', 'spieler', 'doerfler1', 'doerfler2', 'doerfler3', 'doerfler4', 'doerfler5'];
+const VILL_ALT = ['fightZone', 'barZone', 'seats', 'roster', 'baseCount'];
+const SEQ_W1 = 31, SEQ_FH = 42;
+/** Wo die Schritte stehen: im Ausgang (31) und im Ziel (42). Die Hände und Töpfe stehen ans Ende, **hinter** den `seat_villager` (`onlySeated` ist erst dann richtig). */
+const FH_POS = { alt: { auslage: 24, muenzen: 30 }, neu: { auslage: 25, muenzen: 31, hand: 32, topf: 37 } };
+const LAGE_MEHR = ['mehrfach', 'normal'];
+/** Der Ereignis-Stapel von Welle 1 (`onlyLage` fehlt) und seine zwei Formen im Ziel. */
+const qEreignis = (kategorien, lage) => ({ type: 'place_stack', category: [...kategorien], label: 'Dorf-Ereignisse', x: 1780, y: 200, faceDown: true, ...(lage === undefined ? {} : { onlyLage: lage }) });
+const qAuslage = () => ({ type: 'deal_to_zone', stackLabel: 'Heldentaten', count: 6, targetZoneLabel: 'Heldentaten-Auslage', faceDown: false });
+const mitLage = (step, lage) => ({ ...step, onlyLage: lage });
+const qHand = (n) => ({ type: 'deal_to_zone', stackLabel: 'Heldentaten', count: 3, targetZoneLabel: `Hand Dörfler ${n}`, faceDown: true, ...sPlatz(n), onlyLage: [...LAGE_MEHR] });
+/** Der Topf am Platz: unter dem Tableau, mittig (Mitte − 22 wegen des Versatzes −70 des Kastens, 185 breit; M31.16). */
+const TOPF_Y = 1870;
+const qTopf = (n) => ({ type: 'place_counter', name: TOPF(n), value: '$optMuenzenJeDoerfler', x: TISCH_X[n] - 22, y: TOPF_Y, ...sPlatz(n), onlyLage: [...LAGE_MEHR] });
+const istGeheimerStapel = (s) => isObject(s) && s.type === 'place_stack' && Array.isArray(s.category) && s.category.includes(GEHEIM);
+const istHandSchritt = (s) => isObject(s) && s.type === 'deal_to_zone' && s.stackLabel === 'Heldentaten' && /^Hand Dörfler \d$/.test(s.targetZoneLabel ?? '') && hat(s, 'onlyLage');
+const istTopfSchritt = (s) => isObject(s) && s.type === 'place_counter' && /^Münzen Dörfler \d$/.test(s.name ?? '');
+
+/** Jedes Gate `onlyLage` weg, der zweite Ereignis-Stapel, die fünf Hände und die fünf Töpfe heraus — und `options.spieler`, `villagers.lage` — **nur** diese Stücke. */
+function ohneSpieler(scenario, sequence) {
+  const sc = copy(scenario);
+  if (isObject(sc?.options)) delete sc.options.spieler;
+  if (isObject(sc?.villagers)) delete sc.villagers.lage;
+  const q = (Array.isArray(sequence) ? copy(sequence) : sequence);
+  return {
+    scenario: sc,
+    sequence: Array.isArray(q) ? q.filter(s => !(istGeheimerStapel(s) || istHandSchritt(s) || istTopfSchritt(s))).map(s => { if (!isObject(s)) return s; const { onlyLage: _g, ...rest } = s; return rest; }) : q,
+  };
+}
+
+/**
+ * Die Stücke einordnen: `options.spieler`, `villagers.lage`, in der Folge der Ereignis-Stapel (Nr. 1), der zweite Stapel (Nr. 2), die Auslage, der gemeinsame Topf, die fünf Hände, die fünf Töpfe. Jedes steht **genau** im Wortlaut
+ * des Ausgangs oder des Ziels; alles andere ist ein Problem mit Pfad, ein halber Stand ebenso. Die Zahl der Schritte (31 oder 42) entscheidet, wo gesucht wird. Liefert `'alt'`, `'neu'` oder `null`.
+ */
+function einordnenSpieler(scenario, sequence, probleme) {
+  const stand = {};
+  const stueck = stueckVon(stand, probleme);
+  const o = scenario?.options, v = scenario?.villagers;
+  if (!isObject(o)) probleme.push('scenario_data.options fehlt oder ist kein Objekt');
+  if (!isObject(v)) probleme.push('scenario_data.villagers fehlt oder ist kein Objekt');
+  if (!Array.isArray(sequence)) probleme.push('sequence_data ist kein Feld von Schritten');
+  if (!isObject(o) || !isObject(v) || !Array.isArray(sequence)) return null;
+
+  stueck('scenario_data.options.spieler', o.spieler, undefined, text(SPIELER_OPTION));
+  stueck('scenario_data.villagers.lage', v.lage, undefined, text(LAGE_DATEN));
+
+  const n = sequence.length;
+  if (n !== SEQ_W1 && n !== SEQ_FH) probleme.push(`sequence_data: hat ${n} Schritte, erwartet ${SEQ_W1} (Ausgang) oder ${SEQ_FH} (Ziel)`);
+  else {
+    const neu = n === SEQ_FH, p = neu ? FH_POS.neu : FH_POS.alt;
+    const ort = (i, was) => `sequence_data[${i}] (${was})`;
+    stueck(ort(1, 'Ereignis-Stapel'), sequence[1], text(qEreignis(KATEGORIEN_OFFEN)), text(qEreignis(KATEGORIEN_OFFEN, ['solo', 'mehrfach'])));
+    stueck(ort(p.auslage, 'Auslage, sechs Heldentaten'), sequence[p.auslage], text(qAuslage()), text(mitLage(qAuslage(), 'solo')));
+    stueck(ort(p.muenzen, 'der gemeinsame Topf'), sequence[p.muenzen], text(Q_MUENZEN_NEU), text(mitLage(Q_MUENZEN_NEU, 'solo')));
+    if (neu) {
+      stueck(ort(2, 'Ereignis-Stapel mit der dritten Kategorie'), sequence[2], undefined, text(qEreignis([...KATEGORIEN_OFFEN, GEHEIM], 'normal')));
+      for (const k of PLAETZE) stueck(ort(p.hand + k - 1, `Heldentaten in Hand Dörfler ${k}`), sequence[p.hand + k - 1], undefined, text(qHand(k)));
+      for (const k of PLAETZE) stueck(ort(p.topf + k - 1, `Münzen Dörfler ${k}`), sequence[p.topf + k - 1], undefined, text(qTopf(k)));
+    } else stand['sequence_data (zweiter Ereignis-Stapel, Hände, Töpfe)'] = 'alt';
+  }
+
+  // ── zusammen: alles alt, oder alles neu; dann die Reihenfolge der Schlüssel ──
+  const namen = Object.keys(stand);
+  const neuNamen = namen.filter(k => stand[k] === 'neu'), altNamen = namen.filter(k => stand[k] === 'alt');
+  if (!probleme.length && neuNamen.length && altNamen.length) probleme.push(`halber Stand: schon geschrieben ${neuNamen.join('; ')}; noch alt ${altNamen.join('; ')}`);
+  if (probleme.length) return null;
+  const neu = neuNamen.length > 0;
+  if (text(Object.keys(o)) !== text(neu ? OPT_SPIELER : OPT_NEU)) {
+    probleme.push(`scenario_data.options: die Schlüssel sind ${Object.keys(o).join(', ')}, erwartet in dieser Reihenfolge ${(neu ? OPT_SPIELER : OPT_NEU).join(', ')}`);
+    return null;
+  }
+  if (text(Object.keys(v)) !== text(neu ? [...VILL_ALT, 'lage'] : VILL_ALT)) {
+    probleme.push(`scenario_data.villagers: die Schlüssel sind ${Object.keys(v).join(', ')}, erwartet in dieser Reihenfolge ${(neu ? [...VILL_ALT, 'lage'] : VILL_ALT).join(', ')}`);
+    return null;
+  }
+  return neu ? 'neu' : 'alt';
+}
+
+/**
+ * Den Aufbau der Spielerachse einordnen — **eine** Frage mit drei Antworten, über **beide** Spalten:
+ *
+ * - `zu-schreiben`: jedes Stück steht genau wie im Ausgang (Welle 1: 31 Schritte, keine Option `spieler`, keine `lage`) **und** Welle 1 ist, wie gebaut (`patchSchalter` auf dem Stand ohne die Stücke dieses Schrittes sagt
+ *   `schon-da`, gegen die Zonen und Aktionen von Welle 1), **und** `haende` (FF) und `aktionen-spieler` (FG) sind geschrieben (`vorgaenger` trägt `{ zone, assets, action }`, gelesen, nie verändert);
+ * - `schon-da`: jedes Stück steht im Ziel (und die Vorgänger auch);
+ * - `abweichend`: alles andere — jeder halbe Stand, jedes Stück anders, die Zahl der Schritte falsch, ein fehlender Vorgänger. `probleme` nennt jede Abweichung mit Pfad; Zielstand gibt es keinen.
+ *
+ * Verändert die Eingabe nicht.
+ *
+ * @param {object} scenario    – `scenario_data` (gelesen)
+ * @param {Array}  sequence    – `sequence_data` (gelesen)
+ * @param {{ zone: object[], assets: object[], action: object[] }} vorgaenger – `zone_data`, die Zeilen von `table_assets`, `action_data`
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', scenario?: object, sequence?: Array, probleme?: string[] }}
+ */
+export function patchSpieler(scenario, sequence, vorgaenger) {
+  const probleme = [];
+  const braucht = (name, r) => { if (r.art !== 'schon-da') probleme.push(`Voraussetzung ${name} nicht erfüllt — ${r.art === 'zu-schreiben' ? 'noch nicht geschrieben' : r.probleme.join('; ')}`); };
+  braucht('haende (FF, zone_data): capacity 4 an den fünf Händen', patchHaende(vorgaenger?.zone));
+  braucht('aktionen-spieler (FG, action_data): onlyCounter, Töpfe, Hände, verdeckte Ereignisse', patchAktionenSpieler(vorgaenger?.action));
+  const stand = einordnenSpieler(scenario, sequence, probleme);
+  if (stand !== null) {
+    // Der Rest muss Welle 1 sein, wie `optionen` (EX) sie geschrieben hat — gegen die Zonen und Aktionen **von Welle 1** (die Hände mit capacity 3, die Aktionen ohne die Spielerachse).
+    const w1 = ohneSpieler(scenario, sequence);
+    const r = patchSchalter(w1.scenario, w1.sequence, {
+      zone: Array.isArray(vorgaenger?.zone) ? mitKapazitaet(vorgaenger.zone, HAND_ALT) : vorgaenger?.zone,
+      assets: vorgaenger?.assets,
+      action: Array.isArray(vorgaenger?.action) ? ohneSpielerachse(vorgaenger.action) : vorgaenger?.action,
+    });
+    if (r.art !== 'schon-da') probleme.push('außer den Stücken von FH ist der Aufbau nicht der Stand von Welle 1 (optionen, EX)', ...(r.probleme ?? []));
+  }
+  if (probleme.length) return { art: 'abweichend', probleme };
+  if (stand === 'neu') return { art: 'schon-da', scenario: copy(scenario), sequence: copy(sequence) };
+
+  const sc = copy(scenario);
+  sc.options = Object.fromEntries(Object.entries(sc.options).flatMap(([k, x]) => (k === 'troedel' ? [[k, x], ['spieler', copy(SPIELER_OPTION)]] : [[k, x]])));
+  sc.villagers.lage = copy(LAGE_DATEN);
+  const q = copy(sequence);
+  const seq = [
+    q[0],
+    qEreignis(KATEGORIEN_OFFEN, ['solo', 'mehrfach']),
+    qEreignis([...KATEGORIEN_OFFEN, GEHEIM], 'normal'),
+    ...q.slice(2, FH_POS.alt.auslage),
+    mitLage(q[FH_POS.alt.auslage], 'solo'),
+    ...q.slice(FH_POS.alt.auslage + 1, FH_POS.alt.muenzen),
+    mitLage(q[FH_POS.alt.muenzen], 'solo'),
+    ...PLAETZE.map(qHand),
+    ...PLAETZE.map(qTopf),
+  ];
+  return { art: 'zu-schreiben', scenario: sc, sequence: seq };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und **vor** dem Schreiben: `spieler`, `lage`, der zweite Ereignis-Stapel, die zehn neuen Schritte und jedes `onlyLage` weg — das muss den gelesenen Text ergeben, **beide** Spalten,
+ * Zeichen für Zeichen. Dazu die **Vorwärtsprobe**: aus dem Zurückgerechneten entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe einen falschen Topfwert oder ein falsches Gate nicht, weil er beides wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseSpieler(before, after, vorgaenger) {
+  if (!isObject(after?.scenario) || !Array.isArray(after?.sequence)) return ['Rückwärtsbeweis scenario_data: der Zielstand trägt kein scenario und keine sequence'];
+  const meldungen = [];
+  const zurueck = ohneSpieler(after.scenario, after.sequence);
+  if (text(zurueck.scenario) !== text(before?.scenario)) meldungen.push(`Rückwärtsbeweis scenario_data: ohne options.spieler und villagers.lage ist der Text nicht der gelesene — ${abwTeil(text(zurueck.scenario), text(before?.scenario))}`);
+  if (text(zurueck.sequence) !== text(before?.sequence)) meldungen.push(`Rückwärtsbeweis sequence_data: ohne den zweiten Ereignis-Stapel, die zehn neuen Schritte und die Gates ist der Text nicht der gelesene — ${abwTeil(text(zurueck.sequence), text(before?.sequence))}`);
+  const vor = patchSpieler(zurueck.scenario, zurueck.sequence, vorgaenger);
+  if (vor.art !== 'zu-schreiben') meldungen.push(`Rückwärtsbeweis scenario_data (Vorwärtsprobe): das Zurückgerechnete ist kein Ausgang (${vor.art}: ${(vor.probleme ?? []).join('; ')})`);
+  else {
+    if (text(vor.scenario) !== text(after.scenario)) meldungen.push(`Rückwärtsbeweis scenario_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.scenario), text(after.scenario))}`);
+    if (text(vor.sequence) !== text(after.sequence)) meldungen.push(`Rückwärtsbeweis sequence_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.sequence), text(after.sequence))}`);
+  }
+  return meldungen;
+}
+
+/**
+ * `lageOf` gegen die Daten, für **jede** Kombination der Wahlen von `spieler` mit `doerfler3`–`doerfler5` (an/aus): nie `null`, nie ein Wurf; `S ≤ D` gibt `solo` / `normal` / `mehrfach`, `S > D` ein Problem. Die Namenskonvention der Wahlen
+ * (die Zahl steht am Ende des Schlüssels) lebt **allein in `lageOf`** — `validateOptions` darf es nicht rufen (M7) und sieht darum nicht, wenn jemand die Wahlen später `eins`, `zwei` nennt; hier fällt es auf (`FA`).
+ */
+function lageProbleme(scenario) {
+  const out = [];
+  const o = scenario?.options;
+  const keys = Object.keys(o?.spieler?.choices ?? {});
+  if (keys.length !== 5) out.push(`options.spieler hat ${keys.length} Wahlen, erwartet fünf`);
+  keys.forEach((k, i) => {
+    for (let m = 0; m < 8; m++) {
+      const an = LEITER.filter((_, j) => m & (1 << j));
+      const choices = { spieler: k, ...Object.fromEntries(LEITER.map(l => [`doerfler${l.n}`, an.includes(l) ? l.on : o?.[`doerfler${l.n}`]?.optional?.off])) };
+      const wo = `lageOf bei spieler ${k}, Plätze ${an.map(l => l.n).join(',') || '-'}`;
+      const r = lageOf(scenario, choices);
+      if (r === null) { out.push(`${wo}: null — die Daten nennen keine Lage`); continue; }
+      const D = 2 + an.length, S = i + 1;
+      if (r.players !== S) out.push(`${wo}: ${r.players} Spieler, erwartet ${S} (die Zahl am Ende des Schlüssels „${k}“) ${r.problems.join('; ')}`);
+      else if (r.villagers !== D) out.push(`${wo}: ${r.villagers} Dörfler, erwartet ${D}`);
+      else if (S <= D && (r.problems.length || r.kind !== (S === 1 ? 'solo' : S === D ? 'normal' : 'mehrfach'))) out.push(`${wo}: ${r.kind} (${r.problems.join('; ')}), erwartet ${S === 1 ? 'solo' : S === D ? 'normal' : 'mehrfach'}`);
+      else if (S > D && (r.kind !== null || !r.problems.length)) out.push(`${wo}: S > D, aber kind ${r.kind} und ${r.problems.length} Probleme`);
+    }
+  });
+  const vorgabe = lageOf(scenario, {});
+  if (vorgabe?.kind !== 'solo') out.push(`lageOf ohne Wahl: ${vorgabe?.kind ?? 'null'}, erwartet solo (die Vorgabe: ein Spieler, zwei Dörfler)`);
+  return out;
+}
+
+/** Die Prüfer des Zielstands, `[{ titel, probleme }]`: `validateOptions` (Folge **und** Aktionen), `validateScenarioData`, `validateVillagers`, `lageOf` für alle 40 Kombinationen, und die Form der Schritte (M31.16, M31.17). */
+function spielerPruefer(scenario, sequence, vorgaenger) {
+  const form = [];
+  const seq = Array.isArray(sequence) ? sequence : [];
+  const ereignis = seq.filter(s => isObject(s) && s.type === 'place_stack' && s.label === 'Dorf-Ereignisse');
+  if (ereignis.length !== 2) form.push(`${ereignis.length} place_stack mit dem Etikett „Dorf-Ereignisse“, erwartet zwei`);
+  else {
+    const [a, b] = ereignis;
+    const mehr = (b.category ?? []).filter(c => !(a.category ?? []).includes(c)), weniger = (a.category ?? []).filter(c => !(b.category ?? []).includes(c));
+    if (mehr.length !== 1 || mehr[0] !== GEHEIM || weniger.length) form.push(`die zwei Kategorielisten unterscheiden sich nicht in genau einem Eintrag (${GEHEIM}): mehr ${text(mehr)}, weniger ${text(weniger)}`);
+    if (text(a.onlyLage) !== text(['solo', 'mehrfach']) || b.onlyLage !== 'normal') form.push(`Gates der Ereignis-Stapel: ${text(a.onlyLage)} und ${text(b.onlyLage)}, erwartet ["solo","mehrfach"] und "normal"`);
+  }
+  const hand = seq.filter(istHandSchritt), topf = seq.filter(istTopfSchritt);
+  if (hand.length !== 5) form.push(`${hand.length} Hand-Austeilungen, erwartet fünf`);
+  if (topf.length !== 5) form.push(`${topf.length} Töpfe „Münzen Dörfler n“, erwartet fünf`);
+  PLAETZE.forEach((n, k) => {
+    if (hand[k] && text(hand[k]) !== text(qHand(n))) form.push(`Hand-Austeilung ${n}: ${text(hand[k])}, erwartet ${text(qHand(n))}`);
+    if (topf[k] && text(topf[k]) !== text(qTopf(n))) form.push(`Topf ${n}: ${text(topf[k])}, erwartet ${text(qTopf(n))}`);
+  });
+  const letzterSitz = Math.max(-1, ...seq.map((s, i) => (isObject(s) && s.type === 'seat_villager' ? i : -1)));
+  const ersteNeue = seq.findIndex(s => istHandSchritt(s) || istTopfSchritt(s));
+  if (ersteNeue !== -1 && ersteNeue < letzterSitz) form.push(`die Hände und Töpfe beginnen bei Schritt ${ersteNeue}, vor dem letzten seat_villager (${letzterSitz}) — onlySeated wäre dort noch falsch`);
+  const solo = seq.filter(s => isObject(s) && s.onlyLage === 'solo').map(s => s.name ?? s.targetZoneLabel);
+  if (text(solo) !== text(['Heldentaten-Auslage', 'Münzen (gemeinsam)'])) form.push(`Schritte mit onlyLage "solo": ${text(solo)}, erwartet die Auslage und den gemeinsamen Topf`);
+  return [
+    { titel: 'validateOptions (mit der Folge und den Aktionen)', probleme: validateOptions(scenario?.options, sequence, vorgaenger?.action) },
+    { titel: 'validateScenarioData', probleme: validateScenarioData(scenario) },
+    { titel: 'validateVillagers (mit allen Assets und Zonen)', probleme: validateVillagers(scenario?.villagers, { assets: vorgaenger?.assets ?? [], zones: vorgaenger?.zone ?? [] }) },
+    { titel: 'lageOf für jede Kombination spieler × doerfler3–5', probleme: lageProbleme(scenario) },
+    { titel: 'Form der Schritte (M31.16, M31.17)', probleme: form },
+  ];
+}
+
+/** Dieselben Prüfer als flache Liste von Meldungen, jede mit dem Titel ihres Prüfers davor. */
+export const pruefeSpieler = (scenario, sequence, vorgaenger) => spielerPruefer(scenario, sequence, vorgaenger).flatMap(g => g.probleme.map(m => `${g.titel}: ${m}`));
+
 // ── Die Schritte: was je Schritt anders ist ─────────────────────────────────
 
 /**
@@ -1918,6 +2173,35 @@ const DEFS = {
       console.log(`  villagers: baseCount ${v.baseCount}, ${v.seats.length} Plätze (${v.seats.map(s => s.anchor.replace(TABLEAU_PREFIX, '')).join(', ')}); die ersten drei und das Roster: ${text(v.seats.slice(0, 3)) === text(before.scenario.villagers.seats) && text(v.roster) === text(before.scenario.villagers.roster) ? 'gleich' : 'GEÄNDERT'}`);
       const q = after.sequence;
       console.log(`  sequence_data: ${q.length} Schritte; seat_villager an ${q.map((s, i) => (s.type === 'seat_villager' ? i : null)).filter(i => i !== null).join(', ')}, Münzen an ${q.findIndex(s => s.type === 'place_counter')} (${q.at(-1).x}, ${q.at(-1).y}) mit ${text(q.at(-1).value)}; die ersten 27 Schritte ${text(q.slice(0, 27)) === text(before.sequence.slice(0, 27)) ? 'gleich' : 'GEÄNDERT'}`);
+    },
+  },
+  'aufbau-spieler': {
+    spalten: ['scenario', 'sequence'],
+    liest: leseVorgaenger,
+    patch: (b, x) => patchSpieler(b.scenario, b.sequence, x),
+    beweise: beweiseSpieler,
+    gelesen: (b, x) => `Aufbau: ${Array.isArray(b.sequence) ? b.sequence.length : '?'} Schritte, options ${Object.keys(b.scenario?.options ?? {}).join(', ')}, villagers.lage ${b.scenario?.villagers?.lage === undefined ? 'fehlt' : 'da'}; die Vorgänger (nur gelesen): zone_data ${Array.isArray(x?.zone) ? x.zone.length : '?'} Zonen, Hände capacity ${HAENDE.map(l => text(x?.zone?.find?.(z => z?.label === l)?.capacity)).join(', ')} (FF), action_data ${Array.isArray(x?.action) ? x.action.length : '?'} Aktionen, dorfphase-beginnen ${aktionVon(Array.isArray(x?.action) ? x.action : [], 'dorfphase-beginnen')[0]?.steps?.length ?? '?'} Schritte (FG), table_assets ${x?.assets?.length ?? '?'} Zeilen`,
+    schonDa: () => 'schon geschrieben: options.spieler (s1 … s5, Vorgabe s1), villagers.lage und 42 Schritte im Aufbau (zweiter Ereignis-Stapel, die Gates onlyLage, fünf Hände, fünf Töpfe) — nichts zu schreiben',
+    plan: (b, n) => {
+      const o = n.scenario.options.spieler;
+      console.log(`  options: ${Object.keys(b.scenario.options).length} → ${Object.keys(n.scenario.options).length} Schlüssel (${Object.keys(n.scenario.options).join(', ')}); spieler: default ${o.default}, Wahlen ${Object.entries(o.choices).map(([k, c]) => `${k} „${c.label}“`).join(', ')}`);
+      console.log(`  villagers.lage: ${text(n.scenario.villagers.lage)}`);
+      console.log(`  Aufbau: ${b.sequence.length} → ${n.sequence.length} Schritte — Nr. 1 mit onlyLage ${text(n.sequence[1].onlyLage)}, neu Nr. 2 (${n.sequence[2].category.length} Kategorien, onlyLage ${text(n.sequence[2].onlyLage)}), alle folgenden um eins weiter (die seat_villager an ${n.sequence.map((s, i) => (s.type === 'seat_villager' ? i : null)).filter(i => i !== null).join(', ')}), die Auslage (${FH_POS.neu.auslage}) und der gemeinsame Topf (${FH_POS.neu.muenzen}) mit onlyLage "solo"`);
+      console.log(`  ans Ende: ${FH_POS.neu.hand}–${FH_POS.neu.hand + 4} fünf Hand-Austeilungen (3 verdeckte Heldentaten, onlyLage ${text(LAGE_MEHR)}, für 3 bis 5 onlySeated), ${FH_POS.neu.topf}–${FH_POS.neu.topf + 4} fünf Töpfe „Münzen Dörfler n“ (${n.sequence[FH_POS.neu.topf].value}, x ${PLAETZE.map(k => TISCH_X[k] - 22).join(' / ')}, y ${TOPF_Y})`);
+      console.log('  unberührt: troedel, doerfler1–5, partie, Bösewichte, terrainCards, die ersten Schritte außer Nr. 1; zone_data, action_data, table_assets, grid_data, state_data, save_states');
+    },
+    pruefer: (n, x) => spielerPruefer(n.scenario, n.sequence, x),
+    kontrolle: (before, after) => {
+      const o = after.scenario.options, v = after.scenario.villagers, q = after.sequence;
+      console.log(`  options: ${Object.keys(o).join(', ')}; spieler default ${text(o.spieler?.default)}, Wahlen ${Object.keys(o.spieler?.choices ?? {}).join(', ')}`);
+      console.log(`  villagers.lage: ${text(v.lage)}; Schlüssel ${Object.keys(v).join(', ')}`);
+      console.log(`  sequence_data: ${q.length} Schritte; Ereignis-Stapel an ${q.map((s, i) => (s.type === 'place_stack' && s.label === 'Dorf-Ereignisse' ? i : null)).filter(i => i !== null).join(', ')}; seat_villager an ${q.map((s, i) => (s.type === 'seat_villager' ? i : null)).filter(i => i !== null).join(', ')}; Hände an ${q.map((s, i) => (istHandSchritt(s) ? i : null)).filter(i => i !== null).join(', ')}; Töpfe an ${q.map((s, i) => (istTopfSchritt(s) ? i : null)).filter(i => i !== null).join(', ')}`);
+      console.log(`  Schritte mit onlyLage: ${q.filter(s => hat(s, 'onlyLage')).length} (${[...new Set(q.filter(s => hat(s, 'onlyLage')).map(s => text(s.onlyLage)))].join(' | ')})`);
+      const z = ohneSpieler(after.scenario, after.sequence);
+      console.log(`  ohne die Spielerachse: scenario_data ${text(z.scenario) === text(before.scenario) ? 'Zeichen für Zeichen der gelesene Stand von Welle 1' : 'ABWEICHEND'}, sequence_data ${text(z.sequence) === text(before.sequence) ? 'Zeichen für Zeichen der gelesene Stand von Welle 1' : 'ABWEICHEND'}`);
+      for (const k of Object.keys(after.scenario).filter(y => y !== 'options' && y !== 'villagers')) {
+        console.log(`  Schlüssel ${k.padEnd(18)} sha ${sha(text(before.scenario[k]))} → ${sha(text(after.scenario[k]))} ${text(before.scenario[k]) === text(after.scenario[k]) ? 'gleich' : 'GEÄNDERT'}`);
+      }
     },
   },
 };
