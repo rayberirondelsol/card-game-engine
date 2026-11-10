@@ -29,8 +29,8 @@ import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData, statsOf, missingStats, terrainFor } from './scenarioData.js';
 import { normalizeCounter, counterValue, counterMax, foldProduct, isUnreadableProduct } from './counters.js';
 import { findCardByName } from './cardSearch.js';
-import { resolveChoices, checkGate } from './setupOptions.js';
-import { seatVars, seatedVillagers, villagerCount, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
+import { resolveChoices, checkGate, lageValuesOf, LAGEN } from './setupOptions.js';
+import { lageOf, seatVars, seatedVillagers, villagerCount, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
 
 export function executeSequence(stateData, sequenceData, zones = [], options = {}) {
   return executeSequenceWithLog(stateData, sequenceData, zones, options).state;
@@ -121,6 +121,7 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
   const ctx = {
     vars: {}, seatVars: {}, seated: null,
     optionVars: resolved.vars, options: scenarioOptions, choices: given ? resolved.choices : undefined,
+    lage: given ? lageOf(options?.scenarioData, resolved.choices) : null,
     revealedLast: false, halted: false, finalFight: null,
   };
   bindTable(ctx, state, assets, scenarioData?.villagers);
@@ -187,6 +188,10 @@ export function executeSequenceWithLog(stateData, sequenceData, zones = [], opti
  *   wenn an diesem Platz (oder einem der Plätze der Liste) ein Tableau liegt. Anders
  *   als `onlyChoice` liest es den **Tisch** und ist darum in Aktionen erlaubt.
  *
+ * - `onlyLage` (M31.15): **fail-loud**; der Schritt läuft nur, wenn die Lage (solo / mehrfach /
+ *   normal) zu einem der Wörter passt. Die Lage folgt aus der **Wahl**; darum in Aktionen
+ *   verboten (`validateOptions`) und ohne Wahl ein Problem, nie ein stilles Nein.
+ *
  * `onlyChoice` wird zuerst gefragt: ein kaputtes Gate wird auch dann gemeldet,
  * wenn der Schritt aus anderem Grund nicht liefe.
  */
@@ -198,6 +203,11 @@ function stepApplies(step, ctx) {
   }
   if (step?.onlySeated !== undefined) {
     const r = seatedGate(step.onlySeated, ctx.seated);
+    if (!r.ok) return { applies: false, problem: r.problem };
+    if (!r.applies) return { applies: false };
+  }
+  if (step?.onlyLage !== undefined) {
+    const r = lageGate(step.onlyLage, ctx.lage);
     if (!r.ok) return { applies: false, problem: r.problem };
     if (!r.applies) return { applies: false };
   }
@@ -240,6 +250,21 @@ function seatedGate(value, seated) {
     return { ok: false, problem: `onlySeated: ${JSON.stringify(value) ?? String(value)} is not a seat (1 to ${seated.of}) or a list of seats` };
   }
   return { ok: true, applies: list.some(n => seated.taken.includes(n)) };
+}
+
+/**
+ * `onlyLage` gegen die Lage des Laufs: `{ ok, applies }` oder `{ ok: false, problem }`.
+ * Ohne Lage (`null`: keine Wahl, keine `villagers.lage`, oder `kind: null` bei `S > D`) ist
+ * das ein Problem - „läuft nicht" und „keine Lage bekannt" dürfen nicht dasselbe aussehen.
+ */
+function lageGate(value, lage) {
+  if (!lage?.kind) {
+    const why = lage?.problems?.length ? ` (${lage.problems.join('; ')})` : '';
+    return { ok: false, problem: `onlyLage: no lage - the run has no valid choice of players and villagers${why}` };
+  }
+  const want = lageValuesOf(value);
+  if (!want) return { ok: false, problem: `onlyLage: ${JSON.stringify(value) ?? String(value)} is not one of ${LAGEN.join(', ')} or a list of them` };
+  return { ok: true, applies: want.includes(lage.kind) };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@
  * `<seat.zones>: <Platz>`.
  */
 import { findCardByName } from './cardSearch.js';
+import { optionalOf } from './setupOptions.js';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
@@ -176,6 +177,64 @@ export function seatedVillagers(state, assets, villagers) {
  * Zählung (M6): `seatVars` bindet sie als `$doerflerzahl`, sonst zählt keiner.
  */
 export const villagerCount = (state, assets, villagers) => seatedVillagers(state, assets, villagers).length;
+
+/**
+ * M31.14/M31.15: die Lage - **die eine Stelle** für „solo / mehrfach / normal" (M6).
+ * `{ players, villagers, kind, problems }`, oder `null`, wenn die Daten keine
+ * `villagers.lage` nennen (alle Daten vor Welle 2): keine Daten, keine Rechnung - lautlos,
+ * kein Problem. Rechnet aus der **Wahl**, nicht aus dem Tisch; wirft nie.
+ *
+ * `S` ist die gewählte Spielerzahl, `D` die Zahl der `seats`-Optionen, die nicht auf ihrer
+ * `off`-Wahl stehen (eine gewöhnliche Option zählt immer; **Lücken werden nicht geschlossen**,
+ * wie bei der Leiter). `solo` bei `S = 1`, `normal` bei `S = D`, `mehrfach` bei `1 < S < D`.
+ *
+ * `S > D` ist **keine Lage**: `kind: null` und ein Problem, das beide Zahlen und die Option
+ * nennt. Das Problem steht hier, nicht im Aufbau - ein Halt mitten im Lauf ließe einen halb
+ * gebauten Tisch zurück; wer hält (Dialog, Server, Executor), fragt vorher hier.
+ * Kaputte Daten (eine Option, die es nicht gibt, eine `lage` ohne Form) sind ebenfalls
+ * Probleme mit `kind: null` - laut, nie ein stilles `null`.
+ *
+ * @param {object} scenarioData  – `setups.scenario_data` (`options`, `villagers.lage`)
+ * @param {object} choices       – die aufgelöste Wahl `{ <Option>: <Wahl> }`
+ */
+export function lageOf(scenarioData, choices) {
+  const lage = scenarioData?.villagers?.lage;
+  if (lage === undefined) return null;
+
+  const fail = (...problems) => ({ players: null, villagers: null, kind: null, problems });
+  const isText = (x) => typeof x === 'string' && x !== '';
+  if (!lage || typeof lage !== 'object' || Array.isArray(lage) || !isText(lage.players)
+    || !Array.isArray(lage.seats) || !lage.seats.length || !lage.seats.every(isText)) {
+    return fail('villagers.lage must be { players: <option>, seats: [<option>, …] }');
+  }
+
+  const options = scenarioData.options && typeof scenarioData.options === 'object' ? scenarioData.options : {};
+  const missing = [lage.players, ...lage.seats].filter(name => !options[name]);
+  if (missing.length) return fail(`villagers.lage names ${missing.map(n => `"${n}"`).join(', ')}, which the setup has no option for`);
+
+  // Die Zahl steht in den **Ziffern am Ende des Schlüssels** (`s3`, `3`, `spieler5`): der Schlüssel
+  // reist in der Adresse und darf nicht mit einer Ziffer beginnen (`KEY`, `setupOptions.js`), das
+  // Label ("3") ist für Menschen. Führende Nullen werden als Zahl gelesen (`s03` = 3), nicht gemeldet.
+  const raw = choices?.[lage.players] ?? options[lage.players].default;
+  const digits = /(\d+)$/.exec(typeof raw === 'string' ? raw : '');
+  const players = digits ? Number(digits[1]) : NaN;
+  if (!Number.isInteger(players) || players < 1) {
+    return fail(`option "${lage.players}": the choice "${String(raw ?? '')}" must end in the number of players (1 or more), e.g. "s3"`);
+  }
+
+  const seated = lage.seats.filter((name) => {
+    const opt = optionalOf(options[name], choices?.[name]);
+    return !opt || !opt.isOff;
+  }).length;
+
+  const out = { players, villagers: seated, kind: null, problems: [] };
+  if (players > seated) {
+    out.problems.push(`option "${lage.players}": ${players} players but only ${seated} villagers - there must be at least as many villagers as players`);
+  } else {
+    out.kind = players === 1 ? 'solo' : players === seated ? 'normal' : 'mehrfach';
+  }
+  return out;
+}
 
 /**
  * Die Platzhalter, die jeder Lauf bindet (CL): `$V<n>` der Kurzname, `$F<n>` der

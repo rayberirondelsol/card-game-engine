@@ -194,6 +194,23 @@ export function checkGate(onlyChoice, options, choices) {
   return { ok: true, applies };
 }
 
+/**
+ * M31.15: die drei Wörter, die `onlyLage` kennt - und **nur** die Wörter. Wie aus Spielerzahl
+ * und Dörflerzahl eine Lage wird, rechnet `lageOf` (`shared/villagers.js`); diese Datei
+ * bleibt neutral und lernt nichts über Townsfolk Tussle.
+ */
+export const LAGEN = ['solo', 'mehrfach', 'normal'];
+
+/**
+ * M31.15: die Lagen, die ein `onlyLage`-Wert nennt - ein Wort oder eine nicht leere Liste
+ * davon - oder `null` bei allem Unverstandenen. **Die eine Regel** für Wert-Prüfung (M6):
+ * der Executor fragt sie beim Lauf, `validateOptions` beim Schreiben.
+ */
+export function lageValuesOf(value) {
+  const want = Array.isArray(value) ? value : [value];
+  return want.length && want.every(w => LAGEN.includes(w)) ? want : null;
+}
+
 // Ein Schlüssel reist in der Adresse (`opt=partie:lang`): kein `:`, kein `&`, keine
 // Leerzeichen, kein Umlaut, der kodiert werden müsste.
 const KEY = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -271,6 +288,10 @@ export function validateOptions(options, sequence = [], actions = []) {
       const gate = checkGate(step.onlyChoice, opts, Object.fromEntries(Object.keys(opts).map(k => [k, ''])));
       if (!gate.ok) problems.push(`${at}: ${gate.problem}`);
     }
+    // M31.15: hier zählt nur, ob der Wert ein Lagenwort ist; ob die Lage am Tisch zutrifft, weiß erst `lageOf`.
+    if (step?.onlyLage !== undefined && !lageValuesOf(step.onlyLage)) {
+      problems.push(`${at}: onlyLage ${JSON.stringify(step.onlyLage) ?? String(step.onlyLage)} is not one of ${LAGEN.join(', ')} or a list of them`);
+    }
     for (const ph of new Set(optPlaceholdersIn(step))) {
       if (!setBy.has(ph.slice(1 + OPTION_VAR_PREFIX.length))) problems.push(`${at}: ${ph} is not set by any option`);
     }
@@ -282,6 +303,10 @@ export function validateOptions(options, sequence = [], actions = []) {
       const at = `action "${action?.id ?? action?.label ?? '?'}", step ${i + 1}`;
       if (step?.onlyChoice !== undefined) {
         problems.push(`${at}: onlyChoice is not allowed in an action - a saved game does not know the choice`);
+      }
+      // M31.15: die Lage folgt aus der Wahl, die ein Spielstand nicht kennt - wie `onlyChoice`.
+      if (step?.onlyLage !== undefined) {
+        problems.push(`${at}: onlyLage is not allowed in an action - a saved game does not know the choice`);
       }
       for (const ph of new Set(optPlaceholdersIn(step))) {
         problems.push(`${at}: ${ph} is not allowed in an action - a saved game does not know the choice`);
