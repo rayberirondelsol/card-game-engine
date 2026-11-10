@@ -265,7 +265,7 @@ Dazu steht ein Kommentar, der „zwei Versuche, kein dritter und kein Aehnlichke
 
 1. Alle Tests von `DK`–`DO` grün; die Änderungen sind auf `origin/master` (der Auftraggeber committet und pusht; der Agent nicht).
 2. **Rauchtest `vorher`:** die Fassung von `auslagen-rauchtest.mjs`, die **jetzt** auf der VM liegt (M28, `docker exec card-game-engine-backend ls /app`), gegen die Produktion laufen lassen; Ausgabe **und** die Datei selbst (`docker cp` heraus) ins Scratchpad. (`ssh … "docker exec -w /app card-game-engine-backend node /app/auslagen-rauchtest.mjs /app/data/card-game-engine.db"`.) Erwartet: 0 Beanstandungen.
-3. **Deploy:** `cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build`.
+3. **Deploy:** `cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d --build`.
 4. **Belege:** (a) `docker exec card-game-engine-backend sha256sum /shared/sequenceExecutor.js` = der Hash der Datei im Repo; (b) **das Frontend-Bundle** enthält `terrainCards` (`docker exec card-game-engine-frontend sh -c 'grep -lc terrainCards /usr/share/nginx/html/assets/*.js'` — Pfad prüfen; es ist ein Bündel, kein Quelltext); (c) die Skripte **neu in den Container** (`docker cp`, Rezept in `docs/datenzugriff.md`), und **derselbe alte Rauchtest wie in Schritt 2** → `diff` der beiden Ausgaben **leer**.
 5. Stimmt (c) nicht: **nicht weiter.** Den Deploy zurücknehmen (`git revert`, Rebuild) — die Spalte ist unberührt.
 

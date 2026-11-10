@@ -7172,7 +7172,7 @@ dem Gegenprüfen (offener Editor!) kurz bleibt:
 
 1. **Bauen, ohne die Produktion zu berühren** (`DK`–`DO`): Tests grün, **nichts** in der Spalte; dann `origin/master`.
 2. **Den Rauchtest `vorher` aufnehmen** an der Produktion, mit der Fassung von `auslagen-rauchtest.mjs`, die dort jetzt liegt (M28), Ausgabe ins Scratchpad; die Datei als Kopie aufheben.
-3. **Deploy beider Images** (`cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build`; der Checkout steht auf `1fc6f39`, M27, und zieht dabei die acht Commits seither nach).
+3. **Deploy beider Images** (`cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d --build`; der Checkout steht auf `1fc6f39`, M27, und zieht dabei die acht Commits seither nach).
    Danach: die Skripte **neu in den Container** (ein neu angelegter Container hat nur, was das Image hat; `/app/*.mjs` kamen mit `docker cp` — `docs/datenzugriff.md`); `/shared/sequenceExecutor.js` im Backend-Container
    gleich dem Repo; das **Frontend-Bundle** enthält `terrainCards` (der Tisch führt den Executor aus dem Bundle aus, nicht aus dem Backend); **derselbe alte Rauchtest wie in Schritt 2 → Ausgabe gleich** (`diff` leer).
    Nur wenn das stimmt, weiter.
@@ -8007,7 +8007,7 @@ Die Soloregeln sind für **drei** Dörfler geschrieben. Bösewicht-Werte und `FF
 1. **Die Vorgabe zwei macht „einfach loslegen" zu einer Hausregel-Partie** (M31.5). Entschieden vom Auftraggeber; die Folge steht als Satz in seiner Liste.
 2. **Heldentaten (6), Ladenerneuerung** (M31.10): kein Regeltext, ausdrücklich nicht angefasst; bei **fünf** Dörflern sind 6 Heldentaten **schwerer** als jede gedruckte Regel. Frage an den Auftraggeber.
 3. **Die Leisten der Plätze 4 und 5 sind Kopien** der Vorlage ihrer Familie, innerhalb der Familie **nicht gemessen** (M31.8 Punkt 4). Sichtprüfung.
-4. **Ob die Produktion für verankerte Zonen ein gespeichertes `x`/`y` trägt**, sagt der Auszug nicht (`EU` Teil 2 liest es). Das ändert nichts an der Wirkung des Feldes `showWithoutAnchor`, wohl aber daran, **wie** die Geister ohne es aussähen.
+4. ~~**Ob die Produktion für verankerte Zonen ein gespeichertes `x`/`y` trägt**, sagt der Auszug nicht (`EU` Teil 2 liest es).~~ Das ändert nichts an der Wirkung des Feldes `showWithoutAnchor`, wohl aber daran, **wie** die Geister ohne es aussähen. **Beantwortet (2026-11-10, aus dem `EU`-Protokoll, `docs/m31-welle1-belege.md`): nein.** Alle 13 verankerten Zonen melden `x: undefined`; die umgestellte `Hand Dörfler 3` trägt nur `anchor` und `showWithoutAnchor`. Absolut gesetzt sind nur die **fünf unverankerten** Zonen (`Hand Dörfler 1` x 150, `Hand Dörfler 2` x 560, Bösewicht-Tableau, Besiegte Bösewichte, Heldentaten-Auslage). **Ohne das Feld** stünden die Geister daher in den **Standardmaßen des Editors** (0, 0, 100 × 140) in der linken oberen Tischecke — der Fall, den `EO` an `require_marker` gemessen hat. Das Feld ist nicht Kosmetik, sondern die Ursache des Verschwindens.
 5. **Die gespeicherte Ansicht „Dörfler"** zeigt die Plätze 4 und 5 nicht (M31.8 Punkt 6).
 6. **Der Plus-Knopf wird von keinem Test gezeichnet** (der Client hat keine Testinfrastruktur): geprüft sind `ladderOf`, `validateOptions` und der Bau; die Zeichnung prüfen der Bau und die **Sichtprüfung** (`EZ`).
 7. **Das Produkt im Wert ist neue Syntax** in `shared/counters.js` (vier Leser, viele Tests); das Risiko ist die stille 0 aus `Number("15*3")`, sie ist der **erste** rote Test.

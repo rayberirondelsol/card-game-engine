@@ -627,7 +627,7 @@ die Wahl in der Lobby, Start → derselbe Aufbau wie am Tisch.
 
 ## Ausliefern (zwischen `CX` und `CY`)
 
-`cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d
+`cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d
 --build` — **beide** Container (`CLAUDE.md`, „Deployment"); der Client-Bundle trägt
 den Executor (11). Kontrolle: nach dem Bau ein Setup **ohne** neue Daten laden — die
 Kurzpartie muss **unverändert** wie vorher aufbauen (neuer Code, alte Daten:

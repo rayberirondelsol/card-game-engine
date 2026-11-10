@@ -63,8 +63,24 @@ Ein Lesezeichen ohne Wahl und ein Raum ohne Wahl bauen **zwei** Dörfler, gegen 
 - Die Ladenerneuerung kostet weiter 4 bis 10 Münzen, von Hand.
 - Die fünf Werte „je Dörfler" auf den Tableaus sind **ungeprüft**.
 - **Pepins Endkampf-Gelände bei vier und fünf** trägt **erschlossene** Bürger-Plättchen: beide liegen in der Bibliothek, aber bestätigen kann das nur das gedruckte Tableau. Lohnt einen Blick, wenn Du Pepin mit vier oder fünf Dörflern spielst.
-- Für `EU` (die Zonen) gibt es **kein Lauf-Protokoll** im Scratchpad — der Schreibvorgang ist belegt, der Lauf selbst nicht dokumentiert. Nachzuholen, wenn Du Wert darauf legst.
+- ~~Für `EU` (die Zonen) gibt es **kein Lauf-Protokoll** im Scratchpad.~~ **Falsch — berichtigt am 2026-11-10:** es gibt eines, in acht Dateien, vollständig bis zum Rückwärtsbeweis. Ich hatte nicht nachgesehen, bevor ich es Dir als Lücke genannt habe. Beides, das `EU`-Protokoll und die Deploy-Belege von `ER`, stehen jetzt dauerhaft in [docs/m31-welle1-belege.md](m31-welle1-belege.md) — **beide Lücken sind damit zu.** Nebenbei beantwortet das Protokoll die seit M31.13 offene Frage Nr. 4: verankerte Zonen tragen **kein** gespeichertes `x`/`y`, und deshalb ist `showWithoutAnchor` nicht Kosmetik, sondern das, was die Geister leerer Plätze überhaupt verschwinden lässt.
 - **Rückweg, falls etwas nicht stimmt:** `--zurueck` je Schritt, **zuerst `optionen`**, dann `aktionen`, `assets`, `zonen`, `werte`, `gelaende`. Es gibt kein `--force` und soll keines geben.
+
+---
+
+## Einer, der Dich beißen würde — gefunden beim Belegen, nicht gesucht
+
+Der Deploy-Befehl von Hand, der seit M27 in `CLAUDE.md` und in fünf Aufgabenlisten steht, war eine Falle:
+
+```
+cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build
+```
+
+In `/opt/card-game-engine` ist **auch die Fernreferenz alt**, nicht nur `HEAD`: dort stand `HEAD` = `origin/master` = `8e09dca`, letzter `fetch` am **2026-11-08 14:27 UTC**; CI schreibt die Dateien mit `rsync` hinein und nimmt `.git` dabei aus, also meldet `git status` die **aktuellen** Dateien als 60 „geänderte". Ohne `git fetch` davor zieht `reset --hard origin/master` nichts nach — es **setzt den Baum um 20 Commits zurück**, also auf den Stand vor `ER`.
+
+Das ist genau die Mischung, gegen die die ganze Reihenfolge „erst deployen, dann schreiben" gebaut ist: alter Executor, neue Daten. `onlySeated` unbekannt (Schritte laufen, die nicht laufen sollen), `"15*3"` wird zu einem Zähler auf **0**, die 28 neuen Zonen als Geister. Und es sähe aus wie ein Update.
+
+**Nichts davon ist passiert** — alle sechs Deploys dieser Welle liefen über CI, nicht von Hand. Der Befehl trägt jetzt `git fetch origin`; der ruhigere Weg von Hand ist ohnehin kein `git`, sondern `gh workflow run deploy.yml`. Berichtigt in `CLAUDE.md` und in `tasks-auslagen`, `-kartenzuordnung`, `-m30`, `-m31` sowie der Spec.
 
 ---
 

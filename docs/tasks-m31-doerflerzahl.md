@@ -250,11 +250,13 @@ Entschieden hat der Auftraggeber nur, was im Auftrag steht: **die Dörflerzahl w
 1. `EH`–`EP` grün, Bau grün, auf `origin/master` (der Auftraggeber committet und pusht).
 2. **Rauchtest `vorher`** (`auslagen-rauchtest.mjs`, **die Fassung, die jetzt auf der VM liegt**): Ausgabe **und** Datei ins Scratchpad; erwartet 0 Beanstandungen.
 3. **`--check`** der Skripte von M28, M29, M30 (`szenariodaten-berichtigung.mjs`, `gelaendekarten-zuordnung.mjs`, `setupwahl-daten.mjs`): „schon geschrieben".
-4. **Deploy:** per CI oder von Hand (`cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build`); **beide** Images neu.
+4. **Deploy:** per CI oder von Hand (`cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d --build`); **beide** Images neu.
 5. **Belege:** (a) `sha256sum` der sechs Dateien im Backend = Repo; (b) das Frontend-Bündel enthält die Zeichenketten `onlySeated`, `nobody sits at the table`, `showWithoutAnchor`, `-minus` (Funktionsnamen sind **kein** Beleg, der Minifier benennt sie um); (c) `gh run list --workflow=deploy.yml --limit 1 --json headSha` = der gepushte Commit; (d) die Skripte **neu in den Container**, **derselbe alte Rauchtest wie in Schritt 2** → `diff` **leer**.
 6. Stimmt (d) nicht: **nicht weiter.** Deploy zurücknehmen — die Spalten sind unberührt.
 
 **Fertig, wenn:** (a)–(d) belegt sind und die Ausgaben im Scratchpad liegen. **Sagt der Auftraggeber „nicht jetzt", bleibt `ER` offen** — Teil 1 von `ES`–`EX` darf vorher laufen, **kein** Teil 2.
+
+> **Nachgetragen (nach `EZ`, 2026-11-10).** „Im Scratchpad" war zu wenig: der Scratchpad ist vergänglich, und (a)–(c) lagen am Ende **nirgends**. Jetzt stehen (a)–(d) in **`docs/m31-welle1-belege.md`** — (a) und (b) am 2026-11-10 **nachgemessen** (die sechs Hashes gleich, sieben Zeichenketten im Bündel), (c) `1df5a1e` → success 2026-11-09T15:28:28Z, gegengeprüft an der Dateizeit auf der VM (15:28:35), (d) die zwei Rauchtestdateien byteweise gleich. **Für künftige Deploys gilt: die Belege gehören in ein Dokument, nicht nur in den Scratchpad.** Dabei fiel die Falle am Befehl von Hand auf (fehlendes `git fetch`, `docs/datenzugriff.md`); Schritt 4 trägt sie jetzt.
 
 ## ES — Die Endkampf-Plättchen: die Messung in die Daten (M31.7)
 
@@ -496,7 +498,9 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 12. **Offen, zur Kenntnis:** Heldentaten bleiben **6** (bei fünf Dörflern 1,2 je Dörfler, schwerer als jede gedruckte Regel); die Ladenerneuerung kostet 4 bis 10 Münzen (von Hand); die fünf Werte „je Dörfler" auf den Tableaus sind **ungeprüft**.
 13. **Rückweg bekannt:** `--zurueck` je Schritt, **zuerst `optionen`**, dann `aktionen`, `assets`, `zonen`, `werte`, `gelaende`.
 
-**Geschrieben als `docs/m31-welle1-abnahme.md`** (2026-11-10) — dort stehen die Punkte in der Fassung, die der Auftraggeber liest, samt der Berichtigung zu Punkt 9, der Pepin-Lücke und dem fehlenden `EU`-Lauf-Protokoll.
+**Geschrieben als `docs/m31-welle1-abnahme.md`** (2026-11-10) — dort stehen die Punkte in der Fassung, die der Auftraggeber liest, samt der Berichtigung zu Punkt 9, der Pepin-Lücke und ~~dem fehlenden `EU`-Lauf-Protokoll~~.
+
+> **Berichtigt (noch am 2026-11-10).** Das `EU`-Lauf-Protokoll **fehlte nicht** — acht Dateien im Scratchpad, vollständig bis zum Rückwärtsbeweis; ich hatte es als Lücke genannt, **ohne nachzusehen**. Es und die `ER`-Belege stehen jetzt in `docs/m31-welle1-belege.md`, womit **beide** gemeldeten Lücken zu sind, und es beantwortet M31.13 **Offen Nr. 4** (verankerte Zonen tragen **kein** gespeichertes `x`/`y`; ohne `showWithoutAnchor` stünden die Geister in den Editor-Standardmaßen 0/0/100×140 in der Tischecke — der `EO`-Fall). Die Prüfliste trägt die Berichtigung und einen **neuen Befund**: der Deploy-Befehl von Hand hätte ohne `git fetch` den Baum um 20 Commits zurückgesetzt.
 
 **Fertig, wenn:** der Auftraggeber die Sichtprüfung abgehakt oder einen Befund genannt hat und die Frage nach der Vorgabe beantwortet ist. **Dann beginnt Welle 2.**
 

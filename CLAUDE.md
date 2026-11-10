@@ -68,7 +68,7 @@ self-hosted Runner `card-game-vm` auf derselben VM (Labels `self-hosted, linux,
 proxmox`). Von Hand, wenn CI nicht kann:
 
 ```
-cd /opt/card-game-engine && git reset --hard origin/master && docker compose up -d --build
+cd /opt/card-game-engine && git fetch origin && git reset --hard origin/master && docker compose up -d --build
 ```
 
 ### CI-Deploys fallen still aus, wenn der Runner fehlt
@@ -125,8 +125,20 @@ Und `rsync` nimmt `.git` aus, also sagt `git rev-parse HEAD` in
 `/opt/card-game-engine` nach einem CI-Deploy **nicht**, was dort läuft — die
 Dateien sind neuer als die Metadaten (nach dem ersten CI-Deploy stand dort
 `8e09dca`, obwohl `80c45ff` lief). Was deployt ist, sagt
-`gh run list --workflow=deploy.yml --limit 1 --json headSha`; der Befehl von Hand
-(`git reset --hard origin/master`) zieht die Metadaten wieder nach.
+`gh run list --workflow=deploy.yml --limit 1 --json headSha`; ~~der Befehl von Hand
+(`git reset --hard origin/master`) zieht die Metadaten wieder nach.~~
+
+**Berichtigt (2026-11-10, gemessen).** Nicht nur die Metadaten sind alt, sondern
+auch die **Fernreferenz**: in `/opt/card-game-engine` stand `HEAD` = `origin/master`
+= `8e09dca`, letzter `fetch` 2026-11-08 14:27 UTC, 60 Dateien als „geändert"
+gemeldet (die rsyncten, aktuellen). `git reset --hard origin/master` **ohne**
+vorheriges `git fetch` zieht also nichts nach, sondern **setzt den Baum um 20
+Commits zurück** — nach M31 heißt das: der alte Executor gegen die neu
+geschriebenen Daten, genau die Mischung, die „erst deployen, dann schreiben"
+verhindern soll (`onlySeated` unbekannt, `"15*3"` wird zu 0, neue Zonen als
+Geister). Der Befehl oben trägt deshalb jetzt `git fetch origin`. **Der ruhigere
+Weg von Hand ist kein `git`:** `gh workflow run deploy.yml` — das ist derselbe
+Weg, den CI nimmt (`rsync` des Checkouts, dann `docker compose build`).
 
 Das Dockerfile macht `COPY src/ ./src/` — Quelländerungen brauchen also einen
 Rebuild, kein Neustart. Uploads und Datenbank liegen in Named Volumes und
