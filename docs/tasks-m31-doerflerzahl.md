@@ -502,7 +502,9 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 > **Berichtigt (noch am 2026-11-10).** Das `EU`-Lauf-Protokoll **fehlte nicht** — acht Dateien im Scratchpad, vollständig bis zum Rückwärtsbeweis; ich hatte es als Lücke genannt, **ohne nachzusehen**. Es und die `ER`-Belege stehen jetzt in `docs/m31-welle1-belege.md`, womit **beide** gemeldeten Lücken zu sind, und es beantwortet M31.13 **Offen Nr. 4** (verankerte Zonen tragen **kein** gespeichertes `x`/`y`; ohne `showWithoutAnchor` stünden die Geister in den Editor-Standardmaßen 0/0/100×140 in der Tischecke — der `EO`-Fall). Die Prüfliste trägt die Berichtigung und einen **neuen Befund**: der Deploy-Befehl von Hand hätte ohne `git fetch` den Baum um 20 Commits zurückgesetzt.
 
-**Fertig, wenn:** der Auftraggeber die Sichtprüfung abgehakt oder einen Befund genannt hat und die Frage nach der Vorgabe beantwortet ist. **Dann beginnt Welle 2.**
+**Fertig, wenn:** der Auftraggeber die Sichtprüfung abgehakt oder einen Befund genannt hat ~~und die Frage nach der Vorgabe beantwortet ist~~. **Dann beginnt Welle 2.**
+
+> **Stand 2026-11-10:** die **Frage ist beantwortet** — die **Vorgabe bleibt zwei**, ausdrücklich bestätigt, nachdem die Kehrseite vorlag (ein Einstieg ohne Wahl baut zwei statt drei Dörfler). `options.doerfler3.default` bleibt `keiner`, **nichts geschrieben, nichts geändert**; M31.13 Offen Nr. 1 ist damit entschieden. **Offen ist allein die Sichtprüfung 1–6** der Prüfliste, vor allem Punkt 5 (die kopierten Wertleisten der Plätze 4 und 5).
 
 ---
 

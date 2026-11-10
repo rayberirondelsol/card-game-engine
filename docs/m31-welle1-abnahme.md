@@ -6,7 +6,11 @@ Stand 2026-11-10, HEAD `7f74def`. Alles aus `EH`–`EZ` ist gebaut, deployt und 
 
 ---
 
-## Die eine Frage, die ich nicht entscheiden kann
+## Die eine Frage — entschieden am 2026-11-10
+
+> **Die Vorgabe bleibt zwei.** Der Auftraggeber hat es bestätigt, nachdem die Kehrseite benannt war: ein Einstieg ohne Wahl baut **zwei** Dörfler auf, nicht mehr die gewohnten drei. **Nichts zu tun** — der geschriebene Stand ist der gewollte, `options.doerfler3.default` bleibt `keiner`. Granny holt das Plus. Damit ist auch M31.13 „Offen Nr. 1" entschieden, und **Welle 2 hängt nur noch an der Sichtprüfung 1–6.**
+
+Der Satz, der zur Frage geführt hat, bleibt stehen, weil er die Folge beschreibt:
 
 > **Wer ohne Änderung startet, spielt jetzt zu zweit.**
 
@@ -86,4 +90,4 @@ Das ist genau die Mischung, gegen die die ganze Reihenfolge „erst deployen, da
 
 ## Fertig, wenn
 
-Du die Sichtprüfung 1–6 abgehakt oder einen Befund genannt hast **und** die Frage oben beantwortet ist. **Dann beginnt Welle 2** — die Spielerzahl, `FA`–`FJ`: mehrere Spieler, Lagen solo / mehrfach / normal, Geld je Dörfler, Heldentaten verdeckt in den Händen, geheime Dorf-Ereignisse.
+Du die Sichtprüfung 1–6 abgehakt oder einen Befund genannt hast. ~~**und** die Frage oben beantwortet ist~~ — die Frage ist am 2026-11-10 beantwortet (die Vorgabe bleibt zwei). **Dann beginnt Welle 2** — die Spielerzahl, `FA`–`FJ`: mehrere Spieler, Lagen solo / mehrfach / normal, Geld je Dörfler, Heldentaten verdeckt in den Händen, geheime Dorf-Ereignisse.
