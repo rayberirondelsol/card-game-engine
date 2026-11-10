@@ -698,6 +698,22 @@ Wie `EW` Teil 2 (Ausgang: der Stand nach `EW`; Sicherung; `--check`; Frage nach 
 
 **Fertig, wenn:** Teil 1 grün ist und Teil 2 belegt im Scratchpad liegt.
 
+> **Teil 1 erledigt am 2026-11-10** (Commit „M31 FG Teil 1"), test-zuerst durch einen Subagenten. **2367 → 2398 Tests**, alle grün; neue Testdatei `server/test/doerflerzahl-spielerachse.test.js` (31 Tests) — **nicht** in `doerflerzahl-daten.test.js`, wie die Aufgabe sagte, weil dort zur Zeit der Arbeit eine andere Sitzung uncommittet schrieb. **Teil 2 (Produktion) steht aus.**
+>
+> **Die Zahlen für Teil 2:** Ausgang `action_data` **7564/`9f41211076a4`** (dieselbe Zahl wie das Ziel von `aktionen`, keine zweite Abschrift), Ziel **9961/`33b4dc50051e`**; `dorfphase-beginnen` 43 → **53** Schritte, `dorfereignis` 6 → **11**.
+>
+> **Die Beträge aus einer Konstante:** `MUENZEN_NACH_KAMPF = 6` in `scripts/doerflerzahl-daten.mjs`; daraus entstehen alle sechs (der gemeinsame Topf von Welle 1 jetzt als `` `+${MUENZEN_NACH_KAMPF}*$doerflerzahl` ``, sein Text bleibt byteweise gleich). Zwei Tests halten es fest: einer liest die sechs Beträge aus dem Zielstand, einer verlangt, dass im Quelltext außerhalb von Kommentaren kein Literal `+6` steht. **Eigene Gegenproben:** Topf-Betrag `+7` → **10** Tests rot; Konstante 7 → **9** rot; dritte Kategorie falsch geschrieben → **13** rot.
+>
+> **Die heikelste Stelle, gemessen:** jede Hand wird **auf drei** aufgefüllt, nicht auf vier, **weil das `clear_table` vorher läuft** — Ausgangslage Hände mit 2 / 4 / 4 Karten (ein Ereignis darin), danach `[3,3,3]`, kein Ereignis mehr am Tisch, keine `skipped`-Zeile. **Mit dem `clear_table` hinter den Auffüllungen käme `[2,3,3]` heraus** — die Reihenfolge trägt, und der Test ist dafür empfindlich.
+>
+> **Zwei Berichtigungen der Aufgabe:** (1) **Punkt 6 („Gleiche Auskunft, zwei Zeitpunkte") ist hier nicht gebaut — und muss auch nirgends hinwandern:** `FI` Nr. 2 trägt dieselbe Probe schon („Aufbau und Aktionen stimmen überein, für jede Kombination"). Die Aufgabenliste hatte ihn doppelt, und `FG` hätte dafür den Aufbau von `FH` gebraucht, während `FH` `FG` voraussetzt — ein Ringschluss. (Ich hatte ihn zunächst „nach `FH`" verlegt; der richtige Ort ist `FI`, wo er schon steht.) (2) **Die Schrittnummern der Aufgabe** („16, 19, 2") sind 0-basierte Positionen des Stands **vor** Welle 1; im Stand nach Welle 1 liegen die Münzen an Index **18**, die Auslage an **21**, das `clear_table` an **2**.
+>
+> **Gemessen, nicht erwartet:** die Protokollzeile des `clear_table` der Dorfphase trägt jetzt `… + Dorf-Ereignisse (geheim)` im `target` — Status und Grund sind gleich, „dieselben Protokollzeilen" stimmt also bis auf **diese eine Zeile je Dorfphase**; der Test benennt sie. Und `dorfereignis` hat eine Wache (`require_zone`, „Bösewicht-Tableau leer"): nach `kampf-beginnen` meldet die Aktion `skipped` — der echte Zyklus ist Ereignis → Kampf → Dorfphase.
+>
+> **Nach dem Schreiben melden `--check --schritt aktionen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen `action_data` als Stand von Welle 1 ein) — erwartet, wie bei `haende`. Rückweg in umgekehrter Reihenfolge: erst `aktionen-spieler`, dann der Rest.
+>
+> **Grenze, bewusst wie bei `aktionen`:** eine fremde Änderung an einem Schritt, der in **keinem** Stück steht, fällt der Vorbedingung nicht auf (je Stück und Schrittzahl gilt der exakte Ausgang). Das ist beim Vorbild so und nicht strenger gebaut.
+
 ## FH — Die Option `spieler`: der Schalter der Welle (M31.15–M31.17)
 
 **Befund.** **Dieser Schritt macht die Spielerzahl wählbar.** Er schreibt `scenario_data` und `sequence_data` (auf dem Stand von Welle 1):

@@ -1,8 +1,8 @@
-// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.17).
+// Die Dörflerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände, die Aktionen der Spielerachse (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.16, M31.17).
 //
-// **Sieben Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende`, M31.12): jeder ändert ein **eigenes Stück**,
+// **Acht Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende|aktionen-spieler`, M31.12): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
-// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs — und **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter. Ein Schritt, der in `SCHRITTE` `null` wäre,
+// **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs —, **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter und **`aktionen-spieler`** (Aufgabe FG, Teil 1, Welle 2) als achter. Ein Schritt, der in `SCHRITTE` `null` wäre,
 // hielte laut an, **ohne die Datenbank zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
 // Kontrolle, Weg zurück) ändert sich nur, was ein Schritt **mehr** braucht (siehe `liest` bei `optionen`).
 //
@@ -54,6 +54,15 @@
 // — **gemessen in `FF` meldet es `skipped: zone „Hand Dörfler 1" is full (3)`**, nicht `1 of 1 cards stayed in the stack`, wie M31.14 und die Aufgabe sagen (das kommt nur, wenn die Zone *während* des Schrittes voll wird; die Wirkung ist dieselbe). Ausgang ist der Zielstand von `zonen` (EU, dieselbe Zahl): `patchHaende` fragt `patchZonen` auf den Händen mit `capacity 3`, ob **alles andere** so ist, wie EU es geschrieben hat; ein halber Stand (ein bis vier von fünf Händen) ist
 // ein Abbruch. Rückwärtsbeweis (`capacity` wieder 3) und Vorwärtsprobe. **Folge am Tisch:** vier Plätze im Abstand 90 statt drei im Abstand 120; die Karten (100 breit) überlappen um 10 Punkte, ein Dorf-Ereignis allein liegt 15 Punkte weiter links.
 // **Nach dem Schreiben melden `--check --schritt zonen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen `zone_data` mit `capacity 3` ein) — der erwartete Stand, wie bei M30 nach `EX`.
+//
+// **`aktionen-spieler` (FG, M31.16, M31.17):** in `action_data` lernen zwei Aktionen die Spielerachse, auf dem Stand von Welle 1 (Ausgang = Zielstand von `aktionen`, dieselbe Zahl; `AKTION_STUECKE_SPIELER`, jedes Stück ersetzt **einen** Schritt
+// durch einen oder mehrere): `dorfphase-beginnen` 43 → 53 Schritte (die dritte Kategorie `Dorf-Ereignisse (geheim)` im `clear_table`; die Münzen `+6*$doerflerzahl` mit `onlyCounter "Münzen (gemeinsam)"`, **fünf Töpfe** `+6` mit
+// `onlyCounter "Münzen Dörfler n"`; die Auslage `fill 6` mit `onlyCounter "Münzen (gemeinsam)"`, **fünf** `fill 3` verdeckt in die Hände mit `onlyCounter "!Münzen (gemeinsam)"` und für 3 bis 5 `onlySeated`) und `dorfereignis` 6 → 11 (die fünf
+// offenen Austeilungen mit `onlyCounter "Münzen (gemeinsam)"`, **fünf verdeckte** dahinter mit `"!Münzen (gemeinsam)"`). **Die sechs Beträge entstehen aus einer Konstante** (`MUENZEN_NACH_KAMPF`, M31.16) — auch der gemeinsame Topf von Welle 1;
+// `pruefeAktionenSpieler` hält ihre Gleichheit fest. **Welle 1 muss geschrieben sein** (`patchAktionen` sagt `schon-da`); jedes Stück und die Zahl der Schritte stehen **genau** wie dort, jede andere Zeile bleibt, wie sie ist; ein halber Stand ist ein
+// Abbruch. Er setzt den **deployten Code** voraus (`onlyCounter`, `FB`/`FC`) und die **Hände mit `capacity 4`** (`haende`, `FF`: sonst ließe `dorfereignis` die verdeckte Karte im Stapel). Er schreibt `action_data`, sonst nichts — der Aufbau der Spielerachse
+// (`aufbau-spieler`, `FH`) ist ein eigener Schritt. Rückwärtsbeweis (Gates weg, die 15 neuen Schritte heraus, zwei Kategorien) und Vorwärtsprobe. **Nach dem Schreiben melden `--check --schritt aktionen` und `--schritt optionen` `ABWEICHEND`** (beide ordnen
+// `action_data` als Stand von Welle 1 ein) — der erwartete Stand, wie bei `haende`.
 //
 // **`gelaende`:** in `scenario_data.bosses[…].final.terrain` bekommen **drei** Bösewichte die Plättchen für vier und fünf Dörfler: Deputy
 // Waggums, Pepin Milkfrog, Samuel Strawman („1 je Dörfler“, auf dem Plan `FF1`–`FF5` nummeriert). Ihr dritter Eintrag (`FF3`) bekommt
@@ -138,6 +147,8 @@ const gelaende = {
 };
 // `werte` läuft nach `gelaende` (Reihenfolge ES, ET): sein Ausgang ist dessen Ziel — **dieselbe** Zahl. Der Text ist in beiden Reihenfolgen derselbe.
 const werte = { ausgang: gelaende.ziel, ziel: { scenario: { laenge: 23104, sha: '5613ccf1cd29' } } };
+// `aktionen` (EW) trägt seine Zahlen als Konstante, weil der Ausgang von `aktionen-spieler` (FG) **dieselbe** Zahl ist (der Zielstand von `aktionen`), nicht eine zweite.
+const aktionenW1 = { ausgang: { action: { laenge: 5803, sha: '33033dace238' } }, ziel: { action: { laenge: 7564, sha: '9f41211076a4' } } };
 export const SCHRITTE = {
   gelaende,
   werte,
@@ -151,7 +162,7 @@ export const SCHRITTE = {
   // hier nicht: der Auszug trägt nicht alle Spalten (`created_at`, `source_url`, `quantity`, `category_id`), die Produktion schon; die Teil-2-Lesung nennt ihn.
   assets: { ausgang: { assets: { zahl: 212 } }, ziel: { assets: { zahl: 220 } } },
   // `aktionen` (EW, M31.4/M31.8/M31.9): `action_data`, vier Aktionen. Ausgang: der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchAktionen` gerechnet.
-  aktionen: { ausgang: { action: { laenge: 5803, sha: '33033dace238' } }, ziel: { action: { laenge: 7564, sha: '9f41211076a4' } } },
+  aktionen: aktionenW1,
   // `optionen` (EX, M31.5/M31.8/M31.12): **zwei** Spalten. Ausgang: `scenario` ist das Ziel von `werte` (dieselbe Zahl), `sequence` der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchSchalter` gerechnet.
   optionen: {
     ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
@@ -159,6 +170,8 @@ export const SCHRITTE = {
   },
   // `haende` (FF, M31.14/M31.17): `zone_data`, capacity 3 → 4 an fünf Zonen. Ausgang: der Zielstand von `zonen` (dieselbe Zahl); Ziel: aus `patchHaende` gerechnet.
   haende: { ausgang: { zone: { laenge: 39886, sha: 'efe0b0743364' } }, ziel: { zone: { laenge: 39886, sha: 'e6bf6aeaf3d6' } } },
+  // `aktionen-spieler` (FG, M31.16/M31.17): `action_data`, zwei Aktionen (43 → 53 und 6 → 11 Schritte). Ausgang: der Zielstand von `aktionen` (dieselbe Zahl); Ziel: aus `patchAktionenSpieler` gerechnet.
+  'aktionen-spieler': { ausgang: aktionenW1.ziel, ziel: { action: { laenge: 9961, sha: '33b4dc50051e' } } },
 };
 
 // ── Die Messung ─────────────────────────────────────────────────────────────
@@ -1088,6 +1101,8 @@ const aHand = (n) => ({ type: 'deal_to_zone', stackLabel: 'Dorf-Ereignisse', cou
 const aFigur = (n) => ({ type: 'place_asset', assetName: `$F${n}`, gridLabel: 'Spielfeld A–S / 1–14', cell: `$D${n}`, faceDown: false });
 const aRaeumen = (n) => ({ type: 'clear_table', assetName: `$F${n}` });
 const aMarker = (n, i) => ({ type: 'place_asset', assetName: `Marker ${n}: ${LEISTEN[i]}`, targetZoneLabel: `Dörfler ${n}: ${LEISTEN[i]}`, slot: `$V${n}${WERT_TAG[i]}` });
+/** Die Münzen nach jedem Kampf, **je Dörfler** (Regeltext „Nimm dir 6 Münzen“, M31.16): die **eine** Zahl, aus der alle sechs Beträge der Dorfphase entstehen — der gemeinsame Topf (`"+6*$doerflerzahl"`, Welle 1) und die fünf Töpfe je Dörfler (`"+6"`, Welle 2). */
+export const MUENZEN_NACH_KAMPF = 6;
 const aMuenzen = (value) => ({ type: 'set_counter', name: 'Münzen (gemeinsam)', value });
 const WACHE_ALT = 'Auf keiner Lebensleiste liegt noch ein Marker — alle drei Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.';
 const WACHE_NEU = 'Auf keiner Lebensleiste liegt noch ein Marker — alle Dörfler sind besiegt. Nach [DE S.22] ist die Partie damit zu Ende.';
@@ -1112,7 +1127,7 @@ const AKTION_STUECKE = {
   'dorfphase-beginnen': [
     { name: 'die Wache (fünf Lebensleisten, ein Satz ohne Zahl)', at: 1, alt: aWache([1, 2, 3], WACHE_ALT), neu: [aWache([1, 2, 3, 4, 5], WACHE_NEU)] },
     { name: 'clear_table $F3, $F4, $F5', at: 13, alt: aRaeumen(3), neu: [mitGate(aRaeumen(3), 3), mitGate(aRaeumen(4), 4), mitGate(aRaeumen(5), 5)] },
-    { name: 'die Münzen („+6*$doerflerzahl“)', at: 16, alt: aMuenzen('+18'), neu: [aMuenzen('+6*$doerflerzahl')] },
+    { name: 'die Münzen („+6*$doerflerzahl“)', at: 16, alt: aMuenzen('+18'), neu: [aMuenzen(`+${MUENZEN_NACH_KAMPF}*$doerflerzahl`)] },
     ...[0, 1, 2].map(i => ({ name: `Marker 3: ${LEISTEN[i]}`, at: 29 + i, alt: aMarker(3, i), neu: [mitGate(aMarker(3, i), 3)] })),
     { name: 'Marker 3: Präzision, dazu die acht für Platz 4 und 5', at: 32, alt: aMarker(3, 3), neu: [mitGate(aMarker(3, 3), 3), ...[0, 1, 2, 3].map(i => mitGate(aMarker(4, i), 4)), ...[0, 1, 2, 3].map(i => mitGate(aMarker(5, i), 5))] },
   ],
@@ -1125,8 +1140,7 @@ const woA = (id, i) => `action_data[${text(id)}].steps[${i}]`;
  * **halber** Stand — ein Stück neu, ein anderes alt — ist ein Problem). Die Schritte werden **der Reihe nach** abgelaufen: ein Stück, das schon im Ziel steht, hat die Positionen dahinter
  * verschoben, und der Lauf weiß es.
  */
-function einordnenAktion(id, steps, probleme) {
-  const stuecke = AKTION_STUECKE[id];
+function einordnenAktion(id, steps, probleme, stuecke = AKTION_STUECKE[id], schritteAlt = AKTION_SCHRITTE_ALT[id]) {
   const stand = [];
   let off = 0;
   for (const s of stuecke) {
@@ -1136,9 +1150,9 @@ function einordnenAktion(id, steps, probleme) {
     probleme.push(`${woA(id, i)}: ist ${text(steps[i]) ?? 'kein Schritt'}, erwartet ${text(s.alt)} (oder schon ${s.neu.map(text).join(' ')}) — ${s.name}`);
     return null;
   }
-  const erwartet = AKTION_SCHRITTE_ALT[id] + off;
+  const erwartet = schritteAlt + off;
   if (steps.length !== erwartet) {
-    probleme.push(`action_data[${text(id)}]: hat ${steps.length} Schritte, erwartet ${erwartet} (${AKTION_SCHRITTE_ALT[id]} im Ausgang${off ? `, ${off} dazu für die Stücke, die schon da sind` : ''})`);
+    probleme.push(`action_data[${text(id)}]: hat ${steps.length} Schritte, erwartet ${erwartet} (${schritteAlt} im Ausgang${off ? `, ${off} dazu für die Stücke, die schon da sind` : ''})`);
     return null;
   }
   if (stand.every(x => x === 'alt')) return 'alt';
@@ -1148,10 +1162,10 @@ function einordnenAktion(id, steps, probleme) {
 }
 
 /** Aus einer Aktion im Ausgang (jedes Stück `alt`) den Zielstand ihrer Schritte machen. */
-function vorwaerts(id, steps) {
+function vorwaerts(id, steps, stuecke = AKTION_STUECKE[id]) {
   const out = copy(steps);
   let off = 0;
-  for (const s of AKTION_STUECKE[id]) { out.splice(s.at + off, 1, ...copy(s.neu)); off += s.neu.length - 1; }
+  for (const s of stuecke) { out.splice(s.at + off, 1, ...copy(s.neu)); off += s.neu.length - 1; }
   return out;
 }
 
@@ -1233,6 +1247,151 @@ export function pruefeAktionen(actions) {
       if (!isObject(s)) out.push(`${woA(a?.id, i)}: kein Schritt (Objekt)`);
       else if (hat(s, 'onlySeated') && !platzOk(s.onlySeated)) out.push(`${woA(a.id, i)}: onlySeated ${text(s.onlySeated)} ist kein Platz (1 bis 5)`);
     });
+  }
+  return out;
+}
+
+// ── Die Aktionen der Spielerachse (FG, M31.16, M31.17) ──────────────────────
+
+/**
+ * **Zwei Aktionen lernen die Lage** (auf dem Stand von Welle 1; Welle 1 wird nicht umgeschrieben): `dorfphase-beginnen` und `dorfereignis`. Die Aktionen kennen die Spielerzahl nicht — sie lesen die **Form des Geldes** am Tisch
+ * (`onlyCounter`, M31.15): liegt `Münzen (gemeinsam)`, ist es die Lage solo (Welle 1 läuft wie bisher), liegt es nicht, hat jeder Dörfler seinen Topf (`Münzen Dörfler n`) und seine Hand. Jedes Stück ersetzt **einen** Schritt des Ausgangs
+ * (`at`, 0-basiert im **Ausgang** = Zielstand von `aktionen`, `alt` Zeichen für Zeichen) durch einen oder mehrere (`neu`); was dazwischen liegt, wird nie gelesen und nie angefasst.
+ *
+ * **Reihenfolge, entschieden (die Aufgabe nennt sie nicht):** die Töpfe stehen **hinter** dem gemeinsamen Topf (1 … 5), die Heldentaten-Austeilungen **hinter** der Auslage (1 … 5; `clear_table` der Ereignisse, Schritt 2, läuft davor —
+ * `fill` zählt also kein Ereignis in der Hand, M31.17), die verdeckten Ereignisse **hinter** den fünf offenen und **absteigend** (5 … 1 — wie die offenen, die Reihenfolge der Austeilung bleibt). Das Gate `onlyCounter` steht **am Ende** des Schritts,
+ * hinter `onlySeated` (Nachsätze: Wahl → Platz → Lage → Zähler, `FD`). Die Töpfe tragen **kein** `onlySeated` (der Topf **ist** die Auskunft, dass der Platz sitzt, M31.16); die Hände und Ereignisse der Plätze 3 bis 5 schon (M31.17).
+ */
+const GEMEINSAM = 'Münzen (gemeinsam)';
+const TOPF = (n) => `Münzen Dörfler ${n}`;
+const GEHEIM = 'Dorf-Ereignisse (geheim)';
+const KATEGORIEN_OFFEN = ['Dorf-Ereignisse', 'Dorf-Ereignisse (Neue Nachbarn)'];
+const PLAETZE = [1, 2, 3, 4, 5];
+const mitZaehler = (step, name) => ({ ...step, onlyCounter: name });
+const sPlatz = (n) => (n >= 3 ? { onlySeated: n } : {});
+/** Die Schritte von Welle 1, wie sie heute stehen (der Ausgang), und die neuen. Eine Kopie je Aufruf. */
+const sKategorie = (kategorien) => ({ type: 'clear_table', category: kategorien, targetStackLabel: 'Dorf-Ereignisse', faceDown: true });
+const sAuslage = () => ({ type: 'deal_to_zone', stackLabel: 'Heldentaten', count: 6, targetZoneLabel: 'Heldentaten-Auslage', faceDown: false, fill: true });
+const sMuenzenGemeinsam = () => aMuenzen(`+${MUENZEN_NACH_KAMPF}*$doerflerzahl`);
+const sOffeneHand = (n) => (n >= 3 ? mitGate(aHand(n), n) : aHand(n));
+const sTopf = (n) => ({ type: 'set_counter', name: TOPF(n), value: `+${MUENZEN_NACH_KAMPF}`, onlyCounter: TOPF(n) });
+const sHeldenHand = (n) => ({ type: 'deal_to_zone', stackLabel: 'Heldentaten', count: 3, targetZoneLabel: `Hand Dörfler ${n}`, faceDown: true, fill: true, ...sPlatz(n), onlyCounter: `!${GEMEINSAM}` });
+const sEreignisVerdeckt = (n) => ({ type: 'deal_to_zone', stackLabel: 'Dorf-Ereignisse', count: 1, targetZoneLabel: `Hand Dörfler ${n}`, faceDown: true, ...sPlatz(n), onlyCounter: `!${GEMEINSAM}` });
+
+const AKTIONEN_SPIELER = ['dorfereignis', 'dorfphase-beginnen'];
+/** Die Zahl der Schritte im Ausgang (= Zielstand von `aktionen`; an der Fixture gezählt, nicht geglaubt). */
+const SCHRITTE_SPIELER_ALT = { 'dorfphase-beginnen': 43, dorfereignis: 6 };
+const AKTION_STUECKE_SPIELER = {
+  dorfereignis: [5, 4, 3, 2, 1].map((n, k) => ({
+    name: `Hand Dörfler ${n} offen mit onlyCounter${n === 1 ? ', dazu die fünf verdeckten' : ''}`, at: 1 + k, alt: sOffeneHand(n),
+    neu: [mitZaehler(sOffeneHand(n), GEMEINSAM), ...(n === 1 ? [5, 4, 3, 2, 1].map(sEreignisVerdeckt) : [])],
+  })),
+  'dorfphase-beginnen': [
+    { name: 'clear_table: die dritte Kategorie', at: 2, alt: sKategorie(KATEGORIEN_OFFEN), neu: [sKategorie([...KATEGORIEN_OFFEN, GEHEIM])] },
+    { name: 'die Münzen mit onlyCounter, dazu die fünf Töpfe', at: 18, alt: sMuenzenGemeinsam(), neu: [mitZaehler(sMuenzenGemeinsam(), GEMEINSAM), ...PLAETZE.map(sTopf)] },
+    { name: 'die Auslage mit onlyCounter, dazu die fünf Heldentaten-Austeilungen', at: 21, alt: sAuslage(), neu: [mitZaehler(sAuslage(), GEMEINSAM), ...PLAETZE.map(sHeldenHand)] },
+  ],
+};
+
+/** Jedes Gate `onlyCounter` weg, die zehn neuen Schritte je Aktion heraus (die fünf Töpfe, die fünf Heldentaten-Austeilungen, die fünf verdeckten Ereignisse), die dritte Kategorie weg — **nur** in den beiden Aktionen. */
+function ohneSpielerachse(actions) {
+  const z = copy(actions);
+  for (const a of z) {
+    if (!AKTIONEN_SPIELER.includes(a?.id) || !Array.isArray(a.steps)) continue;
+    a.steps = a.steps
+      .filter(s => !(isObject(s) && ((s.type === 'set_counter' && typeof s.name === 'string' && s.name.startsWith('Münzen Dörfler ')) || (s.type === 'deal_to_zone' && s.onlyCounter === `!${GEMEINSAM}`))))
+      .map(s => {
+        if (!isObject(s)) return s;
+        const { onlyCounter: _gate, ...rest } = s;
+        return rest.type === 'clear_table' && Array.isArray(rest.category) ? { ...rest, category: rest.category.filter(c => c !== GEHEIM) } : rest;
+      });
+  }
+  return z;
+}
+
+/**
+ * Die Aktionen der Spielerachse einordnen — **eine** Frage mit drei Antworten (wie `patchAktionen`):
+ *
+ * - `zu-schreiben`: **Welle 1 ist geschrieben** (`patchAktionen` sagt `schon-da`), und jedes Stück von `dorfphase-beginnen` und `dorfereignis` steht **genau** wie dort, bei der Zahl Schritte von Welle 1;
+ * - `schon-da`: jedes Stück steht im Ziel (und ohne die Spielerachse ist es der Stand von Welle 1);
+ * - `abweichend`: alles andere — Welle 1 noch nicht geschrieben, ein Stück anders, die Zahl der Schritte falsch, jeder **halbe** Stand (ein Stück neu, eins alt; eine Aktion fertig, die andere nicht). `probleme` nennt jede Abweichung mit Aktion und Index.
+ *
+ * Verändert die Eingabe nicht. `kampf-beginnen` und `laden-nachfuellen` und jeder Schritt, der in keinem Stück steht, bleiben, wie sie sind.
+ *
+ * @param {object[]} actions  – `action_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', action?: object[], probleme?: string[] }}
+ */
+export function patchAktionenSpieler(actions) {
+  if (!Array.isArray(actions)) return { art: 'abweichend', probleme: ['action_data ist keine Liste von Aktionen'] };
+  const welle1 = patchAktionen(actions);
+  if (welle1.art === 'zu-schreiben') return { art: 'abweichend', probleme: ['action_data: Welle 1 (aktionen, EW) ist noch nicht geschrieben — FG setzt sie voraus (die Aktionen tragen noch die Schritte vor der Dörflerzahl)'] };
+  const probleme = [];
+  const stand = {};
+  for (const id of AKTIONEN_SPIELER) {
+    const treffer = aktionVon(actions, id);
+    if (treffer.length !== 1) { probleme.push(`action_data: ${treffer.length} Aktionen mit der Id ${text(id)}, erwartet genau eine`); continue; }
+    if (!Array.isArray(treffer[0].steps)) { probleme.push(`action_data[${text(id)}].steps ist keine Liste von Schritten`); continue; }
+    stand[id] = einordnenAktion(id, treffer[0].steps, probleme, AKTION_STUECKE_SPIELER[id], SCHRITTE_SPIELER_ALT[id]);
+  }
+  const ids = Object.keys(stand);
+  if (!probleme.length && !ids.every(id => stand[id] === 'alt') && !ids.every(id => stand[id] === 'neu')) {
+    probleme.push(`halber Stand: schon geschrieben ${ids.filter(id => stand[id] === 'neu').join(', ')}; noch alt ${ids.filter(id => stand[id] === 'alt').join(', ')}`);
+  }
+  if (probleme.length) return { art: 'abweichend', probleme };
+  const alle = ids.every(id => stand[id] === 'neu');
+  // Der Rest muss der Stand von Welle 1 sein: im Ausgang sagt es `patchAktionen` selbst, im Ziel **ohne** die Spielerachse.
+  const w1 = alle ? patchAktionen(ohneSpielerachse(actions)) : welle1;
+  if (w1.art !== 'schon-da') return { art: 'abweichend', probleme: ['action_data: außer den Stücken von FG sind die Aktionen nicht der Stand von Welle 1 (aktionen, EW)', ...(w1.probleme ?? [])] };
+  if (alle) return { art: 'schon-da', action: copy(actions) };
+  return { art: 'zu-schreiben', action: actions.map(a => (AKTIONEN_SPIELER.includes(a?.id) ? { ...copy(a), steps: vorwaerts(a.id, a.steps, AKTION_STUECKE_SPIELER[a.id]) } : copy(a))) };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und **vor** dem Schreiben: jedes `onlyCounter` weg, die zehn neuen Schritte je Aktion heraus, die dritte Kategorie weg — das muss den gelesenen Text ergeben, Zeichen für Zeichen.
+ * Dazu die **Vorwärtsprobe**: aus dem Zurückgerechneten entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe einen falschen Betrag oder ein falsches Gate nicht, weil er beides wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseAktionenSpieler(before, after) {
+  if (!Array.isArray(after?.action)) return ['Rückwärtsbeweis action_data: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const zurueck = ohneSpielerachse(after.action);
+  const alt = text(before?.action);
+  if (text(zurueck) !== alt) meldungen.push(`Rückwärtsbeweis action_data: ohne die Gates, die zehn neuen Schritte je Aktion und die dritte Kategorie ist der Text nicht der gelesene — ${abwTeil(text(zurueck), alt)}`);
+  const vor = patchAktionenSpieler(zurueck);
+  if (vor.art !== 'zu-schreiben') meldungen.push(`Rückwärtsbeweis action_data (Vorwärtsprobe): das Zurückgerechnete ist kein Ausgang (${vor.art}: ${(vor.probleme ?? []).join('; ')})`);
+  else if (text(vor.action) !== text(after.action)) meldungen.push(`Rückwärtsbeweis action_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor.action), text(after.action))}`);
+  return meldungen;
+}
+
+/**
+ * Die Prüfer des Zielstands: die von `aktionen` (`validateOptions` in einer Aktion, `onlySeated` ein Platz 1 … 5) und dazu **M31.16**: genau sechs Münzschritte in der Dorfphase (der gemeinsame Topf, fünf Töpfe), alle mit **demselben** Betrag aus
+ * `MUENZEN_NACH_KAMPF` (der gemeinsame mit dem Produkt, die Töpfe mit `+n`), jeder Topf mit dem Gate auf **seinen** Namen; jedes `onlyCounter` ist eines der sieben Gates (`Münzen (gemeinsam)`, `!Münzen (gemeinsam)`, `Münzen Dörfler 1 … 5`);
+ * je Aktion fünf Schritte mit `!Münzen (gemeinsam)` (Heldentaten-Hände bzw. verdeckte Ereignisse), die **verdeckt** austeilen. `validateStep` (Editor) liegt im Client und im Container nicht; der Test fährt es auf jedem Schritt.
+ */
+export function pruefeAktionenSpieler(actions) {
+  const out = pruefeAktionen(actions);
+  const erlaubt = new Set([GEMEINSAM, `!${GEMEINSAM}`, ...PLAETZE.map(TOPF)]);
+  const aktion = (id) => (Array.isArray(actions) ? aktionVon(actions, id) : []).find(a => Array.isArray(a?.steps))?.steps;
+  for (const id of AKTIONEN_SPIELER) {
+    const steps = aktion(id);
+    if (!steps) { out.push(`action_data[${text(id)}]: fehlt oder hat keine Schritte`); continue; }
+    steps.forEach((s, i) => { if (isObject(s) && hat(s, 'onlyCounter') && !erlaubt.has(s.onlyCounter)) out.push(`${woA(id, i)}: onlyCounter ${text(s.onlyCounter)} ist keines der sieben Gates der Spielerachse`); });
+    const verdeckt = steps.filter(s => isObject(s) && s.onlyCounter === `!${GEMEINSAM}`);
+    if (verdeckt.length !== 5) out.push(`action_data[${text(id)}]: ${verdeckt.length} Schritte mit onlyCounter "!${GEMEINSAM}", erwartet fünf (einer je Hand)`);
+    for (const s of verdeckt) if (s.faceDown !== true) out.push(`action_data[${text(id)}]: die Austeilung in „${s.targetZoneLabel}“ ist nicht verdeckt (faceDown true erwartet)`);
+  }
+  const dp = aktion('dorfphase-beginnen') ?? [];
+  const muenzen = dp.filter(s => isObject(s) && s.type === 'set_counter' && typeof s.name === 'string' && s.name.startsWith('Münzen'));
+  const soll = [[GEMEINSAM, `+${MUENZEN_NACH_KAMPF}*$doerflerzahl`, GEMEINSAM], ...PLAETZE.map(n => [TOPF(n), `+${MUENZEN_NACH_KAMPF}`, TOPF(n)])];
+  if (muenzen.length !== soll.length) out.push(`action_data["dorfphase-beginnen"]: ${muenzen.length} Münzschritte, erwartet ${soll.length} (der gemeinsame Topf und fünf Töpfe)`);
+  for (const [name, wert, gate] of soll) {
+    const s = muenzen.filter(x => x.name === name);
+    if (s.length !== 1) out.push(`action_data["dorfphase-beginnen"]: ${s.length} Münzschritte für „${name}“, erwartet einer`);
+    else {
+      if (s[0].value !== wert) out.push(`action_data["dorfphase-beginnen"]: „${name}“ hat den Wert ${text(s[0].value)}, erwartet ${text(wert)} (M31.16: alle sechs Beträge aus einer Konstante)`);
+      if (s[0].onlyCounter !== gate) out.push(`action_data["dorfphase-beginnen"]: „${name}“ hat onlyCounter ${text(s[0].onlyCounter)}, erwartet ${text(gate)}`);
+    }
   }
   return out;
 }
@@ -1701,6 +1860,33 @@ const DEFS = {
       console.log(`  Hände: capacity ${HAENDE.map(l => after.zone.find(z => z.label === l)?.capacity).join(', ')}`);
       console.log(`  die ${before.zone.length - HAENDE.length} anderen Zonen: ${text(ohneHaende(after.zone)) === text(ohneHaende(before.zone)) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
       console.log(`  die Hände ohne capacity: ${text(mitKapazitaet(after.zone, HAND_ALT)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+    },
+  },
+  'aktionen-spieler': {
+    spalten: ['action'],
+    patch: (b) => patchAktionenSpieler(b.action),
+    beweise: beweiseAktionenSpieler,
+    gelesen: (b) => `Schritte: ${AKTIONEN_SPIELER.map(id => `${id} ${aktionVon(Array.isArray(b.action) ? b.action : [], id)[0]?.steps?.length ?? '?'}`).join(', ')}`,
+    schonDa: () => 'schon geschrieben: die Stücke von dorfphase-beginnen und dorfereignis stehen im Ziel (onlyCounter, fünf Töpfe, fünf Heldentaten-Hände, fünf verdeckte Ereignisse, dritte Kategorie) — nichts zu schreiben',
+    plan: (b, n) => {
+      for (const id of AKTIONEN_SPIELER) {
+        const alt = aktionVon(b.action, id)[0].steps, neu = aktionVon(n.action, id)[0].steps;
+        console.log(`  ${id}: ${alt.length} → ${neu.length} Schritte — ${AKTION_STUECKE_SPIELER[id].map(s => s.name).join('; ')}`);
+      }
+      console.log(`  Beträge: alle sechs Münzschritte aus MUENZEN_NACH_KAMPF = ${MUENZEN_NACH_KAMPF} (der gemeinsame Topf mit dem Produkt, fünf Töpfe je +${MUENZEN_NACH_KAMPF})`);
+      console.log('  unberührt: kampf-beginnen, laden-nachfuellen und jeder Schritt von dorfphase-beginnen und dorfereignis, der in keinem Stück steht; zone_data, scenario_data, sequence_data (der Aufbau der Spielerachse ist FH)');
+    },
+    pruefer: (n) => [{ titel: 'validateOptions (Aktionen), Gates onlySeated und onlyCounter, die sechs Beträge', probleme: pruefeAktionenSpieler(n.action) }],
+    kontrolle: (before, after) => {
+      for (const id of AKTIONEN_SPIELER) {
+        const steps = aktionVon(after.action, id)[0].steps;
+        console.log(`  ${id}: ${steps.length} Schritte, ${steps.filter(s => hat(s, 'onlyCounter')).length} mit onlyCounter, ${steps.filter(s => hat(s, 'onlySeated')).length} mit onlySeated`);
+      }
+      const dp = aktionVon(after.action, 'dorfphase-beginnen')[0].steps;
+      console.log(`  Münzschritte: ${dp.filter(s => s.type === 'set_counter' && /^Münzen/.test(s.name)).map(s => `${s.name} ${text(s.value)}`).join('; ')}`);
+      console.log(`  Kategorien von clear_table (Schritt 2): ${text(dp[2].category)}`);
+      for (const id of ['kampf-beginnen', 'laden-nachfuellen']) console.log(`  die Aktion ${id}: ${text(aktionVon(before.action, id)[0]) === text(aktionVon(after.action, id)[0]) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+      console.log(`  ohne die Spielerachse: ${text(ohneSpielerachse(after.action)) === text(before.action) ? 'Zeichen für Zeichen der gelesene Stand von Welle 1' : 'ABWEICHEND'}`);
     },
   },
   optionen: {
