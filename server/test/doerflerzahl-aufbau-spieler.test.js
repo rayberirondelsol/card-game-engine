@@ -971,7 +971,12 @@ test('FH Rauchtest: auf dem Stand von Welle 1 (Zonen vor FF, Aktionen vor FG, Au
 
 test('FH Rauchtest: der Text der Ausgabe auf dem Zielstand ist der des Standes von Welle 1 — **bis auf zwei Zeilen**: die Kopfzeile (Zahl der Schritte und der Aktionsschritte) und die Zeile mit der Liste der Optionen (`spieler` kommt dazu); jede andere Zeile gleich', async () => {
   const [neu, alt] = await beideStaende();
-  const a = alt.r.out.join('\n').split('\n'), n = neu.r.out.join('\n').split('\n');
+  // `FI`: der Zielstand trägt seither **hinter** den Abschnitten 0 bis 4 den Abschnitt „5. Die Lagen“ (nur wo die Daten `villagers.lage` tragen) - er wird hier abgeschnitten
+  // (nur **hinzugefügte** Zeilen, geprüft in `auslagen-lagen.test.js`); der Rest ist weiter Zeichen für Zeichen der von Welle 1.
+  const ohneLagen = (out) => { const i = out.findIndex(z => /^\n5\. Die Lagen/.test(z)); return i < 0 ? out : [...out.slice(0, i), ...out.slice(out.findIndex(z => /^\nRauchtest: /.test(z)))]; };
+  assert.equal(alt.r.out.some(z => /^\n5\. Die Lagen/.test(z)), false, 'Welle 1: kein Abschnitt 5');
+  assert.equal(neu.r.out.some(z => /^\n5\. Die Lagen/.test(z)), true, 'Zielstand: Abschnitt 5');
+  const a = ohneLagen(alt.r.out).join('\n').split('\n'), n = ohneLagen(neu.r.out).join('\n').split('\n');
   assert.equal(n.length, a.length, 'gleich viele Zeilen');
   const anders = a.map((z, i) => [z, n[i]]).filter(([x, y]) => x !== y);
   assert.deepEqual(anders.map(([x]) => x.slice(0, 10)), ['Aufbau: 31', '  seat_vil'], `nur zwei Zeilen: ${text(anders)}`);
