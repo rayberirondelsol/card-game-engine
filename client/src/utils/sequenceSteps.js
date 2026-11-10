@@ -11,12 +11,12 @@
  * for one. Offering a field the handler ignores is worse than offering none:
  * it is a promise the setup does not keep.
  */
-import { counterMax, counterValueForm, foldProduct } from '../../../shared/counters.js';
+import { counterMax, counterValueForm, foldProduct, parseCounterGate } from '../../../shared/counters.js';
 import { cellRange } from '../../../shared/gridGeometry.js';
 import { ROTATIONS, rotationOf } from '../../../shared/assetToken.js';
 import { hasPlaceholder, categoryList, onlyFinalOf, cardsInCategories } from '../../../shared/sequenceExecutor.js';
 import { findCardByName } from '../../../shared/cardSearch.js';
-import { checkGate, optPlaceholdersIn } from '../../../shared/setupOptions.js';
+import { checkGate, optPlaceholdersIn, LAGEN, lageValuesOf } from '../../../shared/setupOptions.js';
 
 /**
  * The step types, in the order the dropdown offers them: card steps first
@@ -344,7 +344,7 @@ export function describeStep(step) {
   // hinten, weil die Zeile zuerst sagt, *was* der Schritt tut.
   const gate = onlyFinalOf(step?.onlyFinal);
   const when = gate === null ? '' : gate ? ' · only in the final fight' : ' · not in the final fight';
-  return describeWork(step) + describeChoiceGate(step?.onlyChoice) + describeSeatedGate(step?.onlySeated) + when;
+  return describeWork(step) + describeChoiceGate(step?.onlyChoice) + describeSeatedGate(step?.onlySeated) + describeLageGate(step?.onlyLage) + describeCounterGate(step?.onlyCounter) + when;
 }
 
 /**
@@ -377,6 +377,22 @@ const seatsOf = (value) => {
 function describeSeatedGate(value) {
   const seats = value === undefined ? null : seatsOf(value);
   return seats ? ` · only with a villager at seat ${seats.join(' or ')}` : '';
+}
+
+/**
+ * M31.15/FD: `onlyLage` als Nachsatz („· only in the lage mehrfach or normal") und `onlyCounter`
+ * („· only if counter "Münzen (gemeinsam)" exists", mit `!` „does not exist"). Wie bei `onlySeated`
+ * steht nur da, was verstanden wird; `validateStep` meldet den Rest. **Keine zweite Regel:** die
+ * Wörter kommen aus `lageValuesOf` (shared/setupOptions.js), die Syntax aus `parseCounterGate`
+ * (shared/counters.js) - dieselben, die der Lauf fragt.
+ */
+function describeLageGate(value) {
+  const lagen = value === undefined ? null : lageValuesOf(value);
+  return lagen ? ` · only in the lage ${lagen.join(' or ')}` : '';
+}
+function describeCounterGate(value) {
+  const g = value === undefined ? null : parseCounterGate(value);
+  return g?.ok ? ` · only if counter "${g.name}" ${g.not ? 'does not exist' : 'exists'}` : '';
 }
 
 /**
@@ -769,6 +785,21 @@ export function validateStep(step, ctx = {}) {
   // prüft der Lauf (fail-loud). In einer Aktion erlaubt: es liest den Tisch, den die Aktion sieht.
   if (step?.onlySeated !== undefined && !seatsOf(step.onlySeated)) {
     problems.push(`onlySeated: ${JSON.stringify(step.onlySeated) ?? String(step.onlySeated)} is not a seat (a whole number from 1) or a list of seats`);
+  }
+  // M31.15/FD: `onlyLage` - ein Wort aus `LAGEN` oder eine nicht leere Liste davon. In einer Aktion
+  // verboten, wie `onlyChoice`: ein Spielstand kennt die Wahl nicht, und mit ihr nicht die Lage;
+  // der Lauf einer Aktion hat keine (`onlyLage: no lage`). `onlyCounter` liest dagegen den Tisch,
+  // den die Aktion sieht - erlaubt, der Wert wird überall geprüft.
+  if (step?.onlyLage !== undefined) {
+    if (ctx?.inAction) {
+      problems.push('onlyLage does not belong in an action: a saved game does not know the lage');
+    } else if (!lageValuesOf(step.onlyLage)) {
+      problems.push(`onlyLage: ${JSON.stringify(step.onlyLage) ?? String(step.onlyLage)} is not one of ${LAGEN.join(', ')} or a list of them`);
+    }
+  }
+  if (step?.onlyCounter !== undefined) {
+    const g = parseCounterGate(step.onlyCounter);
+    if (!g.ok) problems.push(g.problem);
   }
   if (ctx?.inAction) {
     for (const ph of new Set(optPlaceholdersIn(step))) {

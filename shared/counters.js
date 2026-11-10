@@ -176,3 +176,22 @@ export function counterEdit(counter, raw) {
   if (form === 'base') return { reason: `counter has no starting value` };
   return { reason: `cannot read "${written}" – type 21, +21, -21, max or base` };
 }
+
+/**
+ * M31.15/FB, FD: die Syntax von `onlyCounter` - **die eine Regel** (M6). Verstanden wird ein
+ * nicht leerer Text, höchstens mit **einem** `!` davor; alles andere (Zahl, Liste, Objekt,
+ * leer, `"!"`, `"!!x"`) ist ein Problem. Der Executor fragt sie beim Lauf, der Editor
+ * (`validateStep`, `describeStep`) beim Schreiben - sonst liefen zwei Fassungen auseinander.
+ *
+ * Gibt `{ ok: true, not, name, key }` (`name` wie geschrieben, ohne `!` und Leerraum; `key`
+ * der Vergleichsschlüssel, klein geschrieben wie `norm` im Executor) oder
+ * `{ ok: false, problem }` zurück.
+ */
+export function parseCounterGate(value) {
+  const bad = () => ({ ok: false, problem: `onlyCounter: ${JSON.stringify(value) ?? String(value)} is not a counter name (or "!" and a counter name)` });
+  if (typeof value !== 'string') return bad();
+  const not = value.startsWith('!');
+  const name = (not ? value.slice(1) : value).trim();
+  if (!name || name.startsWith('!')) return bad();
+  return { ok: true, not, name, key: name.toLowerCase() };
+}

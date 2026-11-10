@@ -27,7 +27,7 @@ import { resolveZones, anchorBoxes } from './anchoring.js';
 import { resolveGrids, cellAt, cellRange, rangeLabel, rangeBox, rangeCenter } from './gridGeometry.js';
 import { assetToken, assetFace, assetSize, rotationOf } from './assetToken.js';
 import { validateScenarioData, statsOf, missingStats, terrainFor } from './scenarioData.js';
-import { normalizeCounter, counterValue, counterMax, foldProduct, isUnreadableProduct } from './counters.js';
+import { normalizeCounter, counterValue, counterMax, foldProduct, isUnreadableProduct, parseCounterGate } from './counters.js';
 import { findCardByName } from './cardSearch.js';
 import { resolveChoices, checkGate, lageValuesOf, LAGEN } from './setupOptions.js';
 import { lageOf, seatVars, seatedVillagers, villagerCount, findVillager, hasVillagers, gearCards, counterName, seatGeometryProblems, seatHasCounters, coordOf, markerStart, STATS, TABLEAU_PREFIX } from './villagers.js';
@@ -306,12 +306,10 @@ function lageGate(value, lage) {
  * wie bei `set_counter` und `swap_villager`.
  */
 function counterGate(value, counters) {
-  const bad = () => ({ ok: false, problem: `onlyCounter: ${JSON.stringify(value) ?? String(value)} is not a counter name (or "!" and a counter name)` });
-  if (typeof value !== 'string') return bad();
-  const not = value.startsWith('!');
-  const name = norm(not ? value.slice(1) : value);
-  if (!name || name.startsWith('!')) return bad();
-  return { ok: true, applies: counters.has(name) !== not };
+  // M31.15/FD: die Syntax steht in `parseCounterGate` (shared/counters.js) - der Editor liest dieselbe.
+  const g = parseCounterGate(value);
+  if (!g.ok) return g;
+  return { ok: true, applies: counters.has(g.key) !== g.not };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
