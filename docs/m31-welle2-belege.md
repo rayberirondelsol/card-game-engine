@@ -107,3 +107,56 @@ angefasst; die Zonendaten sind seit `EX` nicht geschrieben.
 `NaN`** — die Zonen zeichnen eine Runde, bevor ihre Geometrie (Ankerkästen, M31 `EU`/`EO`)
 da ist. Sichtbarer Schaden ist keiner gemessen. Aber 500 Fehler je Aufruf **verdecken
 echte**, und darum ist es als eigene Aufgabe abgelegt, nicht hier behoben.
+
+## `FF` Teil 2 — `capacity` 3 → 4 an den fünf Hand-Zonen (Produktion)
+
+**Freigabe:** ausdrücklich erteilt; die Pflichtfrage „ist ein Setup-Editor offen?" wurde
+vorher gestellt und mit „kein Editor offen" beantwortet (der Server kann einen
+schlafenden Tab nicht sehen, M31/`EX` — darum fragt der Mensch, nicht das Skript).
+
+**Vorher gelesen.** `zone_data` **39886 Zeichen, sha `efe0b0743364`**, Hände
+`1=3, 2=3, 3=3, 4=3, 5=3` — **genau der Ausgang, den Teil 1 aus der Fixture gerechnet
+hatte**. Zielstand laut Konstanten: **39886/`e6bf6aeaf3d6`**. `--sicherung-sha`:
+`d6da91c44dd9…38c9ef`.
+
+**Sicherung:** `zone_data-M31-FF-vorher.json` im Scratchpad, 39 977 Bytes / 82 Zonen,
+**sha256 der Datei = `efe0b0743364`** — also gegen die Lesung des Skripts geprüft, nicht
+nur abgelegt.
+
+**Rückwärtsbeweis, wirklich gefahren** (nicht nur gerechnet): auf einer
+`VACUUM INTO`-Kopie der **Produktionsdatenbank** `--write` → `e6bf6aeaf3d6`, dann
+`--zurueck` → `efe0b0743364`, „Zeichen für Zeichen die Sicherung"; Fingerabdrücke aller
+Tabellen in der Transaktion und nach dem Commit unverändert. Kopie danach entfernt.
+
+**Geschrieben.** `zone_data` 39886 → 39886 Zeichen, `efe0b0743364` → **`e6bf6aeaf3d6`**;
+Hände `capacity 4, 4, 4, 4, 4`; **die 77 anderen Zonen Zeichen für Zeichen gleich**, die
+Hände ohne `capacity` ebenso; „Zielstand aus den Konstanten erreicht"; Fingerabdruck
+aller Tabellen in der Transaktion vorher/nachher **und** nach dem Commit neu gelesen:
+unverändert; **alle 17 `save_states` mit gleichem sha**. Die zehn nicht geschriebenen
+Spalten der Zeile sind einzeln gehasht und gleich. **Zweiter Lauf:** „schon geschrieben
+— nichts zu schreiben".
+
+**Rauchtest: 0 Beanstandungen**, und der `diff` gegen den Grundstand von `EY`
+(2026-11-10 00:24, **vor** Welle 2) ist **völlig leer**.
+
+Das ist kein Widerspruch zur Änderung, sondern ihr Zuschnitt: heute teilt der Aufbau die
+Heldentaten in die **gemeinsame Auslage** (solo), die Hand-Zonen sind **leer**, und ein
+Dorf-Ereignis passt in drei Plätze wie in vier. **Wirksam wird `capacity 4` erst mit
+`FG`/`FH`**, die drei Heldentaten je Hand austeilen. Das einzige, was heute messbar
+anders ist — die Ereigniskarte liegt **15 Punkte weiter links** (x 210 → 195) —, steht
+nicht in der Ausgabe des Rauchtests; es steht im Test von Teil 1.
+
+**Zwei Dinge für die Sichtprüfung (`FJ`), beide neu gemessen:**
+1. Bei vier Plätzen ragen die **äußeren Karten je 5 Punkte über den Zonenrand** (Platz 1
+   bei x−5, Platz 4 bei x+365 von 360); bei drei lagen alle 10 Punkte innerhalb. Die
+   Hände stehen 50 auseinander, stoßen also nicht aneinander. **Kosmetisch.**
+2. Die Karten (100 breit) **überlappen bei Abstand 90 um 10 Punkte** — gewollt, aber
+   sichtbar.
+
+**Die `Auto Save`-Zeile des Rauchtests ist kein Befund.** Sie hat sich heute dreimal
+geändert (15 → 17 → 15 Zeilen in `kampf-beginnen`), weil ein **Tisch-Tab mit Auto-Save
+offen** war und bei jedem Neuaufbau speichert — zuletzt durch den Auftraggeber selbst um
+**10:12:59** (drei Tableaus, 106 650 Zeichen). **Kein Deploy und kein Schreiblauf hat sie
+angefasst**; die Fingerabdrücke der Läufe belegen es. Für künftige Belege: **ein offener
+Tisch-Tab macht diese Zeile zu einem wandernden Ziel** — vor dem Vergleich schließen oder
+die Zeile ausklammern.
