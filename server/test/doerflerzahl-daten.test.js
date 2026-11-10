@@ -540,7 +540,7 @@ test('ES 8: die Datei startet nur, wenn `process.argv[1]` auf ihren **eigenen** 
     catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; }
   };
   const fremd = lauf('C:/irgendwo/alt-gelaende.mjs');
-  assert.equal(fremd.code, 0);
+  istCode(fremd, 0);
   assert.equal(fremd.out, '', 'unter anderem Namen: leere Ausgabe');
   const eigen = lauf('/app/doerflerzahl-daten.mjs');
   assert.equal(eigen.code, 2, eigen.out);
@@ -548,6 +548,9 @@ test('ES 8: die Datei startet nur, wenn `process.argv[1]` auf ihren **eigenen** 
 });
 
 // ── Die Läufe gegen eine Wegwerf-Datenbank ──────────────────────────────────
+
+/** Ein fester Zeitpunkt für `created_at` der Wegwerf-Zeilen — kein `datetime('now')`, damit kein Vergleich an der Sekunde des Einfügens hängt. */
+const ASSET_ZEIT = '2026-02-25 10:00:00';
 
 /** Das echte Schema (`setupDatabase` in einem Kindprozess), die Bibliothek aus dem Auszug, die Kurzpartie mit den drei Spalten **aus der Fixture**, ein zweiter Aufbau, drei Spielstände. */
 function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.actions, zon = zones, ast = assets } = {}) {
@@ -564,9 +567,15 @@ function frischeDatenbank({ scen = dz.scenario, seq = dz.sequence, act = dz.acti
     if (!cat.has(name)) { cat.set(name, randomUUID()); db.prepare('insert into categories (id, game_id, name) values (?, ?, ?)').run(cat.get(name), GAME_ID, name); }
     return cat.get(name);
   };
+  // `created_at` setzt der Aufbau selbst. Die Spalte steht auf `DEFAULT (datetime('now'))` mit Sekundenauflösung, und
+  // `patchAssets` vergleicht die acht Klone `Marker 4/5: <Wert>` mit ihrer Vorlage `Marker 3: <Wert>` über **jedes**
+  // Feld (`diffFelder(…, [])`) — in der Produktion ist der Klon `{ ...Vorlage, id, name }` und erbt den Wert. Ließe die
+  // Schleife die Uhr entscheiden, bekämen Vorlage und Klon unter Last verschiedene Sekunden und der Lauf bräche mit
+  // „weicht von der Vorlage ab: created_at“ ab. Dass der Klon das Feld wirklich mitnimmt, prüft `doerflerzahl-assets.test.js`
+  // mit **verschiedenen** Zeiten je Zeile — hier geht es um die Schritte danach, die den Satz nur vorfinden.
   for (const a of ast) {
-    db.prepare('insert into table_assets (id, game_id, type, name, image_path, back_image_path, width, height, category_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(a.id, GAME_ID, a.type, a.name, a.image_path, a.back_image_path, a.width, a.height, catId(a.category));
+    db.prepare('insert into table_assets (id, game_id, type, name, image_path, back_image_path, width, height, category_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(a.id, GAME_ID, a.type, a.name, a.image_path, a.back_image_path, a.width, a.height, catId(a.category), a.created_at ?? ASSET_ZEIT);
   }
   for (const c of cards) {
     db.prepare('insert into cards (id, game_id, category_id, name, image_path, width, height) values (?, ?, ?, ?, ?, ?, ?)')
@@ -595,6 +604,16 @@ async function lauf(args, { haken, Db = Database } = {}) {
     console.log = origLog;
     console.error = origErr;
   }
+}
+
+/**
+ * `code` eines `lauf(...)` pruefen und bei Abweichung **die Ausgabe des Laufs** als Meldung mitgeben.
+ * `main` faengt jeden Fehler ab (`Abbruch: <message>`, Exit 1) — ohne die Ausgabe sagt ein
+ * Ausfall nur „1 !== 0“ und verschweigt, welcher der vielen `return 1`-Pfade es war.
+ */
+function istCode(r, erwartet, wo) {
+  assert.equal(r.code, erwartet, [wo, r.out || '(keine Ausgabe)'].filter(Boolean).join('\n'));
+  return r;
 }
 
 /** Alles, was in der Datenbank steht – neu gelesen, alle Tabellen, alle Spalten. */
@@ -660,7 +679,7 @@ test('ES main: `--check` öffnet schreibgeschützt, `--write` nicht; geschrieben
       constructor(pfad, opt) { optionen.push(opt); super(pfad, opt); }
       prepare(s) { sql.push(s); return super.prepare(s); }
     }
-    assert.equal((await lauf(['--check', file, '--schritt', 'gelaende'], { Db: Spion })).code, 0);
+    istCode(await lauf(['--check', file, '--schritt', 'gelaende'], { Db: Spion }), 0);
     assert.equal(optionen.at(-1).readonly, true);
     const lesend = new Database(file, { readonly: true });
     assert.throws(() => lesend.prepare('update setups set name = name').run(), /readonly/i);
@@ -711,7 +730,7 @@ test('ES main: der zweite Lauf – „schon geschrieben“, Rückgabe 0, nichts 
   const { tmp, file } = frischeDatenbank();
   try {
     const { h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h))).code, 0);
+    istCode(await lauf(schreiben(file, h)), 0);
     const nach1 = alles(file);
     const check = await lauf(['--check', file, '--schritt', 'gelaende']);
     assert.equal(check.code, 0, check.out);
@@ -729,18 +748,18 @@ test('ES main: ohne Sicherung kein Schreiben – fehlender Hash, falsche Form, f
   try {
     const vorher = alles(file);
     const ohne = await lauf(['--write', file, '--schritt', 'gelaende']);
-    assert.equal(ohne.code, 1);
+    istCode(ohne, 1);
     assert.match(ohne.out, /ohne Sicherung kein Schreiben/);
     const kurz = await lauf(['--write', file, '--schritt', 'gelaende', '--sicherung-sha', 'abc']);
-    assert.equal(kurz.code, 1);
+    istCode(kurz, 1);
     assert.match(kurz.out, /12 Hex-Stellen/);
     const falsch = await lauf(['--write', file, '--schritt', 'gelaende', '--sicherung-sha', 'deadbeefdead']);
-    assert.equal(falsch.code, 1);
+    istCode(falsch, 1);
     assert.match(falsch.out, /passt nicht zum gelesenen Text/);
     // Der Hash des bloßen Textes (statt des Sicherungshashes) und der einer anderen Spalte reichen nicht.
     for (const andere of [sha(dz.scenario), sha(dz.sequence), sha(dz.actions)]) {
       const r = await lauf(['--write', file, '--schritt', 'gelaende', '--sicherung-sha', andere]);
-      assert.equal(r.code, 1, andere);
+      istCode(r, 1, andere);
     }
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
@@ -776,7 +795,7 @@ test('ES main: ein Stand, der nicht kompaktes JSON.stringify ist, wird nicht ang
   try {
     const vorher = alles(file);
     const c = await lauf(['--check', file, '--schritt', 'gelaende']);
-    assert.equal(c.code, 1);
+    istCode(c, 1);
     assert.match(c.out, /kompaktes JSON/);
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
@@ -818,7 +837,7 @@ test('ES main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, Zeich
   try {
     const vorher = alles(file);
     const { datei, h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h))).code, 0);
+    istCode(await lauf(schreiben(file, h)), 0);
     assert.notDeepEqual(alles(file), vorher);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'gelaende']);
     assert.equal(r.code, 0, r.out);
@@ -835,7 +854,7 @@ test('ES main: `--zurueck` ersetzt nur den exakten Zielstand – hat jemand dana
   const { tmp, file } = frischeDatenbank();
   try {
     const { datei, h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h))).code, 0);
+    istCode(await lauf(schreiben(file, h)), 0);
     setze(file, 'scenario_data', zeile(file).scenario_data + ' ');
     const vorher = alles(file);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'gelaende']);
@@ -849,20 +868,20 @@ test('ES main: `--zurueck` prüft die Sicherung – beschädigt, nicht kompakt, 
   const { tmp, file } = frischeDatenbank();
   try {
     const { h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h))).code, 0);
+    istCode(await lauf(schreiben(file, h)), 0);
     const vorher = alles(file);
     const schreibe = (name, o) => { const d = path.join(tmp, name); fs.writeFileSync(d, JSON.stringify(o)); return d; };
     const gut = { scenario_data: dz.scenario, sha256: sicherungsHash(dz.scenario) };
     const kaputt = await lauf(['--zurueck', schreibe('a.json', { ...gut, sha256: 'f'.repeat(64) }), file, '--schritt', 'gelaende']);
-    assert.equal(kaputt.code, 1); assert.match(kaputt.out, /beschädigt/);
+    istCode(kaputt, 1); assert.match(kaputt.out, /beschädigt/);
     const lose = JSON.stringify(scenario, null, 1);
     const nk = await lauf(['--zurueck', schreibe('b.json', { scenario_data: lose, sha256: sicherungsHash(lose) }), file, '--schritt', 'gelaende']);
-    assert.equal(nk.code, 1); assert.match(nk.out, /kompaktes JSON/);
+    istCode(nk, 1); assert.match(nk.out, /kompaktes JSON/);
     // Die Sicherung ist schon der Zielstand: dorthin führt kein Weg zurück.
     const neu = await lauf(['--zurueck', schreibe('c.json', { scenario_data: ZIELTEXT, sha256: sicherungsHash(ZIELTEXT) }), file, '--schritt', 'gelaende']);
-    assert.equal(neu.code, 1); assert.match(neu.out, /nicht der Ausgangsstand/);
+    istCode(neu, 1); assert.match(neu.out, /nicht der Ausgangsstand/);
     const form = await lauf(['--zurueck', schreibe('d.json', { sequence_data: dz.sequence }), file, '--schritt', 'gelaende']);
-    assert.equal(form.code, 1); assert.match(form.out, /nicht die Form/);
+    istCode(form, 1); assert.match(form.out, /nicht die Form/);
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
 });
@@ -923,7 +942,7 @@ test('ES main: die Transaktion ist `IMMEDIATE` – die Schreibsperre liegt vor d
       }
     }
     const { h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h), { Db: Spion })).code, 0);
+    istCode(await lauf(schreiben(file, h), { Db: Spion }), 0);
     assert.deepEqual(aufrufe, ['immediate']);
   } finally { weg(tmp); }
 });
@@ -941,7 +960,7 @@ test('ES main: ein Prüfer, der etwas findet, hält den Lauf an – validateScen
     assert.match(c.out, /unknown key "facedown"|facedown/);
     assert.doesNotMatch(c.out, /würde schreiben/);
     const { h } = sicherung(tmp, text(kaputt2));
-    assert.equal((await lauf(schreiben(file, h))).code, 1);
+    istCode(await lauf(schreiben(file, h)), 1);
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
 });
@@ -958,7 +977,7 @@ test('ES main: gehört der Aufbau zu einem anderen Spiel, wird nichts angefasst'
     assert.equal(c.code, 1, c.out);
     assert.match(c.out, /Aufbau gehört zu Spiel anderes-spiel/);
     const { h } = sicherung(tmp);
-    assert.equal((await lauf(schreiben(file, h))).code, 1);
+    istCode(await lauf(schreiben(file, h)), 1);
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
 });
@@ -1426,7 +1445,7 @@ test('ET main: `--write` – `scenario_data` auf dem Zielstand, **nichts sonst**
     assert.match(nochmal.out, /schon geschrieben/);
     assert.deepEqual(alles(file), nachher, 'der zweite Lauf schreibt nichts');
     const c = await lauf(['--check', file, '--schritt', 'werte']);
-    assert.equal(c.code, 0);
+    istCode(c, 0);
     assert.match(c.out, /schon geschrieben/);
   } finally { weg(tmp); }
 });
@@ -1450,8 +1469,8 @@ test('ET main: ohne Sicherung kein Schreiben; `--force` und jedes andere unbekan
   try {
     const vorher = alles(file);
     const { h } = sicherung(tmp);
-    assert.equal((await lauf(['--write', file, '--schritt', 'werte'])).code, 1);
-    assert.equal((await lauf(schreibenW(file, 'abcdef012345'))).code, 1, 'falscher Hash');
+    istCode(await lauf(['--write', file, '--schritt', 'werte']), 1);
+    istCode(await lauf(schreibenW(file, 'abcdef012345')), 1, 'falscher Hash');
     for (const flag of ['--force', '--erzwingen', '--ueberschreiben', '--yes']) {
       const r = await lauf(schreibenW(file, h, [flag]));
       assert.equal(r.code, 2, `${flag}: ${r.out}`);
@@ -1465,11 +1484,11 @@ test('ET main: ohne Sicherung kein Schreiben; `--force` und jedes andere unbekan
     const r = await lauf(['--check', file, '--schritt', 'werte']);
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /Handsy/);
-    assert.equal((await lauf(schreibenW(file, sicherung(tmp, text(halb)).h))).code, 1);
+    istCode(await lauf(schreibenW(file, sicherung(tmp, text(halb)).h)), 1);
     assert.deepEqual(alles(file), v2, 'nichts geschrieben');
     // anderer Wert
     setze(file, 'scenario_data', text(mit(s => { s.bosses['Handsy'].stats.LEB = 99; })));
-    assert.equal((await lauf(['--check', file, '--schritt', 'werte'])).code, 1);
+    istCode(await lauf(['--check', file, '--schritt', 'werte']), 1);
   } finally { weg(tmp); }
 });
 
@@ -1478,7 +1497,7 @@ test('ET main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, Zeich
   try {
     const vorher = alles(file);
     const { datei, h } = sicherung(tmp, NACH_GELAENDE);
-    assert.equal((await lauf(schreibenW(file, h))).code, 0);
+    istCode(await lauf(schreibenW(file, h)), 0);
     assert.notDeepEqual(alles(file), vorher);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'werte']);
     assert.equal(r.code, 0, r.out);
@@ -1486,7 +1505,7 @@ test('ET main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, Zeich
     assert.deepEqual(alles(file), vorher, 'jede Tabelle, jede Spalte wie am Anfang');
     assert.match((await lauf(['--zurueck', datei, file, '--schritt', 'werte'])).out, /schon der Ausgangsstand/);
     // weitergearbeitet: nach dem Schreiben ändert jemand etwas
-    assert.equal((await lauf(schreibenW(file, h))).code, 0);
+    istCode(await lauf(schreibenW(file, h)), 0);
     const jetzt = text({ ...JSON.parse(zeile(file).scenario_data), gridLabel: 'anders' });
     setze(file, 'scenario_data', jetzt);
     const nein = await lauf(['--zurueck', datei, file, '--schritt', 'werte']);
@@ -2199,7 +2218,7 @@ test('EW main: `--check` öffnet schreibgeschützt, `--write` nicht; geschrieben
       constructor(pfad, opt) { optionen.push(opt); super(pfad, opt); }
       prepare(s) { sql.push(s); return super.prepare(s); }
     }
-    assert.equal((await lauf(['--check', file, '--schritt', 'aktionen'], { Db: Spion })).code, 0);
+    istCode(await lauf(['--check', file, '--schritt', 'aktionen'], { Db: Spion }), 0);
     assert.equal(optionen.at(-1).readonly, true);
     const lesend = new Database(file, { readonly: true });
     assert.throws(() => lesend.prepare('update setups set name = name').run(), /readonly/i);
@@ -2250,7 +2269,7 @@ test('EW main: der zweite Lauf – „schon geschrieben“, Rückgabe 0, nichts 
   const { tmp, file } = frischeDatenbank();
   try {
     const { h } = ewSicherung(tmp);
-    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    istCode(await lauf(ewSchreiben(file, h)), 0);
     const nach1 = alles(file);
     const check = await lauf(['--check', file, '--schritt', 'aktionen']);
     assert.equal(check.code, 0, check.out);
@@ -2267,14 +2286,14 @@ test('EW main: ohne Sicherung kein Schreiben – fehlender Hash, falsche Form, f
   try {
     const vorher = alles(file);
     const ohne = await lauf(['--write', file, '--schritt', 'aktionen']);
-    assert.equal(ohne.code, 1); assert.match(ohne.out, /ohne Sicherung kein Schreiben/);
+    istCode(ohne, 1); assert.match(ohne.out, /ohne Sicherung kein Schreiben/);
     const kurz = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', 'abc']);
-    assert.equal(kurz.code, 1); assert.match(kurz.out, /12 Hex-Stellen/);
+    istCode(kurz, 1); assert.match(kurz.out, /12 Hex-Stellen/);
     const falsch = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', 'deadbeefdead']);
-    assert.equal(falsch.code, 1); assert.match(falsch.out, /passt nicht zum gelesenen Text/);
+    istCode(falsch, 1); assert.match(falsch.out, /passt nicht zum gelesenen Text/);
     for (const andere of [sha(dz.actions), sha(dz.scenario), sha(dz.sequence), sicherungsHash(dz.scenario)]) {
       const r = await lauf(['--write', file, '--schritt', 'aktionen', '--sicherung-sha', andere]);
-      assert.equal(r.code, 1, andere);
+      istCode(r, 1, andere);
     }
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
@@ -2366,7 +2385,7 @@ test('EW main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, Zeich
   try {
     const vorher = alles(file);
     const { datei, h } = ewSicherung(tmp);
-    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    istCode(await lauf(ewSchreiben(file, h)), 0);
     assert.notDeepEqual(alles(file), vorher);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'aktionen']);
     assert.equal(r.code, 0, r.out);
@@ -2382,7 +2401,7 @@ test('EW main: `--zurueck` ersetzt nur den exakten Zielstand – hat jemand dana
   const { tmp, file } = frischeDatenbank();
   try {
     const { datei, h } = ewSicherung(tmp);
-    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    istCode(await lauf(ewSchreiben(file, h)), 0);
     setze(file, 'action_data', zeile(file).action_data + ' ');
     const vorher = alles(file);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'aktionen']);
@@ -2396,20 +2415,20 @@ test('EW main: `--zurueck` prüft die Sicherung – beschädigt, nicht kompakt, 
   const { tmp, file } = frischeDatenbank();
   try {
     const { h } = ewSicherung(tmp);
-    assert.equal((await lauf(ewSchreiben(file, h))).code, 0);
+    istCode(await lauf(ewSchreiben(file, h)), 0);
     const vorher = alles(file);
     const schreibe = (name, o) => { const d = path.join(tmp, name); fs.writeFileSync(d, JSON.stringify(o)); return d; };
     const gut = { action_data: dz.actions, sha256: sicherungsHash(dz.actions) };
     const kaputt = await lauf(['--zurueck', schreibe('a.json', { ...gut, sha256: 'f'.repeat(64) }), file, '--schritt', 'aktionen']);
-    assert.equal(kaputt.code, 1); assert.match(kaputt.out, /beschädigt/);
+    istCode(kaputt, 1); assert.match(kaputt.out, /beschädigt/);
     const lose = JSON.stringify(AKT, null, 1);
     const nk = await lauf(['--zurueck', schreibe('b.json', { action_data: lose, sha256: sicherungsHash(lose) }), file, '--schritt', 'aktionen']);
-    assert.equal(nk.code, 1); assert.match(nk.out, /kompaktes JSON/);
+    istCode(nk, 1); assert.match(nk.out, /kompaktes JSON/);
     const zt = EW_ZIELTEXT();
     const neu = await lauf(['--zurueck', schreibe('c.json', { action_data: zt, sha256: sicherungsHash(zt) }), file, '--schritt', 'aktionen']);
-    assert.equal(neu.code, 1); assert.match(neu.out, /nicht der Ausgangsstand/);
+    istCode(neu, 1); assert.match(neu.out, /nicht der Ausgangsstand/);
     const form = await lauf(['--zurueck', schreibe('d.json', { scenario_data: dz.scenario }), file, '--schritt', 'aktionen']);
-    assert.equal(form.code, 1); assert.match(form.out, /nicht die Form/);
+    istCode(form, 1); assert.match(form.out, /nicht die Form/);
     assert.deepEqual(alles(file), vorher);
   } finally { weg(tmp); }
 });
@@ -3364,6 +3383,25 @@ const exSicherung = (tmp, scen = exAusgangScen, seq = dz.sequence) => {
 const exSchreiben = (file, h, extra = []) => ['--write', file, '--schritt', 'optionen', '--sicherung-sha', h.slice(0, 16), ...extra];
 const exCheck = (file) => ['--check', file, '--schritt', 'optionen'];
 
+test('EX/EV Wegwerf-Datenbank: `created_at` der `table_assets`-Zeilen kommt aus dem Aufbau, **nicht von der Uhr** – jeder der acht Klone trägt das `created_at` seiner Vorlage, sonst entscheidet die Sekunde des Einfügens, ob `patchAssets` sie noch als Klone erkennt', () => {
+  const { tmp, file } = exDb();
+  try {
+    const rows = alles(file).table_assets;
+    assert.ok(rows.length > 100, `${rows.length} Zeilen`);
+    // `patchAssets` vergleicht Klon und Vorlage über **jedes** Feld (`diffFelder(…, [])`), `created_at` eingeschlossen.
+    // Steht die Spalte auf `DEFAULT (datetime('now'))`, entscheidet die Sekunde des Einfügens — unter Last fällt die
+    // Schleife über zwei Sekunden und der Lauf bricht mit „weicht von der Vorlage ab: created_at“ ab.
+    const heute = new Date().toISOString().slice(0, 10);
+    for (const r of rows) assert.ok(!String(r.created_at).startsWith(heute), `„${r.name}“ trägt die Uhr des Laufs (${r.created_at})`);
+    const mit = (name) => rows.find(r => r.name === name);
+    for (const name of Object.keys(EW.ASSET_IDS)) {
+      const wert = name.split(': ')[1];
+      assert.equal(mit(name)?.created_at, mit(`Marker 3: ${wert}`)?.created_at, `${name} gegen seine Vorlage`);
+    }
+    assert.equal(EW.patchAssets(rows).art, 'schon-da', (EW.patchAssets(rows).probleme ?? []).join('; '));
+  } finally { weg(tmp); }
+});
+
 test('EX main: `--check` am Ausgangsstand – schreibgeschützt, „zu schreiben“, Plan, **beide** Beweise, Prüfer, Zielstand beider Spalten, Hash für die Sicherung', async () => {
   const { tmp, file } = exDb();
   try {
@@ -3396,7 +3434,7 @@ test('EX main: `--check` öffnet schreibgeschützt, `--write` nicht; geschrieben
       constructor(pfad, opt) { optionen.push(opt); super(pfad, opt); }
       prepare(s) { sql.push(s); return super.prepare(s); }
     }
-    assert.equal((await lauf(exCheck(file), { Db: Spion })).code, 0);
+    istCode(await lauf(exCheck(file), { Db: Spion }), 0);
     assert.equal(optionen.at(-1).readonly, true);
     sql.length = 0;
     const { h } = exSicherung(tmp);
@@ -3448,7 +3486,7 @@ test('EX main: der zweite Lauf – „schon geschrieben“, Rückgabe 0, nichts 
   const { tmp, file } = exDb();
   try {
     const { h } = exSicherung(tmp);
-    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    istCode(await lauf(exSchreiben(file, h)), 0);
     const nach1 = alles(file);
     for (const args of [exSchreiben(file, h), ['--write', file, '--schritt', 'optionen'], exCheck(file)]) {
       const r = await lauf(args);
@@ -3475,7 +3513,7 @@ test('EX main: ohne Sicherung kein Schreiben – fehlender Hash, falsche Form, f
     ];
     for (const [args, re] of FALL) { const r = await lauf(args); assert.equal(r.code, 1, r.out); assert.match(r.out, re); }
     assert.deepEqual(alles(file), vorher);
-    assert.equal((await lauf(exSchreiben(file, h))).code, 0, 'mit dem richtigen Hash geht es');
+    istCode(await lauf(exSchreiben(file, h)), 0, 'mit dem richtigen Hash geht es');
   } finally { weg(tmp); }
 });
 
@@ -3600,7 +3638,7 @@ test('EX main: `--zurueck` – der exakte Zielstand kommt auf den Ausgang, **bei
   try {
     const vorher = alles(file);
     const { h, datei } = exSicherung(tmp);
-    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    istCode(await lauf(exSchreiben(file, h)), 0);
     const r = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /zurückgeschrieben/);
@@ -3617,7 +3655,7 @@ test('EX main: `--zurueck` ersetzt nur den exakten Zielstand – hat jemand dana
     const { tmp, file } = exDb();
     try {
       const { h, datei } = exSicherung(tmp);
-      assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+      istCode(await lauf(exSchreiben(file, h)), 0);
       setze(file, spalte, zeile(file)[spalte] + ' ');
       const vorher = alles(file);
       const r = await lauf(['--zurueck', datei, file, '--schritt', 'optionen']);
@@ -3632,7 +3670,7 @@ test('EX main: `--zurueck` prüft die Sicherung – beschädigt, nicht kompakt, 
   const { tmp, file } = exDb();
   try {
     const { h } = exSicherung(tmp);
-    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    istCode(await lauf(exSchreiben(file, h)), 0);
     const vorher = alles(file);
     const schreibe = (name, obj) => { const d = path.join(tmp, name); fs.writeFileSync(d, JSON.stringify(obj)); return d; };
     const gut = { scenario_data: exAusgangScen, sequence_data: dz.sequence, sha256: sicherungsHash(exAusgangScen, dz.sequence), updated_at: 'x' };
@@ -3684,7 +3722,7 @@ test('EX main: die Transaktion ist `IMMEDIATE` – die Schreibsperre liegt vor d
       }
     }
     const { h } = exSicherung(tmp);
-    assert.equal((await lauf(exSchreiben(file, h), { Db: Spion })).code, 0);
+    istCode(await lauf(exSchreiben(file, h), { Db: Spion }), 0);
     assert.deepEqual(aufrufe, ['immediate'], 'genau **eine** Transaktion für beide Spalten');
   } finally { weg(tmp); }
 });
@@ -3765,7 +3803,7 @@ test('EX main: die Reihenfolge zu den fünf Schritten davor ist **nicht** gleich
   const { tmp, file } = exDb();
   try {
     const { h } = exSicherung(tmp);
-    assert.equal((await lauf(exSchreiben(file, h))).code, 0);
+    istCode(await lauf(exSchreiben(file, h)), 0);
     for (const schritt of ['gelaende', 'werte']) {
       const r = await lauf(['--check', file, '--schritt', schritt]);
       assert.equal(r.code, 0, `${schritt}: ${r.out}`);

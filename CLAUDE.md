@@ -36,6 +36,11 @@ Konventionen in `server/test/`:
 - Tests laden nichts aus dem Netz; wo ein Download nötig wäre, läuft ein
   `node:http`-Server im Test
 
+- **Zeitstempel setzt der Aufbau selbst.** `created_at`/`updated_at` stehen auf
+  `DEFAULT (datetime('now'))` — **Sekundenauflösung**. Zeilen, die eine Schleife
+  einfügt und ein Test später vergleicht, flattern unter Last, sobald die
+  Schleife über eine Sekundengrenze fällt (`docs/tasks-m31-doerflerzahl.md`).
+
 **Für den Client gibt es keine Testinfrastruktur.** UI-Änderungen sind dadurch
 nicht abgedeckt — wer das ändert, zieht eine Dependency ein und sollte das
 bewusst entscheiden.
