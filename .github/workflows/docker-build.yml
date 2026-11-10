@@ -55,6 +55,13 @@ jobs:
     name: Validate Docker Compose
     runs-on: ubuntu-latest
     needs: [build-backend, build-frontend]
+    env:
+      # Der Tunnel-Token liegt nur auf dem Server in
+      # /opt/card-game-engine/.env, und `${CF_TUNNEL_TOKEN:?...}` laesst
+      # `compose config` ohne ihn nicht durch. Ein Platzhalter reicht: er
+      # prueft die Datei vollstaendig, und gestartet wird der Tunnel hier
+      # nicht (siehe `up` unten).
+      CF_TUNNEL_TOKEN: ci-platzhalter-kein-echter-token
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,7 +74,9 @@ jobs:
 
       - name: Start services
         run: |
-          docker compose up -d
+          # Nur die beiden Dienste, die dieser Job prueft. cloudflared mit
+          # Platzhalter-Token zu starten waere ein Tunnel ins Leere.
+          docker compose up -d backend frontend
           echo "Waiting for services to start..."
           sleep 15
 
