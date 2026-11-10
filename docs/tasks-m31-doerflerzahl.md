@@ -595,6 +595,16 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 **Dann:** `sequenceSteps.js`; im JSX nur lesen. **Fertig, wenn:** die Tests grün sind, `sequence-steps*.test.js` unverändert grün sind, der Bau ohne neue Warnung läuft, `npm test` grün ist.
 
+> **Erledigt am 2026-11-10** (`bf68290`), test-zuerst durch einen Subagenten. **2326 → 2341 Tests**, alle grün; `sequence-steps`, `sequence-steps-seated`, `sequence-only-counter`, `sequence-only-seated`, `sequence-lage-guard`, `villager-lage`, `room-lage`, `setup-options*` unverändert; der Client-Bau mit **nur den zwei alten** Warnungen.
+>
+> **Eine Regel, nicht zwei.** Die drei Wörter kommen aus `LAGEN`/`lageValuesOf` (`FA`). Die Syntax von `onlyCounter` steckte in `FB`s `counterGate` **im Executor und nicht exportiert** — sie ist jetzt als **`parseCounterGate` in `shared/counters.js`** herausgezogen, und der Executor liest dieselbe Regel; `norm` und der neue `key` sind zeichengleich (`trim` + `toLowerCase`), also **keine Verhaltensänderung**, `FB`s Tests unverändert grün. **Eigene Gegenprobe:** die Syntaxprüfung im Helfer ausgeschaltet lässt **6 Tests des Editors und 2 Tests des Laufs** rot werden — die Regel ist wirklich geteilt und von beiden Seiten geprüft. Ein Test des Subagenten vergleicht zusätzlich für **20 Werte**, ob Lauf und Editor dasselbe sagen.
+>
+> **Kein Befund im JSX** (nur gelesen): alle drei `onChange`-Stellen in `SetupSequenceEditor.jsx` (Zeile 32, 358/361, 386/389) gehen vom **ganzen** Schritt aus und verlieren keine Felder; ein Eingabefeld für die Gates gibt es nicht, die Namen kommen in der Datei nicht vor.
+>
+> **Entschieden, weil die Aufgabe es offen ließ:** die **Reihenfolge der Nachsätze** ist Wahl → Platz → Lage → Zähler → Endkampf, im Test festgenagelt. Ein `onlyLage` mit kaputtem Wert **in einer Aktion** gibt **eine** Beanstandung („gehört nicht in eine Aktion"), nicht zwei — wie bei `onlyChoice`. Und `"  !x"` (Leerraum **vor** dem `!`) ist ein Fund, nicht ein verneinter Name — so hält es der Lauf seit `FB`, der Editor zieht nach.
+>
+> **Nebenbefund, zweiter seiner Art:** im ersten vollen Lauf fiel in `doerflerzahl-daten.test.js` der Test „`EX main` … `--write` mit Sicherung" aus — **ein anderer** als der `IMMEDIATE`-Test vom Vormittag, allein und im zweiten Lauf grün. **Zwei verschiedene Tests derselben Datei, beide nur unter Last** stützt die Lastspur (gesperrte Wegwerf-Datei) und spricht gegen einen Logikfehler in einem einzelnen Test. Weitergegeben an die Sitzung, die den Flatterer untersucht.
+
 ## FE — Deploy beider Images, Welle 2 (M31.20)
 
 **Befund.** Wie `ER`: `shared/villagers.js`, `setupOptions.js`, der Executor liegen in beiden Images; `SetupChoiceDialog.jsx` und `CreateRoomModal.jsx` im Frontend, `rooms.js` im Backend. Ein Deploy ändert nach `FA`–`FD` **nichts Sichtbares**: ohne `villagers.lage`, ohne `onlyLage`/`onlyCounter` in den Daten läuft alles wie vor Welle 2.
