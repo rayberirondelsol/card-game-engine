@@ -528,6 +528,14 @@ Das Skript in den Container (Dateiliste `docs/datenzugriff.md`, zehn Dateien mit
 
 **Fertig, wenn:** die Tests grün sind; `setup-options*.test.js`, `sequence-options.test.js`, `sequence-only-seated.test.js` **unverändert** grün sind; `npm test` grün ist.
 
+> **Erledigt am 2026-11-10** (`8821269`), test-zuerst durch einen Subagenten, zwei Durchgänge. **2278 → 2300 Tests**, alle grün; die drei genannten Dateien unverändert. `lageOf` importiert **nur `optionalOf`** — `ladderOf` braucht es nicht, es fragt je Option selbst; die Klammer im Satz oben war zu weit.
+>
+> **Der Fang war ein Widerspruch, den der Subagent gemeldet statt geglättet hat.** Mit den Schlüsseln `1` … `5` scheitert die Option `spieler` an `validateOptions`, mit `s1` … `s5` an `lageOf` — **keine Form bestand beides**, und `FA` hätte `FH` eine Zusage geliefert, die keine Daten einhalten können. Nachgemessen, dann entschieden: **`KEY` bleibt**, die Wahlen heißen **`s1` … `s5` mit Labels „1" … „5"**, `lageOf` liest die **Ziffern am Ende** des Schlüssels. Steht in der Spec bei M31.15; **`FH` schreibt die Option so**.
+>
+> **Zwei Dinge bleiben offen, bewusst:** (a) bei `S > D` **baut der Executor heute noch** — `lageOf` nennt das Problem, der Halt davor ist `FC`, nicht `FA`; (b) die Namenskonvention der Wahlen lebt **allein in `lageOf`**, `validateOptions` kann sie nicht sehen → **`FI` ruft `lageOf` gegen die geschriebenen Daten**.
+>
+> **Ein Nebenbefund, nicht von `FA`:** im vollen Lauf fiel zweimal in neun Läufen der `EX`-Test zur `IMMEDIATE`-Transaktion aus (`doerflerzahl-daten.test.js`, `main` gibt 1 zurück). **Allein läuft er 6 von 6 grün**, mit Diagnose vier volle Läufe grün, und auf dem Stand **vor** `FA` fünf Läufe grün — also lastabhängig, vermutlich eine kurzzeitig gesperrte Wegwerf-Datei unter Windows, und **nicht** von Welle 2 berührt (`FA` rührt das Schreibskript nicht an). Festgehalten, nicht verdeckt.
+
 ## FB — Das Gate `onlyCounter` (M31.15)
 
 **Befund.** Eine Aktion kennt die Lage nicht; sie liest den Tisch, und der Tisch trägt die Form des Geldes: **solo heißt, es gibt `Münzen (gemeinsam)`.**
@@ -627,7 +635,8 @@ Wie `EW` Teil 2 (Ausgang: der Stand nach `EW`; Sicherung; `--check`; Frage nach 
 ## FH — Die Option `spieler`: der Schalter der Welle (M31.15–M31.17)
 
 **Befund.** **Dieser Schritt macht die Spielerzahl wählbar.** Er schreibt `scenario_data` und `sequence_data` (auf dem Stand von Welle 1):
-- `options.spieler` (Reihenfolge der Schlüssel: **nach** `troedel`, **vor** `doerfler1`): `label` „Spieler", `default: "1"`, Wahlen `1` („1 Spieler (Solo)") … `5` („5 Spieler"), **keine** `vars` nötig;
+- `options.spieler` (Reihenfolge der Schlüssel: **nach** `troedel`, **vor** `doerfler1`): `label` „Spieler", ~~`default: "1"`, Wahlen `1` („1 Spieler (Solo)") … `5` („5 Spieler")~~, **keine** `vars` nötig;
+  > **Berichtigt in `FA`, 2026-11-10:** die Wahlen heißen **`s1` … `s5`** (`default: "s1"`), die Labels bleiben „1 Spieler (Solo)" … „5 Spieler". Mit `1` … `5` scheitert die Option an `validateOptions` — ein Schlüssel reist in der Adresse und braucht einen Buchstaben am Anfang (M30). `lageOf` liest die Ziffern am Ende des Schlüssels; gemessen und getestet in `FA`. **Auch der Roundtrip in Nr. 11 heißt damit `?opt=spieler:s2`**, nicht `spieler:2`.
 - `villagers.lage: { players: "spieler", seats: ["doerfler1", …, "doerfler5"] }`;
 - **Aufbau (`sequence_data`)** — die Schritte von Welle 1 bekommen **nur ein Gate**:
   - Schritt 24 (`deal_to_zone Heldentaten count 6 → Auslage`): `onlyLage: "solo"`;
@@ -669,6 +678,7 @@ Wie `EW` Teil 2 (Ausgang: der Stand nach `EW`; Sicherung; `--check`; Frage nach 
 2. **Die Fälle** (je Lage × Zahl 2 … 5, soweit `S ≤ D`): Aufbau, `dorfereignis`, `kampf-beginnen`, `dorfphase-beginnen` — **0** Beanstandungen, **kein** `skipped`; in **solo** die Zahlen von Welle 1; in **mehrfach/normal**: Töpfe, Hände auf drei, Auslage leer, Stapel 80 / 105; **die „Gleiche Auskunft, zwei Zeitpunkte"-Probe** (Aufbau und Aktionen stimmen überein) für **jede** Kombination.
 3. **Die bestehenden Fälle** (`EY`) laufen **unverändert**, `diff` **leer**.
 4. **Ein Raum:** ein Raumstart (`POST /api/rooms/:code/start`) mit `spieler: 2` und vier Dörflern baut dieselbe Folge wie der Tisch (`room-start-sequence.test.js` als Vorbild) — der Aufbau im Raum nutzt dieselben Gates.
+5. **Nachgetragen aus `FA` (2026-11-10): der Rauchtest ruft `lageOf` gegen die geschriebenen Daten** und beanstandet, wenn es für eine Kombination `null` oder ein Problem liefert. **Grund:** die Namenskonvention der `spieler`-Wahlen (`s1` … `s5`, die Zahl steht am Ende des Schlüssels) lebt **allein in `lageOf`** — `validateOptions` darf es nicht rufen (M7) und sieht darum nicht, wenn jemand die Wahlen später `eins`, `zwei` nennt. Ohne diese Probe fiele es erst dem ersten Menschen auf, der den Dialog öffnet.
 
 ### Teil 2 — gegen die Produktion (nur lesend; nach `FH` Teil 2)
 
