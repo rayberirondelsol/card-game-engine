@@ -507,7 +507,7 @@ test('ES 7: berührt nur `scenario_data` – der Zielstand trägt nichts anderes
 // ── 8. Das Gerüst ───────────────────────────────────────────────────────────
 
 test('ES 8: `SCHRITTE` – sechs Schritte, `gelaende` mit `{ ausgang, ziel }`, die noch nicht gebauten `null` (`werte` seit ET, `zonen` seit EU, `assets` seit EV, `aktionen` seit EW gebaut, siehe dort)', () => {
-  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   assert.deepEqual(Object.keys(SCHRITTE.gelaende), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) {
     assert.deepEqual(Object.keys(SCHRITTE.gelaende[k]), ['scenario'], k);
@@ -1546,7 +1546,7 @@ test('ET main: Vergleich-und-Tausch und Transaktion – ändert jemand `scenario
 // ── ET 8. Das Gerüst ────────────────────────────────────────────────────────
 
 test('ET 8: `SCHRITTE` – `werte` hat `{ ausgang, ziel }` (alle sechs Schritte sind seit EX gebaut); der Kopf des Skripts nennt weder Länge noch Hash des Zielstands von `werte`', () => {
-  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   for (const k of Object.keys(SCHRITTE)) assert.notEqual(SCHRITTE[k], null, k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
   const kopf = quelle.split('\n').filter((l, i, alle) => alle.slice(0, i + 1).every(x => x.startsWith('//') || x.trim() === '')).join('\n');
@@ -2164,7 +2164,7 @@ test('EW 8: berührt nur `action_data` – der Zielstand trägt nichts anderes, 
 });
 
 test('EW 8: `SCHRITTE` – `aktionen` ist gebaut (`{ ausgang, ziel }`); der Kopf des Skripts nennt weder Länge noch Hash des Ziels und des Ausgangs', () => {
-  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   assert.deepEqual(Object.keys(SCHRITTE.aktionen), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) assert.deepEqual(Object.keys(SCHRITTE.aktionen[k].action), ['laenge', 'sha'], k);
   const quelle = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').replace(/\r/g, '');
@@ -3348,7 +3348,7 @@ function exScNeuVon(sc) {
 // ── EX 8 (Gerüst). SCHRITTE ─────────────────────────────────────────────────
 
 test('EX Gerüst: `SCHRITTE` – alle sechs Schritte gebaut, `optionen` mit `{ ausgang, ziel }` für **beide** Spalten; der Kopf des Skripts nennt weder Länge noch Hash des Ausgangs oder Ziels', () => {
-  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   for (const k of Object.keys(SCHRITTE)) assert.notEqual(SCHRITTE[k], null, `${k} ist gebaut`);
   assert.deepEqual(Object.keys(SCHRITTE.optionen), ['ausgang', 'ziel']);
   for (const k of ['ausgang', 'ziel']) {

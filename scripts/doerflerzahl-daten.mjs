@@ -1,6 +1,6 @@
 // Die Dörflerzahl und die Spielerzahl als Daten: Endkampf-Plättchen, Werte, Zonen, Assets, Aktionen, die Option — der Schalter, die Hände, die Aktionen der Spielerachse, der Aufbau der Spielerachse (Spec M31.4, M31.5, M31.6, M31.7, M31.8, M31.9, M31.12, M31.15, M31.16, M31.17).
 //
-// **Neun Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende|aktionen-spieler|aufbau-spieler`, M31.12): jeder ändert ein **eigenes Stück**,
+// **Zehn Schritte, ein Skript** (`--schritt gelaende|werte|zonen|assets|aktionen|optionen|haende|aktionen-spieler|aufbau-spieler|eigentum`, M31.12; `eigentum` ist **FS, Teil 1, M32.9** — `platz` an den fünf Händen, der Schalter der Eigentumsrechte): jeder ändert ein **eigenes Stück**,
 // jeder ist einzeln widerrufbar, die Vorbedingung gilt **je Stück** und nicht je Gesamthash. Gebaut sind **`gelaende`** (Aufgabe ES, Teil 1)
 // **`werte`** (Aufgabe ET, Teil 1), **`zonen`** (Aufgabe EU, Teil 1), **`assets`** (Aufgabe EV, Teil 1), **`aktionen`** (Aufgabe EW, Teil 1) und **`optionen`** (Aufgabe EX, Teil 1) — die ersten sechs —, **`haende`** (Aufgabe FF, Teil 1, Welle 2) als siebter **`aktionen-spieler`** (Aufgabe FG, Teil 1, Welle 2) als achter und **`aufbau-spieler`** (Aufgabe FH, Teil 1, Welle 2 — der Schalter der Spielerachse) als neunter. Ein Schritt, der in `SCHRITTE` `null` wäre,
 // hielte laut an, **ohne die Datenbank zu öffnen**. Wer einen baut, trägt seine Zahlen in `SCHRITTE` ein und seine Stücke in `DEFS` — am Gerüst (Lesen, Einordnen, Tausch,
@@ -161,6 +161,7 @@ const optionenW1 = {
   ausgang: { scenario: werte.ziel.scenario, sequence: { laenge: 2621, sha: 'e859bd457002' } },
   ziel: { scenario: { laenge: 25284, sha: '7368e504b85a' }, sequence: { laenge: 2878, sha: '712f93e99e1a' } },
 };
+const haendeS = { ausgang: { zone: { laenge: 39886, sha: 'efe0b0743364' } }, ziel: { zone: { laenge: 39886, sha: 'e6bf6aeaf3d6' } } };
 export const SCHRITTE = {
   gelaende,
   werte,
@@ -178,11 +179,13 @@ export const SCHRITTE = {
   // `optionen` (EX, M31.5/M31.8/M31.12): **zwei** Spalten. Ausgang: `scenario` ist das Ziel von `werte` (dieselbe Zahl), `sequence` der Stand nach M30 (`setupwahl-daten.mjs`, Schritt `boss`); Ziel: aus `patchSchalter` gerechnet.
   optionen: optionenW1,
   // `haende` (FF, M31.14/M31.17): `zone_data`, capacity 3 → 4 an fünf Zonen. Ausgang: der Zielstand von `zonen` (dieselbe Zahl); Ziel: aus `patchHaende` gerechnet.
-  haende: { ausgang: { zone: { laenge: 39886, sha: 'efe0b0743364' } }, ziel: { zone: { laenge: 39886, sha: 'e6bf6aeaf3d6' } } },
+  haende: haendeS,
   // `aktionen-spieler` (FG, M31.16/M31.17): `action_data`, zwei Aktionen (43 → 53 und 6 → 11 Schritte). Ausgang: der Zielstand von `aktionen` (dieselbe Zahl); Ziel: aus `patchAktionenSpieler` gerechnet.
   'aktionen-spieler': { ausgang: aktionenW1.ziel, ziel: { action: { laenge: 9961, sha: '33b4dc50051e' } } },
   // `aufbau-spieler` (FH, M31.15–M31.17): **zwei** Spalten, `scenario_data` und `sequence_data` (31 → 42 Schritte). Ausgang: der Zielstand von `optionen` (dieselbe Zahl, beide Spalten); Ziel: aus `patchSpieler` gerechnet.
   'aufbau-spieler': { ausgang: optionenW1.ziel, ziel: { scenario: { laenge: 25582, sha: '377a3ba650fc' }, sequence: { laenge: 4622, sha: '7ce4574774bd' } } },
+  // `eigentum` (FS, M32.9): `zone_data`, `platz: 1 … 5` an den fünf Händen (5 × `,"platz":n`). Ausgang: der Zielstand von `haende` (dieselbe Zahl); Ziel: aus `patchEigentum` gerechnet. Es setzt **nur** den Schalter der Eigentumsrechte (M32.7 Nr. 4).
+  eigentum: { ausgang: haendeS.ziel, ziel: { zone: { laenge: 39936, sha: '490a23ecda29' } } },
 };
 
 // ── Die Messung ─────────────────────────────────────────────────────────────
@@ -1660,7 +1663,9 @@ export const pruefeSchalter = (scenario, sequence, vorgaenger) => schalterPruefe
 function leseVorgaenger(db) {
   const row = db.prepare('select zone_data, action_data from setups where id = ?').get(SETUP_ID);
   const json = (t) => { try { return JSON.parse(t); } catch { return undefined; } };
-  return { zone: json(row?.zone_data), action: json(row?.action_data), assets: leseAssets(db) };
+  // `platz` (FS, M32.9) ist das Feld eines **späteren** Schritts: wer die Zonen als Vorbedingung liest, sieht sie ohne (sonst meldeten `optionen` und `aufbau-spieler` nach FS ABWEICHEND für ihren eigenen Stand).
+  const zone = json(row?.zone_data);
+  return { zone: Array.isArray(zone) ? ohnePlatz(zone) : zone, action: json(row?.action_data), assets: leseAssets(db) };
 }
 
 // ── Die Hände (FF, M31.14, M31.17) ──────────────────────────────────────────
@@ -1740,6 +1745,89 @@ export function pruefeHaende(zonen) {
     if (da.length !== 1) out.push(`zone_data „${label}“: ${da.length ? `kommt ${da.length}-mal vor` : 'fehlt'}`);
     else if (da[0].capacity !== HAND_NEU) out.push(`zone_data „${label}“: capacity ist ${text(da[0].capacity)}, erwartet ${HAND_NEU}`);
   }
+  return out;
+}
+
+// ── Die Bindung (FS, M32.9) ─────────────────────────────────────────────────
+
+/**
+ * `platz: 1 … 5` an `Hand Dörfler 1` … `Hand Dörfler 5` (`zhand1` … `zhand5`) in `zone_data` — **sonst nichts**. Das Feld ist die **Bindung** der Hand-Zone an den Dörfler-Platz; `exclusive` und Farbe setzt der Raum beim
+ * Start auf **seine Kopie** (`bindZones` in `shared/ownership.js`, M32.3), nie in `zone_data`: `exclusive` in den Daten sperrte in jedem Raum jeden aus (M32.1 Nr. 2). **Dies ist der Schalter der Eigentumsrechte:** ohne `platz`
+ * bindet der Raumstart nichts (M32.7 Nr. 4), mit `platz` und „Spieler“ ≥ 2 gelten Rechte und Blick. Ein Platz, den es nicht gibt (zum Beispiel Platz 5 bei vier Dörflern), bleibt ungebunden.
+ *
+ * Ausgang ist der Zielstand von `haende` (FF, dieselbe Zahl: 39 886 / `e6bf6aeaf3d6`). Eine Frage, drei Antworten — **disjunkt zu `zonen` und `haende`** (jedes Stück erkennt nur seinen Stand; nach FS melden deren `--check`
+ * ABWEICHEND, der erwartete Stand):
+ *
+ * - `zu-schreiben`: keine der fünf Hände trägt `platz`, und die Zonen sind sonst der Zielstand von `haende`;
+ * - `schon-da`: jede der fünf trägt ihre Nummer, sonst dasselbe;
+ * - `abweichend`: alles andere — **teils** (ein bis vier von fünf), ein anderes `platz`, eine Hand fehlt oder kommt doppelt vor, `platz` an einer anderen Zone, `haende` (FF) noch nicht geschrieben, jede andere Abweichung.
+ *
+ * `platz` kommt als **letzter Schlüssel** der Hand (`{ ...z, platz }`); alles andere bleibt Zeichen für Zeichen. Verändert die Eingabe nicht.
+ *
+ * @param {object[]} zonen  – `zone_data` (gelesen)
+ * @returns {{ art: 'zu-schreiben'|'schon-da'|'abweichend', zone?: object[], probleme?: string[] }}
+ */
+const mitPlatz = (zonen) => zonen.map(z => { const i = HAENDE.indexOf(z?.label); return i >= 0 ? { ...z, platz: i + 1 } : z; });
+const ohnePlatz = (zonen) => zonen.map(z => {
+  if (!HAENDE.includes(z?.label) || !hat(z, 'platz')) return z;
+  const { platz: _platz, ...rest } = z;
+  return rest;
+});
+
+export function patchEigentum(zonen) {
+  if (!Array.isArray(zonen)) return { art: 'abweichend', probleme: ['zone_data ist keine Liste von Zonen'] };
+  const probleme = [];
+  const da = [];
+  HAENDE.forEach((label, i) => {
+    const treffer = zonen.filter(z => z?.label === label);
+    if (treffer.length !== 1) { probleme.push(`zone_data „${label}“: ${treffer.length ? `kommt ${treffer.length}-mal vor` : 'fehlt'}`); return; }
+    if (!hat(treffer[0], 'platz')) return;
+    if (treffer[0].platz === i + 1) da.push(label);
+    else probleme.push(`zone_data „${label}“: platz ist ${text(treffer[0].platz)}, erwartet ${i + 1} (oder noch keiner)`);
+  });
+  if (!probleme.length && da.length && da.length < HAENDE.length) {
+    probleme.push(`zone_data: platz an ${da.length} von ${HAENDE.length} Händen (${da.join(', ')}), an den anderen keiner — teils geschrieben: Abbruch, nichts überschreiben`);
+  }
+  const fremd = zonen.filter(z => z && !HAENDE.includes(z.label) && hat(z, 'platz'));
+  for (const z of fremd) probleme.push(`zone_data „${z.label ?? z.id}“: platz ${text(z.platz)} an einer Zone, die keine der fünf Hände ist`);
+  if (probleme.length) return { art: 'abweichend', probleme };
+
+  // Alles andere muss sein, wie FF es geschrieben hat: dieselbe Frage, die `patchHaende` stellt, auf den Händen ohne platz.
+  const ff = patchHaende(ohnePlatz(zonen));
+  if (ff.art === 'zu-schreiben') return { art: 'abweichend', probleme: ['zone_data: die Hände tragen noch capacity 3 — FS setzt `haende` (FF) voraus', ...(ff.probleme ?? [])] };
+  if (ff.art === 'abweichend') return { art: 'abweichend', probleme: ['zone_data: außer platz an den Händen sind die Zonen nicht der Stand nach FF (haende)', ...ff.probleme] };
+  return da.length ? { art: 'schon-da', zone: copy(zonen) } : { art: 'zu-schreiben', zone: mitPlatz(zonen) };
+}
+
+/**
+ * Der Rückwärtsbeweis, auf dem Zielstand und vor dem Schreiben: `platz` an den fünf Händen wieder weg — das muss den gelesenen Text ergeben, Zeichen für Zeichen.
+ * Dazu die **Vorwärtsprobe**: aus dem Gelesenen entsteht genau der Zielstand (der Rückwärtsbeweis allein sähe ein falsches `platz` an einer Hand nicht, weil er es wegwirft).
+ *
+ * @returns {string[]} Beanstandungen, leer = bewiesen
+ */
+export function beweiseEigentum(before, after) {
+  if (!Array.isArray(after?.zone)) return ['Rückwärtsbeweis zone_data: der Zielstand ist keine Liste'];
+  const meldungen = [];
+  const zurueck = ohnePlatz(after.zone);
+  if (text(zurueck) !== text(before?.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data: ohne platz an den fünf Händen ist der Text nicht der gelesene — ${abwTeil(text(zurueck), text(before?.zone))}`);
+  }
+  const vor = mitPlatz(zurueck);
+  if (text(vor) !== text(after.zone)) {
+    meldungen.push(`Rückwärtsbeweis zone_data (Vorwärtsprobe): aus dem Gelesenen entsteht nicht der Zielstand — ${abwTeil(text(vor), text(after.zone))}`);
+  }
+  return meldungen;
+}
+
+/** Die Prüfer des Zielstands: die von `haende` (auf den Zonen ohne platz gelesen), jede der fünf Hände genau einmal mit ihrer Nummer als `platz`, und kein `platz` an einer anderen Zone. */
+export function pruefeEigentum(zonen) {
+  const out = pruefeHaende(ohnePlatz(zonen));
+  HAENDE.forEach((label, i) => {
+    const da = zonen.filter(z => z?.label === label);
+    if (da.length !== 1) out.push(`zone_data „${label}“: ${da.length ? `kommt ${da.length}-mal vor` : 'fehlt'}`);
+    else if (da[0].platz !== i + 1) out.push(`zone_data „${label}“: platz ist ${text(da[0].platz)}, erwartet ${i + 1}`);
+  });
+  for (const z of zonen.filter(x => x && !HAENDE.includes(x.label) && hat(x, 'platz'))) out.push(`zone_data „${z.label ?? z.id}“: platz an einer Zone, die keine der fünf Hände ist`);
   return out;
 }
 
@@ -2115,6 +2203,24 @@ const DEFS = {
       console.log(`  Hände: capacity ${HAENDE.map(l => after.zone.find(z => z.label === l)?.capacity).join(', ')}`);
       console.log(`  die ${before.zone.length - HAENDE.length} anderen Zonen: ${text(ohneHaende(after.zone)) === text(ohneHaende(before.zone)) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
       console.log(`  die Hände ohne capacity: ${text(mitKapazitaet(after.zone, HAND_ALT)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+    },
+  },
+  eigentum: {
+    spalten: ['zone'],
+    patch: (b) => patchEigentum(b.zone),
+    beweise: beweiseEigentum,
+    gelesen: (b) => `platz an den Händen: ${HAENDE.map(l => `${l.replace('Hand Dörfler ', '')}=${text(b.zone?.find?.(z => z?.label === l)?.platz)}`).join(', ')}`,
+    schonDa: () => 'schon geschrieben: platz 1 bis 5 an den fünf Händen Dörfler 1 bis 5 — nichts zu schreiben',
+    plan: (b, n) => {
+      console.log(`  platz 1 … ${HAENDE.length} an ${HAENDE.length} Zonen: ${HAENDE.join(', ')} (als letzter Schlüssel; die Reihenfolge der Zonen bleibt)`);
+      console.log(`  Zonen ${b.zone.length} → ${n.zone.length}; ${b.zone.length - HAENDE.length} andere Zonen unberührt; kein exclusive, keine Farbe in den Daten (setzt der Raum beim Start, M32.3)`);
+      console.log('  Folge: der Schalter der Eigentumsrechte — der nächste Raum mit „Spieler“ ≥ 2 trägt Rechte und Blick; ein laufender Raum liest seine Zonen beim Start und ist nicht betroffen');
+    },
+    pruefer: (n) => [{ titel: 'Zonen: Ids, Labels, Anker, Feld; capacity und platz der Hände', probleme: pruefeEigentum(n.zone) }],
+    kontrolle: (before, after) => {
+      console.log(`  Hände: platz ${HAENDE.map(l => after.zone.find(z => z.label === l)?.platz).join(', ')}`);
+      console.log(`  die ${before.zone.length - HAENDE.length} anderen Zonen: ${text(ohneHaende(after.zone)) === text(ohneHaende(before.zone)) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
+      console.log(`  die Hände ohne platz: ${text(ohnePlatz(after.zone)) === text(before.zone) ? 'Zeichen für Zeichen gleich' : 'GEÄNDERT'}`);
     },
   },
   'aktionen-spieler': {

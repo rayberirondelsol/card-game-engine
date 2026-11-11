@@ -800,7 +800,7 @@ test('FH 12: die anderen Schritte sehen den neuen Stand **unverändert** – `pa
 });
 
 test('FH 12: der Kopf des Skripts und SCHRITTE – `aufbau-spieler` ist gebaut, jetzt neun Schritte; der Kopf trägt FH', () => {
-  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, k);
   const kopf = fs.readFileSync(new URL('../../scripts/doerflerzahl-daten.mjs', import.meta.url), 'utf8').split('\n').slice(0, 16).join('\n');
   assert.match(kopf, /aufbau-spieler/, 'der Kopf nennt den Schritt');
@@ -990,4 +990,19 @@ test('FH Rauchtest: der Text der Ausgabe auf dem Zielstand ist der des Standes v
   assert.deepEqual(anders.map(([x]) => x.slice(0, 10)), ['Aufbau: 31', '  seat_vil'], `nur zwei Zeilen: ${text(anders)}`);
   assert.match(anders[0][1], /Aufbau: 42 Schritte/);
   assert.equal(anders[1][0].replace('troedel, ', 'troedel, spieler, '), anders[1][1], 'die Optionenzeile: nur `spieler` ist dazugekommen');
+});
+
+// FS Teil 1 / Spec M32.9 — `eigentum` schreibt `platz` an die Hände **nach** `aufbau-spieler`. Wer die Zonen als Vorbedingung liest (`leseVorgaenger`), soll `platz` nicht sehen:
+// sonst melden `--check` von `aufbau-spieler` (und `optionen`) nach FS Teil 2 „ABWEICHEND“ für einen Stand, der **ihrer** ist. (`zonen` und `haende` melden es weiter — der erwartete Stand.)
+test('FS: nach `eigentum` (platz an den Händen) meldet `--check aufbau-spieler` weiter „schon geschrieben“ — die Vorbedingung liest die Zonen ohne platz', async () => {
+  const EIG = dz.patchEigentum(FF).zone;
+  assert.equal(dz.patchEigentum(FF).art, 'zu-schreiben');
+  assert.ok(EIG.some(z => 'platz' in z));
+  const { tmp, file } = frischeDatenbank({ ...zielDb(), zon: text(EIG) });
+  try {
+    const r = await fahre(['--check', file, '--schritt', 'aufbau-spieler']);
+    istCode(r, 0, 'check nach eigentum: ');
+    assert.match(r.out, /schon geschrieben/);
+    assert.ok(!/ABWEICHEND/.test(r.out), r.out);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

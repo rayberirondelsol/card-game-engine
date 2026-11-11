@@ -423,7 +423,7 @@ test('EU 9: der Prüfer – Ids und Labels eindeutig, das Feld nur an den Plätz
 });
 
 test('EU 9: der Kopf des Skripts und SCHRITTE – `zonen` ist gebaut (alle sechs Schritte seit EX: `assets` seit EV, `aktionen` seit EW, `optionen` seit EX); die Kurzfassung „Befund“ nennt keine Zahl des Ziels', () => {
-  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler']);
+  assert.deepEqual(Object.keys(dz.SCHRITTE), ['gelaende', 'werte', 'zonen', 'assets', 'aktionen', 'optionen', 'haende', 'aktionen-spieler', 'aufbau-spieler', 'eigentum']);
   for (const k of Object.keys(dz.SCHRITTE)) assert.notEqual(dz.SCHRITTE[k], null, k);
   assert.notEqual(dz.SCHRITTE.zonen, null);
   assert.notEqual(dz.SCHRITTE.aktionen, null);
