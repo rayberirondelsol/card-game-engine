@@ -20,6 +20,10 @@ import { mayTouch, mayTouchCard, ownZoneAt, resolveServerZones } from '../../../
 import { snapPoint, objectsInZone } from '../../../shared/zoneGeometry.js';
 // M32.6: die private Hand hält der Server.
 import { handOf, addToHand, announceHandCount, takeFromStack } from '../roomHand.js';
+// Stapelgriffe im Raum (docs/tasks-stapel-raum.md): die Rechnung auf dem Raumzustand.
+import { stackIdOf, findCard, flipStack } from '../roomStacks.js';
+
+export { stackIdOf };
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -54,6 +58,8 @@ export function handleMessage(room, playerId, rawData) {
       return handleStackTakeTop(room, playerId, payload, timestamp);
     case 'stack_shuffle':
       return handleStackShuffle(room, playerId, payload, timestamp);
+    case 'stack_flip':
+      return handleStackFlip(room, playerId, payload, timestamp);
     case 'card_play_from_hand':
       return handleCardPlayFromHand(room, playerId, payload, timestamp);
     case 'card_draw_to_hand':
@@ -137,9 +143,11 @@ function handleCardMove(room, playerId, payload, timestamp) {
 }
 
 function handleCardFlip(room, playerId, { table_id, face_down }, timestamp) {
-  const card = room.boardState.cards.find(c => c.tableId === table_id);
-  if (card) {
-    if (!allowed(room, playerId, card)) {
+  // Auch eine Karte im Stapel (sie liegt dort, wo ihr Stapel liegt).
+  const hit = findCard(room.boardState, table_id);
+  if (hit) {
+    const { card, stack } = hit;
+    if (!allowed(room, playerId, stack || card)) {
       return rejectTo(room, playerId, { type: 'card_flip', table_id, face_down: !!card.faceDown });
     }
     card.faceDown = face_down;
@@ -148,9 +156,10 @@ function handleCardFlip(room, playerId, { table_id, face_down }, timestamp) {
 }
 
 function handleCardRotate(room, playerId, { table_id, rotation }, timestamp) {
-  const card = room.boardState.cards.find(c => c.tableId === table_id);
-  if (card) {
-    if (!allowed(room, playerId, card)) {
+  const hit = findCard(room.boardState, table_id);
+  if (hit) {
+    const { card, stack } = hit;
+    if (!allowed(room, playerId, stack || card)) {
       return rejectTo(room, playerId, { type: 'card_rotate', table_id, rotation: card.rotation ?? 0 });
     }
     card.rotation = rotation;
@@ -231,10 +240,6 @@ function handleCardPickupToHand(room, playerId, { table_id }, timestamp) {
  * (docs/audit-dead-controls.md, Fund 9). `id` bleibt als Rueckfall stehen,
  * damit ein alter Raumzustand weiter gefunden wird.
  */
-export function stackIdOf(stack) {
-  return stack?.stackId ?? stack?.id;
-}
-
 function findStack(room, stackId) {
   return room.boardState.stacks.find(s => stackIdOf(s) === stackId);
 }
@@ -297,6 +302,17 @@ function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestam
     from_player_id: playerId,
     timestamp,
   }, playerId);
+}
+
+/**
+ * Stapel umdrehen: der **Server** kehrt jede Karte um, die Rückmeldung geht an **alle** (auch den Absender) und trägt die
+ * absoluten Seiten je `tableId`. Der Tisch des Absenders ändert sich erst damit (docs/tasks-stapel-raum.md, Entscheidung 1).
+ */
+function handleStackFlip(room, playerId, { stack_id }, timestamp) {
+  const stack = findStack(room, stack_id);
+  if (!stack || !Array.isArray(stack.cards)) return rejectTo(room, playerId, null, 'Diesen Stapel gibt es nicht.');
+  if (!allowed(room, playerId, stack)) return rejectTo(room, playerId);
+  broadcast(room, { type: 'stack_flip', stack_id, face_down: flipStack(stack), from_player_id: playerId, timestamp });
 }
 
 /**

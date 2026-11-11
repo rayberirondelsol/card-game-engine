@@ -120,9 +120,9 @@ test('Wurzel: `card_flip`/`card_rotate` werden an genau einer Stelle gesendet, `
   // kein Setzen des Winkels `(c.rotation || 0) ± 90` mehr außerhalb von `rotateCards` (dort: `{ ...c, rotation }`)
   assert.equal((source.match(/\.\.\.c, rotation: \(c\.rotation \|\| 0\) [+-] 90/g) || []).length, 0);
   assert.equal((source.match(/\.\.\.c, rotation \}/g) || []).length, 1);
-  // `faceDown: !c.faceDown` bleibt nur an den zwei Stapel-Flips (Menü, MobileActionBar; Stapelaktion, im Raum
-  // bewusst noch nicht gesendet, `docs/audit-dead-controls.md` Fund 1), sonst `{ ...c, faceDown }` in `flipCards`
-  assert.equal((source.match(/\.\.\.c, faceDown: !c\.faceDown/g) || []).length, 2);
+  // `faceDown: !c.faceDown` bleibt nur im Solo-Zweig von `flipStack` (Stapelaktion; Menü und MobileActionBar rufen sie,
+  // im Raum sendet sie `stack_flip`, docs/tasks-stapel-raum.md GA), sonst `{ ...c, faceDown }` in `flipCards`
+  assert.equal((source.match(/\.\.\.c, faceDown: !c\.faceDown/g) || []).length, 1);
   assert.equal((source.match(/\.\.\.c, faceDown \}/g) || []).length, 1);
-  assert.match(menuHandler('context-flip-stack'), /inStack === sid/);
+  assert.match(menuHandler('context-flip-stack'), /flipStack\(contextMenu\.stackId\)/);
 });

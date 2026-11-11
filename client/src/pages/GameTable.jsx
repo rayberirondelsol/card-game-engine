@@ -41,6 +41,7 @@ import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp } from '
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
+import { applyStackFlip } from '../utils/stackOps.js';
 import { tableLayers, WIDGET_BOX, pickTopmost, widgetScale } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
@@ -3779,6 +3780,11 @@ export default function GameTable({ room = null }) {
         case 'stack_shuffle':
           if (Array.isArray(msg.order)) applyStackOrder(msg.stack_id, msg.order);
           break;
+        // docs/tasks-stapel-raum.md GA: der Server hat jede Karte des Stapels umgekehrt - die Seiten sind absolut, die
+        // Rückmeldung gilt auch für den Absender (sein Tisch ändert sich erst damit).
+        case 'stack_flip':
+          setTableCards(prev => applyStackFlip(prev, msg));
+          break;
         case 'stack_removed':
           setTableCards(prev => prev.filter(c => c.inStack !== msg.stack_id));
           break;
@@ -5043,6 +5049,17 @@ export default function GameTable({ room = null }) {
       if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation });
       return { ...c, rotation };
     }));
+  }
+
+  // Einen ganzen Stapel umdrehen („Flip Stack“, Menü und MobileActionBar): **eine** Stelle. Im Raum ist es ein Wunsch an
+  // den Server (`stack_flip`); der Tisch - auch der eigene - ändert sich erst mit der Rückmeldung (`applyRemoteAction`,
+  // docs/tasks-stapel-raum.md GA). Ohne Raum wie immer: jede Karte für sich umgekehrt.
+  function flipStack(stackId) {
+    if (room) {
+      room.sendAction({ type: 'stack_flip', stack_id: stackId });
+      return;
+    }
+    setTableCards(prev => prev.map(c => c.inStack === stackId ? { ...c, faceDown: !c.faceDown } : c));
   }
 
   // ===== MOBILE ACTION BAR HANDLERS =====
@@ -8174,13 +8191,7 @@ export default function GameTable({ room = null }) {
                     </button>
                     <button
                       onClick={() => {
-                        const sid = contextMenu.stackId;
-                        setTableCards(prev => prev.map(c => {
-                          if (c.inStack === sid) {
-                            return { ...c, faceDown: !c.faceDown };
-                          }
-                          return c;
-                        }));
+                        flipStack(contextMenu.stackId);
                         setContextMenu(null);
                       }}
                       data-testid="context-flip-stack"
@@ -8848,7 +8859,7 @@ export default function GameTable({ room = null }) {
             if (card?.inStack) { stackId = card.inStack; break; }
           }
           if (!stackId) return;
-          setTableCards(prev => prev.map(c => c.inStack === stackId ? { ...c, faceDown: !c.faceDown } : c));
+          flipStack(stackId);
         }}
         onRemove={() => {
           // M23.1: derselbe Weg wie im Kontextmenü. Eine Abfrage nur an der
