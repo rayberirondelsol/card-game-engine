@@ -2154,16 +2154,25 @@ export default function GameTable({ room = null }) {
     setShowCounterModal(true);
   }
 
+  /**
+   * Der eine Weg, den Wert eines Zaehlers zu aendern: lokal setzen und im Raum
+   * den **absoluten** Wert schicken (der Server speichert `value`, kein Delta).
+   * Plus, Minus und das getippte Feld laufen alle hier durch - vorher setzte
+   * jeder nur den eigenen Zustand, und die Mitspieler sahen den alten Wert.
+   */
+  function setCounterValue(counterId, value) {
+    setCounters(prev => prev.map(c => (c.id === counterId ? { ...c, value } : c)));
+    if (room) room.sendAction({ type: 'counter_update', counter_id: counterId, value });
+  }
+
   function incrementCounter(counterId) {
-    setCounters(prev => prev.map(c =>
-      c.id === counterId ? { ...c, value: c.value + 1 } : c
-    ));
+    const c = counters.find(x => x.id === counterId);
+    if (c) setCounterValue(counterId, c.value + 1);
   }
 
   function decrementCounter(counterId) {
-    setCounters(prev => prev.map(c =>
-      c.id === counterId ? { ...c, value: c.value - 1 } : c
-    ));
+    const c = counters.find(x => x.id === counterId);
+    if (c) setCounterValue(counterId, c.value - 1);
   }
 
   function deleteCounter(counterId) {
@@ -2238,7 +2247,7 @@ export default function GameTable({ room = null }) {
       cancelCounterEdit();
       return;
     }
-    setCounters(prev => prev.map(c => (c.id === counterId ? { ...c, value: result.value } : c)));
+    setCounterValue(counterId, result.value);
     cancelCounterEdit();
   }
 

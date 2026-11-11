@@ -15,17 +15,19 @@ Zweite: **aufgegebene Features, deren Reste noch verdrahtet aussehen.**
 
 ## Funde, nach Auswirkung
 
-### 1. Neun Mehrspieler-Aktionen, die kein Client je sendet
+### 1. Acht (ursprünglich neun) Mehrspieler-Aktionen, die kein Client je sendet
 `server/src/websocket/messageHandler.js` implementiert und broadcastet sie,
 `GameTable.jsx` ruft für keine `room.sendAction(...)` auf:
 
-`card_play_from_hand` · `counter_update` · `dice_roll` · `note_edit` ·
+`card_play_from_hand` · `dice_roll` · `note_edit` ·
 `stack_move` · `stack_take_top` · `stack_create` · `stack_merge` · `stack_shuffle`
 
 Die letzten drei haben auch clientseitig keinen Empfänger.
 
+**`counter_update` ist verdrahtet** (2026-11-11, Fund aus dem Produktionstest: Spieler B sah den Wert von A auch nach dem Neuladen nicht): Plus, Minus und das getippte Feld laufen durch `setCounterValue` in `GameTable.jsx`, das den absoluten Wert sendet; der Server verwirft nicht endliche Werte (`server/test/counter-update-sync.test.js`). Die übrigen acht stehen unverändert offen.
+
 **Folge:** In einer Mehrspielerpartie sehen die anderen weder Stapel bilden, mischen,
-teilen oder abheben, noch Würfelwürfe, Zähler, Notiz-Änderungen oder eine
+teilen oder abheben, noch Würfelwürfe, Notiz-Änderungen oder eine
 ausgespielte Handkarte. Server-Logik und Broadcast sind fertig, nur der Auslöser fehlt.
 
 Korrekt verdrahtet sind dagegen `drawCardsFromStack`, `handleCardDragEnd`, `createToken`.

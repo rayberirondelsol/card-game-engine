@@ -238,7 +238,7 @@ ist mehr wert als überschneidungsfrei zu liegen (M8.1, M8.6 Regel 3).
 | `shared/sequenceExecutor.js` | nichts zu tun — `place_counter` behält seinen Wert (N5), Suche und Rad sind keine Schrittfelder |
 | `client/src/utils/sequenceSteps.js` | nichts zu tun — kein neues Schrittfeld |
 | `getGameState`/`loadGameState` | nichts zu tun — kein neues Feld am Zähler; Wert und `max` laufen schon über `normalizeCounter` |
-| Raum / `messageHandler.js` | nichts zu tun **und schon vorher kaputt**: `counter_update` ist eine der neun Aktionen, die kein Client sendet (`docs/audit-dead-controls.md` Fund 1). Ein gesetzter Wert erreicht die Mitspieler so wenig wie ein Klick auf `+` heute |
+| Raum / `messageHandler.js` | nichts zu tun; `counter_update` war vorher eine der neun Aktionen, die kein Client sendet (`docs/audit-dead-controls.md` Fund 1), ist seit 2026-11-11 verdrahtet — ein gesetzter Wert erreicht die Mitspieler über `setCounterValue` |
 
 **Abnahmekriterium.** Für jede Zeile ein Beleg im Bericht.
 

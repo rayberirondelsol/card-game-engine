@@ -304,6 +304,8 @@ function handleDiceRoll(room, playerId, { dice_id, value }, timestamp) {
 }
 
 function handleCounterUpdate(room, playerId, { counter_id, value }, timestamp) {
+  // Vertrauensgrenze: nur eine endliche Zahl wird gespeichert und verteilt.
+  if (!Number.isFinite(value)) return;
   const counter = room.boardState.counters.find(c => c.id === counter_id);
   if (counter) counter.value = value;
   broadcast(room, { type: 'counter_update', counter_id, value, from_player_id: playerId, timestamp }, playerId);
