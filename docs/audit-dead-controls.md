@@ -26,6 +26,8 @@ Die letzten drei haben auch clientseitig keinen Empfänger.
 
 **`counter_update` ist verdrahtet** (2026-11-11, Fund aus dem Produktionstest: Spieler B sah den Wert von A auch nach dem Neuladen nicht): Plus, Minus und das getippte Feld laufen durch `setCounterValue` in `GameTable.jsx`, das den absoluten Wert sendet; der Server verwirft nicht endliche Werte (`server/test/counter-update-sync.test.js`). Die übrigen acht stehen unverändert offen.
 
+**Nachtrag zu Einzelkarten (2026-11-11, Sichtprobe M32):** Umdrehen und Drehen einer Karte (Taste F/E/Q, Kontextmenü, MobileActionBar, Zwei-Finger-Drehen) laufen jetzt über `flipCards`/`rotateCards` in `GameTable.jsx` und senden im Raum `card_flip`/`card_rotate`; vorher sendete nur die Taste (`server/test/card-menu-room-sync.test.js`). **Stapelaktionen sind weiter ungesendet:** „Flip Stack“ (Menü und MobileActionBar), `stack_create`/`stack_merge` (Stapel bilden), Split, `stack_take_top`.
+
 **Folge:** In einer Mehrspielerpartie sehen die anderen weder Stapel bilden, mischen,
 teilen oder abheben, noch Würfelwürfe, Notiz-Änderungen oder eine
 ausgespielte Handkarte. Server-Logik und Broadcast sind fertig, nur der Auslöser fehlt.

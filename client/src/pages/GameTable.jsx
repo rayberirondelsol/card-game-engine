@@ -1261,39 +1261,21 @@ export default function GameTable({ room = null }) {
       // F key - flip selected card(s)
       if (e.key === 'f' || e.key === 'F') {
         if (selectedCards.size > 0) {
-          setTableCards(prev => prev.map(c => {
-            if (selectedCards.has(c.tableId)) {
-              if (room) room.sendAction({ type: 'card_flip', table_id: c.tableId, face_down: !c.faceDown });
-              return { ...c, faceDown: !c.faceDown };
-            }
-            return c;
-          }));
+          flipCards(c => selectedCards.has(c.tableId));
         }
       }
 
       // E key - rotate 90 clockwise
       if (e.key === 'e' || e.key === 'E') {
         if (selectedCards.size > 0) {
-          setTableCards(prev => prev.map(c => {
-            if (selectedCards.has(c.tableId)) {
-              if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation: (c.rotation || 0) + 90 });
-              return { ...c, rotation: (c.rotation || 0) + 90 };
-            }
-            return c;
-          }));
+          rotateCards(c => selectedCards.has(c.tableId), 90);
         }
       }
 
       // Q key - rotate 90 counter-clockwise
       if (e.key === 'q' || e.key === 'Q') {
         if (selectedCards.size > 0) {
-          setTableCards(prev => prev.map(c => {
-            if (selectedCards.has(c.tableId)) {
-              if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation: (c.rotation || 0) - 90 });
-              return { ...c, rotation: (c.rotation || 0) - 90 };
-            }
-            return c;
-          }));
+          rotateCards(c => selectedCards.has(c.tableId), -90);
         }
       }
 
@@ -4910,21 +4892,11 @@ export default function GameTable({ room = null }) {
         if (newTouch.clientX < holdTouch.clientX) {
           // Rotate 90° counter-clockwise
           triggerHaptic('action');
-          setTableCards(prev => prev.map(c => {
-            if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
-              return { ...c, rotation: (c.rotation || 0) - 90 };
-            }
-            return c;
-          }));
+          rotateCards((c, all) => c.tableId === draggingCard || (c.inStack && all.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack), -90);
         } else {
           // Rotate 90° clockwise
           triggerHaptic('action');
-          setTableCards(prev => prev.map(c => {
-            if (c.tableId === draggingCard || (c.inStack && prev.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack)) {
-              return { ...c, rotation: (c.rotation || 0) + 90 };
-            }
-            return c;
-          }));
+          rotateCards((c, all) => c.tableId === draggingCard || (c.inStack && all.find(dc => dc.tableId === draggingCard)?.inStack === c.inStack), 90);
         }
         return; // Don't start pinch zoom
       }
@@ -5048,38 +5020,42 @@ export default function GameTable({ room = null }) {
   function dismissSetupSaveModal() { setShowSetupSaveModal(false); }
   function dismissSplitModal() { setShowSplitModal(false); setSplitStackId(null); setSplitCount(''); }
 
+  // Umdrehen und Drehen einzelner Karten: **eine** Stelle für Taste (F/E/Q), Kontextmenü, MobileActionBar und das
+  // Zwei-Finger-Drehen. Im Raum geht jede Änderung als absoluter Wert an den Server (`card_flip`/`card_rotate`); der
+  // weist sie ggf. ab und schickt den wahren Stand zurück (`applyRemoteAction`, M32 FO). Vorher stand der Handgriff
+  // fünfmal da, und nur die Taste kannte den Raum — Sichtprobe M32, 2026-11-11: die Tische liefen still auseinander.
+  // `pick(card, allCards)` wählt die Karten. Stapel-Flip („Flip Stack“) ist eine Stapelaktion und noch nicht im Raum
+  // (`docs/audit-dead-controls.md` Fund 1). Die Nachricht trägt absolute Werte, ein doppelter Aufruf des Updaters
+  // (StrictMode) ist darum harmlos.
+  function flipCards(pick) {
+    setTableCards(prev => prev.map(c => {
+      if (!pick(c, prev)) return c;
+      const faceDown = !c.faceDown;
+      if (room) room.sendAction({ type: 'card_flip', table_id: c.tableId, face_down: faceDown });
+      return { ...c, faceDown };
+    }));
+  }
+
+  function rotateCards(pick, delta) {
+    setTableCards(prev => prev.map(c => {
+      if (!pick(c, prev)) return c;
+      const rotation = (c.rotation || 0) + delta;
+      if (room) room.sendAction({ type: 'card_rotate', table_id: c.tableId, rotation });
+      return { ...c, rotation };
+    }));
+  }
+
   // ===== MOBILE ACTION BAR HANDLERS =====
   function handleMobileFlip() {
-    if (selectedCards.size > 0) {
-      setTableCards(prev => prev.map(c => {
-        if (selectedCards.has(c.tableId)) {
-          return { ...c, faceDown: !c.faceDown };
-        }
-        return c;
-      }));
-    }
+    if (selectedCards.size > 0) flipCards(c => selectedCards.has(c.tableId));
   }
 
   function handleMobileRotateCW() {
-    if (selectedCards.size > 0) {
-      setTableCards(prev => prev.map(c => {
-        if (selectedCards.has(c.tableId)) {
-          return { ...c, rotation: (c.rotation || 0) + 90 };
-        }
-        return c;
-      }));
-    }
+    if (selectedCards.size > 0) rotateCards(c => selectedCards.has(c.tableId), 90);
   }
 
   function handleMobileRotateCCW() {
-    if (selectedCards.size > 0) {
-      setTableCards(prev => prev.map(c => {
-        if (selectedCards.has(c.tableId)) {
-          return { ...c, rotation: (c.rotation || 0) - 90 };
-        }
-        return c;
-      }));
-    }
+    if (selectedCards.size > 0) rotateCards(c => selectedCards.has(c.tableId), -90);
   }
 
   function handleMobileDraw(count) {
@@ -8101,12 +8077,7 @@ export default function GameTable({ room = null }) {
                 </button>
                 <button
                   onClick={() => {
-                    setTableCards(prev => prev.map(c => {
-                      if (selectedCards.has(c.tableId)) {
-                        return { ...c, faceDown: !c.faceDown };
-                      }
-                      return c;
-                    }));
+                    flipCards(c => selectedCards.has(c.tableId));
                     setContextMenu(null);
                   }}
                   data-testid="context-flip"
@@ -8117,12 +8088,7 @@ export default function GameTable({ room = null }) {
                 </button>
                 <button
                   onClick={() => {
-                    setTableCards(prev => prev.map(c => {
-                      if (selectedCards.has(c.tableId)) {
-                        return { ...c, rotation: (c.rotation || 0) + 90 };
-                      }
-                      return c;
-                    }));
+                    rotateCards(c => selectedCards.has(c.tableId), 90);
                     setContextMenu(null);
                   }}
                   data-testid="context-rotate-cw"
@@ -8133,12 +8099,7 @@ export default function GameTable({ room = null }) {
                 </button>
                 <button
                   onClick={() => {
-                    setTableCards(prev => prev.map(c => {
-                      if (selectedCards.has(c.tableId)) {
-                        return { ...c, rotation: (c.rotation || 0) - 90 };
-                      }
-                      return c;
-                    }));
+                    rotateCards(c => selectedCards.has(c.tableId), -90);
                     setContextMenu(null);
                   }}
                   data-testid="context-rotate-ccw"
