@@ -129,3 +129,17 @@ test('Zweiter Connect desselben Spielers schliesst den alten Socket mit 4000, oh
   assert.deepEqual(b.msgs.slice(bVor).filter(m => m.type === 'player_disconnected'), []);
   assert.equal(a2.ws.readyState, WebSocket.OPEN);
 });
+
+test('Reconnect eines Nicht-Hosts laesst den Gnadentimer des getrennten Hosts weiterlaufen', async () => {
+  const room = getRoom(ROOM_CODE);
+  await open('B');
+  const a = await open('A');
+  a.ws.close();                        // Host A trennt sich, Timer laeuft
+  await tick();
+  const timer = room.hostDisconnectTimer;
+  assert.ok(timer, 'Host-Close muss den Gnadentimer setzen');
+
+  await open('B');                     // B verbindet sich neu (Netzwechsel/Neuladen)
+  assert.equal(timer._destroyed, false, 'Timer des Hosts darf nicht gestoppt werden');
+  assert.equal(room.hostDisconnectTimer, timer);
+});

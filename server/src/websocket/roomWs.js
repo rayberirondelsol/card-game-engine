@@ -88,9 +88,12 @@ export function setupWebSocketServer(httpServer) {
       return;
     }
 
-    // Der Host ist (wieder) da: die Gnadenfrist darf niemanden mehr zum Host machen.
-    clearTimeout(room.hostDisconnectTimer);
-    room.hostDisconnectTimer = null;
+    // Der Host ist (wieder) da: die Gnadenfrist darf niemanden mehr zum Host machen. Nur seine eigene
+    // Verbindung stoppt sie – ein anderer Spieler, der sich neu verbindet, nicht.
+    if (room.hostPlayerId === playerId) {
+      clearTimeout(room.hostDisconnectTimer);
+      room.hostDisconnectTimer = null;
+    }
 
     // Derselbe Spieler ein zweites Mal (Reconnect, zweiter Tab): den alten Socket schliessen, sonst speist
     // er weiter Nachrichten ein. Sein Close loest dank des Guards unten keine Trennung aus.
