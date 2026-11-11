@@ -158,6 +158,9 @@ test('FC: ein Start mit zulässiger Wahl gibt weiter 200 und baut', async () => 
   const gameId = await createGame();
   const created = await createRoom(gameId, await mitLage(gameId), { spieler: 's2' });
   const { room_code, player_id } = created.json();
+  // M32/FN: zwei Spieler brauchen zwei Spieler im Raum - der Gast tritt vor dem Start bei.
+  const join = await app.inject({ method: 'POST', url: `/api/rooms/${room_code}/join`, headers, payload: { display_name: 'Gast', color: 'blue' } });
+  assert.equal(join.statusCode, 201, join.body);
 
   const res = await start(room_code, player_id);
   assert.equal(res.statusCode, 200, res.body);

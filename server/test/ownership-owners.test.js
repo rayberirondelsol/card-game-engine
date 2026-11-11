@@ -108,13 +108,13 @@ test('FK 3: falsche Spielerzahl → Problem (deutsch, beide Zahlen), kein Eigent
   const eins = ownersOfPlayers(lage(2, 4), spieler(1));
   assert.deepEqual(Object.keys(eins), ['problems']);
   assert.equal(eins.problems.length, 1);
-  assert.match(eins.problems[0], /braucht genau 2 Spieler, im Raum sind 1/);
+  assert.match(eins.problems[0], /braucht genau 2 Spieler, im Raum ist erst 1 Spieler\./);
 
   const drei = ownersOfPlayers(lage(2, 4), spieler(1, 2, 3));
-  assert.match(drei.problems[0], /braucht genau 2 Spieler, im Raum sind 3/);
+  assert.match(drei.problems[0], /braucht genau 2 Spieler, im Raum sind 3 Spieler\./);
 
   const keiner = ownersOfPlayers(lage(2, 4), []);
-  assert.match(keiner.problems[0], /im Raum sind 0/);
+  assert.match(keiner.problems[0], /im Raum sind 0 Spieler\./);
 });
 
 // ── 4. bindZones ─────────────────────────────────────────────────────────────

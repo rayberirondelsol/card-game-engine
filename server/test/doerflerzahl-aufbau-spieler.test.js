@@ -720,6 +720,12 @@ test('FH 11: **der Raum** – `POST /api/rooms` mit `spieler:s2`, `doerfler3`, `
       const c = await anlegen(choices);
       assert.equal(c.statusCode, 201, c.body);
       const { room_code, player_id } = c.json();
+      // M32/FN: bei mehreren Spielern verlangt der Start genau `S` Spieler im Raum - die Gäste treten vor dem Start bei.
+      const S = Number(/(\d+)$/.exec(choices?.spieler ?? 's1')[1]);
+      for (let i = 1; i < S; i++) {
+        const j = await app.inject({ method: 'POST', url: `/api/rooms/${room_code}/join`, headers, payload: { display_name: `Gast${i}`, color: ['blue', 'green', 'purple', 'orange', 'yellow'][i - 1] } });
+        assert.equal(j.statusCode, 201, j.body);
+      }
       const r = await app.inject({ method: 'POST', url: `/api/rooms/${room_code}/start`, headers, payload: { player_id } });
       assert.equal(r.statusCode, 200, r.body);
       return getRoom(room_code).boardState;

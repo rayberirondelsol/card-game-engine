@@ -36,8 +36,8 @@ export function ownersOf(S, D) {
  * Die Spieler werden nach **Sitz** sortiert (Rang 1 … S): nach Reihenfolge, nicht nach Sitznummer, denn
  * Sitze haben Lücken, wenn jemand vor dem Start geht. Die Eingabe bleibt unverändert.
  *
- * Eine Zahl von Spielern, die nicht `S` ist, gibt `{ problems: [...] }` (deutsch, mit beiden Zahlen) und
- * **kein** Eigentum. `lage` ohne `kind`, `solo` oder `null` gibt `null`.
+ * Eine Zahl von Spielern, die nicht `S` ist, gibt `{ problems: [...] }` (deutsch, mit beiden Zahlen, „… im Raum
+ * ist erst 1 Spieler.“ / „… sind 3 Spieler.“) und **kein** Eigentum. `lage` ohne `kind`, `solo` oder `null` gibt `null`.
  *
  * @param {{ players: number, villagers: number, kind: string|null }|null} lage  Ergebnis von `lageOf` (M31.15)
  * @param {Array<{ id: string, seat: number, color: string }>} players
@@ -50,7 +50,8 @@ export function ownersOfPlayers(lage, players) {
 
   const list = Array.isArray(players) ? players : [];
   if (list.length !== lage.players) {
-    return { problems: [`Der Raum braucht genau ${lage.players} Spieler, im Raum sind ${list.length}.`] };
+    const da = list.length === 1 ? 'ist erst 1 Spieler' : `sind ${list.length} Spieler`;
+    return { problems: [`Der Raum braucht genau ${lage.players} Spieler, im Raum ${da}.`] };
   }
   const sorted = [...list].sort((a, b) => a.seat - b.seat);
   const owners = {};

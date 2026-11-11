@@ -25,6 +25,7 @@ import { resolveGrids, placeOnGrids } from '../../../shared/gridGeometry.js';
 import { anchorBoxes } from '../../../shared/anchoring.js';
 import { resolveChoices, describeChoices } from '../../../shared/setupOptions.js';
 import { lageOf } from '../../../shared/villagers.js';
+import { ownersOf, ownersOfPlayers, bindZones } from '../../../shared/ownership.js';
 
 const VALID_COLORS = ['red', 'blue', 'green', 'purple', 'orange', 'yellow'];
 
@@ -167,7 +168,11 @@ export async function roomsRoutes(fastify) {
     // M27.3/CX: die Wahl mit ihren Bezeichnungen - die Lobby zeigt sie, und die
     // Rechnung ist dieselbe wie bei der Meldung am Tisch.
     const choices = storedChoices(room);
-    const setupRow = choices && room.setup_id ? db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id) : null;
+    const setupRow = room.setup_id ? db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id) : null;
+    // M32/FN: die Lage und wer welchen Platz führt - die Lobby zeigt es (`null`, wo es nicht gilt).
+    const resolved = setupRow ? resolveChoices(scenarioOf(setupRow).options, choices ?? {}) : null;
+    const lage = resolved && !resolved.problems.length ? lageOf(scenarioOf(setupRow), resolved.choices) : null;
+    const raenge = lage ? ownersOf(lage.players, lage.villagers) : null;
 
     // Merge live connection state from in-memory store
     const liveRoom = getRoom(code.toUpperCase());
@@ -191,6 +196,8 @@ export async function roomsRoutes(fastify) {
       setup_choices: choices,
       setup_choices_label: choices ? describeChoices(scenarioOf(setupRow).options, choices) : '',
       players: playersWithStatus,
+      lage: lage ? { players: lage.players, villagers: lage.villagers, kind: lage.kind } : null,
+      plaetze: raenge ? raenge.map((rang, i) => ({ platz: i + 1, rang })) : null,
     };
   });
 
@@ -285,6 +292,7 @@ export async function roomsRoutes(fastify) {
     // (`resolveChoices`, letzte Wache) - dann startet der Raum lieber gar nicht,
     // als mit einem leeren Tisch zu laufen.
     const choices = storedChoices(room) ?? {};
+    let owners = null;
     if (room.setup_id) {
       const setupRow = db.prepare('SELECT scenario_data FROM setups WHERE id = ?').get(room.setup_id);
       const scenario = scenarioOf(setupRow);
@@ -298,6 +306,11 @@ export async function roomsRoutes(fastify) {
       if (lage?.problems.length) {
         return reply.code(409).send({ error: `Die Wahl für diesen Aufbau gilt nicht mehr: ${lage.problems.join('; ')}` });
       }
+      // M32.3/FN: bei mehreren Spielern (Lage `mehrfach`/`normal`) verlangt der Start **genau `S`** Spieler - sonst
+      // gäbe es Plätze ohne Eigentümer. Wie die Wachen oben **vor** dem `active`; `owners` ist `null`, wo kein
+      // Eigentum gilt (solo, keine Lage): dann geschieht unten nichts.
+      owners = ownersOfPlayers(lage, db.prepare('SELECT id, seat, color FROM room_players WHERE room_id = ?').all(room.id));
+      if (owners?.problems) return reply.code(409).send({ error: owners.problems.join('; ') });
     }
 
     db.prepare("UPDATE game_rooms SET status = 'active', updated_at = unixepoch() WHERE room_code = ?").run(roomCode);
@@ -376,7 +389,12 @@ export async function roomsRoutes(fastify) {
             state.cards = placeOnGrids(state.cards, resolved);
           }
 
-          liveRoom.zones = zones;
+          // M32.3/FN: die **Kopie** des Raums bindet seine Hand-Zonen an die Eigentümer (Farbe, `exclusive`);
+          // `zone_data` bleibt unberührt. Ohne Eigentum ist `bound.zones === zones`. Ein Platz ohne Hand-Zone
+          // (Daten vor `FS`) bricht den Start nicht ab, er wird gemeldet wie ein Aufbauschritt, der nicht lief.
+          const bound = bindZones(zones, owners);
+          for (const w of bound.warnings) fastify.log.warn({ room: roomCode }, w);
+          liveRoom.zones = bound.zones;
           liveRoom.grids = grids;
         }
       }

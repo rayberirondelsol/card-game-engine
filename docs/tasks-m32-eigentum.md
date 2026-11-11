@@ -135,6 +135,8 @@ Die Skizze der Abnahmeliste ist an Code und Daten gemessen worden; an diesen Ste
 
 **Fertig, wenn:** die Tests grün sind; `room-lage.test.js`, `room-setup-choices.test.js`, `room-start-sequence.test.js` **unverändert** grün sind; `npm test` grün ist.
 
+**Berichtigung beim Bau (FN, 2026-11-11).** (1) **Zwei vorhandene Tests starteten einen `s2`-Raum mit nur dem Host** und mussten einen Gast bekommen (`room-lage.test.js`: „FC: ein Start mit zulässiger Wahl gibt weiter 200 und baut"; `doerflerzahl-aufbau-spieler.test.js`: „FH 11: der Raum", dort `starten` tritt `S − 1` Gästen bei): das ist die verlangte Wirkung von Nr. 2 („genau `S` Spieler"), keine Abweichung — „unverändert grün" heißt hier: **bis auf den Beitritt vor dem Start**. (2) Der Satz bei falscher Zahl ist grammatisch für 1 und viele: „Der Raum braucht genau 2 Spieler, im Raum **ist erst 1 Spieler**." / „… im Raum **sind 3 Spieler**." (auch 0: „sind 0 Spieler"). (3) Die Spielerzahl prüft der Start an `room_players` (Datenbank), nicht am Live-Raum — sie gilt auch, wenn der Raum nicht im Speicher liegt; die Zonen bindet der Live-Raum. (4) `GET /api/rooms/:code` trägt `lage: null, plaetze: null` auch ohne Lage — **zwei neue Schlüssel**, sonst gleich (die Aufgabe nennt es „unverändert gegen die Antwort von heute" — gemeint ist: kein bestehender Schlüssel ändert sich).
+
 ---
 
 ## FO — Die Handler: Wache an allen Stellen, Zurückspringen (M32.4)
