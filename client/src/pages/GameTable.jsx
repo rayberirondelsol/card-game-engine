@@ -4560,6 +4560,7 @@ export default function GameTable({ room = null }) {
   // Schritt ist `deal_to_zone` mit count 1, und einen zweiten Weg, eine Karte
   // vom Stapel in eine Zone zu legen, gibt es damit nicht.
   function revealTopCardToZone(stackId, zoneLabel) {
+    if (room) { revealInRoom(stackId, zoneLabel); return; }
     const plan = revealPlan(getGameState(), stackId, zoneLabel);
     const { state: next, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
     loadGameState(next);
@@ -4585,6 +4586,29 @@ export default function GameTable({ room = null }) {
     }
     const bad = log.filter(e => e.status !== 'ok');
     setSetupIssues(bad.length ? bad : null);
+  }
+
+  // „Reveal Top Card to …“ im Raum (docs/tasks-stapel-raum.md GD). Aufdecken heißt dort, was es am Tisch heißt: die oberste
+  // Karte geht **offen** in die gewählte Zone, für alle sichtbar (keine Aufdeckung „nur an Spieler X“, M32 Stufe A). Der
+  // Tisch wird dabei **nicht** ersetzt (`loadGameState`): derselbe Executor-Schritt (`revealPlan`) rechnet nur die Stelle,
+  // dann geht ein `stack_take_top` mit Seite und `zIndex` an den Server, und ist die Zone ein Ablagestapel, folgt der Haufen
+  // (`pileInRoom`, M21.1) - gerechnet an dem Tisch, wie er nach dem Abheben aussehen wird. Eine fremde Hand-Zone weist die
+  // Wache ab (`error`). Alles Sichtbare kommt mit den Rückmeldungen, auch am eigenen Tisch.
+  function revealInRoom(stackId, zoneLabel) {
+    const plan = revealPlan(getGameState(), stackId, zoneLabel);
+    const { state: next, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
+    const bad = log.filter(e => e.status !== 'ok');
+    setSetupIssues(bad.length ? bad : null);
+    // die oberste Karte: die mit dem höchsten `zIndex`, bei Gleichstand die erste - wie `deal_to_zone` sie wählt
+    const top = tableCards.filter(c => c.inStack === stackId).reduce((m, c) => (!m || c.zIndex > m.zIndex ? c : m), null);
+    const dealt = top && next.cards.find(c => c.tableId === top.tableId);
+    if (!dealt) return;
+    room.sendAction({ type: 'stack_take_top', stack_id: stackId, new_x: dealt.x, new_y: dealt.y, face_down: false, z_index: dealt.zIndex });
+    const pileZone = tableZones.find(z => z.label === zoneLabel && z.layout === 'stack');
+    if (pileZone) {
+      const taken = { ...top, x: dealt.x, y: dealt.y, faceDown: false, zIndex: dealt.zIndex };
+      pileInRoom(applyTakeTop(tableCards, { stack_id: stackId, new_x: dealt.x, new_y: dealt.y, card: taken }), pileZone);
+    }
   }
 
   /**

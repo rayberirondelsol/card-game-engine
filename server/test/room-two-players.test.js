@@ -409,3 +409,149 @@ test('FP 9: Solo-Gegenprobe – derselbe Aufbau mit s1 und zwei Spielern: alles 
   assert.equal(host.msgs.some(m => m.type === 'error'), false);
   assert.equal(live.players.get(hostId).handCardCount, 0);
 });
+
+// ── GE: die Stapelgriffe mit zwei echten Verbindungen (docs/tasks-stapel-raum.md) ─────────────────────────────────────
+
+test('GE: Stapel bilden, mergen, teilen, abheben, umdrehen, mischen, aufdecken – nach jedem Schritt hat der ANDERE Tisch (und der eigene, aus der Rückmeldung) denselben Stand wie der Server; ein Stapel in fremder Hand-Zone bleibt unberührt', async () => {
+  const ops = await import('../../client/src/utils/stackOps.js');
+  const { pilePlan } = await import('../../client/src/utils/cardDrop.js');
+
+  const ABLAGE = { id: 'zablagetest', label: 'Ablage-Test', shape: 'rect', type: 'shared', color: null, accepts: ['card'], capacity: null, layout: 'stack', snap: true, exclusive: false, startingHandCardIds: [], dealStackId: null, dealCount: 0, x: 3000, y: 100, width: 200, height: 260 };
+  const MITTE_ABLAGE = { x: ABLAGE.x + ABLAGE.width / 2, y: ABLAGE.y + ABLAGE.height / 2 };
+  const k = (id, extra = {}) => ({ tableId: id, cardId: `c-${id}`, name: `Karte ${id}`, image_path: `/uploads/${id}.png`, card_back_id: null, width: 100, height: 150, faceDown: false, rotation: 0, zIndex: 1, ...extra });
+  const state = {
+    cards: [
+      k('a1', { x: 100, y: 100, zIndex: 10 }), k('a2', { x: 110, y: 100, zIndex: 11 }), k('a3', { x: 120, y: 100, zIndex: 12 }),
+      k('alt', { x: MITTE_ABLAGE.x, y: MITTE_ABLAGE.y, zIndex: 13, faceDown: false }),
+    ],
+    stacks: [
+      { stackId: 'S1', label: null, x: 600, y: 600, cards: ['s1', 's2', 's3', 's4'].map((id, i) => k(id, { zIndex: i + 1, faceDown: true })) },
+      { stackId: 'SH', label: null, x: HAND1.x, y: HAND1.y, cards: ['h1', 'h2'].map((id, i) => k(id, { zIndex: i + 1, faceDown: true })) },
+    ],
+    tokens: [TABLEAU3], counters: [],
+  };
+  const gameId = await createGame();
+  const res = await app.inject({
+    method: 'POST', url: `/api/games/${gameId}/setups`, headers,
+    payload: { name: 'GE', state_data: JSON.stringify(state), sequence_data: '[]', scenario_data: JSON.stringify(SCENARIO), zone_data: JSON.stringify([...MIT_PLATZ, ABLAGE]) },
+  });
+  assert.equal(res.statusCode, 201, res.body);
+  const { code, hostId, host, gast } = await startedRoom(res.json().id, gameId, { spieler: 's2', ...VIER });
+  const live = getRoom(code);
+
+  // Der Tisch eines Spielers, so wie `loadGameState` ihn aus dem Zustand des Servers baut (flach, `inStack`)
+  const flach = (bs) => [
+    ...bs.cards.map(c => ({ ...c, inStack: null })),
+    ...bs.stacks.flatMap(s => s.cards.map(c => ({ ...c, x: s.x, y: s.y, inStack: s.stackId }))),
+  ];
+  const sicht = (cards) => cards.map(c => [c.tableId, c.inStack, c.x, c.y, c.zIndex, c.faceDown === true]).sort((p, q) => (p[0] < q[0] ? -1 : 1));
+  const welcome = (c) => c.msgs.find(m => m.type === 'room_started').board_state;
+  const tische = { host: flach(welcome(host)), gast: flach(welcome(gast)) };
+  assert.deepEqual(sicht(tische.host), sicht(flach(plain(live.boardState))), 'Ausgangslage: derselbe Stand');
+
+  // die Anwendung der Rückmeldungen, wie `applyRemoteAction` sie ruft
+  const wende = (cards, m) => ({
+    stack_create: ops.applyStackCreate, stack_merge: ops.applyStackMerge, stack_take_top: ops.applyTakeTop,
+    stack_split: ops.applyStackSplit, stack_flip: ops.applyStackFlip,
+    stack_shuffle: (list, msg) => list.map(c => (c.inStack === msg.stack_id && msg.order.includes(c.tableId) ? { ...c, zIndex: msg.order.indexOf(c.tableId) + 1 } : c)),
+  }[m.type]?.(cards, m) ?? cards);
+
+  /** Der Host sendet; beide warten auf die Rückmeldung (der Host auf seine eigene – `stack_shuffle` geht nicht an den Absender), wenden sie an und vergleichen mit dem Server. */
+  async function schritt(msg, name) {
+    const [h, g] = [host.mark(), gast.mark()];
+    host.send(msg);
+    const [fh, fg] = await Promise.all([
+      msg.type === 'stack_shuffle' ? Promise.resolve(msg) : host.waitFor(m => m.type === msg.type, h),
+      gast.waitFor(m => m.type === msg.type, g),
+    ]);
+    if (msg.type !== 'stack_shuffle') assert.equal(fh.from_player_id, hostId, `${name}: die Rückmeldung nennt den Absender`);
+    tische.host = wende(tische.host, fh);
+    tische.gast = wende(tische.gast, fg);
+    const server = sicht(flach(plain(live.boardState)));
+    assert.deepEqual(sicht(tische.gast), server, `${name}: der andere Tisch hat den Stand des Servers`);
+    assert.deepEqual(sicht(tische.host), server, `${name}: der eigene Tisch hat ihn nach der Rückmeldung auch`);
+    assert.equal(live.boardState.stacks.every(s => s.cards.length >= 2), true, `${name}: kein Stapel mit weniger als zwei Karten`);
+    return fg;
+  }
+  const stapel = (id) => live.boardState.stacks.find(s => s.stackId === id);
+  const ids = (s) => s.cards.map(c => c.tableId);
+
+  // 1. Stapel bilden
+  await schritt({ type: 'stack_create', stack_id: 'N', card_table_ids: ['a1', 'a2'], z_index: [50, 51], x: 200, y: 200 }, 'bilden');
+  assert.deepEqual(ids(stapel('N')), ['a1', 'a2']);
+
+  // 2. eine lose Karte auf den Stapel legen
+  await schritt({ type: 'stack_merge', from_table_id: 'a3', to_stack_id: 'N', z_index: [52] }, 'lose Karte auf den Stapel');
+  assert.deepEqual(ids(stapel('N')), ['a1', 'a2', 'a3']);
+
+  // 3. einen Stapel auf einen Stapel legen
+  await schritt({ type: 'stack_merge', from_stack_id: 'N', to_stack_id: 'S1', order: ['a1', 'a2', 'a3'], z_index: [5, 6, 7] }, 'Stapel auf Stapel');
+  assert.deepEqual(ids(stapel('S1')), ['s1', 's2', 's3', 's4', 'a1', 'a2', 'a3']);
+  assert.equal(stapel('N'), undefined);
+
+  // 4. teilen: die obersten drei werden ein neuer Stapel
+  await schritt({ type: 'stack_split', stack_id: 'S1', count: 3, new_stack_id: 'H', new_x: 700, new_y: 700 }, 'teilen');
+  assert.deepEqual(ids(stapel('H')), ['a1', 'a2', 'a3']);
+  assert.deepEqual(ids(stapel('S1')), ['s1', 's2', 's3', 's4']);
+
+  // 5. abheben: die oberste Karte von H liegt lose
+  await schritt({ type: 'stack_take_top', stack_id: 'H', new_x: 900, new_y: 700 }, 'abheben');
+  assert.deepEqual(ids(stapel('H')), ['a1', 'a2']);
+  assert.deepEqual([amTisch(live, 'a3').x, amTisch(live, 'a3').y], [900, 700]);
+
+  // 6. abheben, bis ein Rest von einer Karte bleibt: der Stapel löst sich auf
+  await schritt({ type: 'stack_take_top', stack_id: 'H', new_x: 950, new_y: 700 }, 'abheben, Rest von einer Karte');
+  assert.equal(stapel('H'), undefined);
+  assert.equal(amTisch(live, 'a1').inStack, undefined);
+
+  // 7. umdrehen
+  const vorher = stapel('S1').cards.map(c => c.faceDown);
+  await schritt({ type: 'stack_flip', stack_id: 'S1' }, 'umdrehen');
+  assert.deepEqual(stapel('S1').cards.map(c => c.faceDown), vorher.map(f => !f));
+
+  // 8. mischen (bestehende Nachricht; der Absender wendet sie lokal an)
+  await schritt({ type: 'stack_shuffle', stack_id: 'S1', order: ['s4', 's2', 's1', 's3'] }, 'mischen');
+  assert.deepEqual(ids(stapel('S1')), ['s4', 's2', 's1', 's3']);
+
+  // 9. aufdecken: die oberste Karte offen in den Ablagestapel, dann der Haufen (die Nachricht, die der Tisch aus pilePlan baut)
+  const ablageZone = { ...ABLAGE };
+  const oben = stapel('S1').cards.at(-1);
+  await schritt({ type: 'stack_take_top', stack_id: 'S1', new_x: MITTE_ABLAGE.x, new_y: MITTE_ABLAGE.y + 6, face_down: false, z_index: 999 }, 'aufdecken');
+  assert.deepEqual([amTisch(live, oben.tableId).faceDown, amTisch(live, oben.tableId).zIndex], [false, 999], 'offen, obenauf');
+  const plan = pilePlan(tische.host, ablageZone, 'ablagehaufen');
+  assert.deepEqual(plan.card_table_ids.slice().sort(), ['alt', oben.tableId].sort(), 'der Haufen: die alte und die aufgedeckte Karte');
+  await schritt({ type: 'stack_create', ...plan }, 'Haufen im Ablagestapel');
+  assert.deepEqual(ids(stapel('ablagehaufen')), plan.card_table_ids);
+  assert.deepEqual(stapel('ablagehaufen').cards.map(c => c.zIndex), plan.z_index);
+
+  // 10. ein Spieler greift einen Stapel in der Hand-Zone des anderen an: error, der Stand bleibt, der Host sieht nichts
+  const serverVorher = JSON.stringify(live.boardState);
+  const hostMarke = host.mark();
+  for (const msg of [
+    { type: 'stack_flip', stack_id: 'SH' },
+    { type: 'stack_take_top', stack_id: 'SH', new_x: FREI.x, new_y: FREI.y },
+    { type: 'stack_split', stack_id: 'SH', count: 1, new_x: FREI.x, new_y: FREI.y },
+    { type: 'stack_merge', from_stack_id: 'SH', to_stack_id: 'S1' },
+    { type: 'stack_create', stack_id: 'X', card_table_ids: ['h1', 'h2'], x: FREI.x, y: FREI.y },
+  ]) {
+    const m = gast.mark();
+    gast.send(msg);
+    const fehler = await gast.next('error', m);
+    assert.match(fehler.message, /Hand eines anderen Spielers/, msg.type);
+  }
+  await tick();
+  assert.equal(JSON.stringify(live.boardState), serverVorher, 'der Server hat nichts geändert');
+  assert.deepEqual(host.since(hostMarke), [], 'der Host sieht nichts davon');
+
+  // ... und der Eigentümer darf
+  await schritt({ type: 'stack_flip', stack_id: 'SH' }, 'umdrehen in der eigenen Hand-Zone');
+
+  // 11. ein später verbundener Tisch (neues welcome) sieht denselben Stand
+  host.ws.close();
+  await host.closed();
+  const neu = open(code, hostId);
+  const w = await neu.next('welcome');
+  assert.deepEqual(sicht(flach(w.board_state)), sicht(tische.gast), 'nach dem Neuverbinden: derselbe Stand wie der des Gastes');
+  neu.ws.close();
+  await neu.closed();
+});

@@ -182,3 +182,34 @@ test('GC: applyRemoteAction wendet `stack_take_top` und `stack_split` über stac
   assert.match(remoteCase('stack_split'), /setTableCards\(prev => applyStackSplit\(prev, msg\)\)/);
   assert.match(source, /import \{[^}]*applyTakeTop[^}]*applyStackSplit[^}]*\} from '\.\.\/utils\/stackOps\.js'/);
 });
+
+// ── GD: „Reveal Top Card to …“ ───────────────────────────────────────────────
+
+test('GD: revealTopCardToZone geht im Raum einen eigenen Weg VOR dem alten Code und kehrt zurück; ohne Raum bleibt der Tisch-Ersatz (loadGameState)', () => {
+  const f = functionText('revealTopCardToZone');
+  const raum = f.indexOf('if (room)');
+  const alt = f.indexOf('const plan = revealPlan(getGameState(), stackId, zoneLabel);');
+  assert.ok(raum >= 0 && alt > raum, 'ein Raum-Zweig vor dem alten Code');
+  assert.match(f.slice(raum, alt), /revealInRoom\(stackId, zoneLabel\);\s*return;/);
+  assert.match(f.slice(alt), /loadGameState\(next\);/, 'Solo: unverändert');
+  assert.match(f.slice(alt), /setTableCards\(prev => pileUp\(prev, pileZone, freshStackId\)\)/, 'Solo: unverändert');
+});
+
+test('GD: revealInRoom rechnet die Stelle mit demselben Executor-Schritt (revealPlan) und schickt `stack_take_top` OFFEN; der Tisch wird nie ersetzt', () => {
+  const f = functionText('revealInRoom');
+  assert.match(f, /revealPlan\(getGameState\(\), stackId, zoneLabel\)/);
+  assert.match(f, /executeSequenceWithLog\(plan\.state, plan\.steps, zones, \{ grids \}\)/);
+  assert.match(f, /type: 'stack_take_top', stack_id: stackId, new_x: dealt\.x, new_y: dealt\.y, face_down: false, z_index: dealt\.zIndex/);
+  assert.doesNotMatch(f, /loadGameState|setTableCards|setStackNames/, 'der Tisch folgt der Rückmeldung; kein Hilfsname bleibt hängen');
+  // ein übersprungener Schritt (Zone voll, kein Stapel) schickt nichts und zeigt den Hinweis
+  assert.match(f, /setSetupIssues\(bad\.length \? bad : null\);/);
+  assert.match(f, /if \(!dealt\) return;/);
+});
+
+test('GD: ist die Zone ein Ablagestapel, folgt dem Aufdecken derselbe Haufen wie am Tisch (pilePlan über pileInRoom), gerechnet am Tisch NACH dem Abheben', () => {
+  const f = functionText('revealInRoom');
+  assert.match(f, /z\.label === zoneLabel && z\.layout === 'stack'/);
+  assert.match(f, /applyTakeTop\(tableCards, /);
+  assert.match(f, /pileInRoom\(/);
+  assert.ok(f.indexOf('room.sendAction(') < f.indexOf('pileInRoom('), 'erst das Abheben, dann der Haufen');
+});
