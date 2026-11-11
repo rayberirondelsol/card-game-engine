@@ -21,7 +21,7 @@ import { snapPoint, objectsInZone } from '../../../shared/zoneGeometry.js';
 // M32.6: die private Hand hält der Server.
 import { handOf, addToHand, announceHandCount, takeFromStack } from '../roomHand.js';
 // Stapelgriffe im Raum (docs/tasks-stapel-raum.md): die Rechnung auf dem Raumzustand.
-import { stackIdOf, findCard, flipStack } from '../roomStacks.js';
+import { stackIdOf, findCard, flipStack, topZIndex, planCreate, applyCreate, planMerge, applyMerge } from '../roomStacks.js';
 
 export { stackIdOf };
 
@@ -167,15 +167,6 @@ function handleCardRotate(room, playerId, { table_id, rotation }, timestamp) {
   broadcast(room, { type: 'card_rotate', table_id, rotation, from_player_id: playerId, timestamp }, playerId);
 }
 
-/** Der höchste `zIndex` am Tisch, Karten in Stapeln mitgezählt. */
-function topZIndex(room) {
-  let top = 0;
-  const see = (c) => { top = Math.max(top, Number(c?.zIndex) || 0); };
-  room.boardState.cards.forEach(see);
-  room.boardState.stacks.forEach(s => (s.cards || []).forEach(see));
-  return top;
-}
-
 /**
  * M32.6: Ausspielen aus der privaten Hand. Der Server nimmt die Karte **aus der Hand des Absenders** (`hand_id`), nicht
  * aus der Nachricht – eine mitgeschickte `card` wird nicht gelesen, eine fremde oder unbekannte `hand_id` findet nichts.
@@ -202,7 +193,7 @@ function handleCardPlayFromHand(room, playerId, { hand_id, x, y }, timestamp) {
   const { handId, gridId, cell, ...rest } = hand[i];
   const tableCard = {
     ...rest, tableId: rest.tableId || generateId(), x: spot.x, y: spot.y,
-    zIndex: topZIndex(room) + 1, faceDown: !!own, rotation: 0, inStack: null,
+    zIndex: topZIndex(room.boardState) + 1, faceDown: !!own, rotation: 0, inStack: null,
   };
   hand.splice(i, 1);
   cards.push(tableCard);
@@ -256,30 +247,40 @@ function handleStackMove(room, playerId, { stack_id, x, y }, timestamp) {
   broadcast(room, { type: 'stack_move', stack_id, x, y, from_player_id: playerId, timestamp }, playerId);
 }
 
-function handleStackCreate(room, playerId, { stack_id, card_table_ids, x, y }, timestamp) {
-  // Remove cards from table, put them in a new stack
-  const cards = room.boardState.cards.filter(c => card_table_ids.includes(c.tableId));
-  // Keine Karte aus der Hand-Zone eines anderen heraus und kein Stapel hinein (M32.4); es gibt keine Nachricht, die
-  // den Tisch des Absenders zurückstellt, also bleibt es beim `error`.
-  if (!allowed(room, playerId, null, { x, y }) || cards.some(c => !allowed(room, playerId, c))) return rejectTo(room, playerId);
-  room.boardState.cards = room.boardState.cards.filter(c => !card_table_ids.includes(c.tableId));
-  // `stackId`, nicht `id` – derselbe Name wie im Executor und im Spielstand.
-  room.boardState.stacks.push({ stackId: stack_id, cards, x, y });
-  broadcast(room, { type: 'stack_create', stack_id, card_table_ids, x, y, from_player_id: playerId, timestamp }, playerId);
+/**
+ * Stapel bilden (docs/tasks-stapel-raum.md GB): aus mindestens zwei Karten, lose oder aus anderen Stapeln, in der
+ * Reihenfolge der Nachricht (unten → oben) mit ihren `zIndex`. Der Tisch des Absenders ändert sich erst mit der
+ * Rückmeldung, die an **alle** geht und die angewandte Reihenfolge nennt; eine Ablehnung ändert nichts und braucht darum
+ * kein Zurückstellen, nur den `error`. Die Wache (M32.4): keine Karte aus der Hand-Zone eines anderen heraus (bei einer
+ * Stapelkarte zählt der Ort ihres Stapels) und kein Stapel hinein.
+ */
+function handleStackCreate(room, playerId, msg, timestamp) {
+  const plan = planCreate(room.boardState, msg);
+  if (plan.error) return rejectTo(room, playerId, null, plan.error);
+  const { x, y } = msg;
+  if (!allowed(room, playerId, null, { x, y }) || plan.members.some(({ card, stack }) => !allowed(room, playerId, stack || card))) {
+    return rejectTo(room, playerId);
+  }
+  applyCreate(room.boardState, msg, plan);
+  broadcast(room, { type: 'stack_create', stack_id: msg.stack_id, card_table_ids: msg.card_table_ids, z_index: plan.z, x, y, from_player_id: playerId, timestamp });
 }
 
-function handleStackMerge(room, playerId, { from_stack_id, to_stack_id }, timestamp) {
-  const fromIdx = room.boardState.stacks.findIndex(s => stackIdOf(s) === from_stack_id);
-  const toStack = findStack(room, to_stack_id);
-  if (fromIdx !== -1 && toStack) {
-    const fromStack = room.boardState.stacks[fromIdx];
-    // Weder ein Stapel aus einer fremden Hand-Zone heraus noch einer hinein (M32.4, Nachtrag); es gibt keine Nachricht,
-    // die den Tisch des Absenders zurückstellt, also bleibt es beim `error`.
-    if (!allowed(room, playerId, fromStack, toStack)) return rejectTo(room, playerId);
-    toStack.cards = [...toStack.cards, ...fromStack.cards];
-    room.boardState.stacks.splice(fromIdx, 1);
-  }
-  broadcast(room, { type: 'stack_merge', from_stack_id, to_stack_id, from_player_id: playerId, timestamp }, playerId);
+/**
+ * Auf einen Stapel legen (GB): ein ganzer Stapel (`from_stack_id`) **oder eine lose Karte** (`from_table_id`) kommt oben auf
+ * `to_stack_id`. Wache wie `stack_move` (Ort jetzt der Quelle, Ziel der Ort des Zielstapels; M32.4, Nachtrag), nur `error`.
+ * Die Rückmeldung geht an alle und trägt Reihenfolge, `zIndex` und den Ort des Ziels, wie angewandt.
+ */
+function handleStackMerge(room, playerId, msg, timestamp) {
+  const plan = planMerge(room.boardState, msg);
+  if (plan.error) return rejectTo(room, playerId, null, plan.error);
+  if (!allowed(room, playerId, plan.from || plan.card, plan.to)) return rejectTo(room, playerId);
+  applyMerge(room.boardState, plan);
+  const source = plan.from ? { from_stack_id: msg.from_stack_id } : { from_table_id: msg.from_table_id };
+  broadcast(room, {
+    type: 'stack_merge', ...source, to_stack_id: msg.to_stack_id,
+    card_table_ids: plan.moved.map(c => c.tableId), z_index: plan.z, x: plan.to.x, y: plan.to.y,
+    from_player_id: playerId, timestamp,
+  });
 }
 
 function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestamp) {

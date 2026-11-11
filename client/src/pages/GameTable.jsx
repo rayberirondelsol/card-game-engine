@@ -37,11 +37,11 @@ import { shouldApplyBoardState } from '../utils/roomBoardState.js';
 import { playedCard, isOwnEcho, removeHandCard, removeDrawn, handFromServer, addToHand, pickupPlan } from '../utils/roomHand.js';
 import { seenCard } from '../../../shared/ownership.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
-import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp } from '../utils/cardDrop.js';
+import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp, pilePlan } from '../utils/cardDrop.js';
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
-import { applyStackFlip } from '../utils/stackOps.js';
+import { applyStackFlip, applyStackCreate, applyStackMerge } from '../utils/stackOps.js';
 import { tableLayers, WIDGET_BOX, pickTopmost, widgetScale } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
@@ -1899,7 +1899,8 @@ export default function GameTable({ room = null }) {
     // Die Id wird **ausserhalb** der Aktualisierung gewuerfelt: React darf
     // einen Updater zweimal laufen lassen, und zwei Ids waeren zwei Stapel.
     const freshStackId = crypto.randomUUID();
-    const pile = (list) => (dropZone?.layout === 'stack' ? pileUp(list, dropZone, freshStackId) : list);
+    // Im Raum rechnet der Tisch den Haufen nicht selbst (`pileInRoom` schickt ihn als Wunsch, der Server legt ihn fest).
+    const pile = (list) => (!room && dropZone?.layout === 'stack' ? pileUp(list, dropZone, freshStackId) : list);
 
     // If dropped on a stack, merge them
     if (targetStack) {
@@ -1907,7 +1908,21 @@ export default function GameTable({ room = null }) {
       const targetPosition = targetStackCards[0]; // Get position from any card in target stack
       const maxTargetZ = Math.max(...targetStackCards.map(c => c.zIndex));
 
-      if (card.inStack) {
+      if (room) {
+        // docs/tasks-stapel-raum.md GB: im Raum ein Wunsch an den Server, derselbe Zustand wie unten (die Reihenfolge der
+        // Karten am Tisch, `zIndex` ab dem höchsten des Ziels); der Tisch - auch der eigene - folgt der Rückmeldung.
+        if (card.inStack) {
+          const draggingStackCards = tableCards.filter(c => c.inStack === card.inStack);
+          room.sendAction({
+            type: 'stack_merge', from_stack_id: card.inStack, to_stack_id: targetStack,
+            order: draggingStackCards.map(c => c.tableId), z_index: draggingStackCards.map((_, i) => maxTargetZ + i + 1),
+          });
+          setMaxZIndex(Math.max(maxZIndex, maxTargetZ + draggingStackCards.length));
+        } else {
+          room.sendAction({ type: 'stack_merge', from_table_id: draggingCard, to_stack_id: targetStack, z_index: [maxTargetZ + 1] });
+          setMaxZIndex(Math.max(maxZIndex, maxTargetZ + 1));
+        }
+      } else if (card.inStack) {
         // Merging two stacks - add all cards from dragged stack to target stack
         const draggingStackCards = tableCards.filter(c => c.inStack === card.inStack);
         setTableCards(prev => prev.map(c => {
@@ -1975,7 +1990,7 @@ export default function GameTable({ room = null }) {
 
     if (isMultiSelected) {
       // Snap all selected cards/stacks by the same offset as the dragged card
-      setTableCards(prev => pile(prev.map(c => {
+      const moveSelection = (prev) => prev.map(c => {
         const isSelected = selectedCards.has(c.tableId);
         const isInSelectedStack = c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
         if (isSelected || isInSelectedStack) {
@@ -1983,33 +1998,39 @@ export default function GameTable({ room = null }) {
           return { ...c, x: c.x + snapDx, y: c.y + snapDy, gridId: null, cell: null };
         }
         return c;
-      })));
+      });
+      setTableCards(prev => pile(moveSelection(prev)));
+      pileInRoom(moveSelection(tableCards), dropZone);
     } else if (card.inStack) {
       // Snap the whole stack
-      setTableCards(prev => pile(prev.map(c => {
+      const moveStack = (prev) => prev.map(c => {
         if (c.inStack === card.inStack) {
           return { ...c, x: c.x + snapDx, y: c.y + snapDy };
         }
         return c;
-      })));
+      });
+      setTableCards(prev => pile(moveStack(prev)));
       // M9.4: der Zug am Stapel geht in den Raum. Den Empfaenger gab es seit
       // jeher (audit-dead-controls Fund 9), er suchte den Stapel nur unter dem
       // falschen Feldnamen - siehe `findStack` in messageHandler.js.
       if (room) room.sendAction({ type: 'stack_move', stack_id: card.inStack, x: finalX, y: finalY });
+      pileInRoom(moveStack(tableCards), dropZone);
     } else {
-      setTableCards(prev => pile(prev.map(c => {
+      const moveCard = (prev) => prev.map(c => {
         if (c.tableId !== draggingCard) return c;
         // The field, not the coordinates, is what makes a card come back to the
         // same place after the board moved. A card in a multi-selection or in a
         // stack keeps no field: it moved as part of something else.
         return { ...c, x: finalX, y: finalY, gridId: hit.gridId, cell: hit.cell };
-      })));
+      });
+      setTableCards(prev => pile(moveCard(prev)));
       // Dieselbe Luecke wie bei `token_move`: Karten tragen seit M3b
       // `gridId`/`cell`, und ohne sie behielte der Raum das alte Feld (G5).
       if (room) room.sendAction({
         type: 'card_move', table_id: draggingCard, x: finalX, y: finalY,
         gridId: hit.gridId ?? null, cell: hit.cell ?? null,
       });
+      pileInRoom(moveCard(tableCards), dropZone);
     }
 
     // Haptic feedback on card drop (short vibration)
@@ -2042,6 +2063,13 @@ export default function GameTable({ room = null }) {
     const newZ = maxZIndex + 1;
     setMaxZIndex(newZ + wanted.length);
 
+    // Im Raum ein Wunsch an den Server (docs/tasks-stapel-raum.md GB): der Tisch - auch der eigene - folgt der
+    // Rückmeldung, mit denselben Ids, Orten und `zIndex` wie unten.
+    if (room) {
+      requestStack({ stack_id: stackId, card_table_ids: wanted, z_index: wanted.map((_, i) => newZ + i), x, y });
+      return stackId;
+    }
+
     setTableCards(prev => prev.map(c => {
       if (!wanted.includes(c.tableId)) return c;
       return {
@@ -2059,6 +2087,20 @@ export default function GameTable({ room = null }) {
       };
     }));
     return stackId;
+  }
+
+  // Ein Stapel entsteht im Raum nur auf Wunsch (`stack_create`, **eine** Stelle): Stapelbau (`stackCards`) und der Haufen im
+  // Ablagestapel (`pileInRoom`) senden hier. Der Server prüft die Wache und legt die Reihenfolge fest.
+  function requestStack(plan) {
+    room.sendAction({ type: 'stack_create', ...plan });
+  }
+
+  // Der Haufen in einer Zone mit `layout: 'stack'` (M21.1): am Tisch schreibt ihn `pileUp` in die lokale Liste, im Raum
+  // geht derselbe Plan (`pilePlan`) als Wunsch an den Server. `list` ist der Tisch, wie er nach dem Zug aussieht.
+  function pileInRoom(list, zone) {
+    if (!room || zone?.layout !== 'stack') return;
+    const plan = pilePlan(list, zone, crypto.randomUUID());
+    if (plan) requestStack(plan);
   }
 
   /**
@@ -3784,6 +3826,16 @@ export default function GameTable({ room = null }) {
         // Rückmeldung gilt auch für den Absender (sein Tisch ändert sich erst damit).
         case 'stack_flip':
           setTableCards(prev => applyStackFlip(prev, msg));
+          break;
+        // docs/tasks-stapel-raum.md GB: ein Stapel ist entstanden / eine Karte oder ein Stapel liegt oben auf einem Stapel.
+        // Der Absender wendet seine eigene Rückmeldung an (sein Tisch hat sich vorher nicht geändert).
+        case 'stack_create':
+          setTableCards(prev => applyStackCreate(prev, msg));
+          if (Array.isArray(msg.z_index)) setMaxZIndex(z => Math.max(z, ...msg.z_index));
+          break;
+        case 'stack_merge':
+          setTableCards(prev => applyStackMerge(prev, msg));
+          if (Array.isArray(msg.z_index)) setMaxZIndex(z => Math.max(z, ...msg.z_index));
           break;
         case 'stack_removed':
           setTableCards(prev => prev.filter(c => c.inStack !== msg.stack_id));

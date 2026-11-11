@@ -8,6 +8,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { broadcast } from './websocket/broadcast.js';
+import { tidyStack } from './roomStacks.js';
 
 /** Die Hand eines Spielers. Ein Raum alter Form (ohne `hands`) bekommt die Map hier. */
 export function handOf(room, playerId) {
@@ -46,11 +47,6 @@ export function announceHandCount(room, playerId) {
  */
 export function takeFromStack(room, stack, n) {
   const drawn = stack.cards.splice(stack.cards.length - n, n);
-  stack.card_ids = stack.cards.map(c => c.cardId);
-  stack.table_ids = stack.cards.map(c => c.tableId);
-  if (stack.cards.length <= 1) {
-    room.boardState.stacks = room.boardState.stacks.filter(s => s !== stack);
-    if (stack.cards.length === 1) room.boardState.cards.push({ ...stack.cards[0], x: stack.x, y: stack.y });
-  }
+  tidyStack(room.boardState, stack);
   return drawn;
 }

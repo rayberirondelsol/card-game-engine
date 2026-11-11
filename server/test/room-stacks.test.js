@@ -139,3 +139,161 @@ test('GA 6: eine Stapelkarte in fremder Hand-Zone wird nicht angefasst – error
   assert.deepEqual(inbox.p1[1], { type: 'card_flip', table_id: 'k1', face_down: true });
   assert.deepEqual(inbox.p2, []);
 });
+
+// ── GB: Stapel bilden ────────────────────────────────────────────────────────
+
+const erstellen = (extra = {}) => ({ type: 'stack_create', stack_id: 'neu', card_table_ids: ['l1', 'l2'], z_index: [10, 11], x: 100, y: 200, ...extra });
+const ohneStempel = (m) => { const { from_player_id, timestamp, ...rest } = m; return rest; };
+
+test('GB 1: stack_create legt den Stapel in der Reihenfolge der NACHRICHT an, mit ihren zIndex, ohne Ort an den Karten; die Karten verlassen den Tisch', () => {
+  const { room } = makeRoom();
+  send(room, 'p1', erstellen({ card_table_ids: ['l2', 'l1'] }));
+  const s = stack(room, 'neu');
+  assert.deepEqual(ids(s), ['l2', 'l1']);
+  assert.deepEqual(s.cards.map(c => c.zIndex), [10, 11]);
+  assert.deepEqual([s.x, s.y], [100, 200]);
+  for (const c of s.cards) for (const k of ['x', 'y', 'gridId', 'cell', 'inStack']) assert.equal(k in c, false, `${k} gehört nicht an eine Stapelkarte`);
+  assert.equal(loose(room, 'l1'), undefined);
+  assert.equal(loose(room, 'l2'), undefined);
+  assert.deepEqual(s.card_ids, ['c-l2', 'c-l1']);
+  assert.deepEqual(s.table_ids, ['l2', 'l1']);
+  assert.equal(s.cards[1].faceDown, false, 'sonst bleibt die Karte, wie sie war');
+});
+
+test('GB 1: die Rückmeldung geht an ALLE (auch den Absender) und nennt Reihenfolge, zIndex und Ort, wie angewandt', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', erstellen({ card_table_ids: ['l2', 'l1'] }));
+  const erwartet = { type: 'stack_create', stack_id: 'neu', card_table_ids: ['l2', 'l1'], z_index: [10, 11], x: 100, y: 200 };
+  assert.deepEqual(inbox.p1.map(ohneStempel), [erwartet]);
+  assert.deepEqual(inbox.p2.map(ohneStempel), [erwartet]);
+  assert.equal(inbox.p2[0].from_player_id, 'p1');
+});
+
+test('GB 1: ohne z_index setzt der Server die zIndex über den höchsten am Tisch (Karten in Stapeln mitgezählt)', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', erstellen({ z_index: undefined }));
+  const z = stack(room, 'neu').cards.map(c => c.zIndex);
+  assert.deepEqual(z, [7, 8], 'die höchste Karte am Tisch hat 6');
+  assert.deepEqual(inbox.p2[0].z_index, [7, 8]);
+});
+
+test('GB 2: Karten aus anderen Stapeln werden genommen; ein Rest von einer Karte löst sich auf, ein leerer Stapel verschwindet', () => {
+  const { room } = makeRoom();
+  send(room, 'p1', erstellen({ card_table_ids: ['c', 'l1', 'p', 'q'], z_index: [1, 2, 3, 4] }));
+  assert.deepEqual(ids(stack(room, 'neu')), ['c', 'l1', 'p', 'q']);
+  assert.equal(stack(room, 's2'), undefined, 's2 hatte nur p und q');
+  assert.deepEqual(ids(stack(room, 's3')), ['a', 'b'], 's3 behält zwei Karten');
+  send(room, 'p1', erstellen({ stack_id: 'zwei', card_table_ids: ['a', 'l3'], z_index: [1, 2] }));
+  assert.equal(stack(room, 's3'), undefined, 'b bleibt allein: lose an der Stelle des Stapels');
+  assert.deepEqual([loose(room, 'b').x, loose(room, 'b').y], [300, 300]);
+  assert.equal(loose(room, 'b').faceDown, false);
+});
+
+test('GB 3: eine vorhandene stack_id wird neu gefasst, wenn ALLE ihre Karten in der Liste stehen (so bildet ein Ablagestapel einen Haufen)', () => {
+  const { room } = makeRoom();
+  send(room, 'p1', erstellen({ stack_id: 's2', card_table_ids: ['p', 'q', 'l1'], z_index: [1, 2, 3], x: 500, y: 500 }));
+  assert.deepEqual(ids(stack(room, 's2')), ['p', 'q', 'l1']);
+  assert.equal(room.boardState.stacks.filter(s => s.stackId === 's2').length, 1, 'kein zweiter Stapel mit derselben Id');
+});
+
+test('GB 3: eine vorhandene stack_id mit Karten, die nicht in der Liste stehen – error, nichts ändert sich', () => {
+  const { room, inbox } = makeRoom();
+  const vorher = JSON.stringify(room.boardState);
+  send(room, 'p1', erstellen({ stack_id: 's3', card_table_ids: ['a', 'l1'] }));
+  assert.equal(JSON.stringify(room.boardState), vorher);
+  assert.deepEqual(types(inbox.p1), ['error']);
+  assert.deepEqual(inbox.p2, []);
+});
+
+test('GB 4: weniger als zwei Karten, unbekannte Karte, doppelte Id, kein Ort, keine stack_id – error, nichts ändert sich, kein Rundruf', () => {
+  for (const bad of [
+    { card_table_ids: ['l1'] }, { card_table_ids: [] }, { card_table_ids: 'l1' }, { card_table_ids: undefined },
+    { card_table_ids: ['l1', 'gibtsnicht'] }, { card_table_ids: ['l1', 'l1'] },
+    { x: undefined }, { y: 'oben' }, { stack_id: undefined }, { stack_id: '' },
+  ]) {
+    const { room, inbox } = makeRoom();
+    const vorher = JSON.stringify(room.boardState);
+    send(room, 'p1', erstellen(bad));
+    assert.equal(JSON.stringify(room.boardState), vorher, JSON.stringify(bad));
+    assert.deepEqual(types(inbox.p1), ['error'], JSON.stringify(bad));
+    assert.deepEqual(inbox.p2, [], JSON.stringify(bad));
+  }
+});
+
+test('GB 5: die Wache – Karte aus fremder Zone, Karte in fremder Stapel-Zone, Ziel in fremder Zone: error, nichts ändert sich; die eigene Zone darf', () => {
+  const { room, inbox } = makeRoom();
+  const vorher = JSON.stringify(room.boardState);
+  send(room, 'p1', erstellen({ card_table_ids: ['l1', 'k1'] }));          // k1 liegt im Stapel in der Zone von blau
+  send(room, 'p1', erstellen({ x: IN_BLAU.x, y: IN_BLAU.y }));            // Ziel in der Zone von blau
+  assert.equal(JSON.stringify(room.boardState), vorher);
+  assert.deepEqual(inbox.p1, [{ type: 'error', message: FREMD }, { type: 'error', message: FREMD }]);
+  assert.deepEqual(inbox.p2, []);
+  send(room, 'p1', erstellen({ x: IN_ROT.x, y: IN_ROT.y }));
+  assert.deepEqual(ids(stack(room, 'neu')), ['l1', 'l2']);
+});
+
+// ── GB: Stapel mergen ────────────────────────────────────────────────────────
+
+test('GB 7: stack_merge legt die Karten oben auf den Zielstapel: Reihenfolge der Nachricht, zIndex der Nachricht, der Quellstapel ist weg', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', { type: 'stack_merge', from_stack_id: 's2', to_stack_id: 's3', order: ['q', 'p'], z_index: [4, 5] });
+  const s = stack(room, 's3');
+  assert.deepEqual(ids(s), ['a', 'b', 'c', 'q', 'p']);
+  assert.deepEqual(s.cards.map(c => c.zIndex), [1, 2, 3, 4, 5]);
+  assert.equal(stack(room, 's2'), undefined);
+  assert.deepEqual(s.table_ids, ['a', 'b', 'c', 'q', 'p']);
+  const erwartet = { type: 'stack_merge', from_stack_id: 's2', to_stack_id: 's3', card_table_ids: ['q', 'p'], z_index: [4, 5], x: 300, y: 300 };
+  assert.deepEqual(inbox.p1.map(ohneStempel), [erwartet]);
+  assert.deepEqual(inbox.p2.map(ohneStempel), [erwartet]);
+});
+
+test('GB 7: passt `order` nicht genau auf den Quellstapel, gilt die Reihenfolge des Servers; ohne z_index gilt über dem höchsten des Ziels', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', { type: 'stack_merge', from_stack_id: 's2', to_stack_id: 's3', order: ['p'] });
+  const s = stack(room, 's3');
+  assert.deepEqual(ids(s), ['a', 'b', 'c', 'p', 'q']);
+  assert.deepEqual(s.cards.map(c => c.zIndex), [1, 2, 3, 4, 5]);
+  assert.deepEqual(inbox.p2[0].card_table_ids, ['p', 'q']);
+});
+
+test('GB 8: stack_merge mit from_table_id legt eine LOSE Karte oben auf den Stapel; liegt sie nicht lose, error', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', { type: 'stack_merge', from_table_id: 'l1', to_stack_id: 's3', z_index: [9] });
+  const s = stack(room, 's3');
+  assert.deepEqual(ids(s), ['a', 'b', 'c', 'l1']);
+  assert.equal(s.cards[3].zIndex, 9);
+  for (const k of ['x', 'y', 'gridId', 'cell']) assert.equal(k in s.cards[3], false);
+  assert.equal(loose(room, 'l1'), undefined);
+  assert.deepEqual(ohneStempel(inbox.p1[0]), { type: 'stack_merge', from_table_id: 'l1', to_stack_id: 's3', card_table_ids: ['l1'], z_index: [9], x: 300, y: 300 });
+
+  const vorher = JSON.stringify(room.boardState);
+  send(room, 'p1', { type: 'stack_merge', from_table_id: 'a', to_stack_id: 's2' });       // a liegt im Stapel
+  send(room, 'p1', { type: 'stack_merge', from_table_id: 'gibtsnicht', to_stack_id: 's2' });
+  assert.equal(JSON.stringify(room.boardState), vorher);
+  assert.deepEqual(types(inbox.p1), ['stack_merge', 'error', 'error']);
+});
+
+test('GB 8: unbekannter Quell- oder Zielstapel, Stapel auf sich selbst – error, nichts ändert sich, kein Rundruf', () => {
+  for (const bad of [{ from_stack_id: 'gibtsnicht', to_stack_id: 's3' }, { from_stack_id: 's2', to_stack_id: 'gibtsnicht' }, { from_stack_id: 's3', to_stack_id: 's3' }, { to_stack_id: 's3' }]) {
+    const { room, inbox } = makeRoom();
+    const vorher = JSON.stringify(room.boardState);
+    send(room, 'p1', { type: 'stack_merge', ...bad });
+    assert.equal(JSON.stringify(room.boardState), vorher, JSON.stringify(bad));
+    assert.deepEqual(types(inbox.p1), ['error']);
+    assert.deepEqual(inbox.p2, []);
+  }
+});
+
+test('GB 9: stack_merge – die Wache gilt für lose Karte und Stapel, Quelle und Ziel', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', { type: 'stack_merge', from_table_id: 'l1', to_stack_id: 'sblau' });   // Ziel fremd
+  assert.deepEqual(inbox.p1, [{ type: 'error', message: FREMD }]);
+  assert.ok(loose(room, 'l1'));
+  send(room, 'p1', { type: 'stack_merge', from_table_id: 'rot', to_stack_id: 's3' });     // Karte in der eigenen Zone: erlaubt
+  assert.deepEqual(types(inbox.p1), ['error', 'stack_merge']);
+  const { room: r2, inbox: i2 } = makeRoom();
+  r2.boardState.cards.push({ tableId: 'fremd', cardId: 'c', ...IN_BLAU, zIndex: 1, faceDown: true });
+  send(r2, 'p1', { type: 'stack_merge', from_table_id: 'fremd', to_stack_id: 's3' });     // Karte in fremder Zone
+  assert.deepEqual(i2.p1, [{ type: 'error', message: FREMD }]);
+  assert.ok(loose(r2, 'fremd'));
+});

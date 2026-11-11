@@ -189,14 +189,44 @@ export function resolveDrop({ point, stacks, refusal } = {}) {
  *   wenn es nichts zu stapeln gibt.
  */
 export function pileUp(cards, zone, newStackId) {
-  if (!Array.isArray(cards) || zone?.layout !== 'stack') return cards;
+  const plan = pileSettle(cards, zone, newStackId);
+  if (!plan) return cards;
+  const { stackId, at, rank } = plan;
+  return cards.map(c => (rank.has(c)
+    ? { ...c, inStack: stackId, x: at.x, y: at.y, zIndex: rank.get(c), gridId: null, cell: null }
+    : c));
+}
+
+/**
+ * Derselbe Haufen als **Plan** in der Sprache der Nachrichten (`stack_create`, docs/tasks-stapel-raum.md GB): `pileUp`
+ * schreibt ihn in die lokale Liste, im Raum geht er stattdessen an den Server und kommt als Rückmeldung bei allen an.
+ * Eine Rechnung für beide - `pileUp` ruft dieselbe Funktion darunter.
+ *
+ * @returns {{ stack_id: string, card_table_ids: string[], z_index: number[], x: number, y: number }|null}
+ *   `null`, wo es nichts zu stapeln gibt (die Liste bleibt, wie sie ist).
+ */
+export function pilePlan(cards, zone, newStackId) {
+  const plan = pileSettle(cards, zone, newStackId);
+  if (!plan) return null;
+  return {
+    stack_id: plan.stackId,
+    card_table_ids: plan.order.map(c => c.tableId),
+    z_index: plan.order.map(c => plan.rank.get(c)),
+    x: plan.at.x,
+    y: plan.at.y,
+  };
+}
+
+/** Die Rechnung hinter `pileUp` und `pilePlan`: welche Karten, in welcher Reihenfolge, mit welchem `zIndex`, unter welcher Id, wo. */
+function pileSettle(cards, zone, newStackId) {
+  if (!Array.isArray(cards) || zone?.layout !== 'stack') return null;
 
   const mine = cards.filter(c => c && !c.locked && zoneContains(zone, c.x, c.y));
-  if (mine.length < 2) return cards;
+  if (mine.length < 2) return null;
 
   const stackIds = new Set(mine.map(c => c.inStack).filter(Boolean));
   // Liegt schon alles in einem Stapel, ist der gewuenschte Zustand erreicht.
-  if (stackIds.size === 1 && mine.every(c => c.inStack)) return cards;
+  if (stackIds.size === 1 && mine.every(c => c.inStack)) return null;
 
   const stackId = stackIds.size === 1 ? [...stackIds][0] : newStackId;
   const at = zoneCenter(zone);
@@ -209,7 +239,5 @@ export function pileUp(cards, zone, newStackId) {
   const base = Math.min(...mine.map(z));
   const rank = new Map(order.map((c, i) => [c, base + i]));
 
-  return cards.map(c => (rank.has(c)
-    ? { ...c, inStack: stackId, x: at.x, y: at.y, zIndex: rank.get(c), gridId: null, cell: null }
-    : c));
+  return { stackId, at, order, rank };
 }

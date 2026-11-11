@@ -81,3 +81,71 @@ test('GA: applyRemoteAction wendet `stack_flip` über stackOps an (auch die eige
   assert.match(remoteCase('stack_flip'), /setTableCards\(prev => applyStackFlip\(prev, msg\)\)/);
   assert.match(source, /import \{[^}]*applyStackFlip[^}]*\} from '\.\.\/utils\/stackOps\.js'/);
 });
+
+// ── GB: Stapel bilden und mergen ─────────────────────────────────────────────
+
+test('GB: requestStack ist die eine Stelle, die `stack_create` sendet (stackCards und der Haufen im Ablagestapel rufen sie)', () => {
+  assert.equal((source.match(/type: 'stack_create'/g) || []).length, 1);
+  const r = functionText('requestStack');
+  assert.match(r, /room\.sendAction\(\{ type: 'stack_create', \.\.\.plan \}\)/);
+});
+
+test('GB: stackCards sendet im Raum den Wunsch und ändert den Tisch nicht selbst; ohne Raum bleibt der alte Handgriff', () => {
+  const f = functionText('stackCards');
+  const raum = f.indexOf('if (room)');
+  const alt = f.indexOf('setTableCards(prev => prev.map(c => {');
+  assert.ok(raum >= 0 && alt > raum, 'ein Raum-Zweig vor dem alten Code');
+  const zweig = f.slice(raum, alt);
+  assert.match(zweig, /requestStack\(\{ stack_id: stackId, card_table_ids: wanted, z_index: wanted\.map\(\(_, i\) => newZ \+ i\), x, y \}\)/);
+  assert.match(zweig, /return stackId;/);
+  assert.match(f.slice(alt), /inStack: stackId,/, 'Solo: unverändert');
+  assert.match(f.slice(alt), /zIndex: newZ \+ wanted\.indexOf\(c\.tableId\),/);
+});
+
+test('GB: Taste G, Menü „Stack with card below“, MobileActionBar und Halten beim Ablegen rufen stackCards – keiner baut selbst', () => {
+  assert.match(functionText('groupSelectedCards'), /stackCards\(/);
+  const m = menuHandler('context-stack-with-below');
+  assert.match(m, /stackCards\(\[below, contextMenu\.cardTableId\], null\)/);
+  assert.doesNotMatch(m, /setTableCards|inStack/);
+  assert.match(barProp('onGroup'), /groupSelectedCards/);
+  assert.match(functionText('handleCardDragEnd'), /stackCards\(\[mergeTarget, draggingCard\], \{ x: below\.x, y: below\.y \}\)/);
+  // `inStack:` wird im Quelltext nur noch dort gesetzt, wo es eine Rechnung ist (Solo-Zweige), nicht in einem Aufrufer
+  assert.doesNotMatch(functionText('groupSelectedCards'), /setTableCards/);
+});
+
+test('GB: der Merge beim Ablegen (Karte oder Stapel auf einen Stapel) sendet im Raum `stack_merge` und ändert lokal nichts', () => {
+  const f = functionText('handleCardDragEnd');
+  const at = f.indexOf('// If dropped on a stack, merge them');
+  assert.ok(at >= 0);
+  const zweig = f.slice(at, f.indexOf('M10.9/U7: kein Stapel'));
+  const raum = zweig.indexOf('if (room) {');
+  assert.ok(raum >= 0, 'ein Raum-Zweig im Merge');
+  const bis = zweig.indexOf('} else if (card.inStack) {');
+  assert.ok(bis > raum, 'danach der alte Code als `else`: Solo unverändert');
+  const r = zweig.slice(raum, bis);
+  assert.match(r, /type: 'stack_merge', from_stack_id: card\.inStack, to_stack_id: targetStack,/);
+  assert.match(r, /order: draggingStackCards\.map\(c => c\.tableId\), z_index: draggingStackCards\.map\(\(_, i\) => maxTargetZ \+ i \+ 1\)/);
+  assert.match(r, /type: 'stack_merge', from_table_id: draggingCard, to_stack_id: targetStack, z_index: \[maxTargetZ \+ 1\]/);
+  assert.doesNotMatch(r, /setTableCards/, 'der Tisch folgt der Rückmeldung');
+  assert.equal((source.match(/type: 'stack_merge'/g) || []).length, 2);
+});
+
+test('GB: der Haufen im Ablagestapel geht im Raum als `stack_create` aus pilePlan; `pileUp` rechnet dort nicht mehr lokal', () => {
+  const f = functionText('handleCardDragEnd');
+  assert.match(f, /const pile = \(list\) => \(!room && dropZone\?\.layout === 'stack' \? pileUp\(list, dropZone, freshStackId\) : list\);/);
+  assert.match(functionText('pileInRoom'), /pilePlan\(list, zone, crypto\.randomUUID\(\)\)[\s\S]*requestStack\(plan\)/);
+  assert.match(f, /pileInRoom\(/, 'das Ablegen ruft sie');
+  // nach den Wünschen card_move/stack_move, damit der Server die Karte schon an ihrem Ort kennt
+  const move = f.indexOf("type: 'card_move'");
+  assert.ok(f.indexOf('pileInRoom(', move) > move, 'der Haufen folgt dem card_move');
+});
+
+test('GB: applyRemoteAction wendet `stack_create` und `stack_merge` über stackOps an (auch die eigene Rückmeldung) und zählt den zIndex mit', () => {
+  const c = remoteCase('stack_create');
+  assert.match(c, /setTableCards\(prev => applyStackCreate\(prev, msg\)\)/);
+  assert.match(c, /setMaxZIndex\(/);
+  const m = remoteCase('stack_merge');
+  assert.match(m, /setTableCards\(prev => applyStackMerge\(prev, msg\)\)/);
+  assert.match(m, /setMaxZIndex\(/);
+  assert.match(source, /import \{[^}]*applyStackCreate[^}]*applyStackMerge[^}]*\} from '\.\.\/utils\/stackOps\.js'/);
+});
