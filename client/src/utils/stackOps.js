@@ -93,3 +93,32 @@ export function applyStackSplit(cards, msg) {
   const next = cards.map(c => (moving.has(c?.tableId) ? { ...c, inStack: msg.new_stack_id, x: msg.new_x, y: msg.new_y } : c));
   return dissolveLeftovers(next, [msg.stack_id]);
 }
+
+/**
+ * Eine Auswahl um `dx`/`dy` verschieben (Zug einer Mehrfachauswahl, `handleCardDragEnd`): die gewählten Karten **und**
+ * alle Karten eines Stapels, von dem eine gewählt ist. Sie bewegen sich als Teil von etwas anderem und haben danach kein
+ * Rasterfeld. Andere Karten bleiben dasselbe Objekt.
+ */
+export function moveSelected(cards, selected, dx, dy) {
+  const stacks = new Set(cards.filter(c => c.inStack && selected.has(c.tableId)).map(c => c.inStack));
+  return cards.map(c => (selected.has(c.tableId) || (c.inStack && stacks.has(c.inStack))
+    ? { ...c, x: c.x + dx, y: c.y + dy, gridId: null, cell: null }
+    : c));
+}
+
+/**
+ * Die Nachrichten für denselben Zug im Raum: ein `stack_move` je bewegtem Stapel (nicht je Karte), ein `card_move` je
+ * bewegter loser Karte. Ohne sie bliebe der Zug lokal – ein ganzer Stapel gilt beim Greifen als Mehrfachauswahl
+ * (docs/audit-dead-controls.md Fund 9).
+ */
+export function selectionMoveMessages(cards, selected, dx, dy) {
+  const seen = new Set();
+  const msgs = [];
+  moveSelected(cards, selected, dx, dy).forEach((c, i) => {
+    if (c === cards[i]) return;
+    if (!c.inStack) return msgs.push({ type: 'card_move', table_id: c.tableId, x: c.x, y: c.y, gridId: null, cell: null });
+    if (!seen.has(c.inStack)) msgs.push({ type: 'stack_move', stack_id: c.inStack, x: c.x, y: c.y });
+    seen.add(c.inStack);
+  });
+  return msgs;
+}

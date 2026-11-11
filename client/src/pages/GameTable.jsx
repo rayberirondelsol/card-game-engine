@@ -41,7 +41,7 @@ import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp, pilePla
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
-import { applyStackFlip, applyStackCreate, applyStackMerge, applyTakeTop, applyStackSplit } from '../utils/stackOps.js';
+import { applyStackFlip, applyStackCreate, applyStackMerge, applyTakeTop, applyStackSplit, moveSelected, selectionMoveMessages } from '../utils/stackOps.js';
 import { tableLayers, WIDGET_BOX, pickTopmost, widgetScale } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
@@ -1990,16 +1990,11 @@ export default function GameTable({ room = null }) {
 
     if (isMultiSelected) {
       // Snap all selected cards/stacks by the same offset as the dragged card
-      const moveSelection = (prev) => prev.map(c => {
-        const isSelected = selectedCards.has(c.tableId);
-        const isInSelectedStack = c.inStack && prev.some(sc => sc.inStack === c.inStack && selectedCards.has(sc.tableId));
-        if (isSelected || isInSelectedStack) {
-          // Moved as part of a selection, not dropped on a field of its own.
-          return { ...c, x: c.x + snapDx, y: c.y + snapDy, gridId: null, cell: null };
-        }
-        return c;
-      });
+      const moveSelection = (prev) => moveSelected(prev, selectedCards, snapDx, snapDy);
       setTableCards(prev => pile(moveSelection(prev)));
+      // Fund 9: ein Stapel gilt beim Greifen immer als Mehrfachauswahl (`startDraggingCard`), dieser Zweig ist also der
+      // Weg jedes Stapelzugs - ohne diese Zeile blieb er lokal. Die Zuege gehen vor dem Haufen (`pileInRoom`).
+      if (room) selectionMoveMessages(tableCards, selectedCards, snapDx, snapDy).forEach(m => room.sendAction(m));
       pileInRoom(moveSelection(tableCards), dropZone);
     } else if (card.inStack) {
       // Snap the whole stack

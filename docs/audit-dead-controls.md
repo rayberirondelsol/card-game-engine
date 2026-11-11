@@ -148,9 +148,17 @@ Rundruf ja, gespeicherter Raumzustand nein. Betroffen waren auch
 
 **Nachtrag (2026-11-11):** `stack_create`, `stack_merge` und `stack_take_top` senden jetzt (`docs/tasks-stapel-raum.md`); ihre Handler waren dabei zusätzlich falsch (Reihenfolge des Tisches statt der Nachricht, kein `zIndex`, nur lose Karten, ein Stapel mit einer Restkarte blieb stehen) und sind neu geschrieben (`server/src/roomStacks.js`).
 
-Der Rest des Fundes steht unverändert: der **Mehrfachauswahl**-Zweig von
-`handleCardDragEnd` sendet weiterhin **gar keine** Nachricht, im Raum bewegt
-sich dabei nichts.
+**Berichtigt und behoben (2026-11-11).** Die Aussage „seit M9.4 sendet der Zug am
+Stapel“ stimmte nie: `startDraggingCard` markiert beim Greifen eines Stapels
+**alle** seine Karten als ausgewählt, also war `isMultiSelected`
+(`selectedCards.size > 1`) für **jeden** Stapel ab zwei Karten wahr, und der Zweig
+`else if (card.inStack)` mit `stack_move` war für echte Stapel unerreichbar. Ein
+Stapelzug blieb im Raum lokal (der andere Spieler sah nichts, nach dem Neuladen
+sprang der Stapel zurück), genauso der Zug einer echten Mehrfachauswahl loser
+Karten. Behoben: der Zweig sendet im Raum je bewegtem Stapel ein `stack_move`
+und je bewegter loser Karte ein `card_move` (`selectionMoveMessages` in
+`client/src/utils/stackOps.js`, vor `pileInRoom`; Test
+`server/test/selection-move-room.test.js`). Protokoll und Server unverändert.
 Und **Bretter und Textfelder haben überhaupt keine Bewegungsnachricht** — ein
 im Raum verschobenes Brett zieht die daran verankerten Rasterfelder und Zonen
 mit, ohne dass es jemand erfährt.
