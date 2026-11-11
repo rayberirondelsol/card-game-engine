@@ -119,6 +119,9 @@ export function setupWebSocketServer(httpServer) {
 
     // Handle disconnect
     ws.on('close', () => {
+      // Ein Reconnect (Netzwechsel, Neuladen) hat diesen Socket schon ersetzt: sein spaetes Close darf
+      // die lebende Verbindung nicht loeschen und niemanden "getrennt" melden.
+      if (room.connections.get(playerId) !== ws) return;
       setConnection(roomCode, playerId, null);
       broadcast(room, { type: 'player_disconnected', player_id: playerId });
 
