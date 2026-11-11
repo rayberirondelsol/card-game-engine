@@ -203,6 +203,8 @@ Die Skizze der Abnahmeliste ist an Code und Daten gemessen worden; an diesen Ste
 
 **Fertig, wenn:** der Test grün ist und im Bericht steht, **was er nicht abdeckt**.
 
+**Berichtigung beim Bau (FP, 2026-11-11).** Der Test fand **nichts** an `FN`/`FO`/`FU` (kein Rückgang an die Zettel nötig); dass er beißt, belegt eine Gegenprobe: setzt man in `handleCardPlayFromHand` `faceDown` auf `false`, schlagen die Schritte 4, 5, 7 und 8 fehl. Aufbau: **ein** Test mit acht Unterschritten (die Kette hängt voneinander ab) plus der Solo-Gegenprobe als zweiter Test; die Hände 1/2 (absolute Box) gehören dem Host, die **verankerte** Hand 3 dem Gast — der Gast legt in Schritt 4 in sie, ein Tableau-Token im Zustand gibt ihr die Fläche. Wer auf eine Nachricht wartet, wartet auf den Zähler **dieses** Spielers (`zaehler(client, spielerId, ab)`): ein verspäteter `player_hand_count` des anderen ist keine Antwort (das erste Gestell hatte genau diese Wettlaufstelle). **Was der Test nicht abdeckt:** nginx und Cloudflare-Tunnel (derselbe Prozess), den Bildschirm (Blick, Ring, Hinweis, Lobby — `FQ`), ein gespieltes Spiel (kein Kampf, keine Dorfphase; Räume führen keine Aktionen), die Zahl der Spieler ≠ 2 (das prüft `FN`), die Starthände mit Eigentümern (die Hand-Zonen tragen kein `dealStackId`, `FN` 5) und den Neustart des Servers (der Raum stirbt mit ihm, samt Händen).
+
 ---
 
 ## FQ — Client und Lobby: Blick, die Hand-Wege, Hinweis, Zuordnung — und die Sichtprobe (M32.5, M32.6, M32.8)
