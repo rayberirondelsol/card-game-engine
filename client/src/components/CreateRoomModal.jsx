@@ -70,8 +70,8 @@ export default function CreateRoomModal({ gameId, setups = [], onClose, onCreate
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
         <h2 className="text-xl font-semibold mb-4">Create Multiplayer Room</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

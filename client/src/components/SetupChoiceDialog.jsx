@@ -27,8 +27,8 @@ export default function SetupChoiceDialog({ setup, options, onStart, onCancel })
   const [choices, setChoices] = useState(() => resolveChoices(options, {}).choices);
   const problems = lageProblems(setup, choices);
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="setup-choice-dialog">
-      <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" data-testid="setup-choice-dialog">
+      <div className="bg-[var(--color-surface)] rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
         <h2 className="text-xl font-semibold mb-1">Start setup</h2>
         <p className="text-sm text-[var(--color-text-secondary)] mb-4">{setup?.name}</p>
         <SetupChoiceFields options={options} value={choices} onChange={setChoices} />
