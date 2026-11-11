@@ -152,3 +152,23 @@ export function mayTouchCard(zones, players, color, card, dest) {
   if (!mayTouch(zones, players, color, card?.x, card?.y)) return false;
   return !dest || mayTouch(zones, players, color, dest.x, dest.y);
 }
+
+// ─── Der Blick (M32.5, Stufe A) ──────────────────────────────────────────────
+
+/**
+ * Sieht diese Farbe die Vorderseite dieser Karte, obwohl sie verdeckt liegt?
+ *
+ * Wahr für eine **verdeckte** Karte, die in der Hand-Zone **der eigenen Farbe** liegt (`type: "player"`,
+ * `exclusive`) und in keiner fremden. Der Tisch zeichnet sie dann aufgedeckt, der **Zustand** bleibt
+ * `faceDown: true` – ein Klick auf „Flip" deckt also wirklich auf. Falsch ohne Farbe (Hotseat, kein Raum),
+ * ohne Zonen, außerhalb jeder Zone. Kein Sichtfilter am Server: das ist Darstellung, keine Geheimhaltung.
+ *
+ * @param {object[]} zones  **aufgelöste** Zonen
+ * @param {{ x?: number, y?: number, faceDown?: boolean }|null} card
+ * @param {string|null|undefined} myColor
+ */
+export function seesFace(zones, card, myColor) {
+  if (!myColor || card?.faceDown !== true) return false;
+  const hits = ownedZonesAt(zones, card.x, card.y);
+  return hits.length > 0 && hits.every(z => z.color === myColor);
+}

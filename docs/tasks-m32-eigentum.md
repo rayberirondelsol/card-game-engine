@@ -115,6 +115,8 @@ Die Skizze der Abnahmeliste ist an Code und Daten gemessen worden; an diesen Ste
 
 **Fertig, wenn:** die Tests grün sind; `npm test` grün.
 
+**Berichtigung beim Bau (FM, 2026-11-11).** (1) `playedCard` nimmt **die Liste mit**: `playedCard(cards, msg, maxZ)` gibt die neue Liste zurück (Nr. 2 verlangt „keine Doppelung, die Liste kommt unverändert zurück“ – das kann eine Funktion `(msg, maxZ)` ohne Liste nicht); `FQ` ruft `setTableCards(prev => playedCard(prev, msg, maxZ))`. (2) `seesFace` deckt **nur** auf, wenn die Karte in **keiner fremden** Eigentümer-Zone liegt (überlappende Zonen), und zählt wie die Wache nur `type: "player"` mit Farbe und `exclusive` – sonst gäbe die Überlappung mit einer fremden Hand die Vorderseite frei. (3) `handFromServer` liest `cardId ?? id` (die Bibliothekskarte trägt `id`, die Tischkarte `cardId`; `draw_response` bisher `id || cardId`). (4) Nr. 4: ein `stack_size_update` **ohne** `removed` (alter Server) ändert nichts; das `removed` setzt `FU`.
+
 ---
 
 ## FN — Der Raumstart: genau `S` Spieler, Zuordnung, Zonenkopie (M32.3, M32.7)
