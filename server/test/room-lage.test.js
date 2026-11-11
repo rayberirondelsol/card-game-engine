@@ -175,3 +175,35 @@ test('FC: ein Raum ohne villagers.lage startet wie heute', async () => {
   assert.equal(res.statusCode, 200, res.body);
   assert.deepEqual(getRoom(room_code).boardState.counters.map(c => c.name), ['Probe']);
 });
+
+// ── dieselbe Figur zweimal bei mehreren Spielern (Auftraggeber, 2026-11-11) ─────────────────────
+
+test('Doppelwahl: derselbe Dörfler auf zwei Plätzen bei zwei Spielern wird abgewiesen (400), ohne Raum - solo geht', async () => {
+  const gameId = await createGame();
+  const setupId = await mitLage(gameId);
+  const rooms = count('game_rooms');
+
+  const res = await createRoom(gameId, setupId, { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' });
+  assert.equal(res.statusCode, 400, res.body);
+  assert.match(res.json().error, /Ungültige Wahl für diesen Aufbau/);
+  assert.match(res.json().error, /Judy ist doppelt gewählt/);
+  assert.equal(count('game_rooms'), rooms, 'kein Raum angelegt');
+
+  assert.equal((await createRoom(gameId, setupId, { spieler: 's1', doerfler1: 'Judy', doerfler2: 'Judy' })).statusCode, 201, 'solo bleibt wie M30.4');
+});
+
+test('Doppelwahl: „Raum starten" weist ab (409), wenn die Daten nach dem Anlegen eine Doppelwahl ergeben', async () => {
+  const gameId = await createGame();
+  const setupId = await mitLage(gameId);
+  const created = await createRoom(gameId, setupId, { spieler: 's2' });
+  assert.equal(created.statusCode, 201, created.body);
+  const { room_code, player_id } = created.json();
+
+  // der Raum trägt seine aufgelöste Wahl: Dörfler 2 wird Henlo, so wie Dörfler 1 - gültig für `resolveChoices`, eine Doppelwahl für `lageOf`
+  getDb().prepare('UPDATE game_rooms SET setup_choices = ? WHERE room_code = ?').run(JSON.stringify({ spieler: 's2', doerfler1: 'Henlo', doerfler2: 'Henlo' }), room_code);
+  const res = await start(room_code, player_id);
+  assert.equal(res.statusCode, 409, res.body);
+  assert.match(res.json().error, /Die Wahl für diesen Aufbau gilt nicht mehr/);
+  assert.match(res.json().error, /Henlo ist doppelt gewählt/);
+  assert.equal(dbStatus(room_code), 'waiting');
+});

@@ -222,13 +222,35 @@ export function lageOf(scenarioData, choices) {
     return fail(`option "${lage.players}": the choice "${String(raw ?? '')}" must end in the number of players (1 or more), e.g. "s3"`);
   }
 
-  const seated = lage.seats.filter((name) => {
+  const seats = lage.seats.filter((name) => {
     const opt = optionalOf(options[name], choices?.[name]);
     return !opt || !opt.isOff;
-  }).length;
+  });
+  const seated = seats.length;
+
+  // Dieselbe Figur auf zwei Plätzen: bei mehreren Spielern ein Problem (Auftraggeber, 2026-11-11) - jeder
+  // Platz hat dort Topf und Hand, ein leerer Platz bekäme beides ohne Dörfler. Solo bleibt wie M30.4
+  // (der spätere Platz bleibt leer, eine Protokollzeile). Gleich sind Wahlen mit demselben Schlüssel;
+  // genannt wird das Label (der volle Name). Eine Meldung je Figur, nicht je Platz.
+  const doppelt = [];
+  if (players > 1) {
+    const seen = new Set();
+    for (const name of seats) {
+      const key = choices?.[name] ?? options[name].default;
+      if (seen.has(key) && !doppelt.includes(key)) doppelt.push(key);
+      seen.add(key);
+    }
+  }
 
   const out = { players, villagers: seated, kind: null, problems: [] };
-  if (players > seated) {
+  if (doppelt.length) {
+    // Vor `S > D`, und es ersetzt es: `D` zählt Plätze, die Doppelwahl macht aus zweien einen Dörfler - ein zweiter
+    // Satz mit einer Zahl, die den Doppelten noch mitzählt, widerspräche dem ersten. Ist sie behoben, gilt `S > D` wieder.
+    for (const key of doppelt) {
+      const label = seats.map(name => options[name].choices?.[key]?.label).find(isText) ?? key;
+      out.problems.push(`${label} ist doppelt gewählt – bei mehreren Spielern braucht jeder Platz einen eigenen Dörfler.`);
+    }
+  } else if (players > seated) {
     // Deutsch, weil Dialog, Modal und Fehlerantwort den Satz unverändert zeigen (Auftraggeber, 2026-11-11);
     // die Meldungen über kaputte Daten oben bleiben englisch - die liest kein Spieler.
     out.problems.push(`${players} Spieler, aber nur ${seated} Dörfler – es braucht mindestens so viele Dörfler wie Spieler.`);

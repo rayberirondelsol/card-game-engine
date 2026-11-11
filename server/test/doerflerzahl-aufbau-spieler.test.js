@@ -551,32 +551,34 @@ test('FH 9: **`S > D` baut nichts** (`FC`, hier mit den echten Daten) – `spiel
 // 10  Doppelwahl
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('FH 10: **Doppelwahl** – `spieler 2`, Dörfler 1 und 2 beide Judy, Dörfler 3 und 4 gewählt: `lageOf` meldet `mehrfach` aus der **Wahl** (vier), am Tisch sitzen drei; Töpfe und Hände der Plätze 3 bis 5 folgen dem **Tisch** (`onlySeated`), 1 und 2 tragen nur das Lagen-Gate; der erste Kampf hält nicht', () => {
-  const c = { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' };
+test('FH 10: **Doppelwahl** (Auftraggeber, 2026-11-11) – bei mehreren Spielern ein Problem mit dem vollen Namen, und der Aufbau baut **nichts**; solo bleibt wie M30.4: der zweite Judy bleibt draußen, eine `skipped`-Zeile', () => {
   const z = ziel();
-  const l = lageOf(z.scenario, resolveChoices(z.scenario.options, c).choices);
-  assert.deepEqual([l.kind, l.villagers, l.players, l.problems], ['mehrfach', 4, 2, []]);
+  const gemeldet = (c) => lageOf(z.scenario, resolveChoices(z.scenario.options, c).choices);
+  const DOPPELT = 'Judy Marks ist doppelt gewählt – bei mehreren Spielern braucht jeder Platz einen eigenen Dörfler.';
+
+  // spieler 2: eine Meldung, keine Lage - mit zwei, vier oder allen gewählten Plätzen; `S > D` kommt dazu nie ein zweiter Satz
+  for (const c of [
+    { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' },
+    { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' },
+    { spieler: 's5', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' },
+  ]) {
+    const l = gemeldet(c);
+    assert.deepEqual([l.kind, l.problems], [null, [DOPPELT]], JSON.stringify(c));
+    // der Executor ist die letzte Wache: eine Zeile `failed`, kein Zähler, kein Stapel
+    const r = tisch(c);
+    assert.deepEqual(r.log.map(e => [e.index, e.status]), [[-1, 'failed']], JSON.stringify(c));
+    assert.match(r.log[0].reason, /Judy Marks ist doppelt gewählt/);
+    assert.equal(r.state.counters.length, 0);
+  }
+
+  // solo: dieselbe Wahl ist eine Lage, der Aufbau läuft, genau der zweite Judy bleibt draußen (M30.4, M31.3)
+  const c = { spieler: 's1', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' };
+  const l = gemeldet(c);
+  assert.deepEqual([l.kind, l.villagers, l.players, l.problems], ['solo', 4, 1, []]);
   const r = tisch(c);
-  assert.deepEqual(r.log.filter(e => e.status !== 'ok').map(e => [e.type, e.status]), [['seat_villager', 'skipped']], 'genau der zweite Judy bleibt draußen (M31.3)');
-  const sitzende = seatedVillagers(r.state, ASSETS, z.scenario.villagers).map(s => s.n);
-  assert.deepEqual(sitzende, [1, 3, 4], 'drei sitzen');
-  // Gemessen: Platz 3 bis 5 folgen dem Tisch; Platz 1 und 2 tragen kein `onlySeated` (M31.3) — Topf und Hand 2 entstehen auch ohne Dörfler.
-  assert.deepEqual(r.state.counters.map(x => x.name), ['Münzen Dörfler 1', 'Münzen Dörfler 2', 'Münzen Dörfler 3', 'Münzen Dörfler 4']);
-  for (const i of [1, 2, 3, 4]) assert.equal(inHand(r.state, i).length, 3, `Hand ${i}`);
-  assert.equal(inHand(r.state, 5).length, 0);
-  // Der erste Kampf: drei Werte sind da (baseCount 3) — `build_scenario` hält nicht, der leere Platz 2 meldet eine `skipped`-Zeile (`$F2`), wie in M31.3.
-  const k = aktion('kampf-beginnen', r.state);
-  assert.equal(k.log.some(e => e.type === 'build_scenario' && e.status === 'failed'), false, 'build_scenario hält nicht');
-  assert.deepEqual(k.log.filter(e => e.status === 'failed'), []);
-  // … und die Dorfphase zahlt aus allen vier Töpfen (der Topf des leeren Platzes 2 inbegriffen).
-  const d = aktion('dorfphase-beginnen', k.state);
-  for (const i of [1, 2, 3, 4]) assert.equal(zaehler(d.state, `Münzen Dörfler ${i}`).value, 21, `Topf ${i}`);
-  // Nur zwei gewählt, die Wahl hat Platz 3 und 4: Platz 1 und 2 beide Judy ohne dritten → S 2, D 2, normal, ein Dörfler sitzt
-  const c2 = { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' };
-  const r2 = tisch(c2);
-  assert.equal(lageOf(z.scenario, resolveChoices(z.scenario.options, c2).choices).kind, 'normal');
-  assert.equal(r2.state.counters.length, 2);
-  assert.equal(stapel(r2.state, 'Dorf-Ereignisse'), 105);
+  assert.deepEqual(r.log.filter(e => e.status !== 'ok').map(e => [e.type, e.status]), [['seat_villager', 'skipped']]);
+  assert.deepEqual(seatedVillagers(r.state, ASSETS, z.scenario.villagers).map(x => x.n), [1, 3, 4], 'drei sitzen');
+  assert.deepEqual(r.state.counters.map(x => x.name), ['Münzen (gemeinsam)']);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

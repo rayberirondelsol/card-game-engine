@@ -28,7 +28,7 @@ const OPTIONS = {
   // Der Schlüssel ist der Bezeichner (er reist in der Adresse, `KEY`), das Label ist für Menschen.
   spieler: { label: 'Spieler', default: 's1', choices: Object.fromEntries([1, 2, 3, 4, 5].map(n => [`s${n}`, { label: String(n) }])) },
   doerfler1: seat('Henlo'),
-  doerfler2: seat('Granny'),
+  doerfler2: seat('Judy'),   // nicht Granny: `doerfler3: 'Granny'` wäre bei mehreren Spielern eine Doppelwahl
   doerfler3: seat('keiner', 'Granny'),
   doerfler4: seat('keiner', 'Blopsy'),
   doerfler5: seat('keiner', 'Yancy'),
@@ -291,4 +291,71 @@ test('onlyLage in der Folge: solo/mehrfach/normal (und Listen) erlaubt, sonst ei
 test('validateOptions braucht dafür keine Lage in den Daten und lernt nichts über TFT', () => {
   assert.deepEqual(validateOptions({}, [probe('solo')], []), []);
   assert.deepEqual(validateOptions(undefined, [probe('normal')], []), []);
+});
+
+// ── 4. dieselbe Figur zweimal: bei mehreren Spielern ein Problem (Auftraggeber, 2026-11-11) ─────
+//
+// Solo (M30.4) lässt der Aufbau den späteren Platz leer und schreibt eine Zeile - das bleibt.
+// Bei `S > 1` hat jeder Platz Topf und Hand; ein leerer Platz bekäme beides ohne Dörfler. Darum
+// ist die Doppelwahl dort **dasselbe** Problem wie `S > D`: Dialog, Raum, Start und Executor
+// halten ohne eigene Verdrahtung. Gleich sind Wahlen mit demselben Schlüssel; der Satz nennt das Label.
+
+const DOPPELT = (name) => `${name} ist doppelt gewählt – bei mehreren Spielern braucht jeder Platz einen eigenen Dörfler.`;
+
+test('mehrere Spieler, derselbe Dörfler zweimal: ein Problem mit seinem Namen, und keine Lage', () => {
+  const r = lageOf(data(), { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' });
+  assert.equal(r.kind, null);
+  assert.deepEqual(r.problems, [DOPPELT('Judy')]);
+  assert.equal(r.players, 2);
+  assert.equal(r.villagers, 2);
+});
+
+test('die Doppelwahl zählt über alle Plätze, auch die zugeschalteten', () => {
+  // Henlo / Judy (Vorgabe) / Judy: Platz 3 gleicht Platz 2
+  assert.deepEqual(lageOf(data(), { spieler: 's2', doerfler3: 'Judy' }).problems, [DOPPELT('Judy')]);
+  const r = lageOf(data(), { spieler: 's2', doerfler3: 'Granny', doerfler4: 'Henlo' });
+  assert.deepEqual(r.problems, [DOPPELT('Henlo')]);
+});
+
+test('der Name im Satz ist das Label der Wahl (der volle Name), nicht der Schlüssel', () => {
+  const d = data();
+  d.options.doerfler2.choices.Judy = { label: 'Judy Marks' };
+  d.options.doerfler1.choices.Judy = { label: 'Judy Marks' };
+  assert.deepEqual(lageOf(d, { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' }).problems, [DOPPELT('Judy Marks')]);
+});
+
+test('dreimal derselbe: eine Meldung, nicht zwei; zwei verschiedene Doppelte: zwei Meldungen', () => {
+  assert.deepEqual(lageOf(data(), { spieler: 's3', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Judy' }).problems, [DOPPELT('Judy')]);
+  const r = lageOf(data(), { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Granny' });
+  assert.deepEqual(r.problems, [DOPPELT('Judy'), DOPPELT('Granny')]);
+});
+
+test('solo (S = 1) lässt die Doppelwahl, wie sie ist: eine Lage ohne Problem (M30.4)', () => {
+  const r = lageOf(data(), { spieler: 's1', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Granny' });
+  assert.deepEqual(r, { players: 1, villagers: 4, kind: 'solo', problems: [] });
+});
+
+test('ausgeschaltete Plätze sind keine Doppelwahl, auch wenn ihre Wahl "keiner" gleich ist', () => {
+  const r = lageOf(data(), { spieler: 's2' });   // Dörfler 3 bis 5 stehen auf "keiner"
+  assert.equal(r.kind, 'normal');
+  assert.deepEqual(r.problems, []);
+});
+
+test('Doppelwahl und S > D zusammen: nur die Doppelwahl wird gemeldet, die Ursache - kein zweiter Satz mit einer Zahl, die sie noch mitzählt', () => {
+  // vier Plätze gewählt, nur drei verschiedene: D sagt 4, S = 5
+  const r = lageOf(data(), { spieler: 's5', doerfler1: 'Judy', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' });
+  assert.equal(r.kind, null);
+  assert.deepEqual(r.problems, [DOPPELT('Judy')]);
+  // ohne Doppelwahl bleibt es beim S > D
+  assert.match(lageOf(data(), { spieler: 's5', doerfler1: 'Henlo', doerfler2: 'Judy', doerfler3: 'Granny', doerfler4: 'Blopsy' }).problems.join(), /^5 Spieler, aber nur 4 Dörfler/);
+});
+
+test('die Doppelwahl ist ein Problem auch an den Wachen: der Executor baut nichts', () => {
+  const sd = { ...copy(scenarioData), options: copy(OPTIONS), villagers: { ...copy(scenarioData.villagers), lage: copy(LAGE) } };
+  const vorher = build();
+  const r = run(vorher, [{ type: 'place_counter', name: 'Probe', value: 1, x: 0, y: 0 }], { scenarioData: sd, choices: { spieler: 's2', doerfler1: 'Judy', doerfler2: 'Judy' } });
+  assert.equal(r.log.length, 1);
+  assert.equal(r.log[0].status, 'failed');
+  assert.match(r.log[0].reason, /Judy ist doppelt gewählt/);
+  assert.deepEqual(r.state, vorher);
 });
