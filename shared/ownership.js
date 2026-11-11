@@ -8,6 +8,9 @@
  * und Solo, Hotseat und jeder Raum ohne die Wahl bleiben dadurch Zeichen für Zeichen, wie sie sind (M32.7).
  */
 
+import { resolveZones, anchorBoxes } from './anchoring.js';
+import { zoneContains } from './zoneGeometry.js';
+
 const isInt = (n) => Number.isInteger(n);
 
 /**
@@ -86,4 +89,66 @@ export function bindZones(zones, owners) {
   });
   const warnings = places.filter(n => !bound.has(n)).map(n => `Platz ${n}: keine Hand-Zone mit \`platz\``);
   return { zones: out, warnings };
+}
+
+// ─── Die Wache (M32.4) ───────────────────────────────────────────────────────
+
+/**
+ * Die aufgelösten Zonen des Raums: `resolveZones` gegen Bretter und Tokens des **aktuellen** Zustands,
+ * wie der Start es für die Raster tut (`rooms.js`). Rohe Zonen reichen nicht: eine verankerte Hand
+ * (Hand Dörfler 3 bis 5) hat keine absolute Box, und ein Tableau, das jemand verschiebt, nimmt seine Hand mit.
+ *
+ * @param {{ boards?: object[], tokens?: object[] }|null} boardState
+ * @param {object[]} zones  `room.zones`
+ */
+export function resolveServerZones(boardState, zones) {
+  return resolveZones(zones, anchorBoxes(boardState?.boards, boardState?.tokens));
+}
+
+/**
+ * Die Zonen mit Eigentümer, die den Punkt enthalten: `type: "player"`, `exclusive` **und eine Farbe** –
+ * `exclusive` ohne Farbe ist kein Eigentümer (M32.1 Nr. 2d). Eine Zone ohne Box (ein Anker, der nicht
+ * aufgelöst wurde) trifft nie: `zoneContains` rechnet für fehlende Maße mit Vorgaben, und die lägen am Nullpunkt.
+ * Eine abgewandte Zone (`facingAway`) ist nicht da.
+ */
+function ownedZonesAt(zones, x, y) {
+  if (!Array.isArray(zones) || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+  return zones.filter(z => z?.exclusive === true && z.type === 'player' && z.color
+    && z.facingAway !== true
+    && [z.x, z.y, z.width, z.height].every(Number.isFinite)
+    && zoneContains(z, x, y));
+}
+
+/** Ist zu dieser Farbe noch ein Spieler im Raum? Offline zählt als da; ohne Liste gibt es keine Auskunft über Abwesenheit. */
+function ownerPresent(players, color) {
+  if (players == null) return true;
+  const list = players instanceof Map ? players.values() : players;
+  for (const p of list) if (p?.color === color) return true;
+  return false;
+}
+
+/**
+ * Darf `color` an dieser Stelle etwas anfassen? Nein, wenn der Punkt in der Hand-Zone eines **anderen** liegt,
+ * dessen Eigentümer noch im Raum ist (Regel 1 und 2, M32.4). Liegt der Punkt in mehreren Zonen, entscheidet
+ * die fremde, unabhängig von der Reihenfolge. Ohne Eigentümer, ohne Zonen, ohne Liste: `true`, kein Wurf.
+ *
+ * @param {object[]} zones    **aufgelöste** Zonen (`resolveServerZones`)
+ * @param {Array|Map} players `room.players` – `{ color, isConnected }`
+ * @param {string|null} color Farbe des Handelnden
+ */
+export function mayTouch(zones, players, color, x, y) {
+  return ownedZonesAt(zones, x, y).every(z => z.color === color || !ownerPresent(players, z.color));
+}
+
+/**
+ * Die Handlung an einer **Karte**: verboten, wenn ihr Ort **jetzt** oder ihr Ziel in einer fremden Hand-Zone
+ * liegt (auch das Herausziehen, Mangel a). In der eigenen Zone ist alles erlaubt, verdeckt wie aufgedeckt.
+ * `dest` fehlt bei Flip und Rotate: dann zählt nur der Ort.
+ *
+ * @param {{ x?: number, y?: number }|null} card
+ * @param {{ x: number, y: number }} [dest]
+ */
+export function mayTouchCard(zones, players, color, card, dest) {
+  if (!mayTouch(zones, players, color, card?.x, card?.y)) return false;
+  return !dest || mayTouch(zones, players, color, dest.x, dest.y);
 }
