@@ -88,6 +88,10 @@ export function setupWebSocketServer(httpServer) {
       return;
     }
 
+    // Der Host ist (wieder) da: die Gnadenfrist darf niemanden mehr zum Host machen.
+    clearTimeout(room.hostDisconnectTimer);
+    room.hostDisconnectTimer = null;
+
     // Register connection
     setConnection(roomCode, playerId, ws);
 

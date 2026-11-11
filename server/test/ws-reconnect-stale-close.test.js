@@ -96,3 +96,19 @@ test('Close des aktuellen Sockets trennt weiterhin', async () => {
   assert.equal(room.players.get('A').isConnected, false);
   assert.ok(b.msgs.slice(bVor).some(m => m.type === 'player_disconnected' && m.player_id === 'A'));
 });
+
+test('Reconnect des Hosts stoppt den Gnadentimer, es wird kein neuer Host ernannt', async () => {
+  const room = getRoom(ROOM_CODE);
+  const b = await open('B');
+  const a1 = await open('A');
+  a1.ws.close();
+  await tick();
+  const timer = room.hostDisconnectTimer;
+  assert.ok(timer, 'Host-Close muss den Gnadentimer setzen');
+
+  await open('A');                     // Host kommt innerhalb der Gnadenfrist zurueck
+  assert.equal(timer._destroyed, true, 'Timer muss gestoppt sein');
+  assert.ok(!room.hostDisconnectTimer, 'Feld muss zurueckgesetzt sein');
+  assert.equal(room.hostPlayerId, 'A');
+  assert.deepEqual(b.msgs.filter(m => m.type === 'host_changed'), []);
+});
