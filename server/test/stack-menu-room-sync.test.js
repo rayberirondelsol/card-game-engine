@@ -149,3 +149,36 @@ test('GB: applyRemoteAction wendet `stack_create` und `stack_merge` über stackO
   assert.match(m, /setMaxZIndex\(/);
   assert.match(source, /import \{[^}]*applyStackCreate[^}]*applyStackMerge[^}]*\} from '\.\.\/utils\/stackOps\.js'/);
 });
+
+// ── GC: teilen und abheben ───────────────────────────────────────────────────
+
+test('GC: performSplit sendet im Raum `stack_take_top` (1) bzw. `stack_split` (≥ 2) an die gerechnete Stelle und ändert den Tisch nicht selbst; ohne Raum der alte Handgriff', () => {
+  const f = functionText('performSplit');
+  const ziel = f.indexOf('const ziel = spawnSlot(');
+  const raum = f.indexOf('if (room) {');
+  const alt = f.indexOf('setTableCards(prev => prev.map(c => {');
+  assert.ok(ziel >= 0 && raum > ziel && alt > raum, 'der Raum-Zweig steht nach der Stelle (spawnSlot) und vor dem alten Code');
+  const zweig = f.slice(raum, alt);
+  assert.match(zweig, /type: 'stack_split', stack_id: stackId, count, new_stack_id: newStackId, new_x: ziel\.x, new_y: ziel\.y/);
+  assert.match(zweig, /type: 'stack_take_top', stack_id: stackId, new_x: ziel\.x, new_y: ziel\.y/);
+  assert.match(zweig, /return;/);
+  assert.doesNotMatch(zweig, /setTableCards/);
+  assert.match(f.slice(alt), /return \{ \.\.\.c, inStack: newStackId, x: c\.x \+ dx, y: c\.y \+ dy \};/, 'Solo: unverändert');
+});
+
+test('GC: Split-Dialog (Knopf und Enter), „Take Top Card“ und die MobileActionBar laufen über performSplit', () => {
+  assert.equal((source.match(/performSplit\(splitStackId, n\)/g) || []).length, 2, 'Knopf und Enter');
+  const t = menuHandler('context-take-top');
+  assert.match(t, /performSplit\(contextMenu\.stackId, 1\)/);
+  assert.doesNotMatch(t, /setTableCards/);
+  const s = menuHandler('context-split');
+  assert.match(s, /setShowSplitModal\(true\)/);
+  assert.match(barProp('onSplitStack'), /setShowSplitModal\(true\)/);
+  assert.doesNotMatch(barProp('onSplitStack'), /setTableCards/);
+});
+
+test('GC: applyRemoteAction wendet `stack_take_top` und `stack_split` über stackOps an', () => {
+  assert.match(remoteCase('stack_take_top'), /setTableCards\(prev => applyTakeTop\(prev, msg\)\)/);
+  assert.match(remoteCase('stack_split'), /setTableCards\(prev => applyStackSplit\(prev, msg\)\)/);
+  assert.match(source, /import \{[^}]*applyTakeTop[^}]*applyStackSplit[^}]*\} from '\.\.\/utils\/stackOps\.js'/);
+});

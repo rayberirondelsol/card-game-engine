@@ -77,6 +77,45 @@ export function flipStack(stack) {
   return faces;
 }
 
+// ─── Abheben und Teilen ───────────────────────────────────────────────────────
+
+/**
+ * `stack_take_top { stack_id, new_x, new_y, face_down?, z_index? }` / `stack_split { stack_id, count, new_stack_id, new_x, new_y }`
+ * prüfen. `count` ist bei `stack_take_top` 1 (die oberste Karte, lose); bei `stack_split` eine ganze Zahl von 1 bis
+ * Stapelgröße − 1, und ab 2 braucht der neue Stapel eine Id, die es noch nicht gibt.
+ * Gibt `{ error }` oder `{ stack, count, moved }` zurück (`moved` unten → oben).
+ */
+export function planSplit(boardState, msg, count = 1) {
+  const stack = boardState.stacks.find(s => stackIdOf(s) === msg.stack_id);
+  if (!stack || !Array.isArray(stack.cards) || stack.cards.length === 0) return { error: NO_STACK };
+  if (!finite(msg.new_x) || !finite(msg.new_y)) return { error: 'Ungültiger Ort für die Karte.' };
+  if (!Number.isInteger(count) || count < 1 || count > stack.cards.length - (count >= 2 ? 1 : 0)) return { error: 'So viele Karten lassen sich nicht abteilen.' };
+  if (count >= 2 && (typeof msg.new_stack_id !== 'string' || !msg.new_stack_id
+      || boardState.stacks.some(s => stackIdOf(s) === msg.new_stack_id))) return { error: 'Ungültiger Stapel.' };
+  return { stack, count, moved: stack.cards.slice(stack.cards.length - count) };
+}
+
+/**
+ * Die obersten Karten abnehmen und wohin legen: bei `count` 1 liegt die Karte **lose** an der Stelle (Seite und `zIndex`
+ * aus der Nachricht, wenn sie lesbar sind – so deckt „Reveal“ auf –, sonst bleibt sie, wie sie war), sonst bilden sie einen
+ * neuen Stapel. Ein Rest von einer Karte löst sich auf. Gibt die lose Karte zurück (oder `null`).
+ */
+export function applySplit(boardState, msg, { stack, count, moved }, newId) {
+  stack.cards = stack.cards.slice(0, stack.cards.length - count);
+  tidyStack(boardState, stack);
+  if (count === 1) {
+    const card = { ...moved[0], x: msg.new_x, y: msg.new_y, tableId: moved[0].tableId || newId };
+    if (typeof msg.face_down === 'boolean') card.faceDown = msg.face_down;
+    if (finite(msg.z_index)) card.zIndex = msg.z_index;
+    boardState.cards.push(card);
+    return card;
+  }
+  const fresh = { stackId: msg.new_stack_id, cards: moved, x: msg.new_x, y: msg.new_y };
+  syncStackIds(fresh);
+  boardState.stacks.push(fresh);
+  return null;
+}
+
 // ─── Bilden und Mergen ────────────────────────────────────────────────────────
 
 /**

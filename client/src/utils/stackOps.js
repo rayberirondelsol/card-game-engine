@@ -68,3 +68,28 @@ export function applyStackMerge(cards, msg) {
     ? { ...c, inStack: msg.to_stack_id, x: msg.x, y: msg.y, zIndex: zAt(msg.z_index, place.get(c.tableId), c), gridId: null, cell: null }
     : c));
 }
+
+/**
+ * `stack_take_top { stack_id, new_x, new_y, card }`: die oberste Karte des Stapels liegt lose an der Stelle, mit der Seite
+ * und dem `zIndex`, die der Server gesetzt hat (`card` ist die Karte des Servers; „Reveal“ deckt sie auf). Ein Stapel mit
+ * einer Restkarte ist keiner mehr. Eine Karte, die dieser Tisch nicht kennt, wird aus der Nachricht gelegt.
+ */
+export function applyTakeTop(cards, msg) {
+  const card = msg?.card;
+  if (!Array.isArray(cards) || !card?.tableId) return cards;
+  const old = cards.find(c => c?.tableId === card.tableId);
+  const next = [...cards.filter(c => c?.tableId !== card.tableId), { ...old, ...card, x: card.x ?? msg.new_x, y: card.y ?? msg.new_y, inStack: null }];
+  return dissolveLeftovers(next, [msg.stack_id]);
+}
+
+/**
+ * `stack_split { stack_id, new_stack_id, card_table_ids, new_x, new_y }`: die genannten obersten Karten (unten → oben)
+ * bilden den neuen Stapel an der neuen Stelle, ihr `zIndex` bleibt; ein Rest von einer Karte ist lose.
+ */
+export function applyStackSplit(cards, msg) {
+  const ids = msg?.card_table_ids;
+  if (!Array.isArray(cards) || typeof msg?.new_stack_id !== 'string' || !isNum(msg.new_x) || !isNum(msg.new_y) || !known(cards, ids)) return cards;
+  const moving = new Set(ids);
+  const next = cards.map(c => (moving.has(c?.tableId) ? { ...c, inStack: msg.new_stack_id, x: msg.new_x, y: msg.new_y } : c));
+  return dissolveLeftovers(next, [msg.stack_id]);
+}

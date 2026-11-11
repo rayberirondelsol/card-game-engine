@@ -21,7 +21,7 @@ import { snapPoint, objectsInZone } from '../../../shared/zoneGeometry.js';
 // M32.6: die private Hand hält der Server.
 import { handOf, addToHand, announceHandCount, takeFromStack } from '../roomHand.js';
 // Stapelgriffe im Raum (docs/tasks-stapel-raum.md): die Rechnung auf dem Raumzustand.
-import { stackIdOf, findCard, flipStack, topZIndex, planCreate, applyCreate, planMerge, applyMerge } from '../roomStacks.js';
+import { stackIdOf, findCard, flipStack, topZIndex, planCreate, applyCreate, planMerge, applyMerge, planSplit, applySplit } from '../roomStacks.js';
 
 export { stackIdOf };
 
@@ -54,6 +54,8 @@ export function handleMessage(room, playerId, rawData) {
       return handleStackCreate(room, playerId, payload, timestamp);
     case 'stack_merge':
       return handleStackMerge(room, playerId, payload, timestamp);
+    case 'stack_split':
+      return handleStackSplit(room, playerId, payload, timestamp);
     case 'stack_take_top':
       return handleStackTakeTop(room, playerId, payload, timestamp);
     case 'stack_shuffle':
@@ -283,26 +285,35 @@ function handleStackMerge(room, playerId, msg, timestamp) {
   });
 }
 
-function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestamp) {
-  const stack = findStack(room, stack_id);
-  if (!stack || stack.cards.length === 0) return;
-  if (!allowed(room, playerId, stack, { x: new_x, y: new_y })) return rejectTo(room, playerId);
-  const topCard = stack.cards.pop();
-  const tableCard = { ...topCard, x: new_x, y: new_y, tableId: topCard.tableId || generateId() };
-  room.boardState.cards.push(tableCard);
-  // Remove empty stack
-  if (stack.cards.length === 0) {
-    room.boardState.stacks = room.boardState.stacks.filter(s => stackIdOf(s) !== stack_id);
-  }
+/**
+ * Die oberste Karte lose abheben („Take Top Card“; mit `face_down: false` und `z_index` auch „Reveal Top Card to …“).
+ * Der Tisch des Absenders ändert sich erst mit der Rückmeldung an **alle** (docs/tasks-stapel-raum.md, Entscheidung 1);
+ * ein Stapel mit einer Restkarte löst sich auf, die Karte der Rückmeldung ist die des Servers.
+ */
+function handleStackTakeTop(room, playerId, msg, timestamp) {
+  const plan = planSplit(room.boardState, msg);
+  if (plan.error) return rejectTo(room, playerId, null, plan.error);
+  const { new_x, new_y } = msg;
+  if (!allowed(room, playerId, plan.stack, { x: new_x, y: new_y })) return rejectTo(room, playerId);
+  const card = applySplit(room.boardState, msg, plan, generateId());
+  broadcast(room, { type: 'stack_take_top', stack_id: msg.stack_id, new_x, new_y, card, from_player_id: playerId, timestamp });
+}
+
+/**
+ * Teilen („Split Stack“, docs/tasks-stapel-raum.md GC): die obersten `count` Karten werden ein neuer Stapel an `new_x`/`new_y`.
+ * Bei `count` 1 ist es `stack_take_top`. Rückmeldung an **alle** mit den Ids der verschobenen Karten.
+ */
+function handleStackSplit(room, playerId, msg, timestamp) {
+  if (msg.count === 1) return handleStackTakeTop(room, playerId, msg, timestamp);
+  const plan = planSplit(room.boardState, msg, msg.count);
+  if (plan.error) return rejectTo(room, playerId, null, plan.error);
+  const { new_x, new_y } = msg;
+  if (!allowed(room, playerId, plan.stack, { x: new_x, y: new_y })) return rejectTo(room, playerId);
+  applySplit(room.boardState, msg, plan, null);
   broadcast(room, {
-    type: 'stack_take_top',
-    stack_id,
-    new_x,
-    new_y,
-    card: tableCard,
-    from_player_id: playerId,
-    timestamp,
-  }, playerId);
+    type: 'stack_split', stack_id: msg.stack_id, count: plan.count, new_stack_id: msg.new_stack_id,
+    card_table_ids: plan.moved.map(c => c.tableId), new_x, new_y, from_player_id: playerId, timestamp,
+  });
 }
 
 /**

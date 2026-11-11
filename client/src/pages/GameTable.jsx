@@ -41,7 +41,7 @@ import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp, pilePla
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
 import { spawnSlot } from '../utils/spawnSlot.js';
 import { takeFromStack } from '../utils/stackTake.js';
-import { applyStackFlip, applyStackCreate, applyStackMerge } from '../utils/stackOps.js';
+import { applyStackFlip, applyStackCreate, applyStackMerge, applyTakeTop, applyStackSplit } from '../utils/stackOps.js';
 import { tableLayers, WIDGET_BOX, pickTopmost, widgetScale } from '../utils/tokenLayer.js';
 import { zoomAt, worldAt, wheelZoom, claimWheel, ZOOM_MIN, ZOOM_MAX, ZOOM_WHEEL_STEP } from '../utils/cameraZoom.js';
 import { passedSlop, overlayPassesGesture } from '../utils/barPassthrough.js';
@@ -3201,6 +3201,14 @@ export default function GameTable({ room = null }) {
     const dx = ziel.x - top.x;
     const dy = ziel.y - top.y;
 
+    // Im Raum ein Wunsch an den Server (docs/tasks-stapel-raum.md GC): eine Karte ist `stack_take_top`, mehrere
+    // `stack_split`; die Stelle ist die, die der Tisch eben gerechnet hat. Der Tisch - auch der eigene - folgt der Rückmeldung.
+    if (room) {
+      if (count >= 2) room.sendAction({ type: 'stack_split', stack_id: stackId, count, new_stack_id: newStackId, new_x: ziel.x, new_y: ziel.y });
+      else room.sendAction({ type: 'stack_take_top', stack_id: stackId, new_x: ziel.x, new_y: ziel.y });
+      return;
+    }
+
     setTableCards(prev => prev.map(c => {
       if (c.inStack !== stackId) return c;
       if (splitIds.has(c.tableId)) {
@@ -3809,13 +3817,13 @@ export default function GameTable({ room = null }) {
             c.inStack === msg.stack_id ? { ...c, x: msg.x, y: msg.y } : c
           ));
           break;
+        // docs/tasks-stapel-raum.md GC: die oberste Karte liegt lose (mit der Seite des Servers), ein Rest von einer Karte
+        // ist kein Stapel mehr; auch die eigene Rückmeldung.
         case 'stack_take_top':
-          if (msg.card) {
-            setTableCards(prev => {
-              const withoutOld = prev.filter(c => c.tableId !== msg.card.tableId);
-              return [...withoutOld, { ...msg.card, tableId: msg.card.tableId, inStack: null }];
-            });
-          }
+          setTableCards(prev => applyTakeTop(prev, msg));
+          break;
+        case 'stack_split':
+          setTableCards(prev => applyStackSplit(prev, msg));
           break;
         // M15.4/AP2: die Reihenfolge, die der Server angewandt hat - `zIndex`
         // ist die Stapelreihenfolge, also wird sie daraus neu gesetzt.

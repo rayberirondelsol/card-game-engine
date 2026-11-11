@@ -197,9 +197,9 @@ test('FO 5: mit Ziel in neutraler oder eigener Zone verhalten sich alle drei wie
   assert.equal(card(room, 'lose'), undefined);
 
   assert.deepEqual(types(inbox.p2), ['stack_move', 'stack_move', 'stack_take_top', 'stack_create']);
-  // Stapel bilden ist ein Wunsch an den Server: die Rückmeldung geht auch an den Absender (docs/tasks-stapel-raum.md,
-  // Entscheidung 1); `stack_move`/`stack_take_top` gehen (noch) nicht zurück
-  assert.deepEqual(types(inbox.p1), ['stack_create']);
+  // Stapelbau und Abheben sind Wünsche an den Server: die Rückmeldung geht auch an den Absender (docs/tasks-stapel-raum.md,
+  // Entscheidung 1); `stack_move` geht wie heute nicht zurück
+  assert.deepEqual(types(inbox.p1), ['stack_take_top', 'stack_create']);
 });
 
 // ── 6. Eigentümer weg ────────────────────────────────────────────────────────
@@ -264,7 +264,7 @@ test('FO 7: ein Solo-Raum (Zonen ohne Farbe) bleibt für alle diese Nachrichten 
     send(room, 'p1', { type: 'stack_create', stack_id: 'neu', card_table_ids: ['blau', 'lose'], x: ZIEL.x, y: ZIEL.y });
 
     assert.deepEqual(types(inbox.p2), ['card_move', 'card_move', 'card_flip', 'card_rotate', 'stack_move', 'stack_take_top', 'stack_create']);
-    assert.deepEqual(types(inbox.p1), ['stack_create'], 'kein error; nur die Rückmeldung des Stapelbaus an den Absender (docs/tasks-stapel-raum.md)');
+    assert.deepEqual(types(inbox.p1), ['stack_take_top', 'stack_create'], 'kein error; nur die Rückmeldungen von Abheben und Stapelbau an den Absender (docs/tasks-stapel-raum.md)');
     assert.equal(room.boardState.stacks.find(s => s.stackId === 'neu').cards.length, 2);
     assert.equal(room.boardState.stacks.find(s => s.stackId === 'sfrei').cards.length, 2);
   }

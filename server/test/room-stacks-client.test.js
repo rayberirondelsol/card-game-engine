@@ -120,3 +120,46 @@ test('GB: pilePlan – nichts zu tun gibt null (eine Karte, keine Stapel-Zone, s
   assert.equal(pilePlan([abgelegt('a', 0, { inStack: 's-alt' }), abgelegt('b', 1, { inStack: 's-alt' })], ablage, 's'), null);
   assert.equal(pilePlan(null, ablage, 's'), null);
 });
+
+// ── GC: abheben und teilen ───────────────────────────────────────────────────
+
+test('GC: applyTakeTop – die Karte des Servers liegt lose an der Stelle; sie verlässt den Stapel, ein Rest von zwei bleibt', () => {
+  const tisch = [karte('a', { inStack: 's', x: 5, y: 5 }), karte('b', { inStack: 's', x: 5, y: 5 }), karte('c', { inStack: 's', x: 5, y: 5, zIndex: 3 })];
+  const neu = ops.applyTakeTop(tisch, { stack_id: 's', new_x: 40, new_y: 50, card: { tableId: 'c', cardId: 'c-c', x: 40, y: 50, zIndex: 3, faceDown: false, rotation: 0 } });
+  const c = neu.find(x => x.tableId === 'c');
+  assert.deepEqual([c.inStack, c.x, c.y, c.faceDown, c.zIndex], [null, 40, 50, false, 3]);
+  assert.deepEqual(neu.filter(x => x.inStack === 's').map(x => x.tableId), ['a', 'b']);
+  assert.equal(neu.length, 3, 'keine Doppelung');
+});
+
+test('GC: applyTakeTop – bleibt eine Karte im Stapel, ist er keiner mehr; ein zweites Echo ändert nichts; Unsinn ändert nichts', () => {
+  const tisch = [karte('a', { inStack: 's' }), karte('b', { inStack: 's' })];
+  const msg = { stack_id: 's', card: { tableId: 'b', x: 1, y: 2, faceDown: true } };
+  const neu = ops.applyTakeTop(tisch, msg);
+  assert.deepEqual(neu.map(c => [c.tableId, c.inStack]), [['a', null], ['b', null]]);
+  assert.deepEqual(ops.applyTakeTop(neu, msg).map(c => [c.tableId, c.inStack, c.x]), [['a', null, 0], ['b', null, 1]], 'dieselbe Rückmeldung noch einmal');
+  assert.equal(ops.applyTakeTop(tisch, null), tisch);
+  assert.equal(ops.applyTakeTop(tisch, { stack_id: 's' }), tisch);
+  assert.equal(ops.applyTakeTop(undefined, msg), undefined);
+});
+
+test('GC: applyTakeTop – eine Karte, die dieser Tisch nicht kennt, wird aus der Nachricht gelegt (ein später Beitritt)', () => {
+  const neu = ops.applyTakeTop([karte('a', { inStack: 's' })], { stack_id: 's', card: { tableId: 'neu', cardId: 'c-n', x: 3, y: 4, faceDown: true } });
+  assert.deepEqual(neu.map(c => [c.tableId, c.inStack]), [['a', null], ['neu', null]], 'der Rest von einer Karte ist lose, wie beim Server');
+});
+
+test('GC: applyStackSplit – die genannten Karten bilden den neuen Stapel an der neuen Stelle (zIndex bleibt), ein Rest von einer Karte ist lose', () => {
+  const tisch = [karte('a', { inStack: 's', zIndex: 1, x: 5, y: 5 }), karte('b', { inStack: 's', zIndex: 2, x: 5, y: 5 }), karte('c', { inStack: 's', zIndex: 3, x: 5, y: 5 })];
+  const neu = ops.applyStackSplit(tisch, { stack_id: 's', count: 2, new_stack_id: 'n', card_table_ids: ['b', 'c'], new_x: 60, new_y: 70 });
+  assert.deepEqual(neu.map(c => [c.tableId, c.inStack, c.x, c.y, c.zIndex]), [['a', null, 5, 5, 1], ['b', 'n', 60, 70, 2], ['c', 'n', 60, 70, 3]]);
+  const vier = [...tisch, karte('d', { inStack: 's', zIndex: 4, x: 5, y: 5 })];
+  const n2 = ops.applyStackSplit(vier, { stack_id: 's', count: 2, new_stack_id: 'n', card_table_ids: ['c', 'd'], new_x: 60, new_y: 70 });
+  assert.deepEqual(n2.map(c => c.inStack), ['s', 's', 'n', 'n']);
+});
+
+test('GC: applyStackSplit – unlesbare Nachrichten und unbekannte Karten ändern nichts', () => {
+  const tisch = [karte('a', { inStack: 's' }), karte('b', { inStack: 's' }), karte('c', { inStack: 's' })];
+  for (const bad of [null, {}, { stack_id: 's', new_stack_id: 'n', card_table_ids: ['b'], new_x: 'x', new_y: 0 }, { stack_id: 's', new_stack_id: 'n', card_table_ids: ['x'], new_x: 0, new_y: 0 }, { stack_id: 's', card_table_ids: ['b'], new_x: 0, new_y: 0 }]) {
+    assert.equal(ops.applyStackSplit(tisch, bad), tisch, JSON.stringify(bad));
+  }
+});
