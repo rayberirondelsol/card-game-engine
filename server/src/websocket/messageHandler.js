@@ -14,6 +14,8 @@ import { rotationOf } from '../../../shared/assetToken.js';
 // M15.4/AP1: es gibt genau eine Mischung, und sie liegt in shared/ - Tisch,
 // Raum und Executor benutzen dieselbe.
 import { shuffleStack } from '../../../shared/sequenceExecutor.js';
+// M32.4: die Wache – wer eine Karte in oder aus der Hand-Zone eines anderen anfasst. Eine Rechnung in shared/.
+import { mayTouchCard, resolveServerZones } from '../../../shared/ownership.js';
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -93,33 +95,37 @@ export function handleMessage(room, playerId, rawData) {
   }
 }
 
-// ─── Zone exclusivity check ───────────────────────────────────────────────────
+// ─── Zone ownership guard (M32.4) ─────────────────────────────────────────────
 
-function isActionAllowed(room, playerId, x, y) {
-  if (!room.zones || room.zones.length === 0) return true;
-  const player = room.players.get(playerId);
-  if (!player) return false;
+/**
+ * Darf dieser Spieler `card` anfassen und/oder nach `dest` legen? Weder der Ort jetzt noch das Ziel darf in der
+ * Hand-Zone eines anderen liegen (Regel 1); ohne `card` zählt nur das Ziel. Gerechnet wird mit den **aufgelösten**
+ * Zonen des aktuellen Raumzustands - eine verankerte Hand hat sonst keine Fläche. Ohne Eigentümer: immer `true`.
+ */
+function allowed(room, playerId, card, dest) {
+  const color = room.players.get(playerId)?.color;
+  return mayTouchCard(resolveServerZones(room.boardState, room.zones), room.players, color, card, dest);
+}
 
-  for (const zone of room.zones) {
-    if (!zone.exclusive) continue;
-    if (zone.type !== 'player') continue;
-    if (x >= zone.x && x <= zone.x + zone.width && y >= zone.y && y <= zone.y + zone.height) {
-      // In an exclusive player zone – only owner may act
-      return zone.color === player.color;
-    }
-  }
-  return true;
+/**
+ * Eine Ablehnung, die man sieht: `error` und - wo es dafür eine Nachricht gibt - der **wahre Stand**, beides nur an
+ * den Absender, damit sein Tisch zurückspringt. An alle anderen geht nichts. `truth` ist die Nachricht
+ * (`card_move`, `card_flip`, `card_rotate`, `stack_move`) oder `null`; der Text ist der bestehende.
+ */
+function rejectTo(room, playerId, truth = null, message = 'Not allowed in this zone') {
+  sendToPlayer(room, playerId, { type: 'error', message });
+  if (truth) sendToPlayer(room, playerId, truth);
 }
 
 // ─── Card actions ─────────────────────────────────────────────────────────────
 
 function handleCardMove(room, playerId, payload, timestamp) {
   const { table_id, x, y } = payload;
-  if (!isActionAllowed(room, playerId, x, y)) {
-    return sendToPlayer(room, playerId, { type: 'error', message: 'Not allowed in this zone' });
+  const card = room.boardState.cards.find(c => c.tableId === table_id);
+  if (!allowed(room, playerId, card, { x, y })) {
+    return rejectTo(room, playerId, card && { type: 'card_move', table_id, x: card.x, y: card.y, ...gridAddress(card) });
   }
   const address = gridAddress(payload);
-  const card = room.boardState.cards.find(c => c.tableId === table_id);
   if (card) Object.assign(card, { x, y }, address);
   broadcast(room, { type: 'card_move', table_id, x, y, ...address, from_player_id: playerId, timestamp }, playerId);
 }
@@ -127,8 +133,8 @@ function handleCardMove(room, playerId, payload, timestamp) {
 function handleCardFlip(room, playerId, { table_id, face_down }, timestamp) {
   const card = room.boardState.cards.find(c => c.tableId === table_id);
   if (card) {
-    if (!isActionAllowed(room, playerId, card.x, card.y)) {
-      return sendToPlayer(room, playerId, { type: 'error', message: 'Not allowed in this zone' });
+    if (!allowed(room, playerId, card)) {
+      return rejectTo(room, playerId, { type: 'card_flip', table_id, face_down: !!card.faceDown });
     }
     card.faceDown = face_down;
   }
@@ -138,8 +144,8 @@ function handleCardFlip(room, playerId, { table_id, face_down }, timestamp) {
 function handleCardRotate(room, playerId, { table_id, rotation }, timestamp) {
   const card = room.boardState.cards.find(c => c.tableId === table_id);
   if (card) {
-    if (!isActionAllowed(room, playerId, card.x, card.y)) {
-      return sendToPlayer(room, playerId, { type: 'error', message: 'Not allowed in this zone' });
+    if (!allowed(room, playerId, card)) {
+      return rejectTo(room, playerId, { type: 'card_rotate', table_id, rotation: card.rotation ?? 0 });
     }
     card.rotation = rotation;
   }
@@ -147,9 +153,7 @@ function handleCardRotate(room, playerId, { table_id, rotation }, timestamp) {
 }
 
 function handleCardPlayFromHand(room, playerId, { card, x, y }, timestamp) {
-  if (!isActionAllowed(room, playerId, x, y)) {
-    return sendToPlayer(room, playerId, { type: 'error', message: 'Not allowed in this zone' });
-  }
+  if (!allowed(room, playerId, null, { x, y })) return rejectTo(room, playerId);
   const tableCard = { ...card, x, y, tableId: card.tableId || generateId() };
   room.boardState.cards.push(tableCard);
   broadcast(room, {
@@ -185,6 +189,9 @@ function findStack(room, stackId) {
 
 function handleStackMove(room, playerId, { stack_id, x, y }, timestamp) {
   const stack = findStack(room, stack_id);
+  if (!allowed(room, playerId, stack, { x, y })) {
+    return rejectTo(room, playerId, stack && { type: 'stack_move', stack_id, x: stack.x, y: stack.y });
+  }
   if (stack) {
     stack.x = x;
     stack.y = y;
@@ -195,6 +202,9 @@ function handleStackMove(room, playerId, { stack_id, x, y }, timestamp) {
 function handleStackCreate(room, playerId, { stack_id, card_table_ids, x, y }, timestamp) {
   // Remove cards from table, put them in a new stack
   const cards = room.boardState.cards.filter(c => card_table_ids.includes(c.tableId));
+  // Keine Karte aus der Hand-Zone eines anderen heraus und kein Stapel hinein (M32.4); es gibt keine Nachricht, die
+  // den Tisch des Absenders zurückstellt, also bleibt es beim `error`.
+  if (!allowed(room, playerId, null, { x, y }) || cards.some(c => !allowed(room, playerId, c))) return rejectTo(room, playerId);
   room.boardState.cards = room.boardState.cards.filter(c => !card_table_ids.includes(c.tableId));
   // `stackId`, nicht `id` – derselbe Name wie im Executor und im Spielstand.
   room.boardState.stacks.push({ stackId: stack_id, cards, x, y });
@@ -215,6 +225,7 @@ function handleStackMerge(room, playerId, { from_stack_id, to_stack_id }, timest
 function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestamp) {
   const stack = findStack(room, stack_id);
   if (!stack || stack.cards.length === 0) return;
+  if (!allowed(room, playerId, stack, { x: new_x, y: new_y })) return rejectTo(room, playerId);
   const topCard = stack.cards.pop();
   const tableCard = { ...topCard, x: new_x, y: new_y, tableId: topCard.tableId || generateId() };
   room.boardState.cards.push(tableCard);

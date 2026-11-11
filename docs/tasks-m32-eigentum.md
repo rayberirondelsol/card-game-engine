@@ -156,6 +156,8 @@ Die Skizze der Abnahmeliste ist an Code und Daten gemessen worden; an diesen Ste
 
 **Fertig, wenn:** die Tests grün sind; alle bestehenden Raum-Tests unverändert grün; `npm test` grün.
 
+**Berichtigung beim Bau (FO, 2026-11-11).** (1) `rejectTo(room, playerId, truth, message)` nimmt **die Nachricht mit dem wahren Stand** (oder `null`), nicht die Karte: nur `card_move`, `card_flip`, `card_rotate` und `stack_move` haben eine Nachricht, die den Tisch zurückstellt; `stack_take_top`, `stack_create` und `card_play_from_hand` (Ziel in fremder Zone) antworten **nur mit `error`** — `FU` ruft für seine Ablehnungen `rejectTo(room, playerId)`. Der Text bleibt der bestehende („Not allowed in this zone“, englisch; `FQ` zeigt ihn als Hinweis, ob übersetzt, ist dort zu entscheiden). (2) Die Wache `allowed(room, playerId, card, dest)` rechnet bei **`stack_move` und `stack_take_top` auch den Ort des Stapels** (Regel 1: „Ort jetzt“) und bei `stack_create` **jede Karte und das Ziel** — die Tabelle in M32.4 nennt dort nur „Ziel“ bzw. „—“. (3) **`stack_merge` und `stack_shuffle` sind unbewacht** (nicht in der Tabelle): ein Stapel in einer fremden Hand-Zone lässt sich noch in einen anderen legen oder mischen; Token, Zähler, Würfel, Notizen sind bewusst gemeinsam. (4) `card_play_from_hand` nutzt die neue Wache (nur Ziel, nur `error`), sonst unverändert; das Neuschreiben bleibt `FU`. (5) `isActionAllowed` ist entfernt. Eine Ablehnung gilt auch dort, wo die Karte fehlt: dann nur das Ziel, und es geht `error` ohne Rückstellung.
+
 ---
 
 ## FU — Die private Hand im Raum: der Server hält sie (M32.6) — *neu, steht in der Reihenfolge zwischen `FO` und `FP`*
