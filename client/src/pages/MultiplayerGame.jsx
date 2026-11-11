@@ -54,10 +54,11 @@ function MultiplayerGameInner({ code, playerId, gameId, setupId, roomRef }) {
     boardState,
     zones,
     grids,
+    hand,
+    handVersion,
     remoteCursors,
     myPlayer,
     sendAction,
-    sendHandCountUpdate,
     sendCursor,
   } = useGameRoom(code, playerId, (msg) => {
     if (roomRef.current?.onAction) {
@@ -76,10 +77,11 @@ function MultiplayerGameInner({ code, playerId, gameId, setupId, roomRef }) {
     boardState,
     zones,
     grids,
+    hand,
+    handVersion,
     remoteCursors,
     connected,
     sendAction,
-    sendHandCountUpdate,
     sendCursor,
     registerActionHandler: (fn) => { roomRef.current.onAction = fn; },
   };

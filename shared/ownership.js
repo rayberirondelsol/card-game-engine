@@ -184,3 +184,12 @@ export function seesFace(zones, card, myColor) {
   const hits = ownedZonesAt(zones, card.x, card.y);
   return hits.length > 0 && hits.every(z => z.color === myColor);
 }
+
+/**
+ * Die Karte, **wie sie dieser Spieler gezeichnet bekommt**: für den Eigentümer einer verdeckten Karte in seiner
+ * Hand-Zone eine Kopie mit `faceDown: false` (nur zum Zeichnen, Vorschau, Vergrößern), für jeden anderen
+ * **dieselbe** Karte (`===`). Der Zustand der Karte ändert sich nie – `seesFace` entscheidet, hier steht nur die Anwendung.
+ */
+export function seenCard(zones, card, myColor) {
+  return seesFace(zones, card, myColor) ? { ...card, faceDown: false } : card;
+}

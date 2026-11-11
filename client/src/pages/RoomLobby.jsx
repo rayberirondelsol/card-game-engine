@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { lobbyView } from '../utils/roomLobby.js';
 
 const COLOR_HEX = {
   red:    '#ef4444',
@@ -106,6 +107,9 @@ export default function RoomLobby() {
   const players = room.players || [];
   const myPlayer = players.find(p => p.id === playerId);
   const connectedCount = players.filter(p => p.is_connected).length;
+  // M32.8: bei mehreren Spielern (`lage` mehrfach/normal) „n/S Spieler“, wer welche Plätze führt, „Start“ erst bei S.
+  // Ohne `lage` bleibt alles wie vor M32 (`/6`, mindestens zwei) - `lobbyView` rechnet beides.
+  const view = lobbyView({ lage: room.lage, plaetze: room.plaetze, players });
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -153,7 +157,7 @@ export default function RoomLobby() {
         <div className="bg-slate-800 rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-              Players ({players.length}/6)
+              {view.countLabel}
             </h2>
             <span className="text-xs text-gray-500">
               {connectedCount} connected
@@ -179,6 +183,11 @@ export default function RoomLobby() {
                       <span className="ml-2 text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">Host</span>
                     ) : null}
                   </span>
+                  {view.seatsOf[player.id] && (
+                    <span className="text-xs text-gray-300" data-testid={`seats-${player.id}`}>
+                      {view.seatsOf[player.id]}
+                    </span>
+                  )}
                   <span className="text-xs capitalize text-gray-400" style={{ color: hex }}>
                     {player.color}
                   </span>
@@ -187,10 +196,13 @@ export default function RoomLobby() {
               );
             })}
             {/* Empty seats */}
-            {Array.from({ length: Math.max(0, 2 - players.length) }).map((_, i) => (
+            {Array.from({ length: view.emptySeats }).map((_, i) => (
               <div key={`empty-${i}`} className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-700">
                 <div className="w-3 h-3 rounded-full bg-slate-600" />
-                <span className="text-slate-600 text-sm">Waiting for player…</span>
+                <span className="text-slate-600 text-sm flex-1">Waiting for player…</span>
+                {view.openSeats[i] && (
+                  <span className="text-xs text-slate-500" data-testid={`open-seats-${i}`}>{view.openSeats[i]}</span>
+                )}
               </div>
             ))}
           </div>
@@ -207,9 +219,9 @@ export default function RoomLobby() {
           {isHost && (
             <button
               onClick={handleStart}
-              disabled={starting || players.length < 2}
+              disabled={starting || !view.canStart}
               className="flex-1 px-4 py-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-500 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              title={players.length < 2 ? 'Need at least 2 players' : ''}
+              title={view.startHint}
             >
               {starting ? 'Starting…' : 'Start Game'}
             </button>

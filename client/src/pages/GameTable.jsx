@@ -34,6 +34,8 @@ import { canStartPan, panCursor } from '../utils/panTarget.js';
 import { issueLine } from '../utils/setupActions.js';
 import { canZoomTable } from '../utils/wheelTarget.js';
 import { shouldApplyBoardState } from '../utils/roomBoardState.js';
+import { playedCard, isOwnEcho, removeHandCard, removeDrawn, handFromServer, addToHand, pickupPlan } from '../utils/roomHand.js';
+import { seenCard } from '../../../shared/ownership.js';
 import { shelfCount, shelfSlot } from '../utils/libraryShelf.js';
 import { stackAt, stackCandidates, looseCandidates, resolveDrop, pileUp } from '../utils/cardDrop.js';
 import { normalizeViews, putView, removeView, viewCamera, MAX_VIEWS } from '../utils/tableViews.js';
@@ -582,6 +584,10 @@ export default function GameTable({ room = null }) {
   // builds, because it runs before any of this exists.
   const anchors = useMemo(() => anchorBoxes(boards, tokens), [boards, tokens]);
   const tableZones = useMemo(() => resolveZones(zones, anchors), [zones, anchors]);
+  // M32.5 (Stufe A): der Blick - eine verdeckte Karte in der Hand-Zone **meiner** Farbe zeichnet dieser Tisch
+  // aufgedeckt (Zeichnen, Vorschau, Vergrößern, Kopfzeile); der Zustand bleibt `faceDown: true`. Ohne Raum und
+  // ohne Farbe (Hotseat) gibt es keinen Pfad: dieselbe Karte kommt zurück.
+  const blick = (card) => seenCard(tableZones, card, room?.myColor ?? null);
   // Grids (M3b) go the same way and through the same resolution: `grids` is
   // what was saved, `tableGrids` is where the fields are right now.
   const tableGrids = useMemo(() => resolveGrids(grids, anchors), [grids, anchors]);
@@ -676,6 +682,14 @@ export default function GameTable({ room = null }) {
 
   // Hand state
   const [handCards, setHandCards] = useState([]); // cards in player's hand
+  // M32.6: die Hand, wie der letzte Render sie sah - das `welcome` nach `loadGameState` braucht sie, wenn der
+  // Server keine neue geschickt hat (`room_started`), und `loadGameState` leert sie jedes Mal.
+  const handCardsRef = useRef([]);
+  handCardsRef.current = handCards;
+  const appliedHandVersionRef = useRef(0);
+  // M32.4: der Hinweis des Servers im Raum (`error`, deutsch) - "Das ist die Hand eines anderen Spielers."
+  const [roomNotice, setRoomNotice] = useState(null);
+  const roomNoticeTimerRef = useRef(null);
   const [hoveredHandCard, setHoveredHandCard] = useState(null); // card being hovered in hand (for preview)
   const [draggingHandCard, setDraggingHandCard] = useState(null); // card being dragged within hand
   const [handDragOverIndex, setHandDragOverIndex] = useState(null); // index being dragged over for reorder
@@ -3194,6 +3208,16 @@ export default function GameTable({ room = null }) {
     const card = tableCards.find(c => c.tableId === tableId);
     if (!card) return;
 
+    // M32.6: im Raum ist der Server die Quelle der Hand. Eine lose Karte nimmt er auf (`card_removed` an alle,
+    // `draw_response` an uns), eine Karte im Stapel nimmt den Weg der Zahlentasten - **lokal ändert sich nichts**,
+    // der Tisch folgt der Rückmeldung.
+    if (room) {
+      if (card.inStack) room.sendAction({ type: 'card_draw_to_hand', stack_id: card.inStack, count: 1 });
+      else room.sendAction({ type: 'card_pickup_to_hand', table_id: tableId });
+      setContextMenu(null);
+      return;
+    }
+
     // Add to hand
     const handCard = {
       handId: crypto.randomUUID(),
@@ -3209,6 +3233,17 @@ export default function GameTable({ room = null }) {
 
     // Remove from table
     removeCardFromTable(tableId);
+    setContextMenu(null);
+  }
+
+  // „Pick up to hand“ für mehrere ausgewählte Karten. Am Hotseat-Tisch wie bisher Karte für Karte; im Raum
+  // **ein** Zug je Stapel (`pickupPlan`) - ein Stapel, dessen vorletzte Karte gezogen ist, löst sich beim Server
+  // auf, zwei Einzelzüge liefen ins Leere.
+  function pickUpManyToHand(ids) {
+    if (!room) { Array.from(ids).forEach(tid => pickUpToHand(tid)); return; }
+    const plan = pickupPlan(tableCards, ids);
+    plan.pickups.forEach(tid => room.sendAction({ type: 'card_pickup_to_hand', table_id: tid }));
+    plan.draws.forEach(d => room.sendAction({ type: 'card_draw_to_hand', stack_id: d.stack_id, count: d.count }));
     setContextMenu(null);
   }
 
@@ -3269,6 +3304,24 @@ export default function GameTable({ room = null }) {
   function playCardFromHand(handId, targetStackId = null, x = null, y = null) {
     const card = handCards.find(c => c.handId === handId);
     if (!card) return;
+
+    // M32.6: im Raum bestimmt der Server, **wo** und **mit welcher Seite** die Karte liegt (offen auf dem Tisch,
+    // verdeckt in der eigenen Hand-Zone, abgewiesen in einer fremden). Der Client schickt den Wunsch in
+    // Welt-Koordinaten und ändert **lokal nichts**: die Rückmeldung `card_play_from_hand` legt die Karte hin und
+    // nimmt sie aus der Hand. (Ausspielen auf einen Stapel gibt es im Raum nicht - kein Aufrufer.)
+    if (room) {
+      let wx, wy;
+      if (x !== null && y !== null) {
+        ({ x: wx, y: wy } = screenToWorld(x, y));
+      } else {
+        const canvas = canvasRef.current;
+        wx = (canvas?.width || 800) / 2 + (Math.random() - 0.5) * 60;
+        wy = (canvas?.height || 600) / 2 - 60 + (Math.random() - 0.5) * 60;
+      }
+      room.sendAction({ type: 'card_play_from_hand', hand_id: handId, x: wx, y: wy });
+      setHoveredHandCard(null);
+      return;
+    }
 
     const newZIndex = maxZIndex + 1;
     setMaxZIndex(newZIndex);
@@ -3748,39 +3801,45 @@ export default function GameTable({ room = null }) {
           setTableCards(prev => prev.filter(c => c.inStack !== msg.stack_id));
           break;
         case 'stack_size_update':
-          // Server already handled removal - just update the visual stack count by removing extras
-          // (the server's boardState is authoritative; we rely on full sync for accuracy)
+          // M32.6: jemand hat gezogen (auch wir): die Karten mit diesen Ids sind aus dem Stapel. Die Nachricht
+          // trägt nur Ids - kein Name, kein Bild. Die letzte Karte kommt als `stack_removed` (oben).
+          setTableCards(prev => removeDrawn(prev, msg));
           break;
         case 'card_play_from_hand':
+          // M32.6: die Karte liegt mit der Seite, die der **Server** gesetzt hat (`faceDown` aus der Nachricht:
+          // verdeckt in einer Hand-Zone). Die Rückmeldung auf die eigene Tat nimmt die Karte aus der Hand.
           if (msg.card) {
-            setTableCards(prev => {
-              const exists = prev.find(c => c.tableId === msg.card.tableId);
-              if (exists) return prev;
-              return [...prev, {
-                ...msg.card,
-                tableId: msg.card.tableId,
-                inStack: null,
-                faceDown: false,
-                rotation: 0,
-                zIndex: maxZIndex + 1,
-              }];
-            });
+            setTableCards(prev => playedCard(prev, msg, Math.max(maxZIndex, ...prev.map(c => c.zIndex || 0))));
             setMaxZIndex(z => z + 1);
+            if (isOwnEcho(msg, room?.myPlayerId)) setHandCards(prev => removeHandCard(prev, msg.hand_id));
           }
           break;
+        case 'card_removed':
+          // M32.6: eine Karte wurde vom Tisch in die Hand eines Spielers genommen (bei allen weg).
+          setTableCards(prev => prev.filter(c => c.tableId !== msg.table_id));
+          setSelectedCards(prev => {
+            if (!prev.has(msg.table_id)) return prev;
+            const next = new Set(prev);
+            next.delete(msg.table_id);
+            return next;
+          });
+          break;
         case 'draw_response':
-          // Private cards drawn to our hand
+          // Private Karten für unsere Hand - mit der `handId` des Servers (M32.6), damit ein Neuladen dieselben
+          // Karten zeigt und `card_play_from_hand` sie beim Namen nennen kann.
           if (msg.cards && msg.cards.length > 0) {
-            const newHandCards = msg.cards.map(card => ({
-              handId: crypto.randomUUID(),
-              cardId: card.id || card.cardId,
-              name: card.name,
-              image_path: card.image_path,
-              card_back_id: card.card_back_id || null,
-              width: card.width || 0,
-              height: card.height || 0,
-            }));
-            setHandCards(prev => [...prev, ...newHandCards]);
+            setHandCards(prev => addToHand(prev, handFromServer(msg.cards)));
+            setDrawToast(`Drew ${msg.cards.length} card${msg.cards.length > 1 ? 's' : ''} to hand`);
+            setTimeout(() => setDrawToast(null), 2000);
+          }
+          break;
+        case 'error':
+          // M32.4: der Server hat abgelehnt (deutscher Text) - und stellt den wahren Stand in den Nachrichten
+          // davor wieder her (`card_move` usw.). Hier steht nur der Hinweis.
+          if (typeof msg.message === 'string' && msg.message) {
+            setRoomNotice(msg.message);
+            clearTimeout(roomNoticeTimerRef.current);
+            roomNoticeTimerRef.current = setTimeout(() => setRoomNotice(null), 4000);
           }
           break;
         case 'dice_roll':
@@ -3880,13 +3939,6 @@ export default function GameTable({ room = null }) {
     }
   }
 
-  // Sync hand card count to server in multiplayer mode
-  useEffect(() => {
-    if (room) {
-      room.sendHandCountUpdate(handCards.length);
-    }
-  }, [handCards.length, room]);
-
   // Load zones from room welcome message
   useEffect(() => {
     if (room?.zones && room.zones.length > 0) {
@@ -3925,6 +3977,16 @@ export default function GameTable({ room = null }) {
     if (!shouldApplyBoardState(room?.boardState, appliedBoardStateRef.current)) return;
     appliedBoardStateRef.current = room.boardState;
     loadGameState(room.boardState, room.grids || null);
+    // M32.6: `loadGameState` leert die Hand (der Zustand des Raums trägt keine) - **danach** kommt die des
+    // Servers: das `welcome` trägt die eigene Hand (`room.hand`, neu mit `handVersion`), sie überlebt so Neuladen
+    // und Wiederverbinden. Hat der Server keine neue geschickt (`room_started`, `board_sync`), bleibt die Hand,
+    // wie sie war. Der Hotseat-Tisch kommt hier nicht vorbei (`shouldApplyBoardState` braucht einen Raumzustand).
+    if (room.handVersion && room.handVersion !== appliedHandVersionRef.current) {
+      appliedHandVersionRef.current = room.handVersion;
+      setHandCards(handFromServer(room.hand));
+    } else {
+      setHandCards(handCardsRef.current);
+    }
   }, [room?.boardState, room?.grids]);
 
   // Save the game state to the backend
@@ -5148,7 +5210,12 @@ export default function GameTable({ room = null }) {
           stack.sort((a, b) => a.zIndex - b.zIndex);
         });
 
-        const renderCard = (card, stackSize = 0, stackId = null) => {
+        const renderCard = (rawCard, stackSize = 0, stackId = null) => {
+          // M32.5: der Blick. `card` ist, was **dieser** Tisch zeichnet: für den Eigentümer einer verdeckten
+          // Karte in seiner Hand-Zone aufgedeckt, für jeden anderen die Karte selbst (Rücken). Der Zustand
+          // (`rawCard`, `faceDown: true`) bleibt; „Flip" deckt wirklich auf.
+          const card = blick(rawCard);
+          const ownSight = card !== rawCard;
           const isDragging = draggingCard === card.tableId;
           const isSelected = selectedCards.has(card.tableId);
           const isStack = stackSize > 1;
@@ -5228,7 +5295,7 @@ export default function GameTable({ room = null }) {
                   stackId: stackId,
                 });
               }}
-              title={isStack ? stackCaption(stackNames[stackId], stackSize) : view.caption}
+              title={isStack ? stackCaption(stackNames[stackId], stackSize) : ownSight ? `Nur du siehst diese Karte – ${view.caption}` : view.caption}
             >
               {/* Stack offset visual - ghost cards behind */}
               {isStack && (
@@ -5274,10 +5341,13 @@ export default function GameTable({ room = null }) {
                 data-testid={`card-face-container-${card.tableId}`}
                 data-face-down={card.faceDown ? 'true' : 'false'}
                 data-zone-tint={tint || undefined}
+                data-own-sight={ownSight ? 'true' : undefined}
                 style={{
                   width: cardW,
                   height: cardH,
                   perspective: '600px',
+                  // M32.5: Ring „nur du siehst es“ - die Karte liegt für alle anderen verdeckt.
+                  ...(ownSight ? { outline: '3px solid #fbbf24', outlineOffset: '3px' } : {}),
                   // Ziel-Leuchten, Auswahl und Stapel sind **Vorgänge** und
                   // bleiben vorn; die Zonenfarbe ersetzt allein den
                   // Ruhezustand. Sonst stünde beim Ziehen die Herkunft über dem
@@ -5359,6 +5429,20 @@ export default function GameTable({ room = null }) {
                   </div>
                 </div>
               </div>
+
+              {/* M32.5: das Zeichen am Eigentümer - die Mitspieler sehen an dieser Karte einen Rücken. */}
+              {ownSight && (
+                <div
+                  data-testid={`own-sight-${card.tableId}`}
+                  title="Nur du siehst diese Karte"
+                  className="absolute -bottom-2 -left-2 w-5 h-5 rounded-full bg-amber-400 text-black flex items-center justify-center shadow-lg z-10 pointer-events-none"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </div>
+              )}
 
               {/* Stack count badge */}
               {isStack && (
@@ -6299,6 +6383,23 @@ export default function GameTable({ room = null }) {
               </svg>
               <span className="text-sm font-medium">{saveToast}</span>
               <button onClick={() => setSaveToast(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
+            </div>
+          </div>
+        )}
+
+        {/* M32.4: der Hinweis des Servers im Raum (`error`, deutsch) - eine Ablehnung stellt den Tisch selbst
+            zurück, hier steht nur, warum. Gleiche Stelle und Bauart wie `saveToast`, aber nicht grün: es ist
+            keine Erfolgsmeldung. */}
+        {roomNotice && (
+          <div className={`flex justify-center ${isMobileLandscape ? 'px-1.5 pb-1.5' : 'px-3 pb-3'}`}>
+            <div
+              className="bg-amber-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3"
+              data-testid="room-notice"
+              data-ui-element="true"
+              role="alert"
+            >
+              <span className="text-sm font-medium">{roomNotice}</span>
+              <button onClick={() => setRoomNotice(null)} className="pointer-events-auto ml-2 text-white/70 hover:text-white">&times;</button>
             </div>
           </div>
         )}
@@ -7972,7 +8073,7 @@ export default function GameTable({ room = null }) {
                 {(() => {
                   const caption = contextMenu.stackId
                     ? stackCaption(stackNames[contextMenu.stackId], tableCards.filter(c => c.inStack === contextMenu.stackId).length)
-                    : tableObjectView(tableCards.find(c => c.tableId === contextMenu.cardTableId), 'Card').caption;
+                    : tableObjectView(blick(tableCards.find(c => c.tableId === contextMenu.cardTableId)), 'Card').caption;
                   return (
                     <div
                       className="px-3 py-1 text-xs text-slate-300 font-semibold truncate"
@@ -8048,8 +8149,7 @@ export default function GameTable({ room = null }) {
                 </button>
                 <button
                   onClick={() => {
-                    const selected = Array.from(selectedCards);
-                    selected.forEach(tid => pickUpToHand(tid));
+                    pickUpManyToHand(Array.from(selectedCards));
                     setContextMenu(null);
                   }}
                   data-testid="context-pick-up-to-hand"
@@ -8158,6 +8258,9 @@ export default function GameTable({ room = null }) {
                         const sid = contextMenu.stackId;
                         const stackCards = tableCards.filter(c => c.inStack === sid);
                         if (stackCards.length === 0) { setContextMenu(null); return; }
+                        // M32.6: im Raum derselbe Weg wie die Zahlentasten - der Server nimmt die oberste Karte
+                        // in die private Hand, der Tisch folgt der Rückmeldung (nichts lokal entstapeln).
+                        if (room) { drawCardsFromStack(sid, 1); setContextMenu(null); return; }
                         const topCard = stackCards.reduce((max, c) => c.zIndex > max.zIndex ? c : max, stackCards[0]);
                         if (stackCards.length <= 2) {
                           setTableCards(prev => prev.map(c => c.inStack === sid ? { ...c, inStack: null } : c));
@@ -8742,9 +8845,7 @@ export default function GameTable({ room = null }) {
         onRotateCCW={handleMobileRotateCCW}
         onGroup={groupSelectedCards}
         onDraw={handleMobileDraw}
-        onPickUpToHand={() => {
-          selectedCards.forEach(tid => pickUpToHand(tid));
-        }}
+        onPickUpToHand={() => pickUpManyToHand(Array.from(selectedCards))}
         onLockToggle={() => {
           for (const tid of selectedCards) {
             const card = tableCards.find(c => c.tableId === tid);
@@ -8849,7 +8950,7 @@ export default function GameTable({ room = null }) {
 
       {/* Long-press card preview popup for touch devices (Feature #58) */}
       {longPressPreviewCard && (() => {
-        const previewCard = tableCards.find(c => c.tableId === longPressPreviewCard);
+        const previewCard = blick(tableCards.find(c => c.tableId === longPressPreviewCard));
         if (!previewCard) return null;
         // The preview shows the back of a face-down card - and used to caption
         // it with the name, which undoes its own branching.
@@ -9080,7 +9181,7 @@ export default function GameTable({ room = null }) {
 
       {/* ALT key card zoom preview - desktop only (Feature #58) */}
       {altKeyHeld && hoveredTableCard && !isTouchCapableRef.current && (() => {
-        const card = tableCards.find(c => c.tableId === hoveredTableCard);
+        const card = blick(tableCards.find(c => c.tableId === hoveredTableCard));
         if (!card) return null;
         const view = tableObjectView(card, 'Card');
         return (

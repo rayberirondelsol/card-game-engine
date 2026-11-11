@@ -69,7 +69,8 @@ test('CG6: die Kopfzeile des Menüs nennt das Stück statt „Stack Actions"', (
   // Einzelkarte über `tableObjectView` (und damit verdeckt „Face down").
   const kopf = source.slice(at - 500, at + 200);
   assert.match(kopf, /contextMenu\.stackId[\s\S]*stackCaption\(stackNames\[contextMenu\.stackId\]/);
-  assert.match(kopf, /tableObjectView\(tableCards\.find\(c => c\.tableId === contextMenu\.cardTableId\), 'Card'\)\.caption/);
+  // M32.5/FQ: der Eigentümer liest seine Karte in der Hand-Zone (Blick) - `blick` gibt jedem anderen dieselbe Karte zurück.
+  assert.match(kopf, /tableObjectView\(blick\(tableCards\.find\(c => c\.tableId === contextMenu\.cardTableId\)\), 'Card'\)\.caption/);
   assert.ok(!/'Stack Actions'/.test(source), '„Stack Actions" steht noch da');
   assert.ok(!/'Card Actions'/.test(source), '„Card Actions" steht noch da');
 });

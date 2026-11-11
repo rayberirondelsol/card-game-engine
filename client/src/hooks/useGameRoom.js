@@ -19,8 +19,11 @@ const CURSOR_THROTTLE_MS = 33; // ~30fps
  * useGameRoom – manages the WebSocket lifecycle for a multiplayer room.
  *
  * Returns:
- *   { connected, players, boardState, zones, grids, sendAction,
- *     sendHandCountUpdate, remoteCursors, myPlayer }
+ *   { connected, players, boardState, zones, grids, hand, handVersion, sendAction,
+ *     remoteCursors, myPlayer }
+ *
+ * `hand` ist die **eigene** private Hand aus dem letzten `welcome` (M32.6: der Server hält sie), `handVersion`
+ * zählt die `welcome`s - der Tisch setzt seine Hand nur dann neu, wenn die Zahl gestiegen ist.
  */
 export function useGameRoom(roomCode, myPlayerId, onMessage) {
   const [connected, setConnected] = useState(false);
@@ -28,6 +31,8 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
   const [boardState, setBoardState] = useState(null);
   const [zones, setZones] = useState([]);
   const [grids, setGrids] = useState([]);
+  const [hand, setHand] = useState([]);
+  const [handVersion, setHandVersion] = useState(0);
   const [remoteCursors, setRemoteCursors] = useState({});
 
   const wsRef = useRef(null);
@@ -63,6 +68,8 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
           setPlayers(msg.players || []);
           setZones(msg.zones || []);
           setGrids(msg.grids || []);
+          setHand(Array.isArray(msg.hand) ? msg.hand : []);
+          setHandVersion(v => v + 1);
           break;
         case 'board_sync':
           setBoardState(msg.board_state);
@@ -151,10 +158,6 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
     }
   }, []);
 
-  const sendHandCountUpdate = useCallback((count) => {
-    sendAction({ type: 'hand_count_update', count });
-  }, [sendAction]);
-
   const sendCursor = useCallback((worldX, worldY) => {
     const now = Date.now();
     if (now - lastCursorSend.current < CURSOR_THROTTLE_MS) return;
@@ -170,10 +173,11 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
     boardState,
     zones,
     grids,
+    hand,
+    handVersion,
     remoteCursors,
     myPlayer,
     sendAction,
-    sendHandCountUpdate,
     sendCursor,
   };
 }

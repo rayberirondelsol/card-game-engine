@@ -73,3 +73,43 @@ export function handFromServer(cards) {
     height: card.height || 0,
   }));
 }
+
+/**
+ * Die Hand mit neuen Karten vom Server (`draw_response`, `welcome.hand` → `handFromServer`). Die `handId` ist
+ * die des Servers: dieselbe Karte, die noch einmal kommt (ein verspätetes Echo), doppelt sich nicht. Gibt es
+ * nichts Neues, kommt **dieselbe** Hand zurück.
+ */
+export function addToHand(hand, cards) {
+  const base = Array.isArray(hand) ? hand : [];
+  if (!Array.isArray(cards)) return base;
+  const have = new Set(base.map(c => c.handId));
+  const fresh = cards.filter(c => !have.has(c.handId));
+  return fresh.length ? [...base, ...fresh] : base;
+}
+
+/**
+ * Was „Pick up to hand“ im Raum an den Server schickt: lose Karten einzeln (`card_pickup_to_hand`), Karten **im
+ * Stapel** als **ein** Zug je Stapel (`card_draw_to_hand { stack_id, count }`) – der Server nimmt die obersten
+ * Karten, und ein Stapel, dessen vorletzte Karte gezogen ist, löst sich auf (zwei Einzelzüge liefen ins Leere).
+ * Unbekannte Ids und Doppelte zählen nicht; die Eingabe bleibt unverändert.
+ *
+ * @param {object[]} cards  Tischkarten
+ * @param {Iterable<string>} ids  `tableId`s
+ * @returns {{ pickups: string[], draws: { stack_id: string, count: number }[] }}
+ */
+export function pickupPlan(cards, ids) {
+  const plan = { pickups: [], draws: [] };
+  if (!Array.isArray(cards)) return plan;
+  const seen = new Set();
+  for (const id of ids || []) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const card = cards.find(c => c?.tableId === id);
+    if (!card) continue;
+    if (!card.inStack) { plan.pickups.push(id); continue; }
+    const draw = plan.draws.find(d => d.stack_id === card.inStack);
+    if (draw) draw.count += 1;
+    else plan.draws.push({ stack_id: card.inStack, count: 1 });
+  }
+  return plan;
+}
