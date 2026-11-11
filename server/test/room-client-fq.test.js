@@ -291,3 +291,12 @@ test('FQ 7: die Lobby rechnet mit `lobbyView` und zeigt „n/S Spieler“ und di
 test('FQ 7: `MultiplayerGame` reicht dem Tisch `myPlayerId` für das Echo (`isOwnEcho`)', () => {
   assert.match(MP, /myPlayerId: playerId/);
 });
+
+test('Close-Code 4000 (von einem anderen Tab ersetzt): der Hook verbindet nicht neu', () => {
+  const start = HOOK.indexOf('ws.onclose');
+  const rumpf = HOOK.slice(start, HOOK.indexOf('ws.onerror', start));
+  assert.match(rumpf, /ws\.onclose = \(\w+\)/);
+  assert.match(rumpf, /\.code === 4000/);
+  // der 4000-Zweig kehrt zurueck, **bevor** scheduleReconnect() aufgerufen wird
+  assert.ok(rumpf.indexOf('return;', rumpf.indexOf('4000')) < rumpf.indexOf('scheduleReconnect()'));
+});

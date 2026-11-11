@@ -92,6 +92,11 @@ export function setupWebSocketServer(httpServer) {
     clearTimeout(room.hostDisconnectTimer);
     room.hostDisconnectTimer = null;
 
+    // Derselbe Spieler ein zweites Mal (Reconnect, zweiter Tab): den alten Socket schliessen, sonst speist
+    // er weiter Nachrichten ein. Sein Close loest dank des Guards unten keine Trennung aus.
+    const alt = room.connections.get(playerId);
+    if (alt && alt !== ws) alt.close(4000, 'replaced');
+
     // Register connection
     setConnection(roomCode, playerId, ws);
 

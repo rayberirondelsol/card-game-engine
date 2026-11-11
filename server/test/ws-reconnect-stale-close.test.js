@@ -112,3 +112,20 @@ test('Reconnect des Hosts stoppt den Gnadentimer, es wird kein neuer Host ernann
   assert.equal(room.hostPlayerId, 'A');
   assert.deepEqual(b.msgs.filter(m => m.type === 'host_changed'), []);
 });
+
+test('Zweiter Connect desselben Spielers schliesst den alten Socket mit 4000, ohne zu trennen', async () => {
+  const room = getRoom(ROOM_CODE);
+  const b = await open('B');
+  const a1 = await open('A');
+  const geschlossen = new Promise(r => a1.ws.once('close', (code) => r(code)));
+  const bVor = b.msgs.length;
+
+  const a2 = await open('A');
+
+  assert.equal(await Promise.race([geschlossen, tick().then(() => 'offen')]), 4000, 'Socket 1 muss mit 4000 schliessen');
+  await tick();
+  assert.equal(room.players.get('A').isConnected, true);
+  assert.equal(room.connections.get('A').readyState, WebSocket.OPEN);
+  assert.deepEqual(b.msgs.slice(bVor).filter(m => m.type === 'player_disconnected'), []);
+  assert.equal(a2.ws.readyState, WebSocket.OPEN);
+});

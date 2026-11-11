@@ -113,10 +113,13 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       if (!isMounted.current) return;
       setConnected(false);
       wsRef.current = null;
+      // 4000: derselbe Spieler hat sich anderswo (zweiter Tab) verbunden. Neu verbinden wuerde den anderen
+      // Tab wieder hinauswerfen – zwei Tabs mit gleicher player_id schaukelten sich ewig hoch.
+      if (event.code === 4000) return;
       scheduleReconnect();
     };
 
