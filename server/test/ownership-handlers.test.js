@@ -6,8 +6,8 @@
 // `platz` 1 … 5 vom Test gesetzt, gebunden mit `bindZones`): Hand 1 gehört rot (absolute Box), Hand 3 gehört blau
 // und ist **verankert** (nur ein Tableau-Token am Tisch gibt ihr eine Fläche – die Auflösung, FL 2).
 //
-// Die Nachrichten der Hand (`card_draw_to_hand`, `card_pickup_to_hand`, `hand_count_update`) gehören FU; hier steht nur,
-// dass `card_play_from_hand` die neue Wache benutzt statt der alten.
+// Die Nachrichten der Hand (`card_draw_to_hand`, `card_pickup_to_hand`, `hand_count_update`) gehören FU (`room-hand.test.js`); hier steht nur,
+// dass `card_play_from_hand` die neue Wache benutzt statt der alten (seit FU aus der Hand des Absenders).
 //
 // Run with: npm test  (node --test, keine Test-Dependency)
 
@@ -268,17 +268,83 @@ test('FO 7: ein Solo-Raum (Zonen ohne Farbe) bleibt für alle diese Nachrichten 
   }
 });
 
-// ── card_play_from_hand: die alte Wache ist ersetzt (der Handler selbst gehört FU) ──
+// ── card_play_from_hand: die alte Wache ist ersetzt (der Handler selbst gehört FU, `room-hand.test.js`) ──
 
-test('FO: card_play_from_hand benutzt die neue Wache – fremde Zone abgewiesen (error, sonst nichts), sonst wie heute', () => {
+test('FO: card_play_from_hand benutzt die neue Wache – fremde Zone abgewiesen (error, sonst nichts), sonst angewandt', () => {
   const { room, inbox } = makeRoom();
+  room.hands = new Map([['p1', [{ handId: 'h1', tableId: 'x1', name: 'X' }, { handId: 'h2', tableId: 'x2', name: 'X' }]]]);
   const n = room.boardState.cards.length;
-  send(room, 'p1', { type: 'card_play_from_hand', card: { tableId: 'x1', name: 'X' }, x: IN_BLAU.x, y: IN_BLAU.y });
+  send(room, 'p1', { type: 'card_play_from_hand', hand_id: 'h1', x: IN_BLAU.x, y: IN_BLAU.y });
   assert.equal(room.boardState.cards.length, n);
   assert.deepEqual(types(inbox.p1), [FREMD]);
   assert.deepEqual(inbox.p2, []);
 
-  send(room, 'p1', { type: 'card_play_from_hand', card: { tableId: 'x2', name: 'X' }, x: IN_ROT.x, y: IN_ROT.y });
+  send(room, 'p1', { type: 'card_play_from_hand', hand_id: 'h2', x: IN_ROT.x, y: IN_ROT.y });
   assert.equal(room.boardState.cards.length, n + 1);
-  assert.deepEqual(types(inbox.p2), ['card_play_from_hand']);
+  assert.deepEqual(types(inbox.p2), ['card_play_from_hand', 'player_hand_count']);
+});
+
+// ── Nachtrag zu FO: stack_merge / stack_shuffle sind bewacht, die Ablehnung ist deutsch ─────────────────────────
+
+test('FU-Nachtrag: stack_merge – ein Stapel in fremder Hand-Zone lässt sich weder hinein- noch herauslegen; error, nichts ändert sich', () => {
+  const { room, inbox } = makeRoom();
+  const vorher = JSON.stringify(room.boardState);
+
+  send(room, 'p1', { type: 'stack_merge', from_stack_id: 'sblau', to_stack_id: 'sfrei' });   // der Quellstapel liegt fremd
+  send(room, 'p1', { type: 'stack_merge', from_stack_id: 'sfrei', to_stack_id: 'sblau' });   // der Zielstapel liegt fremd
+  assert.equal(JSON.stringify(room.boardState), vorher, 'beide Stapel bleiben, wie sie sind');
+  assert.deepEqual(types(inbox.p1), [FREMD, FREMD]);
+  assert.deepEqual(inbox.p2, [], 'kein anderer bekommt etwas');
+});
+
+test('FU-Nachtrag: stack_merge – der Eigentümer darf in seiner Zone, auf neutraler Fläche gilt es wie heute', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p2', { type: 'stack_merge', from_stack_id: 'sblau', to_stack_id: 'sfrei' });   // blau holt seinen Stapel heraus
+  assert.deepEqual(room.boardState.stacks.map(s => s.stackId), ['sfrei']);
+  assert.equal(room.boardState.stacks[0].cards.length, 5);
+  assert.deepEqual(types(inbox.p1), ['stack_merge']);
+  assert.deepEqual(inbox.p2, []);
+
+  const neutral = makeRoom();
+  neutral.room.boardState.stacks.push({ stackId: 'sneben', x: 320, y: 320, cards: [{ tableId: 'k9' }] });
+  send(neutral.room, 'p1', { type: 'stack_merge', from_stack_id: 'sneben', to_stack_id: 'sfrei' });
+  assert.equal(neutral.room.boardState.stacks.find(s => s.stackId === 'sfrei').cards.length, 4);
+  assert.deepEqual(neutral.inbox.p1, []);
+});
+
+test('FU-Nachtrag: stack_shuffle – ein Stapel in fremder Hand-Zone wird nicht gemischt; der wahre Stand geht an den Absender', () => {
+  const { room, inbox } = makeRoom();
+  const vorher = JSON.stringify(room.boardState);
+  send(room, 'p1', { type: 'stack_shuffle', stack_id: 'sblau', order: ['k2', 'k1'] });
+  assert.equal(JSON.stringify(room.boardState), vorher);
+  assert.deepEqual(types(inbox.p1), [FREMD, 'stack_shuffle']);
+  assert.deepEqual(inbox.p1[1], { type: 'stack_shuffle', stack_id: 'sblau', order: ['k1', 'k2'] }, 'die Reihenfolge, die der Server hält');
+  assert.deepEqual(inbox.p2, []);
+
+  // der Eigentümer mischt seinen Stapel, und auf neutraler Fläche ist es wie heute
+  send(room, 'p2', { type: 'stack_shuffle', stack_id: 'sblau', order: ['k2', 'k1'] });
+  assert.deepEqual(room.boardState.stacks.find(s => s.stackId === 'sblau').cards.map(c => c.tableId), ['k2', 'k1']);
+  send(room, 'p1', { type: 'stack_shuffle', stack_id: 'sfrei', order: ['k5', 'k4', 'k3'] });
+  assert.deepEqual(room.boardState.stacks.find(s => s.stackId === 'sfrei').cards.map(c => c.tableId), ['k5', 'k4', 'k3']);
+  assert.deepEqual(types(inbox.p2), ['stack_shuffle']);
+});
+
+test('FU-Nachtrag: ein Solo-Raum (Zonen ohne Farbe) und ein Raum ohne Zonen mischen und legen zusammen wie vorher', () => {
+  for (const zones of [MIT_PLATZ, [], null]) {
+    const { room, inbox } = makeRoom({ zones });
+    send(room, 'p1', { type: 'stack_shuffle', stack_id: 'sblau', order: ['k2', 'k1'] });
+    send(room, 'p1', { type: 'stack_merge', from_stack_id: 'sblau', to_stack_id: 'sfrei' });
+    assert.deepEqual(room.boardState.stacks.map(s => s.stackId), ['sfrei']);
+    assert.deepEqual(types(inbox.p2), ['stack_shuffle', 'stack_merge']);
+    assert.deepEqual(inbox.p1, []);
+  }
+});
+
+test('FU-Nachtrag: die Ablehnung ist deutsch – „Das ist die Hand eines anderen Spielers."', () => {
+  const { room, inbox } = makeRoom();
+  send(room, 'p1', { type: 'card_move', table_id: 'lose', x: IN_BLAU.x, y: IN_BLAU.y });
+  send(room, 'p1', { type: 'stack_merge', from_stack_id: 'sblau', to_stack_id: 'sfrei' });
+  const fehler = inbox.p1.filter(m => m.type === 'error');
+  assert.equal(fehler.length, 2);
+  for (const m of fehler) assert.equal(m.message, 'Das ist die Hand eines anderen Spielers.');
 });

@@ -142,6 +142,17 @@ export function mayTouch(zones, players, color, x, y) {
 }
 
 /**
+ * Die Hand-Zone **dieser Farbe** an diesem Punkt, oder `null`: dort legt der Eigentümer verdeckt ab (M32.6).
+ * Ohne Farbe (Hotseat) und in Zonen ohne Eigentümer gibt es keine.
+ *
+ * @param {object[]} zones  **aufgelöste** Zonen
+ */
+export function ownZoneAt(zones, color, x, y) {
+  if (!color) return null;
+  return ownedZonesAt(zones, x, y).find(z => z.color === color) ?? null;
+}
+
+/**
  * Die Handlung an einer **Karte**: verboten, wenn ihr Ort **jetzt** oder ihr Ziel in einer fremden Hand-Zone
  * liegt (auch das Herausziehen, Mangel a). In der eigenen Zone ist alles erlaubt, verdeckt wie aufgedeckt.
  * `dest` fehlt bei Flip und Rotate: dann zählt nur der Ort.

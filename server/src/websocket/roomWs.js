@@ -17,6 +17,7 @@ import { getRoom, setConnection, getAllRooms, serializeBoardState } from '../roo
 import { handleMessage } from './messageHandler.js';
 import { broadcast, sendToPlayer } from './broadcast.js';
 import { getDb } from '../database.js';
+import { handOf } from '../roomHand.js';
 import { getSessionUser } from '../routes/auth.js';
 
 /** Marker subprotocol; the client offers [WS_SUBPROTOCOL, <session token>]. */
@@ -102,6 +103,8 @@ export function setupWebSocketServer(httpServer) {
       grids: room.grids,
       room_code: roomCode,
       game_id: room.gameId,
+      // M32.6: nur die **eigene** private Hand – ein Neuladen oder Wiederverbinden bekommt dieselben Karten zurück.
+      hand: handOf(room, playerId),
     };
     ws.send(JSON.stringify(welcomeMsg));
 

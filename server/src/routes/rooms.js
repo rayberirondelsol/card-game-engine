@@ -19,6 +19,8 @@ import {
   serializeBoardState,
 } from '../roomStore.js';
 import { broadcast, sendToPlayer } from '../websocket/broadcast.js';
+import { stackIdOf } from '../websocket/messageHandler.js';
+import { addToHand, announceHandCount, takeFromStack } from '../roomHand.js';
 // M6: derselbe Executor wie am Tisch – shared/ liegt neben server/ und client/.
 import { executeSequenceWithLog } from '../../../shared/sequenceExecutor.js';
 import { resolveGrids, placeOnGrids } from '../../../shared/gridGeometry.js';
@@ -460,11 +462,11 @@ async function dealStartingHands(liveRoom, db) {
 
     // Deal from stack
     if (zone.dealStackId && zone.dealCount > 0) {
-      const stack = liveRoom.boardState.stacks.find(s => s.id === zone.dealStackId);
+      // `stackId`, wie jeder Stapel im System heißt (`id` bleibt als Rückfall, M9.4/H4).
+      const stack = liveRoom.boardState.stacks.find(s => stackIdOf(s) === zone.dealStackId);
       if (stack) {
         const count = Math.min(zone.dealCount, stack.cards.length);
-        const dealt = stack.cards.splice(stack.cards.length - count, count);
-        cardsForHand.push(...dealt);
+        cardsForHand.push(...takeFromStack(liveRoom, stack, count));
       }
     }
 
@@ -476,6 +478,7 @@ async function dealStartingHands(liveRoom, db) {
         if (card) {
           cardsForHand.push({
             id: card.id,
+            cardId: card.id,
             name: card.name,
             image_path: card.image_path,
             width: card.width,
@@ -485,9 +488,10 @@ async function dealStartingHands(liveRoom, db) {
       }
     }
 
+    // M32.6: die Starthand liegt in der Hand des **Servers**; der Eigentümer bekommt die Karten, alle die Zahl.
     if (cardsForHand.length > 0) {
-      sendToPlayer(liveRoom, player.id, { type: 'draw_response', cards: cardsForHand });
-      player.handCardCount = cardsForHand.length;
+      sendToPlayer(liveRoom, player.id, { type: 'draw_response', cards: addToHand(liveRoom, player.id, cardsForHand) });
+      announceHandCount(liveRoom, player.id);
     }
   }
 }

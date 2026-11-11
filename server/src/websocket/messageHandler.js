@@ -15,7 +15,11 @@ import { rotationOf } from '../../../shared/assetToken.js';
 // Raum und Executor benutzen dieselbe.
 import { shuffleStack } from '../../../shared/sequenceExecutor.js';
 // M32.4: die Wache – wer eine Karte in oder aus der Hand-Zone eines anderen anfasst. Eine Rechnung in shared/.
-import { mayTouchCard, resolveServerZones } from '../../../shared/ownership.js';
+import { mayTouch, mayTouchCard, ownZoneAt, resolveServerZones } from '../../../shared/ownership.js';
+// M32.6: die Hand-Zone rastet eine Karte auf den nächsten freien Platz, wie am Tisch.
+import { snapPoint, objectsInZone } from '../../../shared/zoneGeometry.js';
+// M32.6: die private Hand hält der Server.
+import { handOf, addToHand, announceHandCount, takeFromStack } from '../roomHand.js';
 
 const PLAYER_COLORS = new Set(['red', 'blue', 'green', 'purple', 'orange', 'yellow']);
 
@@ -54,6 +58,8 @@ export function handleMessage(room, playerId, rawData) {
       return handleCardPlayFromHand(room, playerId, payload, timestamp);
     case 'card_draw_to_hand':
       return handleCardDrawToHand(room, playerId, payload);
+    case 'card_pickup_to_hand':
+      return handleCardPickupToHand(room, playerId, payload, timestamp);
     case 'dice_roll':
       return handleDiceRoll(room, playerId, payload, timestamp);
     case 'counter_update':
@@ -88,8 +94,8 @@ export function handleMessage(room, playerId, rawData) {
       // Cursor is not persisted in boardState, just broadcast
       broadcast(room, { type: 'cursor', player_id: playerId, x: payload.x, y: payload.y }, playerId);
       return;
-    case 'hand_count_update':
-      return handleHandCountUpdate(room, playerId, payload);
+    // `hand_count_update` des Clients wird ignoriert (M32.6): der Zähler wird aus der Hand abgeleitet, sonst
+    // überschriebe das erste `welcome` nach dem Neuladen die Zahl mit 0, solange `handCards` noch leer ist.
     default:
       // Unknown message type, ignore
   }
@@ -112,7 +118,7 @@ function allowed(room, playerId, card, dest) {
  * den Absender, damit sein Tisch zurückspringt. An alle anderen geht nichts. `truth` ist die Nachricht
  * (`card_move`, `card_flip`, `card_rotate`, `stack_move`) oder `null`; der Text ist der bestehende.
  */
-function rejectTo(room, playerId, truth = null, message = 'Not allowed in this zone') {
+function rejectTo(room, playerId, truth = null, message = 'Das ist die Hand eines anderen Spielers.') {
   sendToPlayer(room, playerId, { type: 'error', message });
   if (truth) sendToPlayer(room, playerId, truth);
 }
@@ -152,18 +158,64 @@ function handleCardRotate(room, playerId, { table_id, rotation }, timestamp) {
   broadcast(room, { type: 'card_rotate', table_id, rotation, from_player_id: playerId, timestamp }, playerId);
 }
 
-function handleCardPlayFromHand(room, playerId, { card, x, y }, timestamp) {
-  if (!allowed(room, playerId, null, { x, y })) return rejectTo(room, playerId);
-  const tableCard = { ...card, x, y, tableId: card.tableId || generateId() };
-  room.boardState.cards.push(tableCard);
-  broadcast(room, {
-    type: 'card_play_from_hand',
-    card: tableCard,
-    x,
-    y,
-    from_player_id: playerId,
-    timestamp,
-  });
+/** Der höchste `zIndex` am Tisch, Karten in Stapeln mitgezählt. */
+function topZIndex(room) {
+  let top = 0;
+  const see = (c) => { top = Math.max(top, Number(c?.zIndex) || 0); };
+  room.boardState.cards.forEach(see);
+  room.boardState.stacks.forEach(s => (s.cards || []).forEach(see));
+  return top;
+}
+
+/**
+ * M32.6: Ausspielen aus der privaten Hand. Der Server nimmt die Karte **aus der Hand des Absenders** (`hand_id`), nicht
+ * aus der Nachricht – eine mitgeschickte `card` wird nicht gelesen, eine fremde oder unbekannte `hand_id` findet nichts.
+ *
+ * Das Ziel entscheidet die Seite, **der Server setzt sie**: in der **eigenen** Hand-Zone liegt die Karte verdeckt (und
+ * rastet, wenn die Zone `snap` hat, auf den nächsten freien Platz); sonst liegt sie offen; in einer **fremden** Hand-Zone
+ * wird sie abgewiesen und bleibt in der Hand. Allen (auch dem Absender) geht `card_play_from_hand` – der Client ändert
+ * lokal nichts, bis diese Antwort kommt.
+ */
+function handleCardPlayFromHand(room, playerId, { hand_id, x, y }, timestamp) {
+  const hand = handOf(room, playerId);
+  const i = hand.findIndex(c => c.handId === hand_id);
+  if (i === -1) return rejectTo(room, playerId, null, 'Diese Karte ist nicht in deiner Hand.');
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return rejectTo(room, playerId, null, 'Ungültiger Ort für die Karte.');
+
+  const color = room.players.get(playerId)?.color;
+  const zones = resolveServerZones(room.boardState, room.zones);
+  if (!mayTouch(zones, room.players, color, x, y)) return rejectTo(room, playerId);
+
+  const own = ownZoneAt(zones, color, x, y);
+  const { cards, stacks, tokens } = room.boardState;
+  const spot = own ? snapPoint(own, x, y, objectsInZone(own, cards, stacks, tokens)) : { x, y };
+  // Eine Karte, die vom Tisch kam, trägt ihr Rasterfeld und ihre Drehung noch: beides gilt am neuen Ort nicht.
+  const { handId, gridId, cell, ...rest } = hand[i];
+  const tableCard = {
+    ...rest, tableId: rest.tableId || generateId(), x: spot.x, y: spot.y,
+    zIndex: topZIndex(room) + 1, faceDown: !!own, rotation: 0, inStack: null,
+  };
+  hand.splice(i, 1);
+  cards.push(tableCard);
+  broadcast(room, { type: 'card_play_from_hand', card: tableCard, hand_id, x: spot.x, y: spot.y, from_player_id: playerId, timestamp });
+  announceHandCount(room, playerId);
+}
+
+/**
+ * M32.6: eine lose Karte vom Tisch in die private Hand. Sie muss lose am Tisch liegen (eine Karte im Stapel oder eine
+ * unbekannte Id → `error`) und die Wache bestehen (aus fremder Hand-Zone ✗). Der Aufnehmende bekommt `draw_response`,
+ * alle `card_removed` – sonst bliebe die Karte bei allen anderen liegen, ein Geist.
+ */
+function handleCardPickupToHand(room, playerId, { table_id }, timestamp) {
+  const i = room.boardState.cards.findIndex(c => c.tableId === table_id);
+  if (i === -1) return rejectTo(room, playerId, null, 'Diese Karte liegt nicht lose auf dem Tisch.');
+  if (!allowed(room, playerId, room.boardState.cards[i])) return rejectTo(room, playerId);
+
+  const [card] = room.boardState.cards.splice(i, 1);
+  const [handCard] = addToHand(room, playerId, [card]);
+  sendToPlayer(room, playerId, { type: 'draw_response', cards: [handCard] });
+  broadcast(room, { type: 'card_removed', table_id, from_player_id: playerId, timestamp });
+  announceHandCount(room, playerId);
 }
 
 // ─── Stack actions ────────────────────────────────────────────────────────────
@@ -179,7 +231,7 @@ function handleCardPlayFromHand(room, playerId, { card, x, y }, timestamp) {
  * (docs/audit-dead-controls.md, Fund 9). `id` bleibt als Rueckfall stehen,
  * damit ein alter Raumzustand weiter gefunden wird.
  */
-function stackIdOf(stack) {
+export function stackIdOf(stack) {
   return stack?.stackId ?? stack?.id;
 }
 
@@ -216,6 +268,9 @@ function handleStackMerge(room, playerId, { from_stack_id, to_stack_id }, timest
   const toStack = findStack(room, to_stack_id);
   if (fromIdx !== -1 && toStack) {
     const fromStack = room.boardState.stacks[fromIdx];
+    // Weder ein Stapel aus einer fremden Hand-Zone heraus noch einer hinein (M32.4, Nachtrag); es gibt keine Nachricht,
+    // die den Tisch des Absenders zurückstellt, also bleibt es beim `error`.
+    if (!allowed(room, playerId, fromStack, toStack)) return rejectTo(room, playerId);
     toStack.cards = [...toStack.cards, ...fromStack.cards];
     room.boardState.stacks.splice(fromIdx, 1);
   }
@@ -260,6 +315,10 @@ function handleStackTakeTop(room, playerId, { stack_id, new_x, new_y }, timestam
  */
 function handleStackShuffle(room, playerId, { stack_id, order }, timestamp) {
   const stack = findStack(room, stack_id);
+  // Ein Stapel in fremder Hand-Zone wird nicht gemischt (M32.4, Nachtrag); der Absender bekommt die Reihenfolge, die der Server hält.
+  if (stack && !allowed(room, playerId, stack)) {
+    return rejectTo(room, playerId, { type: 'stack_shuffle', stack_id, order: Array.isArray(stack.cards) ? stack.cards.map(c => c.tableId) : null });
+  }
   let applied = null;
   if (stack && Array.isArray(stack.cards)) {
     const byId = new Map(stack.cards.map(c => [c.tableId, c]));
@@ -281,29 +340,30 @@ function handleStackShuffle(room, playerId, { stack_id, order }, timestamp) {
 
 // ─── Private hand draw ────────────────────────────────────────────────────────
 
+/**
+ * M32.6: Ziehen geht in die **private Hand des Servers**. Der Ziehende bekommt `draw_response` (Karten mit `handId`),
+ * **alle** (auch er) `stack_size_update { stack_id, size, removed }` bzw. `stack_removed` – nur Ids, kein Name, kein
+ * Bild – und `player_hand_count`. Ein Stapel in fremder Hand-Zone wird abgewiesen (Ort jetzt, wie `stack_take_top`).
+ */
 function handleCardDrawToHand(room, playerId, { stack_id, count }) {
   const stack = findStack(room, stack_id);
   if (!stack) return sendToPlayer(room, playerId, { type: 'draw_response', cards: [] });
+  if (!allowed(room, playerId, stack)) return rejectTo(room, playerId);
 
-  const drawCount = Math.min(count || 1, stack.cards.length);
-  const drawn = stack.cards.splice(stack.cards.length - drawCount, drawCount);
+  const wanted = Math.floor(Number(count));
+  const drawCount = Math.min(wanted >= 1 ? wanted : 1, stack.cards.length);
+  const drawn = takeFromStack(room, stack, drawCount);
+  const cards = addToHand(room, playerId, drawn);
 
-  // Remove empty stack
+  // Karten, die dem Ziehenden allein gehören: nur an ihn.
+  sendToPlayer(room, playerId, { type: 'draw_response', cards });
+  const stamp = { from_player_id: playerId, timestamp: Date.now() };
   if (stack.cards.length === 0) {
-    room.boardState.stacks = room.boardState.stacks.filter(s => stackIdOf(s) !== stack_id);
-    broadcast(room, { type: 'stack_removed', stack_id, from_player_id: playerId, timestamp: Date.now() });
+    broadcast(room, { type: 'stack_removed', stack_id, ...stamp });
   } else {
-    broadcast(room, {
-      type: 'stack_size_update',
-      stack_id,
-      size: stack.cards.length,
-      from_player_id: playerId,
-      timestamp: Date.now(),
-    });
+    broadcast(room, { type: 'stack_size_update', stack_id, size: stack.cards.length, removed: drawn.map(c => c.tableId), ...stamp });
   }
-
-  // Send card data privately to the drawing player only
-  sendToPlayer(room, playerId, { type: 'draw_response', cards: drawn });
+  announceHandCount(room, playerId);
 }
 
 // ─── Game objects ─────────────────────────────────────────────────────────────
@@ -334,14 +394,6 @@ function handleTokenMove(room, playerId, payload, timestamp) {
   const token = room.boardState.tokens.find(t => t.id === token_id);
   if (token) Object.assign(token, { x, y }, address);
   broadcast(room, { type: 'token_move', token_id, x, y, ...address, from_player_id: playerId, timestamp }, playerId);
-}
-
-// ─── Hand count sync ──────────────────────────────────────────────────────────
-
-function handleHandCountUpdate(room, playerId, { count }) {
-  const player = room.players.get(playerId);
-  if (player) player.handCardCount = count;
-  broadcast(room, { type: 'player_hand_count', player_id: playerId, count }, playerId);
 }
 
 // ─── Token create/delete ──────────────────────────────────────────────────────

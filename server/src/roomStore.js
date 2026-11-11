@@ -16,6 +16,7 @@ export function createRoom({ roomCode, gameId, hostPlayerId, setupId = null }) {
     status: 'waiting', // waiting | active | finished
     players: new Map(),    // Map<playerId, PlayerState>
     connections: new Map(), // Map<playerId, WebSocket>
+    hands: new Map(),       // Map<playerId, Karte[]> – die private Hand, vom Server gehalten (M32.6, src/roomHand.js)
     boardState: {
       cards: [],
       stacks: [],
