@@ -26,7 +26,7 @@ Die letzten drei haben auch clientseitig keinen Empfänger.
 
 **`counter_update` ist verdrahtet** (2026-11-11, Fund aus dem Produktionstest: Spieler B sah den Wert von A auch nach dem Neuladen nicht): Plus, Minus und das getippte Feld laufen durch `setCounterValue` in `GameTable.jsx`, das den absoluten Wert sendet; der Server verwirft nicht endliche Werte (`server/test/counter-update-sync.test.js`). Die übrigen acht stehen unverändert offen.
 
-**Nachtrag zu Einzelkarten (2026-11-11, Sichtprobe M32):** Umdrehen und Drehen einer Karte (Taste F/E/Q, Kontextmenü, MobileActionBar, Zwei-Finger-Drehen) laufen jetzt über `flipCards`/`rotateCards` in `GameTable.jsx` und senden im Raum `card_flip`/`card_rotate`; vorher sendete nur die Taste (`server/test/card-menu-room-sync.test.js`). **Stapelaktionen sind weiter ungesendet:** „Flip Stack“ (Menü und MobileActionBar), `stack_create`/`stack_merge` (Stapel bilden), Split, `stack_take_top`.
+**Nachtrag zu Einzelkarten (2026-11-11, Sichtprobe M32):** Umdrehen und Drehen einer Karte (Taste F/E/Q, Kontextmenü, MobileActionBar, Zwei-Finger-Drehen) laufen jetzt über `flipCards`/`rotateCards` in `GameTable.jsx` und senden im Raum `card_flip`/`card_rotate`; vorher sendete nur die Taste (`server/test/card-menu-room-sync.test.js`). ~~**Stapelaktionen sind weiter ungesendet:** „Flip Stack“ (Menü und MobileActionBar), `stack_create`/`stack_merge` (Stapel bilden), Split, `stack_take_top`.~~ **Behoben (2026-11-11, `docs/tasks-stapel-raum.md`):** „Flip Stack“ (`stack_flip`, neu), Stapel bilden (Taste G, „Stack with card below“, Halten beim Ablegen: `stack_create`), Ablegen auf einen Stapel (`stack_merge`, auch eine lose Karte als Quelle), der Haufen im Ablagestapel (`pileUp` → `pilePlan` → `stack_create`), „Split Stack“ (`stack_split`, neu), „Take Top Card“ (`stack_take_top`) und „Reveal Top Card to …“ (`stack_take_top` offen, plus der Haufen) laufen über **eine Funktion je Handgriff** (`flipStack`, `stackCards`, `performSplit`, `revealInRoom`) und senden im Raum; der Tisch folgt der **Rückmeldung an alle**, auch an den Absender. Von den acht Aktionen oben senden damit alle außer `dice_roll` und `note_edit`.
 
 **Folge:** In einer Mehrspielerpartie sehen die anderen weder Stapel bilden, mischen,
 teilen oder abheben, noch Würfelwürfe, Notiz-Änderungen oder eine
@@ -145,6 +145,8 @@ Der Empfänger taugte dabei **nicht**, wie er dastand — er suchte
 Rundruf ja, gespeicherter Raumzustand nein. Betroffen waren auch
 `stack_create`, `stack_merge`, `stack_take_top`, `stack_shuffle` und
 `card_draw_to_hand`; alle sechs gehen jetzt über `findStack`.
+
+**Nachtrag (2026-11-11):** `stack_create`, `stack_merge` und `stack_take_top` senden jetzt (`docs/tasks-stapel-raum.md`); ihre Handler waren dabei zusätzlich falsch (Reihenfolge des Tisches statt der Nachricht, kein `zIndex`, nur lose Karten, ein Stapel mit einer Restkarte blieb stehen) und sind neu geschrieben (`server/src/roomStacks.js`).
 
 Der Rest des Fundes steht unverändert: der **Mehrfachauswahl**-Zweig von
 `handleCardDragEnd` sendet weiterhin **gar keine** Nachricht, im Raum bewegt

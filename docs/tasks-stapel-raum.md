@@ -61,6 +61,27 @@ Ein Test, **ein** Raum, **zwei** `ws`-Clients: Stapel bilden → Karte auf den S
 
 ---
 
-## Stand nach dem Bau
+## Stand nach dem Bau (2026-11-11)
 
-*(wird am Ende der Arbeit ausgefüllt)*
+**Gebaut lokal, nicht gepusht, nicht deployt.** Commits: `GA` Stapel umdrehen · `GB` bilden und mergen · `GC` teilen und abheben · `GD`/`GE` Reveal und der Durchlauf mit zwei Verbindungen (`git log --oneline -6`). Tests **2 663 → 2 724** (`# tests` des Runners); `cd client && npx vite build` ohne neue Warnung (der eine Chunk über 500 kB ist vorbestehend). Neue Dateien: `server/src/roomStacks.js` (die Rechnung auf `room.boardState`), `client/src/utils/stackOps.js` (die Anwendung der Rückmeldungen), `server/test/room-stacks.test.js`, `room-stacks-client.test.js`, `stack-menu-room-sync.test.js`; der Durchlauf steht in `room-two-players.test.js` (`GE`).
+
+**Berichtigung beim Bau.**
+1. **Vier bestehende Tests sind in fünf Zusicherungen umgekehrt** (`ownership-handlers.test.js`: FO 5, FO 7, `FU-Nachtrag stack_merge` mit zwei, „Solo-Raum mischt und legt zusammen“; Muster „der Absender bekommt **nichts** zurück“): Stapelbau, Merge und Abheben melden jetzt auch dem Absender zurück (Entscheidung 1). Die **Ablehnungen** sind unverändert (nur `error`, nichts ändert sich, kein anderer bekommt etwas).
+2. **`stack_take_top` / `stack_merge` bei unbekanntem Stapel** antworten jetzt mit `error` (vorher: der Rundruf ging trotzdem raus bzw. nichts). `stack_create` verlangt zwei vorhandene Karten und lesbare Ids; die alte Fassung legte auch einen leeren Stapel an.
+3. **`takeFromStack` (`FU`, Ziehen in die Hand) ruft dieselbe Rechnung `tidyStack`** wie alle neuen Griffe („ein Stapel mit einer Karte ist keiner“, eine Stelle statt zwei); `room-hand.test.js` unverändert grün.
+4. **`pileUp` ist unverändert** (`card-drop.test.js` unverändert grün); `pilePlan` ist seine Rechnung als Plan, `pileUp` ruft dieselbe Funktion darunter. Im Raum rechnet das Ablegen den Haufen **nicht** mehr lokal, sondern sendet `stack_create` (`pileInRoom`, nach `card_move`/`stack_move`).
+5. **`card_flip`/`card_rotate` finden Stapelkarten** (Entscheidung 6, `findCard`): vorher rundrief der Server, ohne seinen Zustand zu ändern.
+6. **`stack_split` mit `count` 1 ist `stack_take_top`** (Antwort `stack_take_top`); der Client sendet für eine Karte ohnehin `stack_take_top`.
+
+**Was ich nicht ohne Browser prüfen konnte.** Alles, was `GameTable.jsx` tut: dass die Handgriffe wirklich die gemeinsame Funktion rufen, ist am **Quelltext** belegt (`stack-menu-room-sync.test.js`), und die Anwendung der Rückmeldungen ist **gerechnet** (`room-stacks-client.test.js`) und im Durchlauf gegen den Server abgeglichen (`GE`: beide Tische, nach jedem Schritt). Nicht gesehen: das Zeichnen (Stapelkante, Zähler `#n`, Mischabzeichen nach `stack_flip`), das Ziehen mit der Maus bis zum Merge, das Halten beim Ablegen, der Haufen im Ablagestapel mit der echten verankerten `Ablage`, die Hinweise (`room-notice`) bei Ablehnung. **Offen, kein Fehler, nur Grenzen:** Mehrfachauswahl beim Ziehen sendet weiter nichts (Fund 9); ein verspäteter Tisch (Neuladen mitten im Griff) bekommt den Stand des Servers über `welcome`; `locked` eines Stapels wird nicht gesendet.
+
+### Prüfblatt für die Sichtprobe (zwei Tabs, nach Push)
+Raum mit zwei Spielern (**Tab B ist der Zuschauer**, anderer Tab im selben Browser, andere Farbe); nach jedem Griff in Tab A in Tab B ansehen und „gleich“/„anders“ notieren:
+1. **Stapel bilden:** zwei Karten auswählen, `G` → bei B liegen sie als ein Stapel an derselben Stelle. Dasselbe mit „Stack with card below“ und mit Halten beim Ablegen.
+2. **Auf einen Stapel legen:** eine lose Karte auf einen Stapel ziehen; dann einen Stapel auf einen Stapel → bei B ein Stapel mit allen Karten, obenauf die gelegten.
+3. **Split Stack** (Zahl 2): bei B ein neuer Stapel daneben; bleibt eine Karte, liegt sie lose. **Take Top Card:** bei B liegt die oberste Karte lose daneben.
+4. **Flip Stack:** bei B drehen sich alle Karten des Stapels (ein gemischter Stapel bleibt gemischt, nur umgekehrt). **Shuffle** wie bisher.
+5. **Reveal Top Card to „Ablage“:** bei B liegt die Karte **offen** auf der Ablage und gehört zum Haufen (ein Stapel, `Shuffle` im Menü geht).
+6. **Fremde Hand:** A legt einen Stapel in die Hand-Zone von B (Zone des anderen): erscheint ein amberfarbener Hinweis, bleibt der Stapel dort, wo er war? B zieht an einem Stapel in der Zone von A: dasselbe.
+7. **Neuladen** von B mitten im Spiel: derselbe Stand wie bei A.
+8. **Solo-Gegenprobe** (ohne Raum): alle Griffe oben wie vor dem Umbau — unmittelbar, ohne Rückmeldung.
