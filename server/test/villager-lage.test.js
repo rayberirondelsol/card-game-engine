@@ -67,9 +67,8 @@ test('S > D: ein Problem mit beiden Zahlen und dem Namen der Option, und keine L
   const r = lageOf(data(), choose(3, 2));
   assert.equal(r.kind, null);
   assert.equal(r.problems.length, 1);
-  assert.match(r.problems[0], /spieler/);
-  assert.match(r.problems[0], /\b3\b/);
-  assert.match(r.problems[0], /\b2\b/);
+  // Deutsch (Auftraggeber, 2026-11-11): der Text geht unverändert in Dialog und Fehlerantwort.
+  assert.equal(r.problems[0], '3 Spieler, aber nur 2 Dörfler – es braucht mindestens so viele Dörfler wie Spieler.');
   assert.equal(r.players, 3);
   assert.equal(r.villagers, 2);
 

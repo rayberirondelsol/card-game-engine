@@ -46,9 +46,7 @@ test('drei Spieler, zwei Dörfler: nichts wird gebaut, eine Zeile failed, der Zu
   assert.equal(r.log[0].index, -1);
   assert.equal(r.log[0].type, '(sequence)');
   assert.equal(r.log[0].status, 'failed');
-  assert.match(r.log[0].reason, /\b3\b/);
-  assert.match(r.log[0].reason, /\b2\b/);
-  assert.match(r.log[0].reason, /spieler/);
+  assert.match(r.log[0].reason, /3 Spieler, aber nur 2 Dörfler/);
   assert.match(r.log[0].reason, /^choices: lage: /);
   assert.match(r.log[0].reason, /nothing was built/);
   assert.deepEqual(r.state, vorher, 'der Zustand kam so zurück, wie er hineinging');

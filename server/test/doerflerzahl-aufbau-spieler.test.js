@@ -263,7 +263,7 @@ test('FH 2: **`lageOf` ist für JEDE Kombination `spieler` × `doerfler3–5` be
         assert.equal(lage.kind, S === 1 ? 'solo' : S === D ? 'normal' : 'mehrfach', wo);
       } else {
         assert.equal(lage.kind, null, wo);
-        assert.ok(lage.problems.length > 0 && lage.problems[0].includes(`${S} players`) && lage.problems[0].includes(`${D} villagers`), `${wo}: ${lage.problems}`);
+        assert.ok(lage.problems.length > 0 && lage.problems[0].includes(`${S} Spieler, aber nur ${D} Dörfler`), `${wo}: ${lage.problems}`);
       }
       n++;
     }
@@ -541,7 +541,7 @@ test('FH 9: **`S > D` baut nichts** (`FC`, hier mit den echten Daten) – `spiel
     assert.equal(r.log.length, 1, `${S}/${D}: eine Zeile`);
     assert.equal(r.log[0].status, 'failed');
     assert.match(r.log[0].reason, /nothing was built/);
-    assert.match(r.log[0].reason, new RegExp(`${S} players`));
+    assert.match(r.log[0].reason, new RegExp(`${S} Spieler, aber nur`));
     assert.deepEqual(r.state, state, `${S}/${D}: der Zustand bleibt, wie er war`);
   }
   for (const D of [2, 3, 4, 5]) assert.deepEqual(schlecht(tisch(wahl(1, D))), [], `spieler 1, ${D} Dörfler baut`);
@@ -727,7 +727,7 @@ test('FH 11: **der Raum** – `POST /api/rooms` mit `spieler:s2`, `doerfler3`, `
     const vorher = raeume();
     const zu = await anlegen({ spieler: 's3' });
     assert.equal(zu.statusCode, 400, zu.body);
-    assert.match(zu.json().error, /3 players/);
+    assert.match(zu.json().error, /3 Spieler, aber nur 2 Dörfler/);
     assert.equal(raeume(), vorher, 'kein Raum');
 
     // mehrfach: derselbe Tisch wie am Tisch

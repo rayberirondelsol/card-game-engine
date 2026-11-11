@@ -188,7 +188,7 @@ export const villagerCount = (state, assets, villagers) => seatedVillagers(state
  * `off`-Wahl stehen (eine gewöhnliche Option zählt immer; **Lücken werden nicht geschlossen**,
  * wie bei der Leiter). `solo` bei `S = 1`, `normal` bei `S = D`, `mehrfach` bei `1 < S < D`.
  *
- * `S > D` ist **keine Lage**: `kind: null` und ein Problem, das beide Zahlen und die Option
+ * `S > D` ist **keine Lage**: `kind: null` und ein (deutsches) Problem, das beide Zahlen
  * nennt. Das Problem steht hier, nicht im Aufbau - ein Halt mitten im Lauf ließe einen halb
  * gebauten Tisch zurück; wer hält (Dialog, Server, Executor), fragt vorher hier.
  * Kaputte Daten (eine Option, die es nicht gibt, eine `lage` ohne Form) sind ebenfalls
@@ -229,7 +229,9 @@ export function lageOf(scenarioData, choices) {
 
   const out = { players, villagers: seated, kind: null, problems: [] };
   if (players > seated) {
-    out.problems.push(`option "${lage.players}": ${players} players but only ${seated} villagers - there must be at least as many villagers as players`);
+    // Deutsch, weil Dialog, Modal und Fehlerantwort den Satz unverändert zeigen (Auftraggeber, 2026-11-11);
+    // die Meldungen über kaputte Daten oben bleiben englisch - die liest kein Spieler.
+    out.problems.push(`${players} Spieler, aber nur ${seated} Dörfler – es braucht mindestens so viele Dörfler wie Spieler.`);
   } else {
     out.kind = players === 1 ? 'solo' : players === seated ? 'normal' : 'mehrfach';
   }

@@ -90,9 +90,7 @@ test('FC: eine unzulässige Lage (S > D) wird abgewiesen, mit dem Problem im Tex
   assert.ok(res.statusCode >= 400 && res.statusCode < 500, `4xx erwartet, war ${res.statusCode}`);
   const error = res.json().error;
   assert.match(error, /Ungültige Wahl für diesen Aufbau/, 'dieselbe Form wie die vorhandene Abweisung');
-  assert.match(error, /spieler/);
-  assert.match(error, /\b3\b/);
-  assert.match(error, /\b2\b/);
+  assert.match(error, /3 Spieler, aber nur 2 Dörfler/);
 
   assert.equal(count('game_rooms'), rooms, 'kein Raum angelegt');
   assert.equal(count('room_players'), players, 'kein Spieler angelegt');
