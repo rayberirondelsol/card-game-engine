@@ -75,6 +75,8 @@ Die Skizze der Abnahmeliste ist an Code und Daten gemessen worden; an diesen Ste
 
 **Fertig, wenn:** die Tests grün sind; alle bestehenden Tests unverändert grün sind; `npm test` grün ist.
 
+**Berichtigung beim Bau (FK, 2026-11-11).** `bindZones` gibt **`{ zones, warnings }`** zurück, nicht die Liste allein: Nr. 4 („dieselbe Liste zurück“) heißt `result.zones === zones` bei `owners` `null` (oder einem Problem-Ergebnis von `ownersOfPlayers`), und Nr. 5 verlangt `warnings` – beides geht nur in einer Hülle. `FN` ruft also `const { zones, warnings } = bindZones(liveRoom.zones, owners)`. Der Satz bei falscher Spielerzahl: „Der Raum braucht genau 2 Spieler, im Raum sind 1.“ (`FN` Nr. 2 prüft ihn am 409).
+
 ---
 
 ## FL — Die Wache: `mayTouch`, mit aufgelösten Zonen (M32.4)
