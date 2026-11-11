@@ -320,6 +320,8 @@ Anwesenheit des Skripts im Container prüfen (nicht nur den Hash); `zone_data` l
 
 **Fertig, wenn:** ein Leser, der nur `CLAUDE.md` kennt, Eigentum, Stufe A und ihre Grenzen findet.
 
+**Stand (FT Teil 1, 2026-11-11): erledigt.** `CLAUDE.md` (Absatz „Eigentum im Raum (M32)“ und die Einschränkung unter „Bekannte Lücken“, dazu ein Verweis im Absatz der Spielerzahl), `docs/spec-setup-system.md` (am Ende von M32: „M32 — gebaut, und was die Spec dabei berichtigt“, mit der Tabelle der Commits und der Tests, elf Berichtigungen, **dem Satz, dass die Sichtprobe nicht gelaufen ist**; Verweise in M31.18 und in „Offen und riskant“ von Welle 2), `docs/m31-welle2-abnahme.md` (Frage 1 mit der Antwort geschlossen, Stand ehrlich: nicht deployt, Daten nicht geschrieben, Sichtprobe aussteht), `docs/datenzugriff.md` (`eigentum` als zehnter Schritt, `zone_data` von drei Schritten geschrieben, Rückweg `eigentum` zuerst, die beiden erwarteten `ABWEICHEND`). **Teil 2 (die Liste für den Auftraggeber) bleibt: sie ist die Sichtprobe, ihr Prüfblatt steht unter `FQ`.**
+
 ### Teil 2 — Liste für den Auftraggeber (kein Agent)
 
 Eine Prüfliste von Hand, **nach** `FS` Teil 2:
