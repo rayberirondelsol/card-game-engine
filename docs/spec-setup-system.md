@@ -8280,3 +8280,183 @@ Aufgaben `FA`–`FI` in `docs/tasks-m31-doerflerzahl.md`; dort steht je Aufgabe 
 - **Tests:** `server/test/villager-lage.test.js` (Abschnitt 4), `room-lage.test.js`, `doerflerzahl-aufbau-spieler.test.js` (FH 10, mit den echten Daten); die Test-Optionen in `villager-lage.test.js` geben Dörfler 2 die Vorgabe Judy (vorher Granny: `doerfler3: 'Granny'` wäre jetzt eine Doppelwahl).
 
 **Was offen bleibt** (die Liste unter „Offen und riskant" oben gilt weiter; dazu): ein **ganzer Raum mit mehreren Spielern** ist von niemandem gespielt (`docs/m31-welle2-abnahme.md`); ~~die **Doppelwahl auf Platz 2** (Berichtigung 8)~~ (seit 2026-11-11 verboten, siehe den Nachtrag davor); **`zone-nan-render`** trägt zwei `ci:`-Commits (`docker-build.yml`), die nicht übernommen sind; der **offene Tisch-Tab macht die `Auto Save`-Zeile des Rauchtests zu einem wandernden Ziel** (vor einem Beleglauf schließen).
+
+---
+
+## M32 — Eigentum und Geheimhaltung im Raum: wer welchen Dörfler führt, und wer welche Hand liest
+
+Auftrag vom **2026-11-11** (Auftraggeber), Antwort auf Frage 1 der Abnahmeliste `docs/m31-welle2-abnahme.md`. Die Frage lautete: *„Reicht ‚keine Eigentumsrechte und keine Geheimhaltung'?"*, mit der Skizze für den Fall „nein": **Zuordnung Spieler↔Dörfler in den Daten, eine Farbe je Spieler (erst beim Beitritt zum Raum gewählt), `exclusive` an den Hand-Zonen.** Die Antwort: **es reicht nicht — eigener Meilenstein.** *(vom Auftraggeber entschieden)*
+M32 ändert damit **M31.18** („die Zuordnung Spieler → Dörfler bleibt am Tisch"): für einen Raum mit mehr als einem Spieler (Lage `mehrfach`/`normal`, M31.15) weiß der Raum ab jetzt, wer welchen Platz führt. Für `solo`, für jeden Tisch ohne Raum und für jeden Raum ohne diese Wahl gilt M31.18 **unverändert** (M32.7). Aufgaben `FK`–`FT` in `docs/tasks-m32-eigentum.md`. **Nichts in diesem Abschnitt ist gebaut;** wo „Vorschlag" steht, entscheidet der Auftraggeber (Fragen am Ende, je mit Empfehlung).
+
+**Ergebnis in zehn Sätzen.**
+
+1. **Die Skizze trägt an drei Stellen nicht** (M32.1): `exclusive` in die Daten zu schreiben sperrt in jedem Raum jeden aus (die Zone hat keine Farbe), die Wache des Servers hat Lücken (u. a. liest sie unaufgelöste Zonen und trifft die verankerten Hand-Zonen 3–5 nie), und „verdeckt" ist am Draht keine Geheimhaltung — der Server schickt jede Vorderseite an jeden.
+2. **Die Daten tragen nur eine Bindung, keine Zuordnung** (M32.3, M32.9): `platz: n` an den fünf Hand-Zonen. Wer Platz n führt, rechnet der **Raum beim Start** aus Spielerzahl, Dörflerzahl und Sitzreihenfolge — ein Aufbau ist statisch, die Spieler stehen erst im Raum.
+3. **Die Farbe gibt es schon** (M32.1 Nr. 1): sie wird beim Anlegen und beim Beitritt gewählt. Der Raum färbt beim Start seine **Kopie** der Hand-Zonen in der Farbe des Eigentümers und setzt dort `exclusive`; `zone_data` in der Datenbank bleibt unberührt.
+4. **Zuordnung: Blöcke nach Sitzreihenfolge** (Vorschlag, Frage 2): bei 2 Spielern und 4 Dörflern führt der Host Platz 1–2, der Gast Platz 3–4. Der Start verlangt genau so viele Spieler, wie im Dialog gewählt (Frage 3).
+5. **Eigentum heißt: nichts an Karten in einer fremden Hand-Zone** — nicht hinein, nicht heraus, nicht drehen, nicht umdrehen (M32.4). Münzen, Tableaus, Marker und der Rest des Tisches bleiben gemeinsam (Frage 4).
+6. **„Geheim" hat drei Stufen, und M32 baut zwei** (M32.5): *Rechte und Blick* (der Eigentümer sieht seine verdeckten Karten, ohne sie für alle umzudrehen) und *Sichtfilter am Server* (der Server schickt die Vorderseite einer verdeckten Karte in fremder Hand nicht). **Echt** ist das nur für Karten, die der **Server** in die Hand legt — die Starthände. Was später von Hand aus einem Stapel in die Hand gezogen wird, hat jeder Tisch schon (Stufe 3, nicht M32; Frage 1).
+7. **Die Grenze der Geheimhaltung ist die Spieler-ID** (M32.1 Nr. 8): sie ist im Raum nicht geheim. M32 schützt vor dem Hinsehen und vor Versehen, **nicht** vor einem Mitspieler, der sich absichtlich als ein anderer verbindet.
+8. **Eine verdeckte Karte verlässt die Hand nicht verdeckt** (M32.4 Regel 2): erst aufdecken, dann herausnehmen. Das hält den Sichtfilter einfach (er rechnet nach Ort, nicht nach Geschichte) und ist, was TFT ohnehin verlangt (eine Heldentat wird aufgedeckt, wenn sie erfüllt wird).
+9. **Solo, Hotseat und jeder Raum ohne die Wahl bleiben Zeichen für Zeichen, wie sie sind** (M32.7) — mit Tests als Beleg, nicht als Absicht: ohne Eigentümer gibt der Sichtfilter **dasselbe Objekt** zurück.
+10. **Gespeichert wird nichts Neues** (M32.8): die Zuordnung ist aus Wahl und Sitzen jederzeit neu zu rechnen; ein Neuladen im selben Tab behält sie, ein neuer Tab und ein Neustart des Servers können es nicht — das ist der Bestand, M32 ändert daran nichts.
+
+### M32.1 — Befund, gemessen
+
+Gelesen wurde der Stand `081de15` (2026-11-11). **Nichts davon ist an der Produktion nachgemessen** — es ist Code und Daten aus dem Baustein, wo es nicht anders dasteht.
+
+1. **Farbe, Sitz, Spieler entstehen beim Anlegen und beim Beitritt.** `POST /api/rooms` nimmt `display_name` und `color` des Hosts (`server/src/routes/rooms.js:70-80`, Sitz 1 in 141-143), `POST /api/rooms/:code/join` die des Gastes (198-229): die Farbe ist je Raum eindeutig (224-226 und `UNIQUE (room_id, color)`, `server/src/database.js:172`), der Sitz der niedrigste freie (`getNextSeat`, `rooms.js:40-46` — **Lücken sind möglich**, wenn jemand vor dem Start geht). Gewählt wird die Farbe in `CreateRoomModal.jsx` und `JoinRoomModal.jsx`. Die sechs Farben sind dieselben wie `ZONE_COLOR_HEX` (`shared/zoneGeometry.js:253-261`). **Die „Farbe je Spieler, erst beim Beitritt gewählt" aus der Skizze gibt es also schon.**
+2. **`exclusive` gibt es, und es hat fünf Mängel.** `isActionAllowed` (`server/src/websocket/messageHandler.js:98-112`): eine Zone mit `type: "player"` und `exclusive: true` weist jeden Spieler ab, dessen `color` der Zone nicht gleicht, wenn der Punkt in ihr liegt. (a) **Nur der Zielpunkt** wird bei `card_move` geprüft (116-125): eine Karte aus einer fremden Zone **herauszuziehen** ist erlaubt. (b) `stack_move`, `stack_create` und `stack_take_top` (186-234) prüfen **nichts**. (c) **Die Zonen sind roh:** der Raum lädt `zone_data` unaufgelöst (`rooms.js:316`, `379`), die Wache liest `zone.x`/`zone.width`; eine verankerte Zone ohne absolute Box trifft **nie** (`x >= undefined` ist `false`). Das sind seit M31 `Hand Dörfler 3` (`handRelativ` lässt die absolute Box fallen, `scripts/doerflerzahl-daten.mjs:648-655`, gerufen in 663 und 673) sowie 4 und 5 — **ausgerechnet die Hände, um die es geht** (1 und 2 sind absolut; gemessen am Code, nicht an der Produktion). (d) **`exclusive: true` bei `color: null` sperrt jeden aus** (`null === player.color` ist `false`): die Skizze „`exclusive` an den Hand-Zonen" in die Daten geschrieben, nähme in **jedem** Raum, auch im Solo-Raum, jedem die Hand. (e) **Der Client wertet die Ablehnung nicht aus:** der Server antwortet mit `{ type: 'error' }` (z. B. 119), aber weder `useGameRoom.js:60-101` noch `applyRemoteAction` (`GameTable.jsx:3706 ff.`) kennen ein `case 'error'` — die Karte des Zugreifenden bleibt an der neuen Stelle liegen, bei allen anderen und auf dem Server an der alten.
+3. **Die Hand-Zonen gehören niemandem** (M31.14, gemessen): `type: "player"`, `color: null`, `exclusive: false`, Ids `zhand1` … `zhand5`, Label `Hand Dörfler n`, `capacity 4`. `dealStartingHands` (`rooms.js:431-475`) findet zu einer Zonenfarbe den Spieler, teilt aber nur aus `dealStackId` und `startingHandCardIds` aus (444, 454) — beides fehlt an diesen Zonen; mit gesetzter Farbe tut die Funktion also **nichts** (ein Test in `FN` hält es fest).
+4. **„Verdeckt" ist heute eine Darstellung, keine Eigenschaft der Daten.** Eine Karte am Tisch trägt `name`, `image_path` und `cardId`; der Executor teilt die Quellkarte mit allen Feldern aus (`shared/sequenceExecutor.js:1534-1546`, `...card`), `faceDown` ist ein Flag daneben. Der Server schickt den Zustand **unverändert**: `welcome` (`roomWs.js:97-106`), `room_started` (`rooms.js:387-392`), `stack_take_top` mit der ganzen Karte (`messageHandler.js:225-233`), `board_sync` (`broadcast.js:34-39`, wird nirgends gerufen). `card_flip` trägt nur `face_down` (127-136), weil jeder Tisch die Vorderseite schon hat. Der Client versteckt sie mit `rotateY(180deg)` (`GameTable.jsx:5298`) und `tableObjectView` (`client/src/utils/tableObjectView.js`). **Der Satz in Abschnitt 6 („Verdeckt heißt überall verdeckt … im ausgelieferten Zustand") gilt am Draht nicht:** wer im Browser das Netzwerk-Fenster öffnet, liest jede Heldentat. Dasselbe gilt für verdeckte **Token** (`frontImageUrl` und `label` stehen im Token, `handleTokenFlip`, 350-363) — dieselbe Klasse, nicht M32.
+5. **Die Engine kennt eine echte Geheimhaltung — die private Hand —, und sie trägt TFT nicht.** `card_draw_to_hand` (`messageHandler.js:273-293`) nimmt die Karten **serverseitig** aus dem Stapel und schickt sie nur dem Ziehenden (`draw_response`). Aber die Hand ist **Zustand des Clients** (`handCards`); der Server kennt nur die Zahl (`hand_count_update`, 330-336; `GameTable.jsx:3883-3887`): ein Neuladen leert sie. Und `pickUpToHand` (`GameTable.jsx:3193-3213`) nimmt eine Karte nur **lokal** vom Tisch — es gibt keine Nachricht dafür —, die anderen Tische und der Server behalten sie (**ein Fehler im Bestand, von M32 nicht berührt**). M31.17 hatte recht, die Heldentaten auf dem Tisch zu lassen.
+6. **Räume führen keine Aktionen** (M6 Nachtrag 2; `docs/m31-welle2-abnahme.md`, Durchlauf 2026-11-11, Befund 2): die Dorfphase, das Austeilen der Ereignisse und das Auffüllen der Hände geschehen im Raum **von Hand**. Zähler gleichen seit `7a2bf71` ab.
+7. **Wiedereinstieg gibt es nicht, und ein aktiver Raum überlebt keinen Neustart.** Die Spieler-ID steht in `sessionStorage` (`MultiplayerGame.jsx:15`, gesetzt in `GameDetail.jsx:3075-3087` und `StartScreen.jsx:122`): ein Neuladen im selben Tab geht (der WebSocket verbindet neu, `useGameRoom.js:109-132`, das `welcome` trägt den Zustand), ein neuer Tab nicht, und `join` nimmt nur Räume im Zustand `waiting` (`rooms.js:217`). **Aktive Räume werden beim Start des Servers nicht wiederhergestellt:** `getRoom` ist `null`, der WebSocket schließt mit 4004 (`roomWs.js:77-82`); der 30-Sekunden-Schnappschuss (`roomWs.js:179-193`) wird geschrieben und von nichts gelesen außer vom Beitritt zu einem Raum im Zustand `waiting` (`rooms.js:238-251`). Weil **jeder Push auf `master` ein Deploy ist** (`CLAUDE.md`), stirbt ein laufender Raum mit jedem Push. `DELETE …/leave` löscht den Spieler (`rooms.js:411-416`).
+8. **Spieler-IDs sind nicht geheim.** `GET /api/rooms/:code` liefert `SELECT * FROM room_players` samt `id` (`rooms.js:165-181`), das `welcome` die Spielerliste (`roomWs.js:100`); der WebSocket nimmt die ID aus der Adresse und prüft nur, dass **irgendeine** Sitzung gültig ist (`roomWs.js:55-69`, `84-88`). **Wer in einem Raum sitzt, kann sich mit der ID eines anderen verbinden und dessen `welcome` lesen.** (Dasselbe Muster wie die bekannte Lücke in `CLAUDE.md`: `start` vertraut der `player_id`.)
+9. **Was M31 für die Zuordnung schon liefert.** `lageOf(scenarioData, choices)` (`shared/villagers.js:200-246`) gibt `players` (S), `villagers` (D) und `kind`; seit `baa2bb5`/`081de15` ist derselbe Dörfler auf zwei Plätzen bei mehreren Spielern ein **Problem** (Nachtrag am Ende von M31, Welle 2) — jeder Platz hat dort also einen eigenen Dörfler, eine Hand und einen Topf (`Münzen Dörfler n`). Die Hand von Platz n ist die Zone `zhand<n>`; den Platz bestimmt `villagers.seats[n-1]` (M30/M31.8).
+
+### M32.2 — Ziel
+
+In einem Raum mit zwei bis fünf Spielern führt **jeder Spieler bestimmte Dörfler-Plätze**. Nur er bewegt, dreht und deckt auf, was in den Hand-Zonen **seiner** Plätze liegt; nur er sieht dort die verdeckten Vorderseiten (und der Server schickt sie den anderen nicht); alle sehen in jeder Hand die Rücken, die Farbe des Besitzers und wie viele Karten. **Alles andere am Tisch bleibt gemeinsam.** Solo, Hotseat und Räume ohne diese Wahl ändern sich nicht.
+
+### M32.3 — Eigentum: wer führt welchen Platz
+
+**Vier Schichten, jede kennt nur ihre Nachbarin** (so passt „in den Daten" zu „erst beim Beitritt"):
+
+| Schicht | Was sie weiß | Woher | Wann |
+|---|---|---|---|
+| Daten (Aufbau, statisch) | welche Zone zu **Platz n** gehört: `platz: n` an `zhand1` … `zhand5` | `zone_data` (M32.9) | einmal geschrieben |
+| Wahl (Dialog, je Raum) | Spielerzahl `S`, Dörflerzahl `D` | `setup_choices`, `lageOf` (M31.15) | beim Anlegen |
+| Raum (je Start) | wer Platz n führt: Spieler **Rang** `r(n)` | Sitzreihenfolge der Spieler | beim Start |
+| Spieler | seine Farbe | Anlegen/Beitritt (**besteht**, M32.1 Nr. 1) | beim Beitritt |
+
+**Die Regel (Vorschlag, Frage 2): Blöcke nach Rang.** Die Spieler werden nach Sitz sortiert (Rang 1 … S; **nach Reihenfolge, nicht nach Sitznummer** — Sitze haben Lücken, M32.1 Nr. 1). Platz `n` (1 … D) gehört dem Rang `⌊(n−1)·S / D⌋ + 1`. Das gibt zusammenhängende Blöcke, der Host zuerst, der größere Block vorn: (S/D) 2/2 → 1,2 · 2/3 → 1,1,2 · **2/4 → 1,1,2,2** · 3/4 → 1,1,2,3 · 3/5 → 1,1,2,2,3 · 2/5 → 1,1,1,2,2 · 5/5 → 1,2,3,4,5. *Verworfen:* (a) **Wahl in der Lobby** (jeder Platz ein Auswahlfeld, ein neuer Weg `POST /api/rooms/:code/owners`, eine Spalte, Abgleich beim Beitritt — mehr als der Nutzen bei zwei Spielern); (b) **reihum** (1,2,1,2): trennt die Tableaus, die nebeneinander liegen, von dem, der sie führt.
+
+**Wann:** `POST /api/rooms/:code/start` (`rooms.js:269`), **nach** dem Aufbau und **vor** dem Rundruf (zwischen 379 und 387), **nur** in den Lagen `mehrfach`/`normal` (`lageOf(...).kind`, M31.15) — dort verlangt der Start **genau `S` Spieler** im Raum (409 mit deutschem Satz, **vor** dem `active`, wie die Wache aus `FC`; Frage 3). In `solo` und ohne `villagers.lage` geschieht nichts.
+**Was:** der Raum bindet seine **Kopie** der Zonen (`liveRoom.zones`, 379): jede Zone mit `platz ≤ D` bekommt `color = Farbe des Eigentümers` und `exclusive = true`. `setups.zone_data` wird nie angefasst, und die Daten tragen **kein** `exclusive` und keine Farbe (Umkehr in `docs/tasks-m32-eigentum.md`, Entscheidung 2; Grund M32.1 Nr. 2d). Die Farbe ist die vorhandene: `ZoneOverlay` zeichnet die Zone und hebt die eigene hervor (`ZoneOverlay.jsx:25`, `myColor`), `cardTint` färbt die Karten darin (`shared/zoneGeometry.js:283`) — „eine Farbe je Spieler" ohne ein neues Feld.
+**Änderbar?** Nach dem Start **nein**. Vor dem Start zeigt die Lobby die Zuordnung (nur lesend, M32.11); ein anderer Zuschnitt heißt: der Raum wird anders besetzt (die Reihenfolge der Beitritte ist die Reihenfolge der Ränge).
+**Geht ein Eigentümer** (`DELETE …/leave`, `player_left`), wird seine Zone **offen**: die Wache fragt, ob zur Zonenfarbe noch ein Spieler im Raum ist. Ein Eigentümer, der nur **offline** ist, behält seine Zone gesperrt (er kommt zurück, `useGameRoom.js` verbindet neu; Frage 5).
+**Nichts wird gespeichert:** `S` und `D` stehen in `game_rooms.setup_choices`, die Sitze in `room_players` — die Zuordnung ist aus beidem jederzeit neu zu rechnen (eine künftige Wiederherstellung aktiver Räume, M32.8, bräuchte keine neue Spalte). Die Rechnung steht in **einer** Funktion (`shared/ownership.js`, M6), aus `server/test/` geprüft.
+
+### M32.4 — Was Eigentum verwehrt
+
+**Regel 1.** *Ein Spieler fasst eine Karte nur an, wenn weder ihr Ort **jetzt** noch ihr Ziel in der Hand-Zone eines anderen liegt.* **Regel 2 (für M32.5).** *Eine verdeckte Karte verlässt eine Hand-Zone nicht verdeckt* — erst aufdecken, dann herausnehmen. **Regel 3.** *Eine Zone, deren Eigentümer nicht mehr im Raum ist, ist offen* (M32.3).
+
+| Handlung (Nachricht, `messageHandler.js`) | in fremde Hand-Zone | aus fremder Hand-Zone | eigene Hand-Zone | übriger Tisch |
+|---|---|---|---|---|
+| `card_move` (116) | ✗ (besteht) | ✗ (**neu**, Mangel a) | ✓; heraus nur aufgedeckt (Regel 2) | ✓ |
+| `card_flip`, `card_rotate` (127, 138) | ✗ (besteht, nach Ort) | — | ✓ | ✓ |
+| `stack_take_top` Ziel (215), `stack_move` Ziel (186) | ✗ (**neu**, Mangel b) | — | ✓ | ✓ |
+| `stack_create` mit Karten (195) | — | ✗ (**neu**) | ✓ | ✓ |
+| `card_play_from_hand` (149) | ✗ (besteht) | — | ✓ | ✓ |
+| Zähler (`Münzen Dörfler n`), Token, Marker, Würfel, Notizen | **gemeinsam, nicht eingeschränkt** (Frage 4) | | | |
+
+**Eine Wache für alles:** `mayTouch` in `shared/ownership.js`, gerufen von den Handlern (die alte `isActionAllowed` ist ihr Sonderfall und verschwindet). Sie rechnet mit **aufgelösten** Zonen — `resolveZones(room.zones, anchorBoxes(boards, tokens))` aus dem **aktuellen** Raumzustand, wie `rooms.js:373` es für die Raster tut (`shared/anchoring.js:138`) —, sonst bleibt Mangel (c) bestehen; ein Tableau, das jemand verschiebt, nimmt seine Hand mit (`token_move` gleicht ab). Ein Punkt in mehreren Zonen gilt als fremd, sobald **eine** davon fremd ist (die alte Wache hat dieselbe Auslegung; keine Abhängigkeit von der Zeichenreihenfolge). **`exclusive` ohne Farbe** ist ab jetzt **kein Eigentümer** und sperrt niemanden (M32.1 Nr. 2d) — das ändert nur eine fehlerhafte Zone.
+**Ablehnung, die man sieht:** der Server antwortet dem Absender mit dem bestehenden `error` **und** mit dem **wahren Stand** in den vorhandenen Nachrichten (`card_move`/`card_flip`/`card_rotate`, nur an ihn) — sein Tisch springt zurück; an alle anderen geht **nichts**. Der Client zeigt `error` als Hinweis (heute ignoriert er ihn, M32.1 Nr. 2e). *Verworfen:* ein neues `rejected`, ein `board_sync` an den Absender (der ganze Zustand für eine Karte).
+**Wirkung auf andere Aufbauten:** Zonen mit `exclusive` und Farbe (die Voreinstellungen des Zoneneditors, `ZoneEditor.jsx:249-250`) verhalten sich wie dokumentiert („only owner may act"), jetzt auch beim Herausziehen und bei Stapeln. **Die Auslegung wird strenger, nicht anders** — und ist in `FL` getestet.
+
+### M32.5 — Was „geheim" technisch heißt
+
+**Ehrlich in drei Stufen.** Nur Stufe 2 und 3 sind Geheimhaltung im Sinne des Wortes.
+
+| Stufe | Was geschieht | Schützt vor | Schützt **nicht** vor |
+|---|---|---|---|
+| 0 (heute) | der Server schickt jede Vorderseite an jeden; der Client zeigt den Rücken | Hinsehen auf dem Bildschirm | dem Netzwerk-Fenster; jedem, der eine Karte umdreht (für alle) |
+| **1 — Rechte und Blick** (M32) | niemand außer dem Eigentümer fasst seine Karten an (M32.4); der Eigentümer **sieht** seine verdeckten Karten, ohne sie für alle umzudrehen (Client: Karte in eigener Hand-Zone wird aufgedeckt gezeichnet, mit Ring „nur du siehst es") | Versehen, Neugier am Bildschirm | dem Netzwerk-Fenster |
+| **2 — Sichtfilter am Server** (M32) | `welcome`, `room_started` (und `board_sync`) werden **je Spieler** gebaut: eine **verdeckte Karte in der Hand-Zone eines anderen** verliert Name, Bild, `cardId`, Kategorie — es bleibt, was zum Zeichnen eines Rückens nötig ist (Ort, Maße, Rückseite) | dem Netzwerk-Fenster, für diese Karten | **Karten, die später von Hand in die Hand kommen** (Stufe 3); einer absichtlich fremden Spieler-ID (M32.1 Nr. 8) |
+| 3 — Stapel und Aktionen (**nicht M32**) | auch die Stapel tragen für niemanden Vorderseiten; Aktionen laufen im Raum **auf dem Server**, der Server teilt aus und filtert | allem Obigen | (der Spieler-ID, solange sie öffentlich ist) |
+
+**Was Stufe 2 in TFT wirklich deckt:** die **Starthände** — der Aufbau teilt im Server drei verdeckte Heldentaten je Dörfler in die Hand-Zonen (M31.17), und `room_started` geht gefiltert hinaus. **Nicht gedeckt:** Karten, die ein Spieler später von Hand aus dem Heldentaten-Stapel in seine Hand-Zone zieht, und die Ereignisse der Dorfphase — beides geschieht im Raum von Hand (M32.1 Nr. 6), und **jeder Tisch trägt den Stapel mit allen Vorderseiten** (`welcome.board_state.stacks`). Das ist Stufe 3 (ein Meilenstein „Aktionen im Raum"; `hideFor` aus M32 ist sein Baustein: der Server teilt aus und schickt jedem seine Sicht). **Empfehlung: Stufe 1 und 2** (Frage 1).
+**Die Spieler-ID ist die Grenze** (M32.1 Nr. 8): wer sich mit der ID eines anderen verbindet, bekommt dessen Sicht. Ein Schutz dagegen wäre die Bindung der ID an das Konto oder ein geheimer Beitrittsschlüssel — **nicht Teil von M32**, bei einem Familien-Raum ein vertretbarer Rest (Offen und riskant, Nr. 2).
+**Aufdecken ist jetzt eine Handlung für alle.** Ein Eigentümer, der eine Karte in seiner Hand umdreht (`card_flip`, `face_down: false`), **deckt sie auf**: der Server schickt allen — auch ihm — die Vorderseite mit der Nachricht (`face: { cardId, name, image_path, … }`), der Client setzt sie in die Karte ein. Das alte „umdrehen, ansehen, zurückdrehen — für alle sichtbar" (M31.17) entfällt durch den Blick. **Wieder umgedreht** bleibt, was die anderen gesehen haben, in ihrem Speicher (so ist es am echten Tisch auch); der Sichtfilter greift beim nächsten `welcome` wieder.
+**Warum Regel 2** (verdeckt nicht herausnehmen): der Filter rechnet nach **Ort** (verdeckt **und** in fremder Zone). Käme eine verdeckte Karte unaufgedeckt heraus, läge sie beim nächsten Neuladen eines anderen Tisches offen im Zustand. Das Merkmal „war einmal geheim" am Kartenobjekt (`secretOf`) hielte das ohne Regel; es wäre ein neues Feld mit eigener Pflege an vier Stellen. *Umkehr, wenn die Regel stört.*
+
+### M32.6 — Der Sichtfilter und der Blick
+
+- **Server:** `hideFor(boardState, zones, color)` (`shared/ownership.js`, rein): gibt **dasselbe Objekt** zurück, wenn keine Zone einen Eigentümer hat (Beleg für M32.7), sonst eine flache Kopie, in der jede Karte mit `faceDown === true`, deren Ort in einer Zone mit anderer Farbe liegt, **nur noch eine Positivliste** behält: `tableId`, `x`, `y`, `zIndex`, `rotation`, `faceDown`, `face_up`, `width`, `height`, `card_back_id`, `gridId`, `cell`, `inStack`. *Positivliste, nicht „Name und Bild streichen":* die Karte trägt, was die Bibliothek hergibt (`category`, Beschreibungen, …); eine Streichliste verrät, was jemand später ergänzt. Fehlt dem Tisch etwas zum Zeichnen eines Rückens, zeigt es der Test (`FM`) an einer echten Fixture. `faceOf(card)` ist das Gegenstück: genau die gestrichenen Felder, und `{ ...gefiltert, ...faceOf(karte) }` gleicht der Karte.
+- **Wo gebaut wird:** `welcome` (`roomWs.js:97-106`), `room_started` (`rooms.js:387-392`, bisher **ein** Rundruf; künftig eine Nachricht je verbundenem Spieler, `sendToPlayer`) und `broadcastBoardSync` (`broadcast.js:34-39`, ungerufen, aber gleiche Tür). Der Server **hält** seinen vollen Zustand: Schnappschüsse (`snapshotAllRooms`, `roomWs.js:179`) und alles, was er rechnet, sehen die Vorderseiten.
+- **Aufdecken:** `card_flip` mit `face_down: false` von einem, der die Zone anfassen darf: der Server setzt `faceDown` und schickt **allen** `card_flip` mit `face` (die Auslieferung an den Absender ist neu, bisher `broadcast(…, playerId)`); `face_down: true` wie heute, ohne `face`.
+- **Client (Blick):** `seesFace(zones, card, myColor)` (`shared/ownership.js`, getestet): wahr für eine verdeckte Karte, die in einer Zone mit **meiner** Farbe und `exclusive` liegt. Der Tisch zeichnet solche Karten aufgedeckt und mit Ring (eine Stelle: dort, wo `tableCards` gezeichnet werden, `GameTable.jsx` ab 5168; Hover und Vergrößern bekommen dasselbe Objekt); der **Zustand** bleibt `faceDown: true`, ein Klick auf „Flip" deckt also wirklich auf. `card_flip` übernimmt `face` in die Karte (`GameTable.jsx:3719-3723`); `error` wird als Hinweis gezeigt. **Ohne Raum und ohne Farbe ist `seesFace` falsch** — der Hotseat-Tisch rechnet nichts anders.
+- **Die Zonen im `welcome`:** unverändert die rohe Liste, aber mit gebundener Farbe und `exclusive` (M32.3); der Client löst sie selbst auf (`GameTable.jsx:584`).
+
+### M32.7 — Solo, Hotseat, alte Räume: Zeichen für Zeichen wie heute
+
+Jede Zeile hat einen **Test, der es beweist** (M31.13-Stil), nicht eine Absicht:
+1. **Kein Raum** (Hotseat, `/games/<id>/play`): `room` ist `null`; `seesFace` ist falsch; kein Handler, kein Filter läuft. Gleichwertig mit dem Tisch vor M32.
+2. **Raum mit `solo`** (Dialog „1 Spieler", die Vorgabe `s1`): kein Eigentümer, `bindZones` gibt die Zonen unverändert zurück, `hideFor` **dasselbe Objekt** → `welcome` gleicht dem von heute (`deepEqual`). Zwei Menschen in einem Solo-Raum bleiben zwei Menschen am selben Tisch ohne Rechte.
+3. **Raum ohne `villagers.lage`** (jeder andere Aufbau; `lageOf` → `null`): dasselbe.
+4. **Daten ohne `platz`** (jeder Stand vor `FS`): dasselbe; **Code vor Daten ist folgenlos** — das ist der Schalter (M32.9). Ist die Lage `mehrfach`/`normal` und fehlt einem Platz die Hand-Zone mit `platz`, **startet der Raum trotzdem** und schreibt eine Warnung (wie ein Aufbauschritt, der nicht läuft, `rooms.js:358-364`).
+5. **Spielstände** tragen keine Zonen (M22); sie laden wie bisher.
+6. **Zwei Tabs im selben Browser** (`sessionStorage` je Tab) bleiben zwei Spieler.
+7. **Andere Aufbauten mit `exclusive` und Farbe** (Zoneneditor): strenger, nicht anders (M32.4).
+
+### M32.8 — Spielstand, Neuladen, Wiedereinstieg
+
+- **Neuladen im selben Tab:** der WebSocket verbindet neu, das `welcome` ist **je Spieler** gebaut, die Zuordnung steht im Raum (Zonenkopie) — der Eigentümer sieht seine Karten wieder, die anderen den Rücken. Nichts Neues zu bauen; **ein Test in `FP`** (schließen, neu verbinden, gleiche Sicht).
+- **Neustart des Servers (jeder Deploy):** der Raum ist weg (M32.1 Nr. 7); **M32 ändert nichts**, macht es aber auch nicht schwerer: die Zuordnung ist neu zu rechnen (M32.3). Eine Wiederherstellung aktiver Räume ist ein eigener Meilenstein und **braucht dann keine Spalte für M32**.
+- **Neuer Tab, anderes Gerät:** kein Weg zurück (M32.1 Nr. 7). Das war schon heute so; mit Eigentum ist es **teurer** — die gesperrte Hand bleibt gesperrt, solange der Spieler nicht geht (Regel 3 öffnet sie dann). *Nicht Teil von M32* (Frage 5 hält fest, was gilt).
+- **Speichern im Raum:** `getGameState` schreibt die **Sicht des Clients** (`GameTable.jsx:3931`); nach Stufe 2 trägt sie für fremde Hände **Rücken ohne Gesicht** — ein Spielstand mit leeren Händen, der beim Laden am Hotseat-Tisch Karten ohne Bild zeigte. **Vorschlag (Frage 6):** der Save-Knopf (`GameTable.jsx:6879`) ist in einem Raum **mit Eigentümern** gesperrt (Hinweis „im Raum mit Geheimhaltung nicht möglich"); ein Spielstand aus dem Raum ist ein eigener Weg (der Server speichert seinen vollen Zustand), kein Teil von M32. Auto-Save ist im Raum ohnehin aus (`GameTable.jsx:3971`).
+
+### M32.9 — Daten: eine Bindung, ein Schalter
+
+**Ein Feld, fünf Zonen.** `platz: n` (ganze Zahl, 1-basiert, = Index in `villagers.seats` + 1) an `zhand1` … `zhand5`. Mehr nicht: kein `exclusive`, keine Farbe (M32.3), **kein Aufbauschritt, keine Aktion ändert sich** (Heldentaten und Ereignisse werden wie in M31 ausgeteilt). Ein Platz ohne Dörfler (`facingAway`, M31.8) hat keine sichtbare Hand und keinen Eigentümer (`n > D`).
+**Ein Datenschritt `eigentum`** in `scripts/doerflerzahl-daten.mjs` (zehnter Schritt, dieselbe Vorlage: Vorbedingung je Stück, `--check`, `--write … --sicherung-sha`, `--zurueck`, kein `--force`, Rückwärtsbeweis, ein zweiter Lauf schreibt nichts). Er schreibt **`zone_data`** und sonst nichts; **Ausgang = Zielstand von `haende`** (Zahlen entstehen beim Bauen, M31.20). **Er ist der Schalter:** vorher tut der Code nichts (M32.7 Nr. 4), hinterher greift Eigentum in jedem **neuen** Raum mit `S ≥ 2` (ein laufender Raum liest seine Zonen nur beim Start, `rooms.js:316`). Danach melden `--check` von `zonen` und `haende` `ABWEICHEND` — der erwartete Stand, wie in M31.
+*Warum ein Feld und nicht das Namensmuster `zhand<n>`:* das spart den Datenschritt, aber ein umbenanntes Label oder eine neu angelegte Hand-Zone macht das Eigentum **lautlos** wirkungslos — eine Sicherheitseigenschaft, die still ausfällt. Das Feld überlebt `resolveZones` (`...rest`, `shared/anchoring.js:149-157`) und den Editor (gespreizt); `FS` prüft es. Ein Editor-Schalter für `platz` ist **nicht** Teil von M32.
+
+### M32.10 — Bewusst nicht Teil davon
+
+1. **Stufe 3** — Stapel ohne Vorderseiten, Aktionen im Raum auf dem Server (M32.5). Eigener Meilenstein; `hideFor` ist sein Baustein.
+2. **Verdeckte Token** (die Bosseleiste: `frontImageUrl` und `label` im Zustand) — dieselbe Klasse wie die Karten, eigener Schritt.
+3. **Bindung der Spieler-ID** an Konto oder Beitrittsschlüssel (M32.1 Nr. 8).
+4. **Wiedereinstieg** (neuer Tab, `localStorage`) und **Wiederherstellung aktiver Räume** (M32.1 Nr. 7).
+5. **Spielstand aus dem Raum** (M32.8).
+6. **Rechte an Töpfen, Tableaus, Markern, Wertleisten, „Erfüllte Heldentaten", Auslage** (Frage 4) und ein „Münzen übergeben".
+7. **Zuordnung wählen oder tauschen** (Lobby, Dialog, Host) — nur Blöcke (Frage 2).
+8. **Ein Editor-Schalter für `platz`**, eine Rundenfolge („wer ist dran"), Zuschauer.
+9. **`pickUpToHand` im Raum** (kein Server-Weg, M32.1 Nr. 5) — ein Bestandsfehler, der mit Eigentum nicht schlimmer wird, aber auch nicht verschwindet.
+10. **Kein Aufbauschritt, keine Aktion, kein Dialogfeld** ändert sich; die Spielerzahl bleibt die Option `spieler` (M31.15).
+
+### M32.11 — Zielstand, Reihenfolge, Schreiben
+
+| Stück | Ort | Was | Aufgabe |
+|---|---|---|---|
+| Zuordnung, Zonenbindung, Wache, Sichtfilter, Blick | `shared/ownership.js` (neu) | **eine** Stelle (M6): `ownersOf`, `bindZones`, `mayTouch`, `hideFor`, `faceOf`, `seesFace` | `FK`–`FM` |
+| Raumstart | `server/src/routes/rooms.js` | genau `S` Spieler (409), Zuordnung, Zonenkopie, `room_started` je Spieler, `GET /api/rooms/:code` nennt Lage und Zuordnung | `FN` |
+| Handler, `welcome` | `messageHandler.js`, `roomWs.js` | Wache an allen Stellen der Tabelle M32.4, Zurückspringen, Aufdecken mit `face` | `FO` |
+| Beleg | `server/test/room-two-players.test.js` | zwei echte Verbindungen: Start, Zug, Ablehnung, Aufdecken, Neuverbinden | `FP` |
+| Client | `GameTable.jsx`, `RoomLobby.jsx` | Blick, `error`, `face`, Save gesperrt, Lobby: „n/S", Zuordnung, Start erst bei `S` | `FQ` |
+| Daten | `zone_data` | `platz` an fünf Zonen — **der Schalter** | `FS` |
+
+**Reihenfolge:** Code `FK` → `FL` → `FM` (rein, parallel möglich) → `FN` → `FO` → `FP` → `FQ` → **Deploy `FR`** → Daten `FS` (Teil 1 darf vorher, Teil 2 erst nach `FR`) → `FT`. **Jeder Push auf `master` ist ein Deploy** (`CLAUDE.md`): der Code ist ohne `platz` folgenlos (M32.7), also darf er in Schritten live gehen — **an der Quelle zu prüfen, nicht nach der Form der Daten** (M31.12-Nachtrag: `ES` war es nicht). **Schreiben nur mit ausdrücklicher Freigabe, ein Lauf, vorher Sicherung, kein `--force`** (`docs/datenzugriff.md`). Rückweg: `--zurueck --schritt eigentum`; danach tut der Code wieder nichts.
+
+### M32.12 — Abnahme, und was offen und riskant bleibt
+
+**Abnahme.** (Zahlen entstehen beim Bauen.)
+1. **Vorgabe `s1`, jeder Raum ohne die Wahl, Hotseat:** wie vor M32 (M32.7, Tests).
+2. **Raum, 2 Spieler, 4 Dörfler:** der Start mit **einem** Spieler meldet auf Deutsch „braucht 2 Spieler" und startet nicht; mit zweien startet er; die Lobby zeigt vorher „Platz 1–2 → Spieler 1, Platz 3–4 → Spieler 2". Die Hand-Zonen 1–2 sind in der Farbe des Hosts, 3–4 in der des Gastes gezeichnet; die eigenen sind hervorgehoben.
+3. **Rechte:** der Gast zieht eine Karte aus der Hand des Hosts → sie springt zurück, ein Hinweis erscheint; er dreht sie nicht um, legt nichts hinein; der Host bewegt und dreht seine; eine **verdeckte** Karte aus der eigenen Hand ziehen → springt zurück, „erst aufdecken"; aufgedeckt geht es.
+4. **Geheim:** im Netzwerk-Fenster des Gastes trägt das `welcome` für die verdeckten Karten in der Hand des Hosts **weder Name noch Bild noch `cardId`**; der Host sieht seine drei Heldentaten je Hand aufgedeckt mit Ring, der Gast Rücken. Der Host deckt eine auf → der Gast sieht sie.
+5. **Neuladen** des Gast-Tabs: dieselbe Sicht, dieselben Rechte.
+6. **Ein Spieler geht:** seine Hand-Zonen sind für den anderen offen.
+7. **Gespielt:** zwei Browser, zwei Spieler, vom Anlegen bis zum ersten Zug (M31 Abnahme Punkt 7 war schon einmal der Punkt, den noch niemand gespielt hatte).
+8. **Tests:** `cd server && npm test` grün (am Anfang **neu messen**); `cd client && npx vite build` ohne **neue** Warnung.
+
+**Offen und riskant:**
+1. **Stufe 2 ist nur für die Starthände echt** (M32.5): was später von Hand in die Hand kommt, ist am Draht sichtbar, bis Stufe 3 gebaut ist.
+2. **Die Spieler-ID ist nicht geheim** (M32.1 Nr. 8): ein Mitspieler, der sich als ein anderer verbindet, sieht dessen Karten. Vertretbar im Familien-Raum, **nicht** vor Fremden.
+3. **Ohne Wiedereinstieg** (neuer Tab) und **ohne Wiederherstellung** (Deploy) bleibt ein Raum an seinen Verbindungen hängen; mit gesperrten Händen fällt es mehr auf (M32.8). Jeder Push beendet laufende Räume.
+4. **Die Wache rechnet mit aufgelösten Zonen aus dem Raumzustand** (M32.4): sie hängt an der Synchronisation der Tableau-Token (`token_move`); ein Tableau, das nicht abgeglichen wird, nimmt seine Hand nicht mit.
+5. **Die Färbung der Hand-Zonen** färbt die Karten darin (`cardTint`) — eine sichtbare Änderung der Hand-Zonen im Raum, **Sichtprüfung**.
+6. **Blöcke nach Rang sind eine Entscheidung, keine Regel** (M32.3): der Doppel-Modus kennt nur „2 × 2"; für `2/3`, `3/5` gibt es keinen Regeltext (M31.19 Nr. 2).
+7. **Strengere Auslegung von `exclusive`** (M32.4) betrifft jeden Aufbau mit Spielerzonen; in der Produktion gibt es nach bisheriger Messung keinen, **nicht nachgemessen**.
+
+### Offene Fragen an den Auftraggeber
+
+Höchstens sechs, die wichtigste zuerst; zu jeder die **Empfehlung**. Bis zur Antwort baut `docs/tasks-m32-eigentum.md` nach der Empfehlung.
+
+**Frage 1 — Wie weit soll „geheim" gehen?** *(A)* nur **Rechte und Blick** (Stufe 1; Versehen und Neugier am Bildschirm, nicht das Netzwerk-Fenster); *(B)* dazu der **Sichtfilter am Server** (Stufe 2; echt für die Starthände, nicht für später von Hand gezogene Karten); *(C)* dazu **Stapel und Aktionen auf dem Server** (Stufe 3; eigener, großer Meilenstein). **Empfehlung: B.** Es ist das Kleinste, das „der Server schickt die Vorderseite nicht" wahr macht, und es ist der Baustein für C; A allein hieße, „geheim" bliebe eine Darstellung. Die Grenze, die auch B nicht schließt: **Spieler-IDs sind nicht geheim**, und das Nachziehen von Hand ist nicht gedeckt — beides steht in „Offen und riskant".
+**Frage 2 — Wer führt welchen Platz, und wer entscheidet das?** *(A)* **automatisch in Blöcken nach der Reihenfolge der Beitritte** (Host zuerst); *(B)* Wahl in der Lobby; *(C)* Wahl im Dialog beim Anlegen. **Empfehlung: A**, nach dem Start nicht änderbar; die Lobby **zeigt** die Zuordnung vorher. Bei zwei Spielern ist die Besetzung der Raum selbst; B und C kosten einen Weg, eine Spalte und einen Abgleich beim Beitritt für einen Fall, der sich mit „wer zuerst kommt" lösen lässt.
+**Frage 3 — Wann greift Eigentum, und muss die Raumgröße zur Spielerzahl passen?** Eigentum greift **nur**, wenn im Dialog **„Spieler" ≥ 2** gewählt ist (Lage `mehrfach`/`normal`), **nicht** aus der Zahl der Beitretenden. Der Start verlangt dann **genau `S` Spieler** (409, deutsch, vor dem `active`). **Empfehlung: ja.** Sonst gäbe es Plätze ohne Eigentümer oder Spieler ohne Platz, und der Raum „ohne Wahl" (Vorgabe `s1`) bliebe wie heute — **mit der Folge, dass wer Eigentum will, „Spieler" im Dialog wählen muss.**
+**Frage 4 — Was gehört einem Spieler?** *(A)* **nur die Hand-Zonen** seiner Plätze; *(B)* dazu Töpfe, Tableau-Marker, Wertleisten, „Erfüllte Heldentaten". **Empfehlung: A.** Nur die Hände haben etwas zu verbergen; Münzen werden übergeben und Marker bei Absprachen gesetzt (TFT ist kooperativ), und jede Sperre brauchte eine Bindung Zähler/Marker → Platz und einen Weg „übergeben". Kippt es, ist `platz` an weitere Zonen zu schreiben (Daten) und `mayTouch` auf Zähler zu erweitern.
+**Frage 5 — Was geschieht mit der Hand eines Spielers, der geht oder verschwindet?** **Empfehlung:** *geht* (`leave`) → die Hand wird **offen** (jeder kann sie bewegen und aufdecken); *offline* (Tab zu, Netz weg) → bleibt **gesperrt**, er kommt zurück; **kein Eingriff des Hosts** in M32. Ein Spieler, dessen Tab verloren ist, kann heute nicht zurück (M32.1 Nr. 7) — das löst erst ein Wiedereinstieg (eigener Meilenstein).
+**Frage 6 — Speichern im Raum mit Eigentümern?** *(A)* der Save-Knopf ist dort **gesperrt**; *(B)* er bleibt und speichert die Sicht des Klicks (Spielstand mit leeren Händen). **Empfehlung: A.** Ein Spielstand mit Karten ohne Bild ist schlimmer als keiner; ein Spielstand aus dem Raum ist ein eigener Weg (der Server speichert seinen vollen Zustand).
