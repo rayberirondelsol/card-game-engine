@@ -300,3 +300,18 @@ test('Close-Code 4000 (von einem anderen Tab ersetzt): der Hook verbindet nicht 
   // der 4000-Zweig kehrt zurueck, **bevor** scheduleReconnect() aufgerufen wird
   assert.ok(rumpf.indexOf('return;', rumpf.indexOf('4000')) < rumpf.indexOf('scheduleReconnect()'));
 });
+
+test('Close-Code 4000: der Hook meldet `replaced`, `MultiplayerGame` zeigt den Hinweis mit „Hier weiterspielen“ (Reload)', () => {
+  const start = HOOK.indexOf('ws.onclose');
+  const rumpf = HOOK.slice(start, HOOK.indexOf('ws.onerror', start));
+  assert.match(HOOK, /const \[replaced, setReplaced\] = useState\(false\)/);
+  // nur der 4000-Zweig setzt es – und zwar vor dem return, sonst bliebe der Tab stumm
+  assert.ok(rumpf.indexOf('setReplaced(true)') > rumpf.indexOf('4000'));
+  assert.ok(rumpf.indexOf('setReplaced(true)') < rumpf.indexOf('return;', rumpf.indexOf('4000')));
+  assert.match(HOOK.slice(HOOK.indexOf('  return {')), /\breplaced,/);
+  assert.match(MP, /\breplaced,\n/);
+  assert.match(MP, /\{replaced && \(/);
+  assert.match(MP, /Dieser Raum ist in einem anderen Tab geöffnet/);
+  assert.match(MP, /window\.location\.reload\(\)/);
+  assert.match(MP, /Hier weiterspielen/);
+});

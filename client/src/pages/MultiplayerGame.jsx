@@ -50,6 +50,7 @@ export default function MultiplayerGame() {
 function MultiplayerGameInner({ code, playerId, gameId, setupId, roomRef }) {
   const {
     connected,
+    replaced,
     players,
     boardState,
     zones,
@@ -86,5 +87,22 @@ function MultiplayerGameInner({ code, playerId, gameId, setupId, roomRef }) {
     registerActionHandler: (fn) => { roomRef.current.onAction = fn; },
   };
 
-  return <GameTable room={room} />;
+  return (
+    <>
+      <GameTable room={room} />
+      {replaced && (
+        <div className="fixed inset-0 z-[1000] bg-slate-950/90 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-amber-500 rounded-lg p-6 max-w-sm text-center">
+            <p className="text-white text-lg font-semibold mb-4">Dieser Raum ist in einem anderen Tab geöffnet.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded"
+            >
+              Hier weiterspielen
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

@@ -19,7 +19,7 @@ const CURSOR_THROTTLE_MS = 33; // ~30fps
  * useGameRoom – manages the WebSocket lifecycle for a multiplayer room.
  *
  * Returns:
- *   { connected, players, boardState, zones, grids, hand, handVersion, sendAction,
+ *   { connected, replaced, players, boardState, zones, grids, hand, handVersion, sendAction,
  *     remoteCursors, myPlayer }
  *
  * `hand` ist die **eigene** private Hand aus dem letzten `welcome` (M32.6: der Server hält sie), `handVersion`
@@ -27,6 +27,7 @@ const CURSOR_THROTTLE_MS = 33; // ~30fps
  */
 export function useGameRoom(roomCode, myPlayerId, onMessage) {
   const [connected, setConnected] = useState(false);
+  const [replaced, setReplaced] = useState(false);
   const [players, setPlayers] = useState([]);
   const [boardState, setBoardState] = useState(null);
   const [zones, setZones] = useState([]);
@@ -119,7 +120,7 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
       wsRef.current = null;
       // 4000: derselbe Spieler hat sich anderswo (zweiter Tab) verbunden. Neu verbinden wuerde den anderen
       // Tab wieder hinauswerfen – zwei Tabs mit gleicher player_id schaukelten sich ewig hoch.
-      if (event.code === 4000) return;
+      if (event.code === 4000) { setReplaced(true); return; }
       scheduleReconnect();
     };
 
@@ -172,6 +173,7 @@ export function useGameRoom(roomCode, myPlayerId, onMessage) {
 
   return {
     connected,
+    replaced,
     players,
     boardState,
     zones,
