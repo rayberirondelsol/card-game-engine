@@ -23,7 +23,7 @@ import { getPointerPosition, handleTouchPrevention, isTouchEvent, getDeviceInfo,
 import { triggerHaptic, cancelHaptic } from '../utils/hapticUtils';
 import { apiFetch } from '../utils/api';
 import { menuPlacement, closesMenu } from '../utils/menuPlacement.js';
-import { revealZones, revealPlan } from '../utils/revealToZone.js';
+import { revealZones, revealPlan, dissolveLeftover } from '../utils/revealToZone.js';
 import { swapChoices, swapAction } from '../utils/swapVillager.js';
 import { hasVillagers } from '../../../shared/villagers.js';
 import { zoneOccupants } from '../utils/stackDrag.js';
@@ -4557,7 +4557,9 @@ export default function GameTable({ room = null }) {
   function revealTopCardToZone(stackId, zoneLabel) {
     if (room) { revealInRoom(stackId, zoneLabel); return; }
     const plan = revealPlan(getGameState(), stackId, zoneLabel);
-    const { state: next, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
+    const { state: ran, log } = executeSequenceWithLog(plan.state, plan.steps, zones, { grids });
+    // Ein namenloser Haufen mit einer Restkarte ist keiner mehr (der Executor laesst nur benannte Decks im Deck).
+    const next = plan.tempLabel ? dissolveLeftover(ran, stackId) : ran;
     loadGameState(next);
     // M21.1: die aufgedeckte Karte tritt dem Haufen bei, wenn die Zielzone ein
     // Ablagestapel ist - dieselbe Regel wie beim Ablegen von Hand, dieselbe

@@ -80,3 +80,24 @@ export function revealPlan(state, stackId, zoneLabel) {
     tempLabel: named ? null : stackLabel,
   };
 }
+
+/**
+ * Ein Stapel aus einer Karte ist keiner (Regel aller Stapelgriffe, `dissolveLeftovers` in `stackOps.js`): bleibt nach
+ * dem Aufdecken genau eine Karte im Stapel `stackId`, liegt sie lose an seiner Stelle.
+ *
+ * Das ist **nicht** im Executor, weil `deal_to_zone` den Rest eines *benannten* Decks absichtlich im Deck laesst
+ * (Nachschub und Verhaltensdeck werden ueber ihren Namen weiter angesprochen, auch mit der letzten Karte). Der Tisch
+ * ruft das nur fuer einen namenlosen Haufen (`plan.tempLabel`), den der Griff selbst benannt hat.
+ *
+ * @returns {object} `state` selbst, wenn nichts zu tun ist; sonst eine Kopie mit der Restkarte in `cards`.
+ */
+export function dissolveLeftover(state, stackId) {
+  const stack = (state?.stacks ?? []).find(s => s?.stackId === stackId);
+  if (stack?.cards?.length !== 1) return state;
+  const [card] = stack.cards;
+  return {
+    ...state,
+    stacks: state.stacks.filter(s => s !== stack),
+    cards: [...state.cards, { ...card, x: stack.x, y: stack.y, inStack: null }],
+  };
+}

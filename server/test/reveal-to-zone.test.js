@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { revealZones, revealPlan } = await import('../../client/src/utils/revealToZone.js');
+const { revealZones, revealPlan, dissolveLeftover } = await import('../../client/src/utils/revealToZone.js');
 const { executeSequenceWithLog } = await import('../../shared/sequenceExecutor.js');
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -111,6 +111,34 @@ test('Plan + Executor legen die oberste Karte offen auf die Ablage', () => {
   assert.equal(state.cards[0].name, 'K2', 'die oberste');
   assert.equal(state.cards[0].faceDown, false);
   assert.equal(state.stacks[0].cards.length, 1, 'der Rest bleibt liegen');
+});
+
+// ── Ein Stapel aus einer Karte ist keiner ────────────────────────────────────
+
+test('Solo: bleibt nach dem Aufdecken eines namenlosen Stapels eine Karte, liegt sie lose an seiner Stelle', () => {
+  // Der Befund (Produktion): zwei Karten, „Reveal Top Card to …" - die oberste
+  // ging offen in die Zone, die andere blieb als „Stapel" mit einer Karte. Der
+  // Executor laesst den Rest eines *benannten* Decks absichtlich im Deck (siehe
+  // oben: „der Rest bleibt liegen" - Nachschub und Verhaltensdeck werden ueber
+  // ihren Namen weiter angesprochen); ein namenloser Haufen hat keinen Namen,
+  // den jemand adressieren koennte, und folgt der Regel der Stapelgriffe.
+  const plan = revealPlan(table(null), 's1', 'Ablage');
+  const { state } = executeSequenceWithLog(plan.state, plan.steps, [ABLAGE]);
+  const next = dissolveLeftover(state, 's1');
+
+  assert.equal(next.stacks.length, 0, 'ein Stapel aus einer Karte ist keiner');
+  const rest = next.cards.find(c => c.name === 'K1');
+  assert.ok(rest, 'die Restkarte liegt lose am Tisch');
+  assert.ok(!rest.inStack, 'sie gehoert zu keinem Stapel mehr');
+  assert.deepEqual([rest.x, rest.y], [0, 0], 'an der Stelle des Stapels');
+  assert.equal(next.cards.find(c => c.name === 'K2').faceDown, false, 'die aufgedeckte bleibt, wie sie ist');
+});
+
+test('dissolveLeftover laesst Stapel mit zwei oder mehr Karten und unbekannte Ids in Ruhe', () => {
+  const state = table(null);
+  state.stacks[0].cards.push({ tableId: 't3', cardId: 'c3', name: 'K3', zIndex: 3 });
+  assert.equal(dissolveLeftover(state, 's1'), state);
+  assert.equal(dissolveLeftover(state, 'weg'), state);
 });
 
 // ── M11.5: das Menü fragt die Seite ──────────────────────────────────────────
